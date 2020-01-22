@@ -1485,6 +1485,7 @@ func (w *Worker) GetFiatRatesForTimestamps(timestamps []int64, currencies []stri
 	if len(timestamps) == 0 {
 		return nil, NewAPIError("No timestamps provided", true)
 	}
+	currencies = removeEmpty(currencies)
 
 	ret := &db.ResultTickersAsString{}
 	for _, timestamp := range timestamps {
