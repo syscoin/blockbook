@@ -208,7 +208,7 @@ func (m *ProtoTransaction_WitnessAddressType) GetVersion() byte {
 	if m != nil {
 		return m.Version
 	}
-	return nil
+	return 0
 }
 
 func (m *ProtoTransaction_WitnessAddressType) GetWitnessProgram() []byte {
