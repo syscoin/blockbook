@@ -688,7 +688,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if !ok {
-			balanceAssetAllocatedSat = &big.NewInt(0) 
+			balanceAssetAllocatedSat.Set(big.NewInt(0))
 		}
 		strAddrDescriptors = append(strAddrDescriptors, strAddrDesc)
 		var amount big.Int
@@ -713,7 +713,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	sentAssetAllocatedSat := balance.SentAssetAllocatedSat[outputPackage.AssetGuid]
 	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[outputPackage.AssetGuid]
 	if !ok {
-		balanceAssetAllocatedSat = &big.NewInt(0) 
+		balanceAssetAllocatedSat.Set(big.NewInt(0))
 	}
 	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, &outputPackage.TotalAssetSentValue)
 	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, &outputPackage.TotalAssetSentValue)
@@ -806,7 +806,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if chainType == bchain.ChainSyscoinType {
 					isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
 					if isSyscoinTx {
-						outputPackage = d.ConnectSyscoinOutputs(output.ScriptPubKey, balances, tx.Version)
+						outputPackage = d.ConnectSyscoinOutputs(d.chainParser.GetScriptFromAddrDesc(addrDesc), balances, tx.Version)
 						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
 							// for each address returned, add it to map
 							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
@@ -894,7 +894,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				}
 				if chainType == bchain.ChainSyscoinType {
 					if string(outputPackage.AssetSenderAddrDesc) == string(spentOutput.AddrDesc) {
-						d.ConnectSyscoinInputs(outputPackage, &balance)
+						d.ConnectSyscoinInputs(outputPackage, balance)
 					}
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
