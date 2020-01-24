@@ -129,6 +129,14 @@ func (p *SyscoinParser) IsAssetAllocationTx(nVersion uint32) bool {
 func (p *SyscoinParser) IsSyscoinTx(nVersion uint32) bool {
     return p.IsAssetTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }
+// IsAddrDescIndexable returns true if AddressDescriptor should be added to index
+// empty or OP_RETURN scripts are not indexed if not sys tx
+func (p *SyscoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor, version uint32) bool {
+	if !p.IsSyscoinTx(version) && (len(addrDesc) == 0 || addrDesc[0] == txscript.OP_RETURN) {
+		return false
+	}
+	return true
+}
 // TryGetOPReturn tries to process OP_RETURN script and return data
 func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	if len(script) > 1 && script[0] == txscript.OP_RETURN {
@@ -240,7 +248,7 @@ func (p *SyscoinParser) ConnectAssetAllocationInput(outputPackage bchain.Syscoin
 	return true
 
 }
-func (p *SyscoinParser) ConnectOutputs(d *RocksDB, script []byte, balances map[string]*db.AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
+func (p *SyscoinParser) ConnectSyscoinOutputs(d *RocksDB, script []byte, balances map[string]*db.AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
 	sptData := p.TryGetOPReturn(script)
 	if sptData == nil {
 		return nil, nil
@@ -249,7 +257,7 @@ func (p *SyscoinParser) ConnectOutputs(d *RocksDB, script []byte, balances map[s
 		return p.ConnectAssetAllocationOutput(d, sptData, balances, version)
 	}
 }
-func (p *SyscoinParser) ConnectInputs(outputPackage bchain.SyscoinOutputPackage, balance *db.AddrBalance) bool {
+func (p *SyscoinParser) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *db.AddrBalance) bool {
 	if p.IsAssetAllocationTx(outputPackage.Version) {
 		return p.ConnectAssetAllocationInput(outputPackage, balance)
 	}
