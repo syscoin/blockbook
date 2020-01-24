@@ -190,7 +190,7 @@ type Erc20Transfer struct {
 
 // Syscoin function return package given from ConnectOutputs in SyscoinParser, used to pass into ConnectInputs
 type SyscoinOutputPackage struct {
-	Version uint32
+	Version int32
 	AssetGuid uint32
 	TotalAssetSentValue big.Int
 	AssetSenderAddrDesc AddressDescriptor

@@ -635,7 +635,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) ConnectAssetAllocationOutput(sptData []bytes, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
+func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	var pt ProtoTransaction_AssetAllocationType
 	err := proto.Unmarshal(sptData, &pt)
 	if err != nil {
@@ -722,7 +722,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	return true
 
 }
-func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
+func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	sptData := d.chainParser.TryGetOPReturn(script)
 	if sptData == nil {
 		return nil, nil
@@ -1433,7 +1433,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *Block
 
 // Disconnect blocks
 
-func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, version uint32, height uint32, btxID []byte, inputs []outpoint, txa *TxAddresses,
+func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, version int32, height uint32, btxID []byte, inputs []outpoint, txa *TxAddresses,
 	txAddressesToUpdate map[string]*TxAddresses, balances map[string]*AddrBalance) error {
 	var err error
 	var balance *AddrBalance
