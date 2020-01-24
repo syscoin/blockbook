@@ -639,7 +639,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*TxAddresses, len(block.Txs))
 	chainType := d.chainParser.GetChainType()
-	var outputPackage SyscoinOutputPackage
+	var outputPackage bchain.SyscoinOutputPackage
 	// first process all outputs so that inputs can refer to txs in this block
 	for txi := range block.Txs {
 		tx := &block.Txs[txi]

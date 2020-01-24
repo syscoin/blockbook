@@ -4,6 +4,7 @@ import (
 	"blockbook/bchain"
 	"blockbook/bchain/coins/btc"
 	"blockbook/bchain/coins/utils"
+	"blockbook/db"
 	"bytes"
 
 	"github.com/martinboehm/btcd/wire"
@@ -115,17 +116,17 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 	}, nil
 }
 
-func (p *SyscoinParser) IsSyscoinMintTx(uint32 nVersion) bool {
+func (p *SyscoinParser) IsSyscoinMintTx(nVersion uint32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_MINT
 }
-func (p *SyscoinParser) IsAssetTx(uint32 nVersion) bool {
+func (p *SyscoinParser) IsAssetTx(nVersion uint32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE || nVersion == SYSCOIN_TX_VERSION_ASSET_UPDATE || nVersion == SYSCOIN_TX_VERSION_ASSET_TRANSFER || nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
 }
-func (p *SyscoinParser) IsAssetAllocationTx(uint32 nVersion) bool {
+func (p *SyscoinParser) IsAssetAllocationTx(nVersion uint32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN || nVersion == SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION ||
         nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_LOCK
 }
-func (p *SyscoinParser) IsSyscoinTx(uint32 nVersion) bool {
+func (p *SyscoinParser) IsSyscoinTx(nVersion uint32) bool {
     return p.IsAssetTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }
 // TryGetOPReturn tries to process OP_RETURN script and return data
@@ -149,10 +150,10 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 // GetChainType is type of the blockchain, default is ChainBitcoinType
-func (p *SyscoinParser) GetChainType() ChainType {
-	return ChainSyscoinType
+func (p *SyscoinParser) GetChainType() bchain.ChainType {
+	return bchain.ChainSyscoinType
 }
-func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes, balances map[string]*AddrBalance, version uint32) (*SyscoinOutputPackage, error) {
+func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes, balances map[string]*db.AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
 	var pt ProtoTransaction_AssetAllocationType
 	err := proto.Unmarshal(sptData, &pt)
 	if err != nil {
@@ -169,7 +170,7 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 		} else {
 			glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping asset sender addrDesc of length %d", block.Height, tx.Txid, i, len(assetSenderAddrDesc))
 		}
-		continue
+		return nil, nil
 	}
 	listSendingAllocationAmounts := pt.GetListSendingAllocationAmounts();
 	strAddrDescriptors := make([]string, 0, len(listSendingAllocationAmounts))
@@ -194,7 +195,7 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 				return nil, err
 			}
 			if balance == nil {
-				balance = &AddrBalance{}
+				balance = &db.AddrBalance{}
 			}
 			balances[strAddrDesc] = balance
 		}
@@ -211,7 +212,7 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 		totalAssetSentValue.Add(&totalAssetSentValue, &amount)
 		balance.BalanceAssetAllocatedSat[pt.assetAllocationTuple.Asset] = balanceAssetAllocatedSat
 	}
-	return &SyscoinOutputPackage{
+	return &bchain.SyscoinOutputPackage{
 		Version: version,
 		AssetGuid: pt.assetAllocationTuple.Asset,
 		TotalAssetSentValue: totalAssetSentValue,
@@ -219,7 +220,7 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 		AssetReceiverStrAddrDesc: strAddrDescriptors,
 	}, nil
 }
-func (p *SyscoinParser) ConnectAssetAllocationInput(outputPackage SyscoinOutputPackage, balance *AddrBalance) bool {
+func (p *SyscoinParser) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutputPackage, balance *db.AddrBalance) bool {
 	
 	if balance.SentAssetAllocatedSat == nil{
 		balance.SentAssetAllocatedSat = map[uint32]big.Int{}
@@ -239,7 +240,7 @@ func (p *SyscoinParser) ConnectAssetAllocationInput(outputPackage SyscoinOutputP
 	return true
 
 }
-func (p *SyscoinParser) ConnectOutputs(d *RocksDB, script []byte, balances map[string]*AddrBalance, version uint32) (*SyscoinOutputPackage, error) {
+func (p *SyscoinParser) ConnectOutputs(d *RocksDB, script []byte, balances map[string]*db.AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
 	sptData := p.TryGetOPReturn(script)
 	if sptData == nil {
 		return nil, nil
@@ -248,7 +249,7 @@ func (p *SyscoinParser) ConnectOutputs(d *RocksDB, script []byte, balances map[s
 		return p.ConnectAssetAllocationOutput(d, sptData, balances, version)
 	}
 }
-func (p *SyscoinParser) ConnectInputs(outputPackage SyscoinOutputPackage, balance *AddrBalance) bool {
+func (p *SyscoinParser) ConnectInputs(outputPackage bchain.SyscoinOutputPackage, balance *db.AddrBalance) bool {
 	if p.IsAssetAllocationTx(outputPackage.Version) {
 		return p.ConnectAssetAllocationInput(outputPackage, balance)
 	}
