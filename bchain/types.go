@@ -194,7 +194,7 @@ type SyscoinOutputPackage struct {
 	AssetGuid uint32,
 	TotalAssetSentValue big.Int,
 	AssetSenderAddrDesc AddressDescriptor,
-	AssetReceiverStrAddrDesc []string
+	AssetReceiverStrAddrDesc []string,
 }
 
 // MempoolTxidEntry contains mempool txid with first seen time
