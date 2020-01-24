@@ -95,7 +95,7 @@ func (p *BitcoinParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor)
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // empty or OP_RETURN scripts are not indexed
-func (p *BitcoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor, version uint32) bool {
+func (p *BitcoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor, version int32) bool {
 	if len(addrDesc) == 0 || addrDesc[0] == txscript.OP_RETURN {
 		return false
 	}

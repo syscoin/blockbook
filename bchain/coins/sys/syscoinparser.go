@@ -116,22 +116,22 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 	}, nil
 }
 
-func (p *SyscoinParser) IsSyscoinMintTx(nVersion uint32) bool {
+func (p *SyscoinParser) IsSyscoinMintTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_MINT
 }
-func (p *SyscoinParser) IsAssetTx(nVersion uint32) bool {
+func (p *SyscoinParser) IsAssetTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE || nVersion == SYSCOIN_TX_VERSION_ASSET_UPDATE || nVersion == SYSCOIN_TX_VERSION_ASSET_TRANSFER || nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
 }
-func (p *SyscoinParser) IsAssetAllocationTx(nVersion uint32) bool {
+func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN || nVersion == SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION ||
         nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_LOCK
 }
-func (p *SyscoinParser) IsSyscoinTx(nVersion uint32) bool {
+func (p *SyscoinParser) IsSyscoinTx(nVersion int32) bool {
     return p.IsAssetTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // empty or OP_RETURN scripts are not indexed if not sys tx
-func (p *SyscoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor, version uint32) bool {
+func (p *SyscoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor, version int32) bool {
 	if !p.IsSyscoinTx(version) && (len(addrDesc) == 0 || addrDesc[0] == txscript.OP_RETURN) {
 		return false
 	}

@@ -275,7 +275,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // by default all AddressDescriptors are indexable
-func (p *BaseParser) IsAddrDescIndexable(addrDesc AddressDescriptor, version uint32) bool {
+func (p *BaseParser) IsAddrDescIndexable(addrDesc AddressDescriptor, version int32) bool {
 	return true
 }
 
@@ -299,7 +299,7 @@ func (p *BaseParser) EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) IsSyscoinTx(nVersion uint32) bool {
+func (p *BaseParser) IsSyscoinTx(nVersion int32) bool {
 	return false
 }
 

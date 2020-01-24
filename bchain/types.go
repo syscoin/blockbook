@@ -278,7 +278,7 @@ type BlockChainParser interface {
 	GetAddrDescFromAddress(address string) (AddressDescriptor, error)
 	GetAddressesFromAddrDesc(addrDesc AddressDescriptor) ([]string, bool, error)
 	GetScriptFromAddrDesc(addrDesc AddressDescriptor) ([]byte, error)
-	IsAddrDescIndexable(addrDesc AddressDescriptor, version uint32) bool
+	IsAddrDescIndexable(addrDesc AddressDescriptor, version int32) bool
 	// transactions
 	PackedTxidLen() int
 	PackTxid(txid string) ([]byte, error)
