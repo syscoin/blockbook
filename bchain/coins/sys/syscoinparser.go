@@ -214,7 +214,7 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 		AssetGuid: pt.assetAllocationTuple.Asset,
 		TotalAssetSentValue: totalAssetSentValue,
 		AssetSenderAddrDesc: assetSenderAddrDesc,
-		AssetReceiverStrAddrDesc: strAddrDescriptors
+		AssetReceiverStrAddrDesc: strAddrDescriptors,
 	}, nil
 }
 func (p *SyscoinParser) ConnectAssetAllocationInput(outputPackage SyscoinOutputPackage, balance *AddrBalance) bool {
