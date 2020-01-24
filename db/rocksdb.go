@@ -637,7 +637,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 }
 
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
-	var pt ProtoTransaction_AssetAllocationType
+	var pt bchain.ProtoTransaction_AssetAllocationType
 	err := proto.Unmarshal(sptData, &pt)
 	if err != nil {
 		return nil, err
@@ -693,13 +693,13 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		strAddrDescriptors = append(strAddrDescriptors, strAddrDesc)
 		amount := allocation.ValueSat.AsBigInt()
 		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &amount)
-		totalAssetSentValue.Add(&totalAssetSentValue, &amount)
+		totalAssetSentValue.Add(totalAssetSentValue, &amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
 	return &bchain.SyscoinOutputPackage{
 		Version: version,
 		AssetGuid: assetGuid,
-		TotalAssetSentValue: totalAssetSentValue,
+		TotalAssetSentValue: *totalAssetSentValue,
 		AssetSenderAddrDesc: assetSenderAddrDesc,
 		AssetReceiverStrAddrDesc: strAddrDescriptors,
 	}, nil
@@ -714,8 +714,8 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	if !ok {
 		balanceAssetAllocatedSat = big.NewInt(0) 
 	}
-	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, &outputPackage.totalAssetSentValue)
-	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, &outputPackage.totalAssetSentValue)
+	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, &outputPackage.TotalAssetSentValue)
+	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, &outputPackage.TotalAssetSentValue)
 	if balanceAssetAllocatedSat.Sign() < 0 {
 		d.resetValueSatToZero(&balanceAssetAllocatedSat, outputPackage.AssetSenderAddrDesc, "balance")
 	}
@@ -730,12 +730,12 @@ func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*Addr
 		return nil, nil
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
-		return ConnectAssetAllocationOutput(sptData, balances, version)
+		return d.ConnectAssetAllocationOutput(sptData, balances, version)
 	}
 }
 func (d *RocksDB) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
 	if d.chainParser.IsAssetAllocationTx(outputPackage.Version) {
-		return ConnectAssetAllocationInput(outputPackage, balance)
+		return d.ConnectAssetAllocationInput(outputPackage, balance)
 	}
 	return false
 }
@@ -804,7 +804,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if chainType == bchain.ChainSyscoinType {
 					isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
 					if isSyscoinTx {
-						outputPackage = ConnectSyscoinOutputs(d, output.ScriptPubKey, balances, tx.Version)
+						outputPackage = d.ConnectSyscoinOutputs(d, output.ScriptPubKey, balances, tx.Version)
 						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
 							// for each address returned, add it to map
 							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
@@ -892,7 +892,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				}
 				if chainType == bchain.ChainSyscoinType {
 					if string(outputPackage.AssetSenderAddrDesc) == string(spentOutput.AddrDesc) {
-						ConnectSyscoinInputs(outputPackage, &balance)
+						d.ConnectSyscoinInputs(outputPackage, &balance)
 					}
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
