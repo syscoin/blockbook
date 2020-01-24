@@ -201,7 +201,7 @@ type ProtoTransaction_WitnessAddressType struct {
 }
 type ProtoTransaction_RangeAmountPairType struct {
 	witnessProgram 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,1,opt,name=witnessProgram" json:"witnessProgram,omitempty"`
-	Amount         	big.Int   	`protobuf:"bytes,2,opt,name=Amount" json:"Amount,omitempty"`
+	ValueSat        []byte   `protobuf:"bytes,2,opt,name=ValueSat,proto3" json:"ValueSat,omitempty"`
 }
 type ProtoTransaction_AssetAllocationTupleType struct {
 	Asset			uint32	`protobuf:"varint,1,opt,name=Asset" json:"Asset,omitempty"`

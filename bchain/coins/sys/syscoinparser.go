@@ -205,8 +205,9 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 			balanceAssetAllocatedSat = big.NewInt(0) 
 		}
 		strAddrDescriptors = append(strAddrDescriptors, strAddrDesc)
-		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &allocation.Amount)
-		totalAssetSentValue.Add(&totalAssetSentValue, &allocation.Amount)
+		amount := allocation.ValueSat.AsBigInt()
+		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &amount)
+		totalAssetSentValue.Add(&totalAssetSentValue, &amount)
 		balance.BalanceAssetAllocatedSat[pt.assetAllocationTuple.Asset] = balanceAssetAllocatedSat
 	}
 	return &SyscoinOutputPackage{
