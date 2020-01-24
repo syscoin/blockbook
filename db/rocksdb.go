@@ -444,7 +444,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 		return err
 	}
 	addresses := make(addressesMap)
-	if chainType == bchain.ChainBitcoinType {
+	if chainType == bchain.ChainBitcoinType || chainType == bchain.ChainSyscoinType {
 		txAddressesMap := make(map[string]*TxAddresses)
 		balances := make(map[string]*AddrBalance)
 		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances); err != nil {
@@ -546,6 +546,10 @@ type AddrBalance struct {
 	BalanceSat big.Int
 	Utxos      []Utxo
 	utxosMap   map[string]int
+	SentAssetAllocatedSat map[uint32]big.Int
+	BalanceAssetAllocatedSat map[uint32]big.Int
+	SentAssetUnAllocatedSat map[uint32]big.Int
+	BalanceAssetUnAllocatedSat map[uint32]big.Int
 }
 
 // ReceivedSat computes received amount from total balance and sent amount
@@ -634,6 +638,8 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses addressesMap, txAddressesMap map[string]*TxAddresses, balances map[string]*AddrBalance) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*TxAddresses, len(block.Txs))
+	chainType := d.chainParser.GetChainType()
+	var outputPackage SyscoinOutputPackage
 	// first process all outputs so that inputs can refer to txs in this block
 	for txi := range block.Txs {
 		tx := &block.Txs[txi]
@@ -688,6 +694,20 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				counted := addToAddressesMap(addresses, strAddrDesc, btxID, int32(i))
 				if !counted {
 					balance.Txs++
+				}
+			}
+			// process syscoin tx
+			if chainType == bchain.ChainSyscoinType {
+				isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
+				if isSyscoinTx {
+					outputPackage = d.chainParser.ConnectOutputs(d, output.PkScript, balances, tx.Version)
+					for strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
+						// for each address returned, add it to map
+						counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
+						if !counted {
+							balance.Txs++
+						}
+					}
 				}
 			}
 		}
@@ -764,6 +784,11 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				counted := addToAddressesMap(addresses, strAddrDesc, spendingTxid, ^int32(i))
 				if !counted {
 					balance.Txs++
+				}
+				if chainType == bchain.ChainSyscoinType {
+					if outputPackage.AssetSenderAddrDesc == spentOutput.AddrDesc {
+						d.chainParser.ConnectInputs(outputPackage, &balance)
+					}
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
 				balance.markUtxoAsSpent(btxID, int32(input.Vout))

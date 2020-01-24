@@ -13,6 +13,7 @@ It has these top-level messages:
 package bchain
 
 import proto "github.com/golang/protobuf/proto"
+import bech32 "github.com/martinboehm/btcutil/bech32"
 import fmt "fmt"
 import math "math"
 
@@ -194,11 +195,52 @@ func (m *ProtoTransaction_VoutType) GetAddresses() []string {
 	}
 	return nil
 }
+type ProtoTransaction_WitnessAddressType struct {
+	Version			byte		`protobuf:"varint,1,opt,name=Version" json:"Version,omitempty"`
+	WitnessProgram 	[]byte		`protobuf:"bytes,2,opt,name=WitnessProgram" json:"WitnessProgram,omitempty"`
+}
+type ProtoTransaction_RangeAmountPairType struct {
+	witnessProgram 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,1,opt,name=witnessProgram" json:"witnessProgram,omitempty"`
+	Amount         	big.Int   	`protobuf:"bytes,2,opt,name=Amount" json:"Amount,omitempty"`
+}
+type ProtoTransaction_AssetAllocationTupleType struct {
+	Asset			uint32	`protobuf:"varint,1,opt,name=Asset" json:"Asset,omitempty"`
+	witnessProgram 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,2,opt,name=witnessProgram" json:"witnessProgram,omitempty"`
+}
+type ProtoTransaction_AssetAllocationType struct {
+	assetAllocationTuple     		*ProtoTransaction_AssetAllocationTupleType   `protobuf:"bytes,1,opt,name=assetAllocationTuple" json:"assetAllocationTuple,omitempty"`
+	listSendingAllocationAmounts	[]*ProtoTransaction_RangeAmountPairType   	 `protobuf:"bytes,2,opt,name=listSendingAllocationAmounts" json:"listSendingAllocationAmounts,omitempty"`
+}
+
+func (m *ProtoTransaction_WitnessAddressType) ToString() string {
+	if m != nil {
+		if len(m.WitnessProgram) <= 4 && string(m.WitnessProgram) == "burn" {
+			return "burn"
+		}
+		// Convert data to base32:
+		conv, err := bech32.ConvertBits(m.WitnessProgram, 8, 5, true)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return nil
+		}
+		encoded, err := bech32.Encode("sys", conv)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return nil
+		}
+		return encoded
+	}
+	return nil
+}
 
 func init() {
 	proto.RegisterType((*ProtoTransaction)(nil), "bchain.ProtoTransaction")
 	proto.RegisterType((*ProtoTransaction_VinType)(nil), "bchain.ProtoTransaction.VinType")
 	proto.RegisterType((*ProtoTransaction_VoutType)(nil), "bchain.ProtoTransaction.VoutType")
+	proto.RegisterType((*ProtoTransaction_AssetAllocationType)(nil), "bchain.ProtoTransaction.AssetAllocationType")
+	proto.RegisterType((*ProtoTransaction_AssetAllocationTupleType)(nil), "bchain.ProtoTransaction.AssetAllocationTupleType")
+	proto.RegisterType((*ProtoTransaction_RangeAmountPairType)(nil), "bchain.ProtoTransaction.RangeAmountPairType")
+	proto.RegisterType((*ProtoTransaction_WitnessAddressType)(nil), "bchain.ProtoTransaction.WitnessAddressType")
 }
 
 func init() { proto.RegisterFile("tx.proto", fileDescriptor0) }

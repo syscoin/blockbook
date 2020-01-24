@@ -16,7 +16,9 @@ const (
 	// ChainBitcoinType is blockchain derived from bitcoin
 	ChainBitcoinType = ChainType(iota)
 	// ChainEthereumType is blockchain derived from ethereum
-	ChainEthereumType
+	ChainEthereumType,
+	// ChainSyscoinType is blockchain derived from syscoin
+	ChainSyscoinType
 )
 
 // errors with specific meaning returned by blockchain rpc
@@ -184,6 +186,15 @@ type Erc20Transfer struct {
 	From     string
 	To       string
 	Tokens   big.Int
+}
+
+// Syscoin function return package given from ConnectOutputs in SyscoinParser, used to pass into ConnectInputs
+type SyscoinOutputPackage struct {
+	Version uint32,
+	AssetGuid uint32,
+	TotalAssetSentValue big.Int,
+	AssetSenderAddrDesc AddressDescriptor,
+	AssetReceiverStrAddrDesc []string
 }
 
 // MempoolTxidEntry contains mempool txid with first seen time
