@@ -159,7 +159,7 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 		return nil, err
 	}
 	totalValue := big.NewInt(0)
-	assetSenderAddrDesc, err := p.GetAddrDescFromAddress(pt.assetAllocationTuple.witnessProgram.ToString())
+	assetSenderAddrDesc, err := p.GetAddrDescFromAddress(pt.assetAllocationTuple.witnessAddress.ToString())
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -173,7 +173,7 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 	}
 	strAddrDescriptors := make([]string, 0, len(pt.listSendingAllocationAmounts))
 	for allocationIndex, allocation := range pt.listSendingAllocationAmounts {
-		addrDesc, err := p.GetAddrDescFromAddress(allocation.witnessProgram.ToString())
+		addrDesc, err := p.GetAddrDescFromAddress(allocation.witnessAddress.ToString())
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)

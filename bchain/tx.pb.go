@@ -200,12 +200,12 @@ type ProtoTransaction_WitnessAddressType struct {
 	WitnessProgram 	[]byte		`protobuf:"bytes,2,opt,name=WitnessProgram" json:"WitnessProgram,omitempty"`
 }
 type ProtoTransaction_RangeAmountPairType struct {
-	witnessProgram 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,1,opt,name=witnessProgram" json:"witnessProgram,omitempty"`
+	witnessAddress 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,1,opt,name=witnessAddress" json:"witnessAddress,omitempty"`
 	ValueSat        []byte   `protobuf:"bytes,2,opt,name=ValueSat,proto3" json:"ValueSat,omitempty"`
 }
 type ProtoTransaction_AssetAllocationTupleType struct {
 	Asset			uint32	`protobuf:"varint,1,opt,name=Asset" json:"Asset,omitempty"`
-	witnessProgram 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,2,opt,name=witnessProgram" json:"witnessProgram,omitempty"`
+	witnessAddress 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,2,opt,name=witnessAddress" json:"witnessAddress,omitempty"`
 }
 type ProtoTransaction_AssetAllocationType struct {
 	assetAllocationTuple     		*ProtoTransaction_AssetAllocationTupleType   `protobuf:"bytes,1,opt,name=assetAllocationTuple" json:"assetAllocationTuple,omitempty"`
@@ -221,16 +221,16 @@ func (m *ProtoTransaction_WitnessAddressType) ToString() string {
 		conv, err := bech32.ConvertBits(m.WitnessProgram, 8, 5, true)
 		if err != nil {
 			fmt.Println("Error:", err)
-			return nil
+			return ""
 		}
 		encoded, err := bech32.Encode("sys", conv)
 		if err != nil {
 			fmt.Println("Error:", err)
-			return nil
+			return ""
 		}
 		return encoded
 	}
-	return nil
+	return ""
 }
 
 func init() {
