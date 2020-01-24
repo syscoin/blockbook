@@ -706,7 +706,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		AssetReceiverStrAddrDesc: strAddrDescriptors,
 	}, nil
 }
-func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
+func (d *RocksDB) ConnectAssetAllocationInput(outputPackage *bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
 	
 	if balance.SentAssetAllocatedSat == nil{
 		balance.SentAssetAllocatedSat = map[uint32]big.Int{}
@@ -736,7 +736,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*Addr
 	}
 	return nil, errors.New("Not supported OP")
 }
-func (d *RocksDB) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
+func (d *RocksDB) ConnectSyscoinInputs(outputPackage *bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
 	if d.chainParser.IsAssetAllocationTx(outputPackage.Version) {
 		return d.ConnectAssetAllocationInput(outputPackage, balance)
 	}
