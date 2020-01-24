@@ -199,19 +199,24 @@ type ProtoTransaction_WitnessAddressType struct {
 	Version			byte		`protobuf:"varint,1,opt,name=Version" json:"Version,omitempty"`
 	WitnessProgram 	[]byte		`protobuf:"bytes,2,opt,name=WitnessProgram" json:"WitnessProgram,omitempty"`
 }
-type ProtoTransaction_RangeAmountPairType struct {
-	witnessAddress 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,1,opt,name=witnessAddress" json:"witnessAddress,omitempty"`
-	ValueSat        []byte   `protobuf:"bytes,2,opt,name=ValueSat,proto3" json:"ValueSat,omitempty"`
-}
-type ProtoTransaction_AssetAllocationTupleType struct {
-	Asset			uint32	`protobuf:"varint,1,opt,name=Asset" json:"Asset,omitempty"`
-	witnessAddress 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,2,opt,name=witnessAddress" json:"witnessAddress,omitempty"`
-}
-type ProtoTransaction_AssetAllocationType struct {
-	assetAllocationTuple     		*ProtoTransaction_AssetAllocationTupleType   `protobuf:"bytes,1,opt,name=assetAllocationTuple" json:"assetAllocationTuple,omitempty"`
-	listSendingAllocationAmounts	[]*ProtoTransaction_RangeAmountPairType   	 `protobuf:"bytes,2,opt,name=listSendingAllocationAmounts" json:"listSendingAllocationAmounts,omitempty"`
+func (m *ProtoTransaction_WitnessAddressType) Reset()                    { *m = ProtoTransaction_WitnessAddressType{} }
+func (m *ProtoTransaction_WitnessAddressType) String() string            { return proto.CompactTextString(m) }
+func (*ProtoTransaction_WitnessAddressType) ProtoMessage()               {}
+func (*ProtoTransaction_WitnessAddressType) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 1} }
+
+func (m *ProtoTransaction_WitnessAddressType) GetVersion() []byte {
+	if m != nil {
+		return m.Version
+	}
+	return nil
 }
 
+func (m *ProtoTransaction_WitnessAddressType) GetWitnessProgram() []byte {
+	if m != nil {
+		return m.WitnessProgram
+	}
+	return nil
+}
 func (m *ProtoTransaction_WitnessAddressType) ToString() string {
 	if m != nil {
 		if len(m.WitnessProgram) <= 4 && string(m.WitnessProgram) == "burn" {
@@ -231,6 +236,76 @@ func (m *ProtoTransaction_WitnessAddressType) ToString() string {
 		return encoded
 	}
 	return ""
+}
+type ProtoTransaction_RangeAmountPairType struct {
+	WitnessAddress 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,1,opt,name=witnessAddress" json:"witnessAddress,omitempty"`
+	ValueSat        []byte   `protobuf:"bytes,2,opt,name=ValueSat,proto3" json:"ValueSat,omitempty"`
+}
+func (m *ProtoTransaction_RangeAmountPairType) Reset()                    { *m = ProtoTransaction_RangeAmountPairType{} }
+func (m *ProtoTransaction_RangeAmountPairType) String() string            { return proto.CompactTextString(m) }
+func (*ProtoTransaction_RangeAmountPairType) ProtoMessage()               {}
+func (*ProtoTransaction_RangeAmountPairType) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 1} }
+
+func (m *ProtoTransaction_RangeAmountPairType) GetWitnessAddress() *ProtoTransaction_WitnessAddressType {
+	if m != nil {
+		return m.WitnessAddress
+	}
+	return nil
+}
+
+func (m *ProtoTransaction_RangeAmountPairType) GetValueSat() []byte {
+	if m != nil {
+		return m.ValueSat
+	}
+	return nil
+}
+
+type ProtoTransaction_AssetAllocationTupleType struct {
+	Asset			uint32	`protobuf:"varint,1,opt,name=Asset" json:"Asset,omitempty"`
+	WitnessAddress 	*ProtoTransaction_WitnessAddressType	`protobuf:"bytes,2,opt,name=WitnessAddress" json:"WitnessAddress,omitempty"`
+}
+
+func (m *ProtoTransaction_AssetAllocationTupleType) Reset()                    { *m = ProtoTransaction_AssetAllocationTupleType{} }
+func (m *ProtoTransaction_AssetAllocationTupleType) String() string            { return proto.CompactTextString(m) }
+func (*ProtoTransaction_AssetAllocationTupleType) ProtoMessage()               {}
+func (*ProtoTransaction_AssetAllocationTupleType) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 1} }
+
+func (m *ProtoTransaction_AssetAllocationTupleType) GetAsset() uint32 {
+	if m != nil {
+		return m.Asset
+	}
+	return 0
+}
+
+func (m *ProtoTransaction_AssetAllocationTupleType) GetWitnessAddress() []byte {
+	if m != nil {
+		return m.WitnessAddress
+	}
+	return nil
+}
+
+type ProtoTransaction_AssetAllocationType struct {
+	AssetAllocationTuple     		*ProtoTransaction_AssetAllocationTupleType   `protobuf:"bytes,1,opt,name=AssetAllocationTuple" json:"AssetAllocationTuple,omitempty"`
+	ListSendingAllocationAmounts	[]*ProtoTransaction_RangeAmountPairType   	 `protobuf:"bytes,2,opt,name=ListSendingAllocationAmounts" json:"ListSendingAllocationAmounts,omitempty"`
+}
+
+func (m *ProtoTransaction_AssetAllocationType) Reset()                    { *m = ProtoTransaction_AssetAllocationType{} }
+func (m *ProtoTransaction_AssetAllocationType) String() string            { return proto.CompactTextString(m) }
+func (*ProtoTransaction_AssetAllocationType) ProtoMessage()               {}
+func (*ProtoTransaction_AssetAllocationType) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 1} }
+
+func (m *ProtoTransaction_AssetAllocationType) GetAssetAllocationTuple() *ProtoTransaction_AssetAllocationTupleType {
+	if m != nil {
+		return m.AssetAllocationTuple
+	}
+	return nil
+}
+
+func (m *ProtoTransaction_AssetAllocationType) GetListSendingAllocationAmounts() []*ProtoTransaction_RangeAmountPairType {
+	if m != nil {
+		return m.ListSendingAllocationAmounts
+	}
+	return nil
 }
 
 func init() {

@@ -20,22 +20,19 @@ syntax = "proto3";
             byte Version = 1;
             bytes WitnessProgram = 2;
         }
-
         RangeAmountPairType {
-            WitnessAddressType witnessAddress = 1;
+            WitnessAddressType WitnessAddress = 1;
             bytes ValueSat = 2;
         }
-
         AssetAllocationTupleType {
             uint32 Asset = 1;
-            WitnessAddressType witnessAddress = 2;
+            WitnessAddressType WitnessAddress = 2;
+        }
+        AssetAllocationType {
+            AssetAllocationTupleType AssetAllocationTuple = 1;
+            repeated RangeAmountPairType ListSendingAllocationAmounts = 2;
         }
 
-        AssetAllocationType {
-            AssetAllocationTupleType assetAllocationTuple = 1;
-            repeated RangeAmountPairType listSendingAllocationAmounts = 2;
-        }
-        
         bytes Txid = 1;
         bytes Hex = 2;
         uint64 Blocktime = 3;
