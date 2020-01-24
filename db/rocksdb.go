@@ -902,7 +902,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if !counted {
 					balance.Txs++
 				}
-				if chainType == bchain.ChainSyscoinType && outputPackage != nil {
+				if chainType == bchain.ChainSyscoinType && outputPackage != bchain.SyscoinOutputPackage{} {
 					if string(outputPackage.AssetSenderAddrDesc) == string(spentOutput.AddrDesc) {
 						d.ConnectSyscoinInputs(outputPackage, balance)
 					}
