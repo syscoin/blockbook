@@ -659,7 +659,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	listSendingAllocationAmounts := pt.GetListSendingAllocationAmounts();
 	strAddrDescriptors := make([]string, 0, len(listSendingAllocationAmounts))
-	for allocationIndex, allocation := range listSendingAllocationAmounts {
+	for _, allocation := range listSendingAllocationAmounts {
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.GetWitnessAddress().ToString())
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
