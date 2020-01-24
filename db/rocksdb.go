@@ -20,6 +20,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
+	"github.com/gogo/protobuf/proto"
 )
 
 const dbVersion = 5
@@ -635,13 +636,14 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
+func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	var pt ProtoTransaction_AssetAllocationType
 	err := proto.Unmarshal(sptData, &pt)
 	if err != nil {
 		return nil, err
 	}
 	totalValue := big.NewInt(0)
+	assetGuid := pt.GetAssetAllocationTuple().GetAsset()
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(pt.GetAssetAllocationTuple().GetWitnessAddress().ToString())
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
@@ -684,7 +686,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		if balance.BalanceAssetAllocatedSat == nil{
 			balance.BalanceAssetAllocatedSat = map[uint32]big.Int{}
 		}
-		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[pt.assetAllocationTuple.Asset]
+		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if !ok {
 			balanceAssetAllocatedSat = big.NewInt(0) 
 		}
@@ -692,11 +694,11 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		amount := allocation.ValueSat.AsBigInt()
 		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &amount)
 		totalAssetSentValue.Add(&totalAssetSentValue, &amount)
-		balance.BalanceAssetAllocatedSat[pt.assetAllocationTuple.Asset] = balanceAssetAllocatedSat
+		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
 	return &bchain.SyscoinOutputPackage{
 		Version: version,
-		AssetGuid: pt.assetAllocationTuple.Asset,
+		AssetGuid: assetGuid,
 		TotalAssetSentValue: totalAssetSentValue,
 		AssetSenderAddrDesc: assetSenderAddrDesc,
 		AssetReceiverStrAddrDesc: strAddrDescriptors,
@@ -707,8 +709,8 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	if balance.SentAssetAllocatedSat == nil{
 		balance.SentAssetAllocatedSat = map[uint32]big.Int{}
 	}
-	sentAssetAllocatedSat := balance.SentAssetAllocatedSat[outputPackage.assetGuid]
-	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[outputPackage.assetGuid]
+	sentAssetAllocatedSat := balance.SentAssetAllocatedSat[outputPackage.AssetGuid]
+	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[outputPackage.AssetGuid]
 	if !ok {
 		balanceAssetAllocatedSat = big.NewInt(0) 
 	}
@@ -717,12 +719,12 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	if balanceAssetAllocatedSat.Sign() < 0 {
 		d.resetValueSatToZero(&balanceAssetAllocatedSat, outputPackage.assetSenderAddrDesc, "balance")
 	}
-	balance.SentAssetAllocatedSat[outputPackage.assetGuid] = sentAssetAllocatedSat
-	balance.BalanceAssetAllocatedSat[outputPackage.assetGuid] = balanceAssetAllocatedSat
+	balance.SentAssetAllocatedSat[outputPackage.AssetGuid] = sentAssetAllocatedSat
+	balance.BalanceAssetAllocatedSat[outputPackage.AssetGuid] = balanceAssetAllocatedSat
 	return true
 
 }
-func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
+func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	sptData := d.chainParser.TryGetOPReturn(script)
 	if sptData == nil {
 		return nil, nil
@@ -1433,7 +1435,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *Block
 
 // Disconnect blocks
 
-func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, version uint32, height uint32, btxID []byte, inputs []outpoint, txa *TxAddresses,
+func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, version int32, height uint32, btxID []byte, inputs []outpoint, txa *TxAddresses,
 	txAddressesToUpdate map[string]*TxAddresses, balances map[string]*AddrBalance) error {
 	var err error
 	var balance *AddrBalance
