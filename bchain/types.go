@@ -298,6 +298,12 @@ type BlockChainParser interface {
 	DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]AddressDescriptor, error)
 	// EthereumType specific
 	EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
+	// SyscoinType specific
+	IsSyscoinTx(nVersion int32) bool
+	IsSyscoinMintTx(nVersion int32) bool
+	IsAssetTx(nVersion int32) bool
+	IsAssetAllocationTx(nVersion int32) bool
+	TryGetOPReturn(script []byte) []byte
 }
 
 // Mempool defines common interface to mempool

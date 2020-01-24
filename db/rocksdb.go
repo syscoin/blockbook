@@ -642,7 +642,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	if err != nil {
 		return nil, err
 	}
-	totalValue := big.NewInt(0)
+	totalAssetSentValue := big.NewInt(0)
 	assetGuid := pt.GetAssetAllocationTuple().GetAsset()
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(pt.GetAssetAllocationTuple().GetWitnessAddress().ToString())
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
@@ -717,7 +717,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, &outputPackage.totalAssetSentValue)
 	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, &outputPackage.totalAssetSentValue)
 	if balanceAssetAllocatedSat.Sign() < 0 {
-		d.resetValueSatToZero(&balanceAssetAllocatedSat, outputPackage.assetSenderAddrDesc, "balance")
+		d.resetValueSatToZero(&balanceAssetAllocatedSat, outputPackage.AssetSenderAddrDesc, "balance")
 	}
 	balance.SentAssetAllocatedSat[outputPackage.AssetGuid] = sentAssetAllocatedSat
 	balance.BalanceAssetAllocatedSat[outputPackage.AssetGuid] = balanceAssetAllocatedSat
@@ -730,7 +730,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*Addr
 		return nil, nil
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
-		return ConnectAssetAllocationOutput(d, sptData, balances, version)
+		return ConnectAssetAllocationOutput(sptData, balances, version)
 	}
 }
 func (d *RocksDB) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {

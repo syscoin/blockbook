@@ -302,7 +302,15 @@ func (p *BaseParser) EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 func (p *BaseParser) IsSyscoinTx(nVersion int32) bool {
 	return false
 }
-
+func (p *BaseParser) IsSyscoinMintTx(nVersion int32) bool {
+	return false
+}
+func (p *BaseParser) IsAssetTx(nVersion int32) bool {
+    return false
+}
+func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
+	return false
+}
 func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
