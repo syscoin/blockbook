@@ -655,7 +655,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		} else {
 			glog.V(1).Infof("rocksdb: skipping asset sender addrDesc of length %d", len(assetSenderAddrDesc))
 		}
-		return nil, nil
+		return nil, errors.New("Skipping asset sender")
 	}
 	listSendingAllocationAmounts := pt.GetListSendingAllocationAmounts();
 	strAddrDescriptors := make([]string, 0, len(listSendingAllocationAmounts))
@@ -734,7 +734,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*Addr
 	if d.chainParser.IsAssetAllocationTx(version) {
 		return d.ConnectAssetAllocationOutput(sptData, balances, version)
 	}
-	return nil, nil
+	return nil, errors.New("Not supported OP")
 }
 func (d *RocksDB) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
 	if d.chainParser.IsAssetAllocationTx(outputPackage.Version) {
@@ -812,7 +812,11 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 							glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
 							continue
 						}
-						outputPackage = d.ConnectSyscoinOutputs(script, balances, tx.Version)
+						outputPackage, err = d.ConnectSyscoinOutputs(script, balances, tx.Version)
+						if err != nil {
+							glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
+							continue
+						}
 						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
 							// for each address returned, add it to map
 							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
@@ -1129,7 +1133,7 @@ func (d *RocksDB) AddrDescForOutpoint(outpoint bchain.Outpoint) bchain.AddressDe
 
 func packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
-	l := packVaruint(uint(ta.Version), varBuf)
+	l := packVarint32(ta.Version, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	l := packVaruint(uint(ta.Height), varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -1233,8 +1237,8 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 
 func unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	ta := TxAddresses{}
-	version, l := unpackVaruint(buf)
-	ta.Version = uint32(version)
+	version, l := unpackVarint32(buf)
+	ta.Version = version
 	height, l := unpackVaruint(buf[l:])
 	ta.Height = uint32(height)
 	inputs, ll := unpackVaruint(buf[l:])
