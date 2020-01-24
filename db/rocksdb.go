@@ -747,7 +747,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*TxAddresses, len(block.Txs))
 	chainType := d.chainParser.GetChainType()
-	var outputPackage bchain.SyscoinOutputPackage := nil
+	var outputPackage bchain.SyscoinOutputPackage
 	// first process all outputs so that inputs can refer to txs in this block
 	for txi := range block.Txs {
 		tx := &block.Txs[txi]
@@ -812,7 +812,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 							glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
 							continue
 						}
-						outputPackage, err = d.ConnectSyscoinOutputs(script, balances, tx.Version)
+						outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
 						if err != nil {
 							glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
 							continue
