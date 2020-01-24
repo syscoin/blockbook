@@ -300,9 +300,9 @@ func (p *BaseParser) EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 }
 
 func (p *BaseParser) IsSyscoinTx(nVersion uint32) bool {
-	return nil, errors.New("Not supported")
+	return false
 }
 
 func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
-	return nil, errors.New("Not supported")
+	return nil
 }
