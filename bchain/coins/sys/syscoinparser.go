@@ -139,8 +139,7 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 		var data []byte
 		if len(script) < txscript.OP_PUSHDATA1 {
 			data = script[2:]
-		}
-		else if script[1] == txscript.OP_PUSHDATA1 && len(script) <= 0xff {
+		} else if script[1] == txscript.OP_PUSHDATA1 && len(script) <= 0xff {
 			data = script[3:]
 		} else if script[1] == txscript.OP_PUSHDATA2 && len(script) <= 0xffff {
 			data = script[4:]
