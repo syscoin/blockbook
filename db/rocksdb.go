@@ -756,7 +756,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 			return err
 		}
 		blockTxIDs[txi] = btxID
-		ta := TxAddresses{Version: txi.Version, Height: block.Height}
+		ta := TxAddresses{Version: tx.Version, Height: block.Height}
 		ta.Outputs = make([]TxOutput, len(tx.Vout))
 		txAddressesMap[string(btxID)] = &ta
 		blockTxAddresses[txi] = &ta
@@ -812,7 +812,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 							glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
 							continue
 						}
-						outputPackage, err = d.ConnectSyscoinOutputs(script, balances, tx.Version)
+						outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
 						if err != nil {
 							glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
 							continue
@@ -1135,7 +1135,7 @@ func packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	l := packVarint32(ta.Version, varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l := packVaruint(uint(ta.Height), varBuf)
+	l = packVaruint(uint(ta.Height), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	l = packVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
