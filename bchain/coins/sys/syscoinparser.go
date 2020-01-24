@@ -220,12 +220,12 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 func (p *SyscoinParser) ConnectAssetAllocationInput(outputPackage SyscoinOutputPackage, balance *AddrBalance) bool {
 	
 	if balance.SentAssetAllocatedSat == nil{
-		balance.SentAssetAllocatedSat := map[uint32]big.Int{}
+		balance.SentAssetAllocatedSat = map[uint32]big.Int{}
 	}
 	sentAssetAllocatedSat := balance.SentAssetAllocatedSat[outputPackage.assetGuid]
 	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[outputPackage.assetGuid]
 	if !ok {
-		balanceAssetAllocatedSat := big.NewInt(0) 
+		balanceAssetAllocatedSat = big.NewInt(0) 
 	}
 	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, &outputPackage.totalAssetSentValue)
 	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, &outputPackage.totalAssetSentValue)
