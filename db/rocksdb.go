@@ -635,7 +635,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
+func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
 	var pt ProtoTransaction_AssetAllocationType
 	err := proto.Unmarshal(sptData, &pt)
 	if err != nil {
@@ -647,10 +647,10 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 			if err != bchain.ErrAddressMissing {
-				glog.Warningf("rocksdb: asset sender addrDesc: %v - height %d, tx %v, output %v, error %v", err, block.Height, tx.Txid, output, err)
+				glog.Warningf("rocksdb: asset sender addrDesc: %v error %v", assetSenderAddrDesc, err)
 			}
 		} else {
-			glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping asset sender addrDesc of length %d", block.Height, tx.Txid, i, len(assetSenderAddrDesc))
+			glog.V(1).Infof("rocksdb: skipping asset sender addrDesc of length %d", len(assetSenderAddrDesc))
 		}
 		return nil, nil
 	}
@@ -662,10 +662,10 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", err, block.Height, tx.Txid, output, err)
+					glog.Warningf("rocksdb: asset addrDesc: %v error %v", addrDesc, err)
 				}
 			} else {
-				glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping asset addrDesc of length %d", block.Height, tx.Txid, i, len(addrDesc))
+				glog.V(1).Infof("rocksdb: skipping asset addrDesc of length %d", len(addrDesc))
 			}
 			continue
 		}
@@ -722,7 +722,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	return true
 
 }
-func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
+func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
 	sptData := d.chainParser.TryGetOPReturn(script)
 	if sptData == nil {
 		return nil, nil
@@ -1433,7 +1433,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *Block
 
 // Disconnect blocks
 
-func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, version int32, height uint32, btxID []byte, inputs []outpoint, txa *TxAddresses,
+func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, version uint32, height uint32, btxID []byte, inputs []outpoint, txa *TxAddresses,
 	txAddressesToUpdate map[string]*TxAddresses, balances map[string]*AddrBalance) error {
 	var err error
 	var balance *AddrBalance
