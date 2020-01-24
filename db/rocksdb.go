@@ -688,10 +688,11 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if !ok {
-			balanceAssetAllocatedSat = big.NewInt(0) 
+			balanceAssetAllocatedSat = &big.NewInt(0) 
 		}
 		strAddrDescriptors = append(strAddrDescriptors, strAddrDesc)
-		amount := allocation.ValueSat.AsBigInt()
+		var amount big.Int
+		amount.SetBytes(allocation.ValueSat)
 		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &amount)
 		totalAssetSentValue.Add(totalAssetSentValue, &amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
@@ -712,7 +713,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutput
 	sentAssetAllocatedSat := balance.SentAssetAllocatedSat[outputPackage.AssetGuid]
 	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[outputPackage.AssetGuid]
 	if !ok {
-		balanceAssetAllocatedSat = big.NewInt(0) 
+		balanceAssetAllocatedSat = &big.NewInt(0) 
 	}
 	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, &outputPackage.TotalAssetSentValue)
 	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, &outputPackage.TotalAssetSentValue)
@@ -732,6 +733,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*Addr
 	if d.chainParser.IsAssetAllocationTx(version) {
 		return d.ConnectAssetAllocationOutput(sptData, balances, version)
 	}
+	return nil, nil
 }
 func (d *RocksDB) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
 	if d.chainParser.IsAssetAllocationTx(outputPackage.Version) {
@@ -804,7 +806,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if chainType == bchain.ChainSyscoinType {
 					isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
 					if isSyscoinTx {
-						outputPackage = d.ConnectSyscoinOutputs(d, output.ScriptPubKey, balances, tx.Version)
+						outputPackage = d.ConnectSyscoinOutputs(output.ScriptPubKey, balances, tx.Version)
 						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
 							// for each address returned, add it to map
 							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
@@ -1579,7 +1581,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 				glog.Warning("TxAddress for txid ", ut, " not found")
 				continue
 			}
-			if err := d.disconnectTxAddresses(wb, blockTxs[i].version, height, btxID, blockTxs[i].inputs, txa, txAddressesToUpdate, balances); err != nil {
+			if err := d.disconnectTxAddresses(wb, blockTxs[i].Version, height, btxID, blockTxs[i].inputs, txa, txAddressesToUpdate, balances); err != nil {
 				return err
 			}
 		}
