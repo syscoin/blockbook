@@ -190,11 +190,11 @@ type Erc20Transfer struct {
 
 // Syscoin function return package given from ConnectOutputs in SyscoinParser, used to pass into ConnectInputs
 type SyscoinOutputPackage struct {
-	Version uint32,
-	AssetGuid uint32,
-	TotalAssetSentValue big.Int,
-	AssetSenderAddrDesc AddressDescriptor,
-	AssetReceiverStrAddrDesc []string,
+	Version uint32
+	AssetGuid uint32
+	TotalAssetSentValue big.Int
+	AssetSenderAddrDesc AddressDescriptor
+	AssetReceiverStrAddrDesc []string
 }
 
 // MempoolTxidEntry contains mempool txid with first seen time
