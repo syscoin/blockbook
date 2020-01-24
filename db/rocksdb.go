@@ -699,7 +699,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if chainType == bchain.ChainSyscoinType {
 					isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
 					if isSyscoinTx {
-						outputPackage = d.chainParser.ConnectOutputs(d, output.ScriptPubKey, balances, tx.Version)
+						outputPackage = ConnectSyscoinOutputs(d, output.ScriptPubKey, balances, tx.Version)
 						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
 							// for each address returned, add it to map
 							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
@@ -786,8 +786,8 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 					balance.Txs++
 				}
 				if chainType == bchain.ChainSyscoinType {
-					if outputPackage.AssetSenderAddrDesc == spentOutput.AddrDesc {
-						d.chainParser.ConnectInputs(outputPackage, &balance)
+					if string(outputPackage.AssetSenderAddrDesc) == string(spentOutput.AddrDesc) {
+						ConnectSyscoinInputs(outputPackage, &balance)
 					}
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
@@ -800,6 +800,108 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 		}
 	}
 	return nil
+}
+func (d *RocksDB) ConnectAssetAllocationOutput(sptData []bytes, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
+	var pt ProtoTransaction_AssetAllocationType
+	err := proto.Unmarshal(sptData, &pt)
+	if err != nil {
+		return nil, err
+	}
+	totalValue := big.NewInt(0)
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(pt.GetAssetAllocationTuple().GetWitnessAddress().ToString())
+	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
+		if err != nil {
+			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+			if err != bchain.ErrAddressMissing {
+				glog.Warningf("rocksdb: asset sender addrDesc: %v - height %d, tx %v, output %v, error %v", err, block.Height, tx.Txid, output, err)
+			}
+		} else {
+			glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping asset sender addrDesc of length %d", block.Height, tx.Txid, i, len(assetSenderAddrDesc))
+		}
+		return nil, nil
+	}
+	listSendingAllocationAmounts := pt.GetListSendingAllocationAmounts();
+	strAddrDescriptors := make([]string, 0, len(listSendingAllocationAmounts))
+	for allocationIndex, allocation := range listSendingAllocationAmounts {
+		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.GetWitnessAddress().ToString())
+		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
+			if err != nil {
+				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+				if err != bchain.ErrAddressMissing {
+					glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", err, block.Height, tx.Txid, output, err)
+				}
+			} else {
+				glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping asset addrDesc of length %d", block.Height, tx.Txid, i, len(addrDesc))
+			}
+			continue
+		}
+		strAddrDesc := string(addrDesc)
+		balance, e := balances[strAddrDesc]
+		if !e {
+			balance, err = d.GetAddrDescBalance(addrDesc, addressBalanceDetailUTXOIndexed)
+			if err != nil {
+				return nil, err
+			}
+			if balance == nil {
+				balance = &AddrBalance{}
+			}
+			balances[strAddrDesc] = balance
+		}
+		if balance.BalanceAssetAllocatedSat == nil{
+			balance.BalanceAssetAllocatedSat = map[uint32]big.Int{}
+		}
+		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[pt.assetAllocationTuple.Asset]
+		if !ok {
+			balanceAssetAllocatedSat = big.NewInt(0) 
+		}
+		strAddrDescriptors = append(strAddrDescriptors, strAddrDesc)
+		amount := allocation.ValueSat.AsBigInt()
+		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &amount)
+		totalAssetSentValue.Add(&totalAssetSentValue, &amount)
+		balance.BalanceAssetAllocatedSat[pt.assetAllocationTuple.Asset] = balanceAssetAllocatedSat
+	}
+	return &bchain.SyscoinOutputPackage{
+		Version: version,
+		AssetGuid: pt.assetAllocationTuple.Asset,
+		TotalAssetSentValue: totalAssetSentValue,
+		AssetSenderAddrDesc: assetSenderAddrDesc,
+		AssetReceiverStrAddrDesc: strAddrDescriptors,
+	}, nil
+}
+func (d *RocksDB) ConnectAssetAllocationInput(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
+	
+	if balance.SentAssetAllocatedSat == nil{
+		balance.SentAssetAllocatedSat = map[uint32]big.Int{}
+	}
+	sentAssetAllocatedSat := balance.SentAssetAllocatedSat[outputPackage.assetGuid]
+	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[outputPackage.assetGuid]
+	if !ok {
+		balanceAssetAllocatedSat = big.NewInt(0) 
+	}
+	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, &outputPackage.totalAssetSentValue)
+	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, &outputPackage.totalAssetSentValue)
+	if balanceAssetAllocatedSat.Sign() < 0 {
+		d.resetValueSatToZero(&balanceAssetAllocatedSat, outputPackage.assetSenderAddrDesc, "balance")
+	}
+	balance.SentAssetAllocatedSat[outputPackage.assetGuid] = sentAssetAllocatedSat
+	balance.BalanceAssetAllocatedSat[outputPackage.assetGuid] = balanceAssetAllocatedSat
+	return true
+
+}
+func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
+	sptData := d.chainParser.TryGetOPReturn(script)
+	if sptData == nil {
+		return nil, nil
+	}
+	if d.chainParser.IsAssetAllocationTx(version) {
+		return ConnectAssetAllocationOutput(d, sptData, balances, version)
+	}
+}
+func (p *SyscoinParser) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
+	if d.chainParser.IsAssetAllocationTx(outputPackage.Version) {
+		return ConnectAssetAllocationInput(outputPackage, balance)
+	}
+	return false
 }
 
 // addToAddressesMap maintains mapping between addresses and transactions in one block

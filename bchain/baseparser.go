@@ -1,8 +1,6 @@
 package bchain
 
 import (
-	"blockbook/bchain"
-	"blockbook/db"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
@@ -304,9 +302,7 @@ func (p *BaseParser) EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 func (p *BaseParser) IsSyscoinTx(nVersion uint32) bool {
 	return nil, errors.New("Not supported")
 }
-func (p *BaseParser) ConnectSyscoinOutputs(d *RocksDB, script []byte, balances map[string]*db.AddrBalance, version uint32) (*bchain.SyscoinOutputPackage, error) {
-	return nil, errors.New("Not supported")
-}
-func (p *BaseParser) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *db.AddrBalance) bool {
+
+func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 	return nil, errors.New("Not supported")
 }
