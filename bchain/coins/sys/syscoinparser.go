@@ -173,7 +173,6 @@ func (p *SyscoinParser) ConnectAssetAllocationOutput(d *RocksDB, sptData []bytes
 	}
 	strAddrDescriptors := make([]string, 0, len(pt.listSendingAllocationAmounts))
 	for allocationIndex, allocation := range pt.listSendingAllocationAmounts {
-		addrDesc GetAddrDescFromAddress
 		addrDesc, err := p.GetAddrDescFromAddress(allocation.witnessProgram.ToString())
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
