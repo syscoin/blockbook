@@ -731,7 +731,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*Addr
 		return ConnectAssetAllocationOutput(d, sptData, balances, version)
 	}
 }
-func (p *SyscoinParser) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
+func (d *RocksDB) ConnectSyscoinInputs(outputPackage bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
 	if d.chainParser.IsAssetAllocationTx(outputPackage.Version) {
 		return ConnectAssetAllocationInput(outputPackage, balance)
 	}
