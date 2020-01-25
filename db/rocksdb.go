@@ -746,7 +746,6 @@ func (d *RocksDB) ConnectSyscoinInputs(outputPackage *bchain.SyscoinOutputPackag
 func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses addressesMap, txAddressesMap map[string]*TxAddresses, balances map[string]*AddrBalance) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*TxAddresses, len(block.Txs))
-	chainType := d.chainParser.GetChainType()
 	var outputPackage *bchain.SyscoinOutputPackage
 	// first process all outputs so that inputs can refer to txs in this block
 	for txi := range block.Txs {
