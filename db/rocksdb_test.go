@@ -708,7 +708,6 @@ func TestRocksDB_Index_BitcoinType(t *testing.T) {
 		t.Fatal(err)
 	}
 	taw := &TxAddresses{
-		Version: 0,
 		Height: 225494,
 		Inputs: []TxInput{
 			{
@@ -907,7 +906,6 @@ func Test_packTxAddresses_unpackTxAddresses(t *testing.T) {
 			name: "1",
 			hex:  "7b0216001443aac20a116e09ea4f7914be1c55e4c17aa600b70016001454633aa8bd2e552bd4e89c01e73c1b7905eb58460811207cb68a199872012d001443aac20a116e09ea4f7914be1c55e4c17aa600b70101",
 			data: &TxAddresses{
-				Version: 0,
 				Height: 123,
 				Inputs: []TxInput{
 					{
@@ -932,7 +930,6 @@ func Test_packTxAddresses_unpackTxAddresses(t *testing.T) {
 			name: "2",
 			hex:  "e0390317a9149eb21980dc9d413d8eac27314938b9da920ee53e8705021918f2c017a91409f70b896169c37981d2b54b371df0d81a136a2c870501dd7e28c017a914e371782582a4addb541362c55565d2cdf56f6498870501a1e35ec0052fa9141d9ca71efa36d814424ea6ca1437e67287aebe348705012aadcac02ea91424fbc77cdc62702ade74dcf989c15e5d3f9240bc870501664894c02fa914afbfb74ee994c7d45f6698738bc4226d065266f7870501a1e35ec03276a914d2a37ce20ac9ec4f15dd05a7c6e8e9fbdb99850e88ac043b9943603376a9146b2044146a4438e6e5bfbc65f147afeb64d14fbb88ac05012a05f200",
 			data: &TxAddresses{
-				Version: 0,
 				Height: 12345,
 				Inputs: []TxInput{
 					{
@@ -979,7 +976,6 @@ func Test_packTxAddresses_unpackTxAddresses(t *testing.T) {
 			name: "empty address",
 			hex:  "baef9a1501000204d2020002162e010162",
 			data: &TxAddresses{
-				Version: 0,
 				Height: 123456789,
 				Inputs: []TxInput{
 					{

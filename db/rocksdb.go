@@ -1133,7 +1133,7 @@ func (d *RocksDB) AddrDescForOutpoint(outpoint bchain.Outpoint) bchain.AddressDe
 
 func packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
-	l := packVaruint(uint(ta.Version), varBuf)
+	l := packVarint32(ta.Version, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	l = packVaruint(uint(ta.Height), varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -1237,8 +1237,8 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 
 func unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	ta := TxAddresses{}
-	version, l := unpackVaruint(buf)
-	ta.Version = int32(version)
+	version, l := unpackVarint32(buf)
+	ta.Version = version
 	height, ll := unpackVaruint(buf[l:])
 	ta.Height = uint32(height)
 	l += ll
