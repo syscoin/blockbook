@@ -693,8 +693,8 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		strAddrDescriptors = append(strAddrDescriptors, strAddrDesc)
 		amount := big.NewInt(allocation.GetValueSat())
-		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &amount)
-		totalAssetSentValue.Add(totalAssetSentValue, &amount)
+		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, amount)
+		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
 	return &bchain.SyscoinOutputPackage{
