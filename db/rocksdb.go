@@ -813,8 +813,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 					outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
 					if err != nil {
 						glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
-					}
-					else {
+					} else {
 						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
 							// for each address returned, add it to map
 							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
