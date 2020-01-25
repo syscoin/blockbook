@@ -214,7 +214,7 @@ func verifyAfterBitcoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		},
 		{
 			dbtestdata.TxidB1T2,
-			uintToHex(0) +
+			varuintToHex(0) +
 			varuintToHex(225493) +
 				"00" +
 				"03" +
@@ -346,7 +346,7 @@ func verifyAfterBitcoinTypeBlock2(t *testing.T, d *RocksDB) {
 		},
 		{
 			dbtestdata.TxidB2T1,
-			uintToHex(29696) +
+			varuintToHex(29696) +
 			varuintToHex(225494) +
 				"02" +
 				inputAddressToPubKeyHexWithLength(dbtestdata.Addr3, t, d) + bigintToHex(dbtestdata.SatB1T2A3) +
