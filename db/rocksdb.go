@@ -445,7 +445,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 		return err
 	}
 	addresses := make(addressesMap)
-	if chainType == bchain.ChainBitcoinType || chainType == bchain.ChainSyscoinType {
+	if chainType == bchain.ChainBitcoinType {
 		txAddressesMap := make(map[string]*TxAddresses)
 		balances := make(map[string]*AddrBalance)
 		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances); err != nil {
@@ -804,25 +804,23 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 					balance.Txs++
 				}
 				// process syscoin tx
-				if chainType == bchain.ChainSyscoinType {
-					isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
-					if isSyscoinTx {
-						script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
-						if err != nil {
-							glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
-							continue
-						}
-						outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
-						if err != nil {
-							glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
-							continue
-						}
-						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
-							// for each address returned, add it to map
-							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
-							if !counted {
-								balance.Txs++
-							}
+				isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
+				if isSyscoinTx {
+					script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
+					if err != nil {
+						glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
+						continue
+					}
+					outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
+					if err != nil {
+						glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
+						continue
+					}
+					for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
+						// for each address returned, add it to map
+						counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
+						if !counted {
+							balance.Txs++
 						}
 					}
 				}
@@ -902,7 +900,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if !counted {
 					balance.Txs++
 				}
-				if chainType == bchain.ChainSyscoinType && outputPackage != nil {
+				if outputPackage != nil {
 					if string(outputPackage.AssetSenderAddrDesc) == string(spentOutput.AddrDesc) {
 						d.ConnectSyscoinInputs(outputPackage, balance)
 					}

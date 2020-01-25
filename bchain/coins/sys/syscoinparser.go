@@ -157,8 +157,3 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	}
 	return nil
 }
-// GetChainType is type of the blockchain, default is ChainBitcoinType
-func (p *SyscoinParser) GetChainType() bchain.ChainType {
-	return bchain.ChainSyscoinType
-}
-
