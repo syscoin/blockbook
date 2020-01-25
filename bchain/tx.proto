@@ -22,7 +22,7 @@ syntax = "proto3";
         }
         message RangeAmountPairType {
             WitnessAddressType WitnessAddress = 1;
-            int64 ValueSat = 2;
+            bytes ValueSat = 2;
         }
         message AssetAllocationTupleType {
             uint32 Asset = 1;
