@@ -807,12 +807,12 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if isSyscoinTx {
 					script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 					if err != nil {
-						glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
+						glog.Warningf("rocksdb: asset addrDesc: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 						continue
 					}
 					outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
 					if err != nil {
-						glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
+						glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 					} else if outputPackage != nil {
 						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
 							// for each address returned, add it to map
