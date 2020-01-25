@@ -325,7 +325,7 @@ func verifyAfterBitcoinTypeBlock2(t *testing.T, d *RocksDB) {
 	if err := checkColumn(d, cfTxAddresses, []keyPair{
 		{
 			dbtestdata.TxidB1T1,
-			varuintToHex(0) +
+			uintToHex(29696) +
 			varuintToHex(225493) +
 				"00" +
 				"02" +
@@ -346,7 +346,7 @@ func verifyAfterBitcoinTypeBlock2(t *testing.T, d *RocksDB) {
 		},
 		{
 			dbtestdata.TxidB2T1,
-			varuintToHex(0) +
+			uintToHex(29696) +
 			varuintToHex(225494) +
 				"02" +
 				inputAddressToPubKeyHexWithLength(dbtestdata.Addr3, t, d) + bigintToHex(dbtestdata.SatB1T2A3) +
