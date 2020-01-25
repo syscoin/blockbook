@@ -224,11 +224,11 @@ func (m *ProtoTransaction_WitnessAddressType) GetWitnessProgram() string {
 
 func (m *ProtoTransaction_WitnessAddressType) ToString() string {
 	if m != nil {
-		if len(m.WitnessProgram) <= 4 && string(m.WitnessProgram) == "burn" {
+		if len(m.WitnessProgram) <= 4 && m.WitnessProgram == "burn" {
 			return "burn"
 		}
 		// Convert data to base32:
-		conv, err := bech32.ConvertBits(m.WitnessProgram, 8, 5, true)
+		conv, err := bech32.ConvertBits([]byte(m.WitnessProgram), 8, 5, true)
 		if err != nil {
 			fmt.Println("Error:", err)
 			return ""
