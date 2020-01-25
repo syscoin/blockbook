@@ -716,6 +716,7 @@ func TestRocksDB_Index_BitcoinType(t *testing.T) {
 		t.Fatal(err)
 	}
 	taw := &TxAddresses{
+		Version: 29696,
 		Height: 225494,
 		Inputs: []TxInput{
 			{
