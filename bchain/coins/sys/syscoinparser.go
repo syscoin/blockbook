@@ -5,7 +5,8 @@ import (
 	"blockbook/bchain/coins/btc"
 	"blockbook/bchain/coins/utils"
 	"bytes"
-
+	"github.com/golang/glog"
+	"encoding/hex"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
@@ -153,6 +154,7 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 		} else if script[1] == txscript.OP_PUSHDATA2 && len(script) <= 0xffff {
 			data = script[4:]
 		}
+		glog.Warningf("rocksdb: TryGetOPReturn: %v", hex.EncodeToString(data))
 		return data
 	}
 	return nil
