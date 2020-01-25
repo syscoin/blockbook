@@ -196,7 +196,7 @@ func (m *ProtoTransaction_VoutType) GetAddresses() []string {
 	return nil
 }
 type ProtoTransaction_WitnessAddressType struct {
-	Version			byte		`protobuf:"varint,1,opt,name=Version" json:"Version,omitempty"`
+	Version			uint8		`protobuf:"varint,1,opt,name=Version,proto3" json:"Version,omitempty"`
 	WitnessProgram 	[]byte		`protobuf:"bytes,2,opt,name=WitnessProgram" json:"WitnessProgram,omitempty"`
 }
 func (m *ProtoTransaction_WitnessAddressType) Reset()                    { *m = ProtoTransaction_WitnessAddressType{} }
