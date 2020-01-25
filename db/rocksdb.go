@@ -1239,8 +1239,9 @@ func unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	ta := TxAddresses{}
 	version, l := unpackVaruint(buf)
 	ta.Version = int32(version)
-	height, l := unpackVaruint(buf[l:])
+	height, ll := unpackVaruint(buf[l:])
 	ta.Height = uint32(height)
+	l += ll
 	inputs, ll := unpackVaruint(buf[l:])
 	l += ll
 	ta.Inputs = make([]TxInput, inputs)
