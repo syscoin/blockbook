@@ -645,7 +645,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := pt.GetAssetAllocationTuple().GetAsset()
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(pt.GetAssetAllocationTuple().GetWitnessAddress().ToString())
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(string(pt.GetAssetAllocationTuple().GetWitnessAddress()))
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -660,7 +660,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	listSendingAllocationAmounts := pt.GetListSendingAllocationAmounts();
 	strAddrDescriptors := make([]string, 0, len(listSendingAllocationAmounts))
 	for _, allocation := range listSendingAllocationAmounts {
-		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.GetWitnessAddress().ToString())
+		addrDesc, err := d.chainParser.GetAddrDescFromAddress(string(allocation.GetWitnessAddress()))
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
