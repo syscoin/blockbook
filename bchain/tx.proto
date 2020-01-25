@@ -16,19 +16,19 @@ syntax = "proto3";
             bytes ScriptPubKeyHex = 3;
             repeated string Addresses = 4;
         }
-        WitnessAddressType {
+        message WitnessAddressType {
             uint8 Version = 1;
             bytes WitnessProgram = 2;
         }
-        RangeAmountPairType {
+        message RangeAmountPairType {
             WitnessAddressType WitnessAddress = 1;
             bytes ValueSat = 2;
         }
-        AssetAllocationTupleType {
+        message AssetAllocationTupleType {
             uint32 Asset = 1;
             WitnessAddressType WitnessAddress = 2;
         }
-        AssetAllocationType {
+        message AssetAllocationType {
             AssetAllocationTupleType AssetAllocationTuple = 1;
             repeated RangeAmountPairType ListSendingAllocationAmounts = 2;
         }
