@@ -204,7 +204,7 @@ func (m *ProtoTransaction_WitnessAddressType) String() string            { retur
 func (*ProtoTransaction_WitnessAddressType) ProtoMessage()               {}
 func (*ProtoTransaction_WitnessAddressType) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 1} }
 
-func (m *ProtoTransaction_WitnessAddressType) GetVersion() byte {
+func (m *ProtoTransaction_WitnessAddressType) GetVersion() uint8 {
 	if m != nil {
 		return m.Version
 	}
