@@ -180,7 +180,7 @@ func GetTestBitcoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 				Blocktime:     1521595678,
 				Time:          1521595678,
 				Confirmations: 1,
-				Version: 29696
+				Version: 29696,
 			},
 			{
 				Txid: TxidB2T2,
