@@ -18,8 +18,8 @@ syntax = "proto3";
         }
         message AssetAllocationType {
             message WitnessAddressType {
-                uint32 Version = 1;
-                string WitnessProgram = 2;
+                string Version = 1;
+                bytes WitnessProgram = 2;
             }
             message RangeAmountPairType {
                 WitnessAddressType WitnessAddress = 1;
