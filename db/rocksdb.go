@@ -760,7 +760,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 		txAddressesMap[string(btxID)] = &ta
 		blockTxAddresses[txi] = &ta
 		isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
-		outputPackage := nil
+		outputPackage = nil
 		for i, output := range tx.Vout {
 			tao := &ta.Outputs[i]
 			tao.ValueSat = output.ValueSat
@@ -811,7 +811,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 						glog.Warningf("rocksdb: asset addrDesc: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
 						continue
 					}
-					outputPackage, err = d.ConnectSyscoinOutputs(script, balances, tx.Version)
+					outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
 					if err != nil {
 						glog.Warningf("rocksdb: ConnectSyscoinOutputs: %v - height %d, tx %v, output %v, error %v", strAddrDesc, block.Height, tx.Txid, output, err)
 					} else if outputPackage != nil {
