@@ -17,7 +17,7 @@ syntax = "proto3";
             repeated string Addresses = 4;
         }
         message WitnessAddressType {
-            byte Version = 1;
+            varint Version = 1;
             bytes WitnessProgram = 2;
         }
         message RangeAmountPairType {
