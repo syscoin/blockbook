@@ -9,34 +9,8 @@ import (
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
-// NewAddressWitnessPubKeyHash returns a new AddressWitnessPubKeyHash.
-func newAddressWitnessPubKeyHash(witnessProg []byte) (*btcutil.AddressWitnessPubKeyHash, error) {
-	addr := &btcutil.AddressWitnessPubKeyHash{
-		hrp:            "sys",
-		witnessVersion: 0x00,
-		witnessProgram: witnessProg,
-	}
-	return addr, nil
-}
-// NewAddressWitnessScriptHash returns a new AddressWitnessScriptHash.
-func newAddressWitnessScriptHash(witnessProg []byte) (*btcutil.AddressWitnessScriptHash, error) {
-	addr := &btcutil.AddressWitnessScriptHash{
-		hrp:            "sys",
-		witnessVersion: 0x00,
-		witnessProgram: witnessProg,
-	}
-	return addr, nil
-}
-func GetWitnessAddress(witnessProg []byte) (btcutil.Address, error) {
-	switch len(witnessProg) {
-	case 20:
-		return newAddressWitnessPubKeyHash(witnessProg)
-	case 32:
-		return newAddressWitnessScriptHash(witnessProg)
-	default:
-		return nil, btcutil.UnsupportedWitnessProgLenError(len(witnessProg))
-	}
-}
+
+
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocation
@@ -47,11 +21,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	senderWitness, err := GetWitnessAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.WitnessProgram)
-	senderStr := senderWitness.EncodeAddress()
-	if err != nil {
-		return nil, err
-	}
+	senderStr := assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys")
 	glog.Warningf("rocksdb: found assetallocation from asset %v sender addrDesc: %v", assetGuid, senderStr)
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
@@ -67,11 +37,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	strAddrDescriptors := make([]string, 0, len(assetAllocation.ListSendingAllocationAmounts))
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
-		receiverWitness, err := GetWitnessAddress(allocation.WitnessAddress.WitnessProgram)
-		if err != nil {
-			continue
-		}
-		receiverStr := receiverWitness.EncodeAddress()
+		receiverStr := allocation.WitnessAddress.ToString("sys")
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverStr)
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
