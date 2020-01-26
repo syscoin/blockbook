@@ -18,6 +18,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	if err != nil {
 		return nil, err
 	}
+	glog.Warningf("rocksdb: found assetallocation from asset %v sender addrDesc: %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
