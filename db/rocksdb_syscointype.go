@@ -9,7 +9,7 @@ import (
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
-func GetWitnessAddress(witnessProg []byte) btcutil.Address, error{
+func GetWitnessAddress(witnessProg []byte) (*btcutil.Address, error) {
 	switch len(witnessProg) {
 	case 20:
 		return &btcutil.AddressWitnessPubKeyHash{
