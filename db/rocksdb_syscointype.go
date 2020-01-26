@@ -45,18 +45,16 @@ func (a *WitnessAddressType) Deserialize(r io.Reader) {
 
 func (m *WitnessAddressType) ToString() string {
 	if m != nil {
-		if len(m.WitnessProgram) <= 4 && m.WitnessProgram == "burn" {
+		if len(m.WitnessProgram) <= 4 && string(m.WitnessProgram) == "burn" {
 			return "burn"
 		}
 		// Convert data to base32:
 		conv, err := bech32.ConvertBits([]byte(m.WitnessProgram), 8, 5, true)
 		if err != nil {
-			fmt.Println("Error:", err)
 			return ""
 		}
 		encoded, err := bech32.Encode("sys", conv)
 		if err != nil {
-			fmt.Println("Error:", err)
 			return ""
 		}
 		return encoded
