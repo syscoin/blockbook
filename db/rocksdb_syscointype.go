@@ -18,7 +18,7 @@ type WitnessAddressType struct {
 }
 type RangeAmountPairType struct {
 	WitnessAddress WitnessAddressType
-	ValueSat big.Int
+	ValueSat int64
 }
 
 type AssetAllocationTupleType struct {
@@ -74,7 +74,7 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) error {
 	return nil
 }
 func (a *AssetAllocationTupleType) Deserialize(r io.Reader) error {
-	err := wire.readElement(r, &Asset)
+	err := wire.readElement(r, &a.Asset)
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset")
 	}
@@ -95,7 +95,7 @@ func (a *AssetAllocation) Deserialize(r io.Reader) error {
 		return errors.New("rocksdb: AssetAllocation Deserialize numReceivers")
 	}
 	a.ListSendingAllocationAmounts = make([]RangeAmountPairType, numReceivers)
-	for _, allocation := range a.ListSendingAllocationAmount {
+	for _, allocation := range a.ListSendingAllocationAmounts {
 		err = allocation.Deserialize(r)
 		if err != nil {
 			return err
@@ -126,8 +126,8 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		return nil, errors.New("Skipping asset sender")
 	}
-	strAddrDescriptors := make([]string, 0, len(tx.ListSendingAllocationAmount))
-	for _, allocation := range tx.ListSendingAllocationAmount {
+	strAddrDescriptors := make([]string, 0, len(assetAllocation.ListSendingAllocationAmounts))
+	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.WitnessAddress.ToString())
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
