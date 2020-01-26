@@ -5,6 +5,7 @@ import (
 	"bytes"
 
 	"io"
+	"math/big"
 	"github.com/golang/glog"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/juju/errors"
@@ -66,14 +67,14 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) {
 	if err != nil {
 		return err
 	}
-	valueSat, err := binarySerializer.Uint64(r, wire.littleEndian)
+	valueSat, err := binarySerializer.Uint64(r, littleEndian)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error %v", err)
 	}
 	ValueSat := big.NewInt(valueSat)
 }
 func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
-	Asset, err := binarySerializer.Uint32(r, wire.littleEndian)
+	Asset, err := binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset: error %v", err)
 	}
