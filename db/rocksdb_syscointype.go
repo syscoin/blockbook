@@ -30,7 +30,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		} else {
 			glog.V(1).Infof("rocksdb: skipping asset %v sender addrDesc: %v of length %d", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString(), len(assetSenderAddrDesc))
 		}
-		return nil, errors.New("Skipping asset %v sender %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
+		return nil, errors.New("Skipping asset sender")
 	}
 	strAddrDescriptors := make([]string, 0, len(assetAllocation.ListSendingAllocationAmounts))
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
