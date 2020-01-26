@@ -7,7 +7,7 @@ import (
 	"io"
 	"math/big"
 	"github.com/golang/glog"
-	"github.com/martinboehm/btcd/wire"
+	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
 
