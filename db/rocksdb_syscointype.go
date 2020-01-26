@@ -2,7 +2,6 @@ package db
 
 import (
 	"blockbook/bchain"
-	"blockbook/api"
 	"bytes"
 
 	"io"
@@ -68,10 +67,11 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) {
 	if err != nil {
 		return err
 	}
-	err = wire.readElement(r, &ValueSat)
+	valueSat, err := wire.binarySerializer.Uint64(r, wire.littleEndian)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error %v", err)
 	}
+	ValueSat := int64(valueSat)
 }
 func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
 	Asset, err := wire.binarySerializer.Uint32(r, wire.littleEndian)
