@@ -3,6 +3,7 @@ package db
 import (
 	"blockbook/bchain"
 	"bytes"
+	"github.com/martinboehm/btcutil/bech32"
 
 	"io"
 	"math/big"
