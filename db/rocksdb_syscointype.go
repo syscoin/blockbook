@@ -19,7 +19,7 @@ func GetWitnessAddress(witnessProg []byte) (btcutil.Address, error) {
 		}
 		return addr, nil
 	case 32:
-		addr := return &btcutil.AddressWitnessScriptHash{
+		addr := &btcutil.AddressWitnessScriptHash{
 			hrp:            "sys",
 			witnessVersion: 0x00,
 			witnessProgram: witnessProg,
