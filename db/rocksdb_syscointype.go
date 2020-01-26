@@ -21,7 +21,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	senderStr, err := btcutil.encodeSegWitAddress(d.chainParser.Params.Bech32HRPSegwit, assetAllocation.AssetAllocationTuple.WitnessAddress.Version, assetAllocation.AssetAllocationTuple.WitnessAddress.WitnessProgram)
+	senderStr, err := btcutil.encodeSegWitAddress("sys", byte(assetAllocation.AssetAllocationTuple.WitnessAddress.Version), assetAllocation.AssetAllocationTuple.WitnessAddress.WitnessProgram)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	strAddrDescriptors := make([]string, 0, len(assetAllocation.ListSendingAllocationAmounts))
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
-		receiverStr, err := btcutil.encodeSegWitAddress(d.chainParser.Params.Bech32HRPSegwit, allocation.WitnessAddress.Version, allocation.WitnessAddress.WitnessProgram)
+		receiverStr, err := btcutil.encodeSegWitAddress("sys", byte(allocation.WitnessAddress.Version), allocation.WitnessAddress.WitnessProgram)
 		if err != nil {
 			continue
 		}
