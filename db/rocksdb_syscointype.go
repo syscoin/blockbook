@@ -94,7 +94,7 @@ func (a *AssetAllocation) Deserialize(r io.Reader) error {
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocation Deserialize numReceivers")
 	}
-	a.ListSendingAllocationAmounts := make([]RangeAmountPairType, numReceivers)
+	a.ListSendingAllocationAmounts = make([]RangeAmountPairType, numReceivers)
 	for _, allocation := range a.ListSendingAllocationAmount {
 		err = allocation.Deserialize(r)
 		if err != nil {
