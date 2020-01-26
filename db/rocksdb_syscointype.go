@@ -32,13 +32,13 @@ type AssetAllocation struct {
 }
 
 func (a *WitnessAddressType) Deserialize(r io.Reader) {
-	err := wire.ReadVarInt(r, 0, &Version)
+	Version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
-		return errors.New("rocksdb: WitnessAddressType Deserialize Version: error %v", err)
+		return errors.New("rocksdb: WitnessAddressType Deserialize Version")
 	}
-	WitnessProgram, err := wire.ReadVarBytes(r, 0, 256)
+	WitnessProgram, err := wire.ReadVarBytes(r, 0, 256, "WitnessProgram")
 	if err != nil {
-		return errors.New("rocksdb: WitnessAddressType Deserialize WitnessProgram: error %v", err)
+		return errors.New("rocksdb: WitnessAddressType Deserialize WitnessProgram")
 	}
 }
 
@@ -68,13 +68,13 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) {
 	}
 	err = wire.readElement(r, &ValueSat)
 	if err != nil {
-		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error %v", err)
+		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error")
 	}
 }
 func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
 	err := wire.readElement(r, &Asset)
 	if err != nil {
-		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset: error %v", err)
+		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset")
 	}
 	err = WitnessAddress.Deserialize(r)
 	if err != nil {
@@ -88,7 +88,7 @@ func (a *AssetAllocation) Deserialize(r io.Reader) {
 	}
 	numReceivers, err := wire.ReadVarInt(r, 0)
 	if err != nil {
-		return errors.New("rocksdb: AssetAllocation Deserialize numReceivers: error %v", err)
+		return errors.New("rocksdb: AssetAllocation Deserialize numReceivers")
 	}
 	ListSendingAllocationAmounts := make([]RangeAmountPairType, numReceivers)
 	for _, allocation := range ListSendingAllocationAmount {
