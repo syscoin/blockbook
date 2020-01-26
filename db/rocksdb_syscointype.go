@@ -31,10 +31,11 @@ type AssetAllocation struct {
 }
 
 func (a *WitnessAddressType) Deserialize(r io.Reader) {
-	Version, err := binarySerializer.Uint8(r)
+	version, err := wire.Uint8(r)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize Version: error %v", err)
 	}
+	Version := uint8(version)
 	WitnessProgram, err := wire.ReadVarBytes(r, 0, 256)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize WitnessProgram: error %v", err)
@@ -67,17 +68,18 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) {
 	if err != nil {
 		return err
 	}
-	valueSat, err := binarySerializer.Uint64(r, littleEndian)
+	valueSat, err := wire.Uint64(r)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error %v", err)
 	}
 	ValueSat := big.NewInt(valueSat)
 }
 func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
-	Asset, err := binarySerializer.Uint32(r, littleEndian)
+	asset, err := wire.Uint32(r)
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset: error %v", err)
 	}
+	Asset := uint32(asset)
 	err = WitnessAddress.Deserialize(r)
 	if err != nil {
 		return err
