@@ -20,7 +20,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
-	"github.com/gogo/protobuf/proto"
 )
 
 const dbVersion = 5

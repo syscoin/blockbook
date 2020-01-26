@@ -2,15 +2,14 @@ package db
 
 import (
 	"blockbook/bchain"
-	"blockbook/bchain/coins/sys"
+	"blockbook/api"
 	"bytes"
-	"encoding/hex"
 
 	"io"
 	"github.com/golang/glog"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/juju/errors"
-	"github.com/tecbot/gorocksdb"
+	"types"
 )
 
 type WitnessAddressType struct {
@@ -19,7 +18,7 @@ type WitnessAddressType struct {
 }
 type RangeAmountPairType struct {
 	WitnessAddress WitnessAddressType
-	ValueSat Amount
+	ValueSat api.Amount
 }
 
 type AssetAllocationTupleType struct {
@@ -75,7 +74,7 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) {
 	}
 }
 func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
-	err = wire.readElement(r, &Asset)
+	Asset, err := wire.binarySerializer.Uint32(r, wire.littleEndian)
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset: error %v", err)
 	}
@@ -158,8 +157,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			balanceAssetAllocatedSat.Set(big.NewInt(0))
 		}
 		strAddrDescriptors = append(strAddrDescriptors, strAddrDesc)
-		var amount big.Int
-		amount.SetBytes(allocation.ValueSat)
+		amount := allocation.ValueSat.AsBigInt()
 		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &amount)
 		totalAssetSentValue.Add(totalAssetSentValue, &amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
