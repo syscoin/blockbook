@@ -9,8 +9,24 @@ import (
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
-
-
+func GetWitnessAddress(witnessProg []byte) btcutil.Address, error{
+	switch len(witnessProg) {
+	case 20:
+		return &btcutil.AddressWitnessPubKeyHash{
+			hrp:            "sys",
+			witnessVersion: 0x00,
+			witnessProgram: witnessProg,
+		}
+	case 32:
+		return &btcutil.AddressWitnessScriptHash{
+			hrp:            "sys",
+			witnessVersion: 0x00,
+			witnessProgram: witnessProg,
+		}
+	default:
+		return nil, btcutil.UnsupportedWitnessProgLenError(len(witnessProg))
+	}
+}
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocation
@@ -21,7 +37,8 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	senderStr, err := btcutil.encodeSegWitAddress("sys", byte(assetAllocation.AssetAllocationTuple.WitnessAddress.Version), assetAllocation.AssetAllocationTuple.WitnessAddress.WitnessProgram)
+	senderWitness, err := GetWitnessAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.WitnessProgram)
+	senderStr = senderWitness.EncodeAddress()
 	if err != nil {
 		return nil, err
 	}
@@ -40,10 +57,11 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	strAddrDescriptors := make([]string, 0, len(assetAllocation.ListSendingAllocationAmounts))
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
-		receiverStr, err := btcutil.encodeSegWitAddress("sys", byte(allocation.WitnessAddress.Version), allocation.WitnessAddress.WitnessProgram)
+		receiverWitness, err := GetWitnessAddress(allocation.WitnessAddress.WitnessProgram)
 		if err != nil {
 			continue
 		}
+		receiverStr = receiverWitness.EncodeAddress()
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverStr)
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
