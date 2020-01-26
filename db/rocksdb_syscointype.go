@@ -31,7 +31,7 @@ type AssetAllocation struct {
 	ListSendingAllocationAmounts []RangeAmountPairType
 }
 
-func (a *WitnessAddressType) Deserialize(r io.Reader) {
+func (a *WitnessAddressType) Deserialize(r io.Reader) error {
 	Version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize Version")
@@ -40,6 +40,7 @@ func (a *WitnessAddressType) Deserialize(r io.Reader) {
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize WitnessProgram")
 	}
+	return nil
 }
 
 func (m *WitnessAddressType) ToString() string {
@@ -61,7 +62,7 @@ func (m *WitnessAddressType) ToString() string {
 	return ""
 }
 
-func (a *RangeAmountPairType) Deserialize(r io.Reader) {
+func (a *RangeAmountPairType) Deserialize(r io.Reader) error {
 	err := WitnessAddress.Deserialize(r)
 	if err != nil {
 		return err
@@ -70,8 +71,9 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) {
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error")
 	}
+	return nil
 }
-func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
+func (a *AssetAllocationTupleType) Deserialize(r io.Reader) error {
 	err := wire.readElement(r, &Asset)
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset")
@@ -80,8 +82,9 @@ func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
 	if err != nil {
 		return err
 	}
+	return nil
 }
-func (a *AssetAllocation) Deserialize(r io.Reader) {
+func (a *AssetAllocation) Deserialize(r io.Reader) error {
 	err := AssetAllocationTuple.Deserialize(r)
 	if err != nil {
 		return err
@@ -97,6 +100,7 @@ func (a *AssetAllocation) Deserialize(r io.Reader) {
 			return err
 		}
 	}
+	return nil
 }
 
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
