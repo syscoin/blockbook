@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"math/big"
 	"github.com/golang/glog"
+	"github.com/martinboehm/btcutil"
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
@@ -20,27 +21,35 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	glog.Warningf("rocksdb: found assetallocation from asset %v sender addrDesc: %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
+	senderStr, err := btcutil.encodeSegWitAddress(d.chainParser.Params.Bech32HRPSegwit, assetAllocation.AssetAllocationTuple.WitnessAddress.Version, assetAllocation.AssetAllocationTuple.WitnessAddress.WitnessProgram)
+	if err != nil {
+		return nil, err
+	}
+	glog.Warningf("rocksdb: found assetallocation from asset %v sender addrDesc: %v", assetGuid, senderStr)
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 			if err != bchain.ErrAddressMissing {
-				glog.Warningf("rocksdb: asset %v sender addrDesc: %v error %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString(), err)
+				glog.Warningf("rocksdb: asset %v sender addrDesc: %v error %v", assetGuid, senderStr, err)
 			}
 		} else {
-			glog.V(1).Infof("rocksdb: skipping asset %v sender addrDesc: %v of length %d", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString(), len(assetSenderAddrDesc))
+			glog.V(1).Infof("rocksdb: skipping asset %v sender addrDesc: %v of length %d", assetGuid, senderStr, len(assetSenderAddrDesc))
 		}
 		return nil, errors.New("Skipping asset sender")
 	}
 	strAddrDescriptors := make([]string, 0, len(assetAllocation.ListSendingAllocationAmounts))
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
-		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.WitnessAddress.ToString())
+		receiverStr, err := btcutil.encodeSegWitAddress(d.chainParser.Params.Bech32HRPSegwit, allocation.WitnessAddress.Version, allocation.WitnessAddress.WitnessProgram)
+		if err != nil {
+			continue
+		}
+		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverStr)
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: asset %v addrDesc: %v error %v", assetGuid, allocation.WitnessAddress.ToString(), err)
+					glog.Warningf("rocksdb: asset %v addrDesc: %v error %v", assetGuid, receiverStr, err)
 				}
 			} else {
 				glog.V(1).Infof("rocksdb: skipping asset %v addrDesc of length %d", assetGuid, len(addrDesc))
