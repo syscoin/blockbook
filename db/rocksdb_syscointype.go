@@ -9,22 +9,30 @@ import (
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
+// NewAddressWitnessPubKeyHash returns a new AddressWitnessPubKeyHash.
+func newAddressWitnessPubKeyHash(witnessProg []byte) (*btcutil.AddressWitnessPubKeyHash, error) {
+	addr := &btcutil.AddressWitnessPubKeyHash{
+		hrp:            "sys",
+		witnessVersion: 0x00,
+		witnessProgram: witnessProg,
+	}
+	return addr, nil
+}
+// NewAddressWitnessScriptHash returns a new AddressWitnessScriptHash.
+func newAddressWitnessScriptHash(witnessProg []byte) (*btcutil.AddressWitnessScriptHash, error) {
+	addr := &btcutil.AddressWitnessScriptHash{
+		hrp:            "sys",
+		witnessVersion: 0x00,
+		witnessProgram: witnessProg,
+	}
+	return addr, nil
+}
 func GetWitnessAddress(witnessProg []byte) (btcutil.Address, error) {
 	switch len(witnessProg) {
 	case 20:
-		addr := &btcutil.AddressWitnessPubKeyHash{
-			hrp:            "sys",
-			witnessVersion: 0x00,
-			witnessProgram: witnessProg,
-		}
-		return addr, nil
+		return newAddressWitnessPubKeyHash(witnessProg)
 	case 32:
-		addr := &btcutil.AddressWitnessScriptHash{
-			hrp:            "sys",
-			witnessVersion: 0x00,
-			witnessProgram: witnessProg,
-		}
-		return addr, nil
+		return newAddressWitnessScriptHash(witnessProg)
 	default:
 		return nil, btcutil.UnsupportedWitnessProgLenError(len(witnessProg))
 	}
