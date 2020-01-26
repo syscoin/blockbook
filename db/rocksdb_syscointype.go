@@ -4,6 +4,7 @@ import (
 	"blockbook/bchain"
 	"bytes"
 	"math/big"
+	"encoding/hex"
 	"github.com/golang/glog"
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
@@ -42,7 +43,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: asset %v addrDesc: %v error %v", assetGuid, receiverStr, err)
+					glog.Warningf("rocksdb: asset %v addrDesc: %v witness program %v error %v", assetGuid, receiverStr,hex.EncodeToString(allocation.WitnessAddress.WitnessProgram), err)
 				}
 			} else {
 				glog.V(1).Infof("rocksdb: skipping asset %v addrDesc of length %d", assetGuid, len(addrDesc))
