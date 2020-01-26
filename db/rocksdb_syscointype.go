@@ -32,11 +32,11 @@ type AssetAllocation struct {
 }
 
 func (a *WitnessAddressType) Deserialize(r io.Reader) error {
-	Version, err := wire.ReadVarInt(r, 0)
+	a.Version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize Version")
 	}
-	WitnessProgram, err := wire.ReadVarBytes(r, 0, 256, "WitnessProgram")
+	a.WitnessProgram, err := wire.ReadVarBytes(r, 0, 256, "WitnessProgram")
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize WitnessProgram")
 	}
@@ -63,11 +63,11 @@ func (m *WitnessAddressType) ToString() string {
 }
 
 func (a *RangeAmountPairType) Deserialize(r io.Reader) error {
-	err := WitnessAddress.Deserialize(r)
+	err := a.WitnessAddress.Deserialize(r)
 	if err != nil {
 		return err
 	}
-	err = wire.readElement(r, &ValueSat)
+	err = wire.readElement(r, &a.ValueSat)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error")
 	}
@@ -78,14 +78,14 @@ func (a *AssetAllocationTupleType) Deserialize(r io.Reader) error {
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset")
 	}
-	err = WitnessAddress.Deserialize(r)
+	err = a.WitnessAddress.Deserialize(r)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (a *AssetAllocation) Deserialize(r io.Reader) error {
-	err := AssetAllocationTuple.Deserialize(r)
+	err := a.AssetAllocationTuple.Deserialize(r)
 	if err != nil {
 		return err
 	}
@@ -93,8 +93,8 @@ func (a *AssetAllocation) Deserialize(r io.Reader) error {
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocation Deserialize numReceivers")
 	}
-	ListSendingAllocationAmounts := make([]RangeAmountPairType, numReceivers)
-	for _, allocation := range ListSendingAllocationAmount {
+	a.ListSendingAllocationAmounts := make([]RangeAmountPairType, numReceivers)
+	for _, allocation := range a.ListSendingAllocationAmount {
 		err = allocation.Deserialize(r)
 		if err != nil {
 			return err
@@ -112,8 +112,8 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		return nil, err
 	}
 	totalAssetSentValue := big.NewInt(0)
-	assetGuid := pt.AssetAllocationTuple.Asset
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(tx.AssetAllocationTuple.WitnessAddress.ToString())
+	assetGuid := assetAllocation.AssetAllocationTuple.Asset
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
