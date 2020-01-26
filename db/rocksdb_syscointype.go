@@ -25,12 +25,12 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 			if err != bchain.ErrAddressMissing {
-				glog.Warningf("rocksdb: asset sender addrDesc: %v error %v", assetSenderAddrDesc, err)
+				glog.Warningf("rocksdb: asset %v sender addrDesc: %v error %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString(), err)
 			}
 		} else {
-			glog.V(1).Infof("rocksdb: skipping asset sender addrDesc of length %d", len(assetSenderAddrDesc))
+			glog.V(1).Infof("rocksdb: skipping asset %v sender addrDesc: %v of length %d", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString(), len(assetSenderAddrDesc))
 		}
-		return nil, errors.New("Skipping asset sender")
+		return nil, errors.New("Skipping asset %v sender %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
 	}
 	strAddrDescriptors := make([]string, 0, len(assetAllocation.ListSendingAllocationAmounts))
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
@@ -39,10 +39,10 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: asset addrDesc: %v error %v", addrDesc, err)
+					glog.Warningf("rocksdb: asset %v addrDesc: %v error %v", assetGuid, allocation.WitnessAddress.ToString(), err)
 				}
 			} else {
-				glog.V(1).Infof("rocksdb: skipping asset addrDesc of length %d", len(addrDesc))
+				glog.V(1).Infof("rocksdb: skipping asset %v addrDesc of length %d", assetGuid, len(addrDesc))
 			}
 			continue
 		}
