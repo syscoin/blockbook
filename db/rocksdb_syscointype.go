@@ -36,8 +36,8 @@ func (a *WitnessAddressType) Deserialize(r io.Reader) error {
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize Version")
 	}
-	a.WitnessProgram, err1 := wire.ReadVarBytes(r, 0, 256, "WitnessProgram")
-	if err1 != nil {
+	a.WitnessProgram, err = wire.ReadVarBytes(r, 0, 256, "WitnessProgram")
+	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize WitnessProgram")
 	}
 	return nil
