@@ -17,14 +17,14 @@ func GetWitnessAddress(witnessProg []byte) (btcutil.Address, error) {
 			witnessVersion: 0x00,
 			witnessProgram: witnessProg,
 		}
-		return addr
+		return addr, nil
 	case 32:
 		addr := return &btcutil.AddressWitnessScriptHash{
 			hrp:            "sys",
 			witnessVersion: 0x00,
 			witnessProgram: witnessProg,
 		}
-		return addr
+		return addr, nil
 	default:
 		return nil, btcutil.UnsupportedWitnessProgLenError(len(witnessProg))
 	}
