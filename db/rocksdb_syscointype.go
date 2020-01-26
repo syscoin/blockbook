@@ -9,7 +9,7 @@ import (
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
-func GetWitnessAddress(witnessProg []byte) (*btcutil.Address, error) {
+func GetWitnessAddress(witnessProg []byte) (btcutil.Address, error) {
 	switch len(witnessProg) {
 	case 20:
 		return &btcutil.AddressWitnessPubKeyHash{
@@ -38,7 +38,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
 	senderWitness, err := GetWitnessAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.WitnessProgram)
-	senderStr = senderWitness.EncodeAddress()
+	senderStr := senderWitness.EncodeAddress()
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		if err != nil {
 			continue
 		}
-		receiverStr = receiverWitness.EncodeAddress()
+		receiverStr := receiverWitness.EncodeAddress()
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverStr)
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
