@@ -13,14 +13,14 @@ import (
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocation
-	r.Seek(0, 0)
 	err := assetAllocation.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
-	glog.Warningf("rocksdb: found assetallocation from asset %v sender addrDesc: %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
+	
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
+	glog.Warningf("rocksdb: found assetallocation from asset %v sender addrDesc: %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.ToString())
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
