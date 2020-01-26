@@ -32,7 +32,7 @@ type AssetAllocation struct {
 }
 
 func (a *WitnessAddressType) Deserialize(r io.Reader) error {
-	a.Version, err := wire.ReadVarInt(r, 0)
+	err := wire.readElement(r, &a.Version)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize Version")
 	}
@@ -89,7 +89,8 @@ func (a *AssetAllocation) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	numReceivers, err := wire.ReadVarInt(r, 0)
+	var numReceivers uint8
+	err = wire.readElement(r, &numReceivers)
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocation Deserialize numReceivers")
 	}
