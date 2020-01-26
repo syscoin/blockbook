@@ -3,7 +3,6 @@ package db
 import (
 	"blockbook/bchain"
 	"bytes"
-	"github.com/martinboehm/btcutil/bech32"
 
 	"io"
 	"math/big"
@@ -12,101 +11,10 @@ import (
 	"github.com/juju/errors"
 )
 
-type WitnessAddressType struct {
-	Version uint8
-	WitnessProgram []byte
-}
-type RangeAmountPairType struct {
-	WitnessAddress WitnessAddressType
-	ValueSat int64
-}
-
-type AssetAllocationTupleType struct {
-	Asset uint32
-	WitnessAddress WitnessAddressType
-}
-
-type AssetAllocation struct {
-	AssetAllocationTuple AssetAllocationTupleType
-	ListSendingAllocationAmounts []RangeAmountPairType
-}
-
-func (a *WitnessAddressType) Deserialize(r io.Reader) error {
-	err := wire.readElement(r, &a.Version)
-	if err != nil {
-		return errors.New("rocksdb: WitnessAddressType Deserialize Version")
-	}
-	a.WitnessProgram, err = wire.ReadVarBytes(r, 0, 256, "WitnessProgram")
-	if err != nil {
-		return errors.New("rocksdb: WitnessAddressType Deserialize WitnessProgram")
-	}
-	return nil
-}
-
-func (m *WitnessAddressType) ToString() string {
-	if m != nil {
-		if len(m.WitnessProgram) <= 4 && string(m.WitnessProgram) == "burn" {
-			return "burn"
-		}
-		// Convert data to base32:
-		conv, err := bech32.ConvertBits([]byte(m.WitnessProgram), 8, 5, true)
-		if err != nil {
-			return ""
-		}
-		encoded, err := bech32.Encode("sys", conv)
-		if err != nil {
-			return ""
-		}
-		return encoded
-	}
-	return ""
-}
-
-func (a *RangeAmountPairType) Deserialize(r io.Reader) error {
-	err := a.WitnessAddress.Deserialize(r)
-	if err != nil {
-		return err
-	}
-	err = wire.readElement(r, &a.ValueSat)
-	if err != nil {
-		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error")
-	}
-	return nil
-}
-func (a *AssetAllocationTupleType) Deserialize(r io.Reader) error {
-	err := wire.readElement(r, &a.Asset)
-	if err != nil {
-		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset")
-	}
-	err = a.WitnessAddress.Deserialize(r)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-func (a *AssetAllocation) Deserialize(r io.Reader) error {
-	err := a.AssetAllocationTuple.Deserialize(r)
-	if err != nil {
-		return err
-	}
-	var numReceivers uint8
-	err = wire.readElement(r, &numReceivers)
-	if err != nil {
-		return errors.New("rocksdb: AssetAllocation Deserialize numReceivers")
-	}
-	a.ListSendingAllocationAmounts = make([]RangeAmountPairType, numReceivers)
-	for _, allocation := range a.ListSendingAllocationAmounts {
-		err = allocation.Deserialize(r)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32) (*bchain.SyscoinOutputPackage, error) {
 	r := bytes.NewReader(sptData)
-	var assetAllocation AssetAllocation
+	var assetAllocation wire.AssetAllocation
 	r.Seek(0, 0)
 	err := assetAllocation.Deserialize(r)
 	if err != nil {
