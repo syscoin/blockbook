@@ -3,8 +3,6 @@ package db
 import (
 	"blockbook/bchain"
 	"bytes"
-
-	"io"
 	"math/big"
 	"github.com/golang/glog"
 	"github.com/syscoin/btcd/wire"
