@@ -22,7 +22,6 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
 	senderStr := assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys")
-	glog.Warningf("rocksdb: found assetallocation from asset %v sender addrDesc: %v", assetGuid, senderStr)
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
@@ -111,7 +110,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(script []byte, balances map[string]*Addr
 	if d.chainParser.IsAssetAllocationTx(version) {
 		return d.ConnectAssetAllocationOutput(sptData, balances, version)
 	}
-	return nil, errors.New("Not supported OP")
+	return nil, nil
 }
 func (d *RocksDB) ConnectSyscoinInputs(outputPackage *bchain.SyscoinOutputPackage, balance *AddrBalance) bool {
 	if d.chainParser.IsAssetAllocationTx(outputPackage.Version) {

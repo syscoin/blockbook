@@ -154,7 +154,6 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 		} else if script[1] == txscript.OP_PUSHDATA2 && len(script) <= 0xffff {
 			data = script[4:]
 		}
-		glog.Warningf("rocksdb: TryGetOPReturn: %v", hex.EncodeToString(data))
 		return data
 	}
 	return nil
