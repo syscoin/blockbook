@@ -8,7 +8,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/juju/errors"
-	"types"
 )
 
 type WitnessAddressType struct {
