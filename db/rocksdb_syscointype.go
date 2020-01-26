@@ -16,7 +16,7 @@ type WitnessAddressType struct {
 }
 type RangeAmountPairType struct {
 	WitnessAddress WitnessAddressType
-	ValueSat api.Amount
+	ValueSat big.Int
 }
 
 type AssetAllocationTupleType struct {
@@ -66,14 +66,14 @@ func (a *RangeAmountPairType) Deserialize(r io.Reader) {
 	if err != nil {
 		return err
 	}
-	valueSat, err := wire.binarySerializer.Uint64(r, wire.littleEndian)
+	valueSat, err := binarySerializer.Uint64(r, wire.littleEndian)
 	if err != nil {
 		return errors.New("rocksdb: WitnessAddressType Deserialize ValueSat: error %v", err)
 	}
-	ValueSat := int64(valueSat)
+	ValueSat := big.NewInt(valueSat)
 }
 func (a *AssetAllocationTupleType) Deserialize(r io.Reader) {
-	Asset, err := wire.binarySerializer.Uint32(r, wire.littleEndian)
+	Asset, err := binarySerializer.Uint32(r, wire.littleEndian)
 	if err != nil {
 		return errors.New("rocksdb: AssetAllocationTupleType Deserialize Asset: error %v", err)
 	}
