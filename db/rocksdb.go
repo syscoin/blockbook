@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"time"
 	"unsafe"
+	"github.com/martinboehm/btcutil/txscript"
 
 	vlq "github.com/bsm/go-vlq"
 	"github.com/golang/glog"
@@ -652,7 +653,6 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 		txAddressesMap[string(btxID)] = &ta
 		blockTxAddresses[txi] = &ta
 		isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
-		outputPackage = nil
 		for i, output := range tx.Vout {
 			tao := &ta.Outputs[i]
 			tao.ValueSat = output.ValueSat
@@ -698,7 +698,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				}
 			// process syscoin tx
 			} else if isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
-				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxId, int32(i))
+				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxID, int32(i))
 				if err != nil {
 					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 				}
@@ -1423,7 +1423,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 			} else if isSyscoinTx && t.AddrDesc[0] == txscript.OP_RETURN {
 				err := d.DisconnectSyscoinOutputs(t.AddrDesc, balances, txa.Version, addresses)
 				if err != nil {
-					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
+					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, error %v", height, btxID, err)
 				}
 			}
 		}

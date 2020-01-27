@@ -89,7 +89,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	return d.ConnectAssetAllocationInput(assetGuid, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
-func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
+func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses addressesMap) error {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocation
 	err := assetAllocation.Deserialize(r)
@@ -249,8 +249,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSen
 func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
-		glog.Warningf("rocksdb: asset addrDesc: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
-		continue
+		return err
 	}
 	sptData := d.chainParser.TryGetOPReturn(script)
 	if sptData == nil {
@@ -262,11 +261,10 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 	return nil
 }
 
-func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
+func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance, version int32, addresses addressesMap) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
-		glog.Warningf("rocksdb: disconnect asset addrDesc: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
-		continue
+		return err
 	}
 	sptData := d.chainParser.TryGetOPReturn(script)
 	if sptData == nil {
