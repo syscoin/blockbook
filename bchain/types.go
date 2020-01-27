@@ -186,15 +186,6 @@ type Erc20Transfer struct {
 	Tokens   big.Int
 }
 
-// Syscoin function return package given from ConnectOutputs in SyscoinParser, used to pass into ConnectInputs
-type SyscoinOutputPackage struct {
-	Version int32
-	AssetGuid uint32
-	TotalAssetSentValue big.Int
-	AssetSenderAddrDesc AddressDescriptor
-	AssetReceiverStrAddrDesc []string
-}
-
 // MempoolTxidEntry contains mempool txid with first seen time
 type MempoolTxidEntry struct {
 	Txid string
@@ -276,7 +267,7 @@ type BlockChainParser interface {
 	GetAddrDescFromAddress(address string) (AddressDescriptor, error)
 	GetAddressesFromAddrDesc(addrDesc AddressDescriptor) ([]string, bool, error)
 	GetScriptFromAddrDesc(addrDesc AddressDescriptor) ([]byte, error)
-	IsAddrDescIndexable(addrDesc AddressDescriptor, version int32) bool
+	IsAddrDescIndexable(addrDesc AddressDescriptor) bool
 	// transactions
 	PackedTxidLen() int
 	PackTxid(txid string) ([]byte, error)

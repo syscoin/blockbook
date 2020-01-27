@@ -275,7 +275,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // by default all AddressDescriptors are indexable
-func (p *BaseParser) IsAddrDescIndexable(addrDesc AddressDescriptor, version int32) bool {
+func (p *BaseParser) IsAddrDescIndexable(addrDesc AddressDescriptor) bool {
 	return true
 }
 

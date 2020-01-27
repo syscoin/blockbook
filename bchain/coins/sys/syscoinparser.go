@@ -128,14 +128,6 @@ func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
 func (p *SyscoinParser) IsSyscoinTx(nVersion int32) bool {
     return p.IsAssetTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }
-// IsAddrDescIndexable returns true if AddressDescriptor should be added to index
-// empty or OP_RETURN scripts are not indexed if not sys tx
-func (p *SyscoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor, version int32) bool {
-	if !p.IsSyscoinTx(version) && (len(addrDesc) == 0 || addrDesc[0] == txscript.OP_RETURN) {
-		return false
-	}
-	return true
-}
 // TryGetOPReturn tries to process OP_RETURN script and return data
 func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	if len(script) > 1 && script[0] == txscript.OP_RETURN {

@@ -639,7 +639,6 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses addressesMap, txAddressesMap map[string]*TxAddresses, balances map[string]*AddrBalance) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*TxAddresses, len(block.Txs))
-	var outputPackage *bchain.SyscoinOutputPackage
 	// first process all outputs so that inputs can refer to txs in this block
 	for txi := range block.Txs {
 		tx := &block.Txs[txi]
@@ -670,7 +669,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				continue
 			}
 			tao.AddrDesc = addrDesc
-			if d.chainParser.IsAddrDescIndexable(addrDesc, tx.Version) {
+			if d.chainParser.IsAddrDescIndexable(addrDesc) {
 				strAddrDesc := string(addrDesc)
 				balance, e := balances[strAddrDesc]
 				if !e {
@@ -697,25 +696,11 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				if !counted {
 					balance.Txs++
 				}
-				// process syscoin tx
-				if isSyscoinTx {
-					script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
-					if err != nil {
-						glog.Warningf("rocksdb: asset addrDesc: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
-						continue
-					}
-					outputPackage, err := d.ConnectSyscoinOutputs(script, balances, tx.Version)
-					if err != nil {
-						glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
-					} else if outputPackage != nil {
-						for _, strReceiverAddrDesc := range outputPackage.AssetReceiverStrAddrDesc {
-							// for each address returned, add it to map
-							counted := addToAddressesMap(addresses, strReceiverAddrDesc, btxID, int32(i))
-							if !counted {
-								balance.Txs++
-							}
-						}
-					}
+			// process syscoin tx
+			} else isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
+				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxId, int32(i))
+				if err != nil {
+					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 				}
 			}
 		}
@@ -773,7 +758,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				}
 				continue
 			}
-			if d.chainParser.IsAddrDescIndexable(spentOutput.AddrDesc, tx.Version) {
+			if d.chainParser.IsAddrDescIndexable(spentOutput.AddrDesc) {
 				strAddrDesc := string(spentOutput.AddrDesc)
 				balance, e := balances[strAddrDesc]
 				if !e {
@@ -792,11 +777,6 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 				counted := addToAddressesMap(addresses, strAddrDesc, spendingTxid, ^int32(i))
 				if !counted {
 					balance.Txs++
-				}
-				if outputPackage != nil {
-					if string(outputPackage.AssetSenderAddrDesc) == string(spentOutput.AddrDesc) {
-						d.ConnectSyscoinInputs(outputPackage, balance)
-					}
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
 				balance.markUtxoAsSpent(btxID, int32(input.Vout))
@@ -1348,6 +1328,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 	var err error
 	var balance *AddrBalance
 	addresses := make(map[string]struct{})
+	isSyscoinTx := d.chainParser.IsSyscoinTx(txa.Version)
 	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*AddrBalance, error) {
 		var err error
 		s := string(addrDesc)
@@ -1385,7 +1366,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 				sa.Outputs[input.index].Spent = false
 				inputHeight = sa.Height
 			}
-			if d.chainParser.IsAddrDescIndexable(t.AddrDesc, txa.Version) {
+			if d.chainParser.IsAddrDescIndexable(t.AddrDesc) {
 				balance, err = getAddressBalance(t.AddrDesc)
 				if err != nil {
 					return err
@@ -1420,7 +1401,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 			if !exist {
 				addresses[s] = struct{}{}
 			}
-			if d.chainParser.IsAddrDescIndexable(t.AddrDesc, txa.Version) {
+			if d.chainParser.IsAddrDescIndexable(t.AddrDesc) {
 				balance, err := getAddressBalance(t.AddrDesc)
 				if err != nil {
 					return err
@@ -1438,6 +1419,11 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 				} else {
 					ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(t.AddrDesc)
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
+				}
+			} else if isSyscoinTx && t.AddrDesc[0] == txscript.OP_RETURN {
+				err := d.DisconnectSyscoinOutputs(t.AddrDesc, balances, txa.Version, addresses)
+				if err != nil {
+					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 				}
 			}
 		}
