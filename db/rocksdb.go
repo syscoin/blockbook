@@ -363,6 +363,7 @@ func (d *RocksDB) GetTransactions(address string, lower uint32, higher uint32, f
 // Transaction are passed to callback function in the order from newest block to the oldest
 func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, lower uint32, higher uint32, fn GetTransactionsCallback) (err error) {
 	txidUnpackedLen := d.chainParser.PackedTxidLen()
+	addrDescLen := len(addrDesc)
 	startKey := d.chainParser.PackAddressKey(addrDesc, higher)
 	stopKey := d.chainParser.PackAddressKey(addrDesc, lower)
 	indexes := make([]int32, 0, 16)
@@ -370,10 +371,16 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 	defer it.Close()
 	for it.Seek(startKey); it.Valid(); it.Next() {
 		key := it.Key().Data()
-		val := it.Value().Data()
 		if bytes.Compare(key, stopKey) > 0 {
 			break
 		}
+		if len(key) != addrDescLen+packedHeightBytes {
+			if glog.V(2) {
+				glog.Warningf("rocksdb: addrDesc %s - mixed with %s", addrDesc, hex.EncodeToString(key))
+			}
+			continue
+		}
+		val := it.Value().Data()
 		if glog.V(2) {
 			glog.Infof("rocksdb: addresses %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
 		}
