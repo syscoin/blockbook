@@ -697,7 +697,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 					balance.Txs++
 				}
 			// process syscoin tx
-			} else isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
+			} else if isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
 				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxId, int32(i))
 				if err != nil {
 					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
