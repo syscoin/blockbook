@@ -425,8 +425,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSen
 		} else {
 			glog.Warningf("DisconnectAssetAllocationInput: AssetSend SentUnAllocated balance not found guid %s (%s)", assetGuid, assetStrSenderAddrDesc)
 		}
-	}
-	else if balance.SentAssetAllocatedSat != nil {
+	} else if balance.SentAssetAllocatedSat != nil {
 		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if ok {	
