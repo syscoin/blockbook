@@ -157,7 +157,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			balance.Txs++
 		}
 
-		if balance.BalanceAssetAllocatedSat == nil{
+		if balance.BalanceAssetAllocatedSat == nil {
 			balance.BalanceAssetAllocatedSat = map[uint32]big.Int{}
 		}
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
@@ -168,6 +168,9 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
+		if receiverStr == "sys1qd7wt50kaf33yd03vlz3h4ztlpzhjnxnau6uwuf" {
+			glog.Warningf("Connecting to allocation sys1qd7wt50kaf33yd03vlz3h4ztlpzhjnxnau6uwuf value %f new balance %f", amount, balance.BalanceAssetAllocatedSat[assetGuid])
+		}
 	}
 	return d.ConnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
@@ -277,8 +280,8 @@ func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, version int32, t
 	} else {
 		d.cbs.balancesHit++
 	}
-	if d.chainParser.IsSyscoinAssetSend(version){
-		if balance.SentAssetUnAllocatedSat == nil{
+	if d.chainParser.IsSyscoinAssetSend(version) {
+		if balance.SentAssetUnAllocatedSat == nil {
 			balance.SentAssetUnAllocatedSat = map[uint32]big.Int{}
 		}
 		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
@@ -294,7 +297,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, version int32, t
 		balance.SentAssetUnAllocatedSat[assetGuid] = sentAssetUnAllocatedSat
 		balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
 	} else {
-		if balance.SentAssetAllocatedSat == nil{
+		if balance.SentAssetAllocatedSat == nil {
 			balance.SentAssetAllocatedSat = map[uint32]big.Int{}
 		}
 		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
