@@ -4,7 +4,6 @@ import (
 	"blockbook/bchain"
 	"bytes"
 	"math/big"
-	"encoding/hex"
 	"github.com/golang/glog"
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
@@ -33,7 +32,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBa
 	}
 	balance, e := balances[senderStr]
 	if !e {
-		balance, err = d.GetAddrDescBalance(addrDesc, addressBalanceDetailUTXOIndexed)
+		balance, err = d.GetAddrDescBalance(assetSenderAddrDesc, addressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
 		}
@@ -52,7 +51,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBa
 		balance.Txs++
 	}
 
-	if len(asset.WitnessAddressTransfer) > 0 {
+	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
 		transferStr := asset.WitnessAddressTransfer.ToString("sys")
 		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(transferStr)
 		if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
@@ -95,6 +94,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBa
 		balanceAssetUnAllocatedSat.Add(&balanceAssetUnAllocatedSat, &asset.Balance)
 		balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
 	}
+	return nil
 }
 
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
@@ -168,7 +168,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
-	return d.ConnectAssetAllocationInput(assetGuid, totalAssetSentValue, assetSenderAddrDesc, balances)
+	return d.ConnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
 func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses map[string]struct{}) error {
@@ -260,7 +260,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 	return d.DisconnectAssetAllocationInput(assetGuid, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
-func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance) error {
+func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, version uint32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
@@ -354,12 +354,12 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*Add
 		ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(assetSenderAddrDesc)
 		glog.Warningf("DisconnectAssetOutput Balance for asset address %s (%s) not found", ad, assetSenderAddrDesc)
 	}
-	if len(asset.WitnessAddressTransfer) > 0 {
+	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
 		transferStr := asset.WitnessAddressTransfer.ToString("sys")
 		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(transferStr)
-		_, exist := addresses[assetTransferWitnessAddrDesc]
+		_, exist := addresses[assetStrSenderAddrDesc]
 		if !exist {
-			addresses[assetTransferWitnessAddrDesc] = struct{}{}
+			addresses[assetStrSenderAddrDesc] = struct{}{}
 		}
 		balance, err := getAddressBalance(assetTransferWitnessAddrDesc)
 		if err != nil {
