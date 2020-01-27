@@ -176,9 +176,9 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 
 func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, totalAssetSentValue big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
-	balance, e := balances[assetStrSenderAddrDesc]
-	if !e {
-		balance, err = d.GetAddrDescBalance(addrassetSenderAddrDescDesc, addressBalanceDetailUTXOIndexed)
+	balance, err := balances[assetStrSenderAddrDesc]
+	if !err {
+		balance, err = d.GetAddrDescBalance(assetStrSenderAddrDesc, addressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
 		}
@@ -209,7 +209,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, totalAssetSentVa
 
 }
 
-func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSentValue big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance) error {
+func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
@@ -226,8 +226,8 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSen
 		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if ok {	
-			balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, &totalAssetSentValue)
-			sentAssetAllocatedSat.Sub(&sentAssetAllocatedSat, &totalAssetSentValue)
+			balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, totalAssetSentValue)
+			sentAssetAllocatedSat.Sub(&sentAssetAllocatedSat, totalAssetSentValue)
 			if sentAssetAllocatedSat.Sign() < 0 {
 				d.resetValueSatToZero(&sentAssetAllocatedSat, assetSenderAddrDesc, "balance")
 			}
