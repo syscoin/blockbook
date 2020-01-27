@@ -178,7 +178,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, totalAssetSentVa
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
-		balance, err := d.GetAddrDescBalance(assetStrSenderAddrDesc, addressBalanceDetailUTXOIndexed)
+		balance, err := d.GetAddrDescBalance(assetSenderAddrDesc, addressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSen
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
-		balance, err := d.GetAddrDescBalance(assetStrSenderAddrDesc, addressBalanceDetailUTXOIndexed)
+		balance, err := d.GetAddrDescBalance(assetSenderAddrDesc, addressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
 		}
