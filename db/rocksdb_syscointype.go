@@ -10,10 +10,82 @@ import (
 	"github.com/juju/errors"
 )
 
+func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
+	r := bytes.NewReader(sptData)
+	var asset wire.AssetType
+	err := asset.Deserialize(r)
+	if err != nil {
+		return err
+	}
+	assetGuid := asset.Asset
+	senderStr := asset.WitnessAddress.ToString("sys")
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
+		if err != nil {
+			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+			if err != bchain.ErrAddressMissing {
+				glog.Warningf("ConnectAssetOutput sender with asset %v (%v) could not be decoded error %v", assetGuid, senderStr, err)
+			}
+		} else {
+			glog.Warningf("ConnectAssetOutput sender with asset %v (%v) has invalid length: %d", assetGuid, senderStr, len(assetSenderAddrDesc))
+		}
+		return errors.New("ConnectAssetOutput Skipping asset tx")
+	}
+	balance, e := balances[senderStr]
+	if !e {
+		balance, err = d.GetAddrDescBalance(addrDesc, addressBalanceDetailUTXOIndexed)
+		if err != nil {
+			return err
+		}
+		if balance == nil {
+			balance = &AddrBalance{}
+		}
+		balances[senderStr] = balance
+		d.cbs.balancesMiss++
+	} else {
+		d.cbs.balancesHit++
+	}
+
+	// for each address returned, add it to map
+	counted := addToAddressesMap(addresses, senderStr, btxID, outputIndex)
+	if !counted {
+		balance.Txs++
+	}
+
+	if len(asset.WitnessAddressTransfer) > 0 {
+		transferStr := asset.WitnessAddressTransfer.ToString("sys")
+		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(transferStr)
+		if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
+			if err != nil {
+				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+				if err != bchain.ErrAddressMissing {
+					glog.Warningf("ConnectAssetOutput transferee with asset %v (%v) could not be decoded error %v", assetGuid, transferStr, err)
+				}
+			} else {
+				glog.Warningf("ConnectAssetOutput transferee with asset %v (%v) has invalid length: %d", assetGuid, transferStr, len(assetTransferWitnessAddrDesc))
+			}
+			return errors.New("ConnectAssetOutput Skipping asset transfer tx")
+		}
+		counted := addToAddressesMap(addresses, transferStr, btxID, outputIndex)
+		if !counted {
+			balance.Txs++
+		}
+	} else {
+		if balance.BalanceAssetUnAllocatedSat == nil{
+			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
+		}
+		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
+		if !ok {
+			balanceAssetUnAllocatedSat.Set(big.NewInt(0))
+		}
+		balanceAssetUnAllocatedSat.Add(&balanceAssetUnAllocatedSat, &asset.Balance)
+		balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
+	}
+}
 
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
 	r := bytes.NewReader(sptData)
-	var assetAllocation wire.AssetAllocation
+	var assetAllocation wire.AssetAllocationType
 	err := assetAllocation.Deserialize(r)
 	if err != nil {
 		return err
@@ -27,12 +99,12 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 			if err != bchain.ErrAddressMissing {
-				glog.Warningf("rocksdb: asset %v sender addrDesc: %v error %v", assetGuid, senderStr, err)
+				glog.Warningf("ConnectAssetAllocationOutput sender with asset %v (%v) could not be decoded error %v", assetGuid, senderStr, err)
 			}
 		} else {
-			glog.V(1).Infof("rocksdb: skipping asset %v sender addrDesc: %v of length %d", assetGuid, senderStr, len(assetSenderAddrDesc))
+			glog.Warningf("ConnectAssetAllocationOutput sender with asset %v (%v) has invalid length: %d", assetGuid, senderStr, len(assetSenderAddrDesc))
 		}
-		return errors.New("Skipping asset sender")
+		return errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		receiverStr := allocation.WitnessAddress.ToString("sys")
@@ -41,10 +113,10 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: asset %v addrDesc: %v witness program %v error %v", assetGuid, receiverStr,hex.EncodeToString(allocation.WitnessAddress.WitnessProgram), err)
+					glog.Warningf("ConnectAssetAllocationOutput receiver with asset %v (%v) could not be decoded error %v", assetGuid, receiverStr, err)
 				}
 			} else {
-				glog.V(1).Infof("rocksdb: skipping asset %v addrDesc of length %d", assetGuid, len(addrDesc))
+				glog.Warningf("ConnectAssetAllocationOutput receiver with asset %v (%v) has invalid length: %d", assetGuid, receiverStr, len(addrDesc))
 			}
 			continue
 		}
@@ -87,7 +159,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 
 func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses map[string]struct{}) error {
 	r := bytes.NewReader(sptData)
-	var assetAllocation wire.AssetAllocation
+	var assetAllocation wire.AssetAllocationType
 	err := assetAllocation.Deserialize(r)
 	if err != nil {
 		return err
@@ -113,12 +185,12 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 			if err != bchain.ErrAddressMissing {
-				glog.Warningf("rocksdb: asset %v sender addrDesc: %v error %v", assetGuid, senderStr, err)
+				glog.Warningf("DisconnectAssetAllocationOutput sender with asset %v (%v) could not be decoded error %v", assetGuid, senderStr, err)
 			}
 		} else {
-			glog.V(1).Infof("rocksdb: skipping asset %v sender addrDesc: %v of length %d", assetGuid, senderStr, len(assetSenderAddrDesc))
+			glog.Warningf("DisconnectAssetAllocationOutput sender with asset %v (%v) has invalid length: %d", assetGuid, senderStr, len(assetSenderAddrDesc))
 		}
-		return errors.New("Skipping asset sender")
+		return errors.New("DisconnectAssetAllocationOutput Skipping disconnect asset allocation tx")
 	}
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		receiverStr := allocation.WitnessAddress.ToString("sys")
@@ -127,10 +199,10 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: asset %v addrDesc: %v witness program %v error %v", assetGuid, receiverStr,hex.EncodeToString(allocation.WitnessAddress.WitnessProgram), err)
+					glog.Warningf("DisconnectAssetAllocationOutput receiver with asset %v (%v) could not be decoded error %v", assetGuid, receiverStr, err)
 				}
 			} else {
-				glog.V(1).Infof("rocksdb: skipping asset %v addrDesc of length %d", assetGuid, len(addrDesc))
+				glog.Warningf("DisconnectAssetAllocationOutput receiver with asset %v (%v) has invalid length: %d", assetGuid, receiverStr, len(addrDesc))
 			}
 			continue
 		}
@@ -150,7 +222,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 			}
 		} else {
 			ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
-			glog.Warningf("Balance for asset address %s (%s) not found", ad, addrDesc)
+			glog.Warningf("DisconnectAssetAllocationOutput Balance for asset address %s (%s) not found", ad, addrDesc)
 		}
 
 		if balance.BalanceAssetAllocatedSat != nil{
@@ -164,11 +236,11 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 				totalAssetSentValue.Add(totalAssetSentValue, amount)
 				balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 			} else {
-				glog.Warningf("Asset Balance for guid %s (%s) not found", assetGuid, addrDesc)
+				glog.Warningf("DisconnectAssetAllocationOutput Asset Balance for guid %s (%s) not found", assetGuid, addrDesc)
 			}
 		} else {
 			ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
-			glog.Warningf("Asset Balance for asset address %s (%s) not found", ad, addrDesc)
+			glog.Warningf("DisconnectAssetAllocationOutput Asset Balance for asset address %s (%s) not found", ad, addrDesc)
 		}
 	}
 	return d.DisconnectAssetAllocationInput(assetGuid, totalAssetSentValue, assetSenderAddrDesc, balances)
@@ -190,21 +262,39 @@ func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, totalAssetSentVa
 	} else {
 		d.cbs.balancesHit++
 	}
-	if balance.SentAssetAllocatedSat == nil{
-		balance.SentAssetAllocatedSat = map[uint32]big.Int{}
+	if d.chainParser.IsSyscoinAssetSend(version){
+		if balance.SentAssetUnAllocatedSat == nil{
+			balance.SentAssetUnAllocatedSat = map[uint32]big.Int{}
+		}
+		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
+		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
+		if !ok {
+			balanceAssetUnAllocatedSat.Set(big.NewInt(0))
+		}
+		balanceAssetUnAllocatedSat.Sub(&balanceAssetUnAllocatedSat, totalAssetSentValue)
+		sentAssetUnAllocatedSat.Add(&sentAssetUnAllocatedSat, totalAssetSentValue)
+		if balanceAssetUnAllocatedSat.Sign() < 0 {
+			d.resetValueSatToZero(&balanceAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
+		}
+		balance.SentAssetUnAllocatedSat[assetGuid] = sentAssetUnAllocatedSat
+		balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
+	} else {
+		if balance.SentAssetAllocatedSat == nil{
+			balance.SentAssetAllocatedSat = map[uint32]big.Int{}
+		}
+		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
+		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
+		if !ok {
+			balanceAssetAllocatedSat.Set(big.NewInt(0))
+		}
+		balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, totalAssetSentValue)
+		sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, totalAssetSentValue)
+		if balanceAssetAllocatedSat.Sign() < 0 {
+			d.resetValueSatToZero(&balanceAssetAllocatedSat, assetSenderAddrDesc, "balance")
+		}
+		balance.SentAssetAllocatedSat[assetGuid] = sentAssetAllocatedSat
+		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
-	sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
-	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
-	if !ok {
-		balanceAssetAllocatedSat.Set(big.NewInt(0))
-	}
-	balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, totalAssetSentValue)
-	sentAssetAllocatedSat.Add(&sentAssetAllocatedSat, totalAssetSentValue)
-	if balanceAssetAllocatedSat.Sign() < 0 {
-		d.resetValueSatToZero(&balanceAssetAllocatedSat, assetSenderAddrDesc, "balance")
-	}
-	balance.SentAssetAllocatedSat[assetGuid] = sentAssetAllocatedSat
-	balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	return nil
 
 }
@@ -218,11 +308,30 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSen
 			return err
 		}
 		if balance == nil {
-			return errors.New("Asset Balance for sender address not found")
+			return errors.New("DisconnectAssetAllocationInput Asset Balance for sender address not found")
 		}
 		balances[assetStrSenderAddrDesc] = balance
 	}
-	if balance.SentAssetAllocatedSat != nil{
+	if d.chainParser.IsSyscoinAssetSend(version) {
+		if balance.SentAssetUnAllocatedSat != nil {
+			sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
+			balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
+			if ok {	
+				balanceAssetUnAllocatedSat.Add(&balanceAssetUnAllocatedSat, totalAssetSentValue)
+				sentAssetUnAllocatedSat.Sub(&sentAssetUnAllocatedSat, totalAssetSentValue)
+				if sentAssetAllocatedSat.Sign() < 0 {
+					d.resetValueSatToZero(&sentAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
+				}
+				balance.SentAssetUnAllocatedSat[assetGuid] = sentAssetUnAllocatedSat
+				balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
+			} else {
+				glog.Warningf("DisconnectAssetAllocationInput: AssetSend UnAllocated balance not found guid %s (%s)", assetGuid, assetStrSenderAddrDesc)
+			}
+		} else {
+			glog.Warningf("DisconnectAssetAllocationInput: AssetSend SentUnAllocated balance not found guid %s (%s)", assetGuid, assetStrSenderAddrDesc)
+		}
+	}
+	else if balance.SentAssetAllocatedSat != nil {
 		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if ok {	
@@ -234,10 +343,10 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, totalAssetSen
 			balance.SentAssetAllocatedSat[assetGuid] = sentAssetAllocatedSat
 			balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 		} else {
-			glog.Warningf("Asset Sender Balance for guid %s (%s) not found", assetGuid, assetStrSenderAddrDesc)
+			log.Warningf("DisconnectAssetAllocationInput: Asset Allocated balance not found guid %s (%s)", assetGuid, assetStrSenderAddrDesc)
 		}
 	} else {
-		glog.Warningf("Asset Balance for sender asset address %s not found", assetStrSenderAddrDesc)
+		glog.Warningf("DisconnectAssetAllocationInput: Asset Sent Allocated balance not found guid %s (%s)", assetGuid, assetStrSenderAddrDesc)
 	}
 	return nil
 
@@ -253,6 +362,8 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
 		return d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex)
+	} else if d.chainParser.IsAssetTx(version) {
+		return d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex)
 	}
 	return nil
 }
@@ -268,6 +379,8 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
 		return d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses)
+	} else if d.chainParser.IsAssetTx(version) {
+		return d.DisconnectAssetOutput(sptData, balances, version, addresses)
 	}
 	return nil
 }

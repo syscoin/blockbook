@@ -119,14 +119,18 @@ func (p *SyscoinParser) IsSyscoinMintTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_MINT
 }
 func (p *SyscoinParser) IsAssetTx(nVersion int32) bool {
-    return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE || nVersion == SYSCOIN_TX_VERSION_ASSET_UPDATE || nVersion == SYSCOIN_TX_VERSION_ASSET_TRANSFER || nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
+    return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE || nVersion == SYSCOIN_TX_VERSION_ASSET_UPDATE || nVersion == SYSCOIN_TX_VERSION_ASSET_TRANSFER
 }
+// note assetsend in core is assettx but its deserialized as allocation, we just care about balances so we can do it in same code for allocations
 func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN || nVersion == SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION ||
-        nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_LOCK
+        nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_LOCK || nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
 }
 func (p *SyscoinParser) IsSyscoinTx(nVersion int32) bool {
     return p.IsAssetTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
+}
+func (p *SyscoinParser) IsSyscoinAssetSend(nVersion int32) bool {
+	return nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
 }
 // TryGetOPReturn tries to process OP_RETURN script and return data
 func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
