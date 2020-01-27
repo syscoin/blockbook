@@ -49,10 +49,6 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			continue
 		}
 		strAddrDesc := string(addrDesc)
-		_, exist := addresses[strAddrDesc]
-		if !exist {
-			addresses[strAddrDesc] = struct{}{}
-		}
 		balance, e := balances[strAddrDesc]
 		if !e {
 			balance, err = d.GetAddrDescBalance(addrDesc, addressBalanceDetailUTXOIndexed)
@@ -89,7 +85,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	return d.ConnectAssetAllocationInput(assetGuid, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
-func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses addressesMap) error {
+func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses map[string]struct{}) error {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocation
 	err := assetAllocation.Deserialize(r)
@@ -143,7 +139,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		if !exist {
 			addresses[strAddrDesc] = struct{}{}
 		}
-		balance, err = getAddressBalance(addrDesc)
+		balance, err := getAddressBalance(addrDesc)
 		if err != nil {
 			return err
 		}
@@ -261,7 +257,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 	return nil
 }
 
-func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance, version int32, addresses addressesMap) error {
+func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance, version int32, addresses map[string]struct{}) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -271,7 +267,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 		return nil
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
-		return d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex)
+		return d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses)
 	}
 	return nil
 }

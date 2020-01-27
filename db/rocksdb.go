@@ -1421,7 +1421,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
 				}
 			} else if isSyscoinTx && t.AddrDesc[0] == txscript.OP_RETURN {
-				err := d.DisconnectSyscoinOutputs(t.AddrDesc, balances, txa.Version, addresses)
+				err = d.DisconnectSyscoinOutputs(t.AddrDesc, balances, txa.Version, addresses)
 				if err != nil {
 					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, error %v", height, btxID, err)
 				}
