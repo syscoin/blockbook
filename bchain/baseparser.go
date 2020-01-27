@@ -317,3 +317,6 @@ func (p *BaseParser) IsAssetAllocationTx(nVersion int32) bool {
 func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
+func (p *BaseParser) GetMaxAddrLength() int {
+	return 1024
+}

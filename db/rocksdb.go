@@ -26,7 +26,6 @@ import (
 const dbVersion = 5
 
 const packedHeightBytes = 4
-const maxAddrDescLen = 1024
 
 // iterator creates snapshot, which takes lots of resources
 // when doing huge scan, it is better to close it and reopen from time to time to free the resources
@@ -653,6 +652,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 		txAddressesMap[string(btxID)] = &ta
 		blockTxAddresses[txi] = &ta
 		isSyscoinTx := d.chainParser.IsSyscoinTx(tx.Version)
+		maxAddrDescLen := d.chainParser.GetMaxAddrLength()
 		for i, output := range tx.Vout {
 			tao := &ta.Outputs[i]
 			tao.ValueSat = output.ValueSat

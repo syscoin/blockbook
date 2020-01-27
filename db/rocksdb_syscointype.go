@@ -19,6 +19,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBa
 	assetGuid := asset.Asset
 	senderStr := asset.WitnessAddress.ToString("sys")
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	maxAddrDescLen := d.chainParser.GetMaxAddrLength()
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -110,6 +111,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
 	senderStr := assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys")
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	maxAddrDescLen := d.chainParser.GetMaxAddrLength()
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -199,6 +201,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
 	senderStr := assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys")
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	maxAddrDescLen := d.chainParser.GetMaxAddrLength()
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)

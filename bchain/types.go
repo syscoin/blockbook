@@ -262,6 +262,9 @@ type BlockChainParser interface {
 	// AmountToBigInt converts amount in json.Number (string) to big.Int
 	// it uses string operations to avoid problems with rounding
 	AmountToBigInt(n json.Number) (big.Int, error)
+	// get max script length, in bitcoin base derivatives its 1024 
+	// but for example in syscoin this is going to be 8000 for max opreturn output script for syscoin coloured tx
+	GetMaxAddrLength() int
 	// address descriptor conversions
 	GetAddrDescFromVout(output *Vout) (AddressDescriptor, error)
 	GetAddrDescFromAddress(address string) (AddressDescriptor, error)
