@@ -59,7 +59,8 @@ type SyscoinParser struct {
 func NewSyscoinParser(params *chaincfg.Params, c *btc.Configuration) *SyscoinParser {
 	return &SyscoinParser{BitcoinParser: btc.NewBitcoinParser(params, c)}
 }
-func (p *BaseParser) GetMaxAddrLength() int {
+// matches max data carrier for systx
+func (p *SyscoinParser) GetMaxAddrLength() int {
 	return 8000
 }
 // GetChainParams returns network parameters
