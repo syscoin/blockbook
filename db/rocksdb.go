@@ -557,7 +557,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 					d.cbs.balancesHit++
 				}
 				balance.BalanceSat.Add(&balance.BalanceSat, &output.ValueSat)
-				balance.addUtxo(&Utxo{
+				balance.AddUtxo(&Utxo{
 					BtxID:    btxID,
 					Vout:     int32(i),
 					Height:   block.Height,
@@ -650,7 +650,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 					balance.Txs++
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
-				balance.markUtxoAsSpent(btxID, int32(input.Vout))
+				balance.MarkUtxoAsSpent(btxID, int32(input.Vout))
 				if balance.BalanceSat.Sign() < 0 {
 					d.resetValueSatToZero(&balance.BalanceSat, spentOutput.AddrDesc, "balance")
 				}
@@ -1042,7 +1042,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 					if balance.BalanceSat.Sign() < 0 {
 						d.resetValueSatToZero(&balance.BalanceSat, t.AddrDesc, "balance")
 					}
-					balance.markUtxoAsSpent(btxID, int32(i))
+					balance.MarkUtxoAsSpent(btxID, int32(i))
 				} else {
 					ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(t.AddrDesc)
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)

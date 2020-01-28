@@ -224,8 +224,8 @@ func (ab *AddrBalance) ReceivedSat() *big.Int {
 	return &r
 }
 
-// addUtxo
-func (ab *AddrBalance) addUtxo(u *Utxo) {
+// AddUtxo
+func (ab *AddrBalance) AddUtxo(u *Utxo) {
 	ab.Utxos = append(ab.Utxos, *u)
 	l := len(ab.Utxos)
 	if l >= 16 {
@@ -246,10 +246,10 @@ func (ab *AddrBalance) addUtxo(u *Utxo) {
 	}
 }
 
-// markUtxoAsSpent finds outpoint btxID:vout in utxos and marks it as spent
+// MarkUtxoAsSpent finds outpoint btxID:vout in utxos and marks it as spent
 // for small number of utxos the linear search is done, for larger number there is a hashmap index
 // it is much faster than removing the utxo from the slice as it would cause in memory copy operations
-func (ab *AddrBalance) markUtxoAsSpent(btxID []byte, vout int32) {
+func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 	if len(ab.utxosMap) == 0 {
 		for i := range ab.Utxos {
 			utxo := &ab.Utxos[i]

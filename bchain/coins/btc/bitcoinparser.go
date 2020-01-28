@@ -489,7 +489,7 @@ func (p *BitcoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			if detail == AddressBalanceDetailUTXO {
 				ab.Utxos = append(ab.Utxos, u)
 			} else {
-				ab.addUtxo(&u)
+				ab.AddUtxo(&u)
 			}
 		}
 	}
