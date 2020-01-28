@@ -1121,6 +1121,7 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 	l = packBigint(&ab.BalanceSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	l = packVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
+	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetAllocatedSat {
 		if value.Int64() > 0 {
 			l = packVaruint(uint(key), varBuf)
@@ -1130,6 +1131,7 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 		}
 	}
 	l = packVaruint(uint(len(ab.BalanceAssetAllocatedSat)), varBuf)
+	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.BalanceAssetAllocatedSat {
 		if value.Int64() > 0 {
 			l = packVaruint(uint(key), varBuf)
@@ -1139,6 +1141,7 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 		}
 	}
 	l = packVaruint(uint(len(ab.SentAssetUnAllocatedSat)), varBuf)
+	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetUnAllocatedSat {
 		if value.Int64() > 0 {
 			l = packVaruint(uint(key), varBuf)
@@ -1148,6 +1151,7 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 		}
 	}
 	l = packVaruint(uint(len(ab.BalanceAssetUnAllocatedSat)), varBuf)
+	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.BalanceAssetUnAllocatedSat {
 		if value.Int64() > 0 {
 			l = packVaruint(uint(key), varBuf)
