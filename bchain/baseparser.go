@@ -384,6 +384,10 @@ const (
 	maxPackedBigintBytes = 249
 )
 
+func (p *BaseParser) MaxPackedBigintBytes(bi *big.Int, buf []byte) int {
+	return maxPackedBigintBytes
+}
+
 // big int is packed in BigEndian order without memory allocation as 1 byte length followed by bytes of big int
 // number of written bytes is returned
 // limitation: bigints longer than 248 bytes are truncated to 248 bytes

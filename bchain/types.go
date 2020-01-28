@@ -324,7 +324,15 @@ type TxOutput struct {
 	Spent    bool
 	ValueSat big.Int
 }
+// Addresses converts AddressDescriptor of the input to array of strings
+func (ti *bchain.TxInput) Addresses(p BlockChainParser) ([]string, bool, error) {
+	return p.GetAddressesFromAddrDesc(ti.AddrDesc)
+}
 
+// Addresses converts AddressDescriptor of the output to array of strings
+func (to *bchain.TxOutput) Addresses(p BlockChainParser) ([]string, bool, error) {
+	return p.GetAddressesFromAddrDesc(to.AddrDesc)
+}
 // TxAddresses stores transaction inputs and outputs with amounts
 type TxAddresses struct {
 	Version int32
@@ -348,8 +356,8 @@ const (
 	AddressBalanceDetailNoUTXO = 0
 	// AddressBalanceDetailUTXO returns address balance with utxos
 	AddressBalanceDetailUTXO = 1
-	// addressBalanceDetailUTXOIndexed returns address balance with utxos and index for updates, used only internally
-	addressBalanceDetailUTXOIndexed = 2
+	// AddressBalanceDetailUTXOIndexed returns address balance with utxos and index for updates, used only internally
+	AddressBalanceDetailUTXOIndexed = 2
 )
 
 // BlockChain defines common interface to block chain daemon
@@ -454,7 +462,7 @@ type BlockChainParser interface {
 	UnpackVaruint(buf []byte) (uint, int)
 	PackBigint(bi *big.Int, buf []byte) int
 	UnpackBigint(buf []byte) (big.Int, int)
-
+	MaxPackedBigintBytes(bi *big.Int, buf []byte) int
 
 	// blocks
 	PackBlockHash(hash string) ([]byte, error)

@@ -8,6 +8,7 @@ import (
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
+	"math/big"
 )
 
 // magic numbers
@@ -323,13 +324,13 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	l += ll
 	inputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.Inputs = make([]TxInput, inputs)
+	ta.Inputs = make([]bchain.TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
 		l += p.BitcoinParser.UnpackTxInput(&ta.Inputs[i], buf[l:])
 	}
 	outputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.Outputs = make([]TxOutput, outputs)
+	ta.Outputs = make([]bchain.TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
 		l += p.BitcoinParser.UnpackTxOutput(&ta.Outputs[i], buf[l:])
 	}

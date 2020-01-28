@@ -83,7 +83,7 @@ func spentAddressToPubKeyHexWithLength(addr string, t *testing.T, d *RocksDB) st
 }
 
 func bigintToHex(i *big.Int, d *RocksDB) string {
-	b := make([]byte, maxPackedBigintBytes)
+	b := make([]byte, d.chainParser.MaxPackedBigintBytes())
 	l := d.chainParser.PackBigint(i, b)
 	return hex.EncodeToString(b[:l])
 }
@@ -817,6 +817,7 @@ func Test_packBigint_unpackBigint(t *testing.T) {
 	bigbigbig.Mul(bigbig2, bigbig2)
 	bigbigbig.Mul(bigbigbig, bigbigbig)
 	bigbigbig.Mul(bigbigbig, bigbigbig)
+	maxPackedBigintBytes := d.chainParser.MaxPackedBigintBytes()
 	tests := []struct {
 		name      string
 		bi        *big.Int
@@ -1093,7 +1094,7 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 			},
 		},
 	}
-	varBuf := make([]byte, maxPackedBigintBytes)
+	varBuf := make([]byte, parser.MaxPackedBigintBytes())
 	buf := make([]byte, 32)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
