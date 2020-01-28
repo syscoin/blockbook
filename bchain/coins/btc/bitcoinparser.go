@@ -628,7 +628,7 @@ func (p *BitcoinParser) packOutpoints(outpoints []bchain.outpoint) []byte {
 func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]bchain.outpoint, int, error) {
 	txidUnpackedLen := p.BaseParser.packedTxidLen()
 	n, p := p.BaseParser.unpackVaruint(buf)
-	outpoints := make([]outpoint, n)
+	outpoints := make([]bchain.outpoint, n)
 	for i := uint(0); i < n; i++ {
 		if p+txidUnpackedLen >= len(buf) {
 			return nil, 0, errors.New("Inconsistent data in unpackNOutpoints")
@@ -637,7 +637,7 @@ func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]bchain.outpoint, int, er
 		p += txidUnpackedLen
 		vout, voutLen := p.BaseParser.unpackVarint32(buf[p:])
 		p += voutLen
-		outpoints[i] = outpoint{
+		outpoints[i] = bchain.outpoint{
 			btxID: btxID,
 			index: vout,
 		}
