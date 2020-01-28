@@ -625,7 +625,7 @@ func (p *BitcoinParser) packOutpoints(outpoints []bchain.outpoint) []byte {
 	return buf
 }
 
-func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
+func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]bchain.outpoint, int, error) {
 	txidUnpackedLen := p.BaseParser.packedTxidLen()
 	n, p := p.BaseParser.unpackVaruint(buf)
 	outpoints := make([]outpoint, n)
@@ -647,7 +647,7 @@ func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
 
 // Block index
 
-func (p *BitcoinParser) packBlockInfo(block *BlockInfo) ([]byte, error) {
+func (p *BitcoinParser) packBlockInfo(block *bchain.DbBlockInfo) ([]byte, error) {
 	packed := make([]byte, 0, 64)
 	varBuf := make([]byte, vlq.MaxLen64)
 	b, err := p.BaseParser.packBlockHash(block.Hash)
@@ -663,7 +663,7 @@ func (p *BitcoinParser) packBlockInfo(block *BlockInfo) ([]byte, error) {
 	return packed, nil
 }
 
-func (p *BitcoinParser) unpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
+func (p *BitcoinParser) unpackBlockInfo(buf []byte) (*bchain.DbBlockInfo, error) {
 	pl := p.BaseParser.packedTxidLen()
 	// minimum length is PackedTxidLen + 4 bytes time + 1 byte txs + 1 byte size
 	if len(buf) < pl+4+2 {
@@ -676,7 +676,7 @@ func (p *BitcoinParser) unpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
 	t := p.BaseParser.unpackUint(buf[pl:])
 	txs, l := p.BaseParser.unpackVaruint(buf[pl+4:])
 	size, _ := p.BaseParser.unpackVaruint(buf[pl+4+l:])
-	return &BlockInfo{
+	return &bchain.DbBlockInfo{
 		Hash: txid,
 		Time: int64(t),
 		Txs:  uint32(txs),
