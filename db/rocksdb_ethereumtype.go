@@ -243,7 +243,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 	return blockTxs, nil
 }
 
-func (d *RocksDB) storeAndCleanupBlockTxsEthereumType(wb *gorocksdb.WriteBatch, block *bchain.Block, bchain.BlockTxs []ethBlockTx) error {
+func (d *RocksDB) storeAndCleanupBlockTxsEthereumType(wb *gorocksdb.WriteBatch, block *bchain.Block, blockTxs []ethBlockTx) error {
 	pl := d.chainParser.PackedTxidLen()
 	buf := make([]byte, 0, (pl+2*eth.EthereumTypeAddressDescriptorLen)*len(blockTxs))
 	varBuf := make([]byte, vlq.MaxLen64)
