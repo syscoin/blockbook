@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"unsafe"
+	"bytes"
+	"github.com/golang/glog"
 )
 
 // ChainType is type of the blockchain
