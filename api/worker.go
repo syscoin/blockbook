@@ -1279,7 +1279,7 @@ func (w *Worker) GetFiatRatesTickersList(timestamp int64) (*db.ResultTickerListA
 }
 
 // getBlockInfoFromBlockID returns block info from block height or block hash
-func (w *Worker) getBlockInfoFromBlockID(bid string) (*bchain.DbBlockInfo, error) {
+func (w *Worker) getBlockInfoFromBlockID(bid string) (*bchain.BlockInfo, error) {
 	// try to decide if passed string (bid) is block height or block hash
 	// if it's a number, must be less than int32
 	var hash string
