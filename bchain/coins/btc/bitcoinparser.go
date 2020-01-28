@@ -638,7 +638,7 @@ func (p *BitcoinParser) UnpackNOutpoints(buf []byte) ([]bchain.DbOutpoint, int, 
 		m += voutLen
 		outpoints[i] = bchain.DbOutpoint{
 			BtxID: btxID,
-			index: vout,
+			Index: vout,
 		}
 	}
 	return outpoints, m, nil
@@ -649,7 +649,7 @@ func (p *BitcoinParser) UnpackNOutpoints(buf []byte) ([]bchain.DbOutpoint, int, 
 func (p *BitcoinParser) PackBlockInfo(block *bchain.DbBlockInfo) ([]byte, error) {
 	packed := make([]byte, 0, 64)
 	varBuf := make([]byte, vlq.MaxLen64)
-	b, err := p.BaseParser.packBlockHash(block.Hash)
+	b, err := p.BaseParser.PackBlockHash(block.Hash)
 	if err != nil {
 		return nil, err
 	}
