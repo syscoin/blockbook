@@ -1059,7 +1059,7 @@ func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDet
 	for i := uint(0); i < numSentAllocatedBalances; i++ {
 		key, l := unpackVaruint(buf[l:])
 		value, l := unpackBigint(buf[l:])
-		ab.SentAssetAllocatedSat[key] = value
+		ab.SentAssetAllocatedSat[uint32(key)] = value
 	}
 	
 	if detail != AddressBalanceDetailNoUTXO {
