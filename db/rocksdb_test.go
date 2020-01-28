@@ -244,7 +244,7 @@ func verifyAfterBitcoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.Addr3, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatB1T2A3, d) +
-				dbtestdata.TxidB1T2 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatB1T2A3),
+				dbtestdata.TxidB1T2 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatB1T2A3, d),
 			nil,
 		},
 		{
@@ -256,7 +256,7 @@ func verifyAfterBitcoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.Addr5, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatB1T2A5, d) +
-				dbtestdata.TxidB1T2 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatB1T2A5),
+				dbtestdata.TxidB1T2 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatB1T2A5, d),
 			nil,
 		},
 	}); err != nil {
@@ -353,8 +353,8 @@ func verifyAfterBitcoinTypeBlock2(t *testing.T, d *RocksDB) {
 				inputAddressToPubKeyHexWithLength(dbtestdata.Addr2, t, d) + bigintToHex(dbtestdata.SatB1T1A2, d) +
 				"03" +
 				spentAddressToPubKeyHexWithLength(dbtestdata.Addr6, t, d) + bigintToHex(dbtestdata.SatB2T1A6, d) +
-				addressToPubKeyHexWithLength(dbtestdata.Addr7, t, d) + bigintToHex(dbtestdata.SatB2T1A7) +
-				hex.EncodeToString([]byte{byte(len(dbtestdata.TxidB2T1Output3OpReturn))}) + dbtestdata.TxidB2T1Output3OpReturn + bigintToHex(dbtestdata.SatZero),
+				addressToPubKeyHexWithLength(dbtestdata.Addr7, t, d) + bigintToHex(dbtestdata.SatB2T1A7, d) +
+				hex.EncodeToString([]byte{byte(len(dbtestdata.TxidB2T1Output3OpReturn))}) + dbtestdata.TxidB2T1Output3OpReturn + bigintToHex(dbtestdata.SatZero, d),
 			nil,
 		},
 		{
@@ -685,7 +685,7 @@ func TestRocksDB_Index_BitcoinType(t *testing.T) {
 	}
 
 	// test public methods for address balance and tx addresses
-	ab, err := d.GetAddressBalance(dbtestdata.Addr5, AddressBalanceDetailUTXO)
+	ab, err := d.GetAddressBalance(dbtestdata.Addr5, bchain.AddressBalanceDetailUTXO)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1019,16 +1019,16 @@ func Test_packTxAddresses_unpackTxAddresses(t *testing.T) {
 			},
 		},
 	}
-	varBuf := make([]byte, maxPackedBigintBytes)
+	varBuf := make([]byte, parser.MaxPackedBigintBytes())
 	buf := make([]byte, 1024)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := PackTxAddresses(tt.data, buf, varBuf)
+			b := parser.PackTxAddresses(tt.data, buf, varBuf)
 			hex := hex.EncodeToString(b)
 			if !reflect.DeepEqual(hex, tt.hex) {
 				t.Errorf("PackTxAddresses() = %v, want %v", hex, tt.hex)
 			}
-			got1, err := UnpackTxAddresses(b)
+			got1, err := parser.UnpackTxAddresses(b)
 			if err != nil {
 				t.Errorf("UnpackTxAddresses() error = %v", err)
 				return
@@ -1045,7 +1045,7 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 	tests := []struct {
 		name string
 		hex  string
-		data *AddrBalance
+		data *bchain.AddrBalance
 	}{
 		{
 			name: "no utxos",
