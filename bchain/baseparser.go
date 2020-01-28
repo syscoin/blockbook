@@ -484,41 +484,11 @@ func (p *BaseParser) UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error) {
 	return nil, 0, errors.New("Not supported")
 }
 
-// Block index
-
 func (p *BaseParser) PackBlockInfo(block *DbBlockInfo) ([]byte, error) {
-	packed := make([]byte, 0, 64)
-	varBuf := make([]byte, vlq.MaxLen64)
-	b, err := p.PackBlockHash(block.Hash)
-	if err != nil {
-		return nil, err
-	}
-	packed = append(packed, b...)
-	packed = append(packed, p.PackUint(uint32(block.Time))...)
-	l := p.PackVaruint(uint(block.Txs), varBuf)
-	packed = append(packed, varBuf[:l]...)
-	l = p.PackVaruint(uint(block.Size), varBuf)
-	packed = append(packed, varBuf[:l]...)
-	return packed, nil
+	return nil, errors.New("Not supported")
 }
 
 func (p *BaseParser) UnpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
-	pl := p.PackedTxidLen()
-	// minimum length is PackedTxidLen + 4 bytes time + 1 byte txs + 1 byte size
-	if len(buf) < pl+4+2 {
-		return nil, nil
-	}
-	txid, err := p.UnpackBlockHash(buf[:pl])
-	if err != nil {
-		return nil, err
-	}
-	t := p.UnpackUint(buf[pl:])
-	txs, l := p.UnpackVaruint(buf[pl+4:])
-	size, _ := p.UnpackVaruint(buf[pl+4+l:])
-	return &DbBlockInfo{
-		Hash: txid,
-		Time: int64(t),
-		Txs:  uint32(txs),
-		Size: uint32(size),
-	}, nil
+	return nil, errors.New("Not supported")
 }
+
