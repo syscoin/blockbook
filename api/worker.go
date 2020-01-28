@@ -1183,6 +1183,7 @@ func (w *Worker) setFiatRateToBalanceHistories(histories BalanceHistories, curre
 
 // GetBalanceHistory returns history of balance for given address
 func (w *Worker) GetBalanceHistory(address string, fromTimestamp, toTimestamp int64, currencies []string, groupBy uint32) (BalanceHistories, error) {
+	currencies = removeEmpty(currencies)
 	bhs := make(BalanceHistories, 0)
 	start := time.Now()
 	addrDesc, _, err := w.getAddrDescAndNormalizeAddress(address)
@@ -1393,7 +1394,7 @@ func (w *Worker) GetBlocks(page int, blocksOnPage int) (*Blocks, error) {
 	return r, nil
 }
 
-// removeEmty removes empty strings from a slice
+// removeEmpty removes empty strings from a slice
 func removeEmpty(stringSlice []string) []string {
 	var ret []string
 	for _, str := range stringSlice {
