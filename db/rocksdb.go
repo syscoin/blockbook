@@ -663,14 +663,14 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 		// if the tx is already in the slice, append the index to the array of indexes
 		for i, t := range at {
 			if bytes.Equal(btxID, t.BtxID) {
-				at[i].indexes = append(t.indexes, index)
+				at[i].Indexes = append(t.Indexes, index)
 				return true
 			}
 		}
 	}
 	addresses[strAddrDesc] = append(at, bchain.TxIndexes{
 		BtxID:   btxID,
-		indexes: []int32{index},
+		Indexes: []int32{index},
 	})
 	return false
 }
@@ -752,7 +752,7 @@ func (d *RocksDB) storeAndCleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchai
 				}
 			}
 			o[v].BtxID = btxID
-			o[v].index = int32(vin.Vout)
+			o[v].Index = int32(vin.Vout)
 		}
 		btxID, err := d.chainParser.PackTxid(tx.Txid)
 		if err != nil {
@@ -981,7 +981,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 			}
 			var inputHeight uint32
 			if sa != nil {
-				sa.Outputs[input.index].Spent = false
+				sa.Outputs[input.Index].Spent = false
 				inputHeight = sa.Height
 			}
 			if d.chainParser.IsAddrDescIndexable(t.AddrDesc) {
@@ -1001,7 +1001,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
 					balance.Utxos = append(balance.Utxos, bchain.Utxo{
 						BtxID:    input.BtxID,
-						Vout:     input.index,
+						Vout:     input.Index,
 						Height:   inputHeight,
 						ValueSat: t.ValueSat,
 					})

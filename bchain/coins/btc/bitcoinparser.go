@@ -601,9 +601,9 @@ func (p *BitcoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 	for j := len(txi) - 1; j >= 0; j-- {
 		t := &txi[j]
 		buf = append(buf, []byte(t.BtxID)...)
-		for i, index := range t.indexes {
+		for i, index := range t.Indexes {
 			index <<= 1
-			if i == len(t.indexes)-1 {
+			if i == len(t.Indexes)-1 {
 				index |= 1
 			}
 			l := p.BaseParser.PackVarint32(index, bvout)
@@ -617,7 +617,7 @@ func (p *BitcoinParser) PackOutpoints(outpoints []bchain.DbOutpoint) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	for _, o := range outpoints {
-		l := p.BaseParser.PackVarint32(o.index, bvout)
+		l := p.BaseParser.PackVarint32(o.Index, bvout)
 		buf = append(buf, []byte(o.BtxID)...)
 		buf = append(buf, bvout[:l]...)
 	}
