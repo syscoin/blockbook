@@ -63,7 +63,6 @@ func NewSyscoinParser(params *chaincfg.Params, c *btc.Configuration) *SyscoinPar
 		BaseParser:    &bchain.BaseParser{},
 	}
 }
-}
 // matches max data carrier for systx
 func (p *SyscoinParser) GetMaxAddrLength() int {
 	return 8000
