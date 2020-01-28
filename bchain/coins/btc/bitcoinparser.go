@@ -467,7 +467,7 @@ func (p *BitcoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		BalanceSat: balanceSat,
 	}
 
-	if detail != AddressBalanceDetailNoUTXO {
+	if detail != bchain.AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
 		ab.Utxos = make([]bchain.Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
 		// ab.utxosMap = make(map[string]int, cap(ab.Utxos))
@@ -486,7 +486,7 @@ func (p *BitcoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 				Height:   uint32(height),
 				ValueSat: valueSat,
 			}
-			if detail == AddressBalanceDetailUTXO {
+			if detail == bchain.AddressBalanceDetailUTXO {
 				ab.Utxos = append(ab.Utxos, u)
 			} else {
 				ab.AddUtxo(&u)
@@ -535,7 +535,6 @@ func (p *BitcoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	ta := bchain.TxAddresses{}
 	height, l := p.BaseParser.UnpackVaruint(buf[l:])
 	ta.Height = uint32(height)
-	l += ll
 	inputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	ta.Inputs = make([]bchain.TxInput, inputs)
@@ -601,7 +600,7 @@ func (p *BitcoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 	// store the txs in reverse order for ordering from newest to oldest
 	for j := len(txi) - 1; j >= 0; j-- {
 		t := &txi[j]
-		buf = append(buf, []byte(t.btxID)...)
+		buf = append(buf, []byte(t.BtxID)...)
 		for i, index := range t.indexes {
 			index <<= 1
 			if i == len(t.indexes)-1 {
@@ -619,7 +618,7 @@ func (p *BitcoinParser) PackOutpoints(outpoints []bchain.DbOutpoint) []byte {
 	bvout := make([]byte, vlq.MaxLen32)
 	for _, o := range outpoints {
 		l := p.BaseParser.PackVarint32(o.index, bvout)
-		buf = append(buf, []byte(o.btxID)...)
+		buf = append(buf, []byte(o.BtxID)...)
 		buf = append(buf, bvout[:l]...)
 	}
 	return buf
@@ -638,7 +637,7 @@ func (p *BitcoinParser) UnpackNOutpoints(buf []byte) ([]bchain.DbOutpoint, int, 
 		vout, voutLen := p.BaseParser.UnpackVarint32(buf[p:])
 		p += voutLen
 		outpoints[i] = bchain.DbOutpoint{
-			btxID: btxID,
+			BtxID: btxID,
 			index: vout,
 		}
 	}

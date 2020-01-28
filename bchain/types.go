@@ -295,8 +295,8 @@ type AddrDescForOutpointFunc func(outpoint Outpoint) AddressDescriptor
 
 // Addresses index
 type TxIndexes struct {
-	btxID   []byte
-	indexes []int32
+	BtxID   []byte
+	Indexes []int32
 }
 
 // AddressesMap is a map of addresses in a block
@@ -334,13 +334,13 @@ type TxAddresses struct {
 }
 
 type DbOutpoint struct {
-	btxID []byte
-	index int32
+	BtxID []byte
+	Index int32
 }
 
 type BlockTxs struct {
-	btxID  []byte
-	inputs []DbOutpoint
+	BtxID  []byte
+	Inputs []DbOutpoint
 }
 
 const (

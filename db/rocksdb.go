@@ -662,14 +662,14 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 	if found {
 		// if the tx is already in the slice, append the index to the array of indexes
 		for i, t := range at {
-			if bytes.Equal(btxID, t.btxID) {
+			if bytes.Equal(btxID, t.BtxID) {
 				at[i].indexes = append(t.indexes, index)
 				return true
 			}
 		}
 	}
 	addresses[strAddrDesc] = append(at, bchain.TxIndexes{
-		btxID:   btxID,
+		BtxID:   btxID,
 		indexes: []int32{index},
 	})
 	return false
@@ -746,12 +746,12 @@ func (d *RocksDB) storeAndCleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchai
 			if err != nil {
 				// do not process inputs without input txid
 				if err == bchain.ErrTxidMissing {
-					btxID = zeroTx
+					BtxID = zeroTx
 				} else {
 					return err
 				}
 			}
-			o[v].btxID = btxID
+			o[v].BtxID = btxID
 			o[v].index = int32(vin.Vout)
 		}
 		btxID, err := d.chainParser.PackTxid(tx.Txid)
@@ -790,7 +790,7 @@ func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.BlockTxs, error) {
 			return nil, errors.New("Inconsistent data in blockTxs")
 		}
 		bt = append(bt, bchain.BlockTxs{
-			btxID:  txid,
+			BtxID:  txid,
 			inputs: o,
 		})
 		i += ol
@@ -968,10 +968,10 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 			if !exist {
 				addresses[s] = struct{}{}
 			}
-			s = string(input.btxID)
+			s = string(input.BtxID)
 			sa, found := txAddressesToUpdate[s]
 			if !found {
-				sa, err = d.getTxAddresses(input.btxID)
+				sa, err = d.getTxAddresses(input.BtxID)
 				if err != nil {
 					return err
 				}
@@ -1000,7 +1000,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 					}
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
 					balance.Utxos = append(balance.Utxos, bchain.Utxo{
-						BtxID:    input.btxID,
+						BtxID:    input.BtxID,
 						Vout:     input.index,
 						Height:   inputHeight,
 						ValueSat: t.ValueSat,
@@ -1079,7 +1079,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 		// when connecting block, amount is first in tx on the output side, then in another tx on the input side
 		// when disconnecting, it must be done backwards
 		for i := len(blockTxs) - 1; i >= 0; i-- {
-			btxID := blockTxs[i].btxID
+			btxID := blockTxs[i].BtxID
 			s := string(btxID)
 			txsToDelete[s] = struct{}{}
 			txa, err := d.getTxAddresses(btxID)

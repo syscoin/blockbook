@@ -200,7 +200,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		ab.BalanceAssetUnAllocatedSat[uint32(key)] = value
 	}	
 
-	if detail != AddressBalanceDetailNoUTXO {
+	if detail != bchain.AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
 		ab.Utxos = make([]bchain.Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
 		// ab.utxosMap = make(map[string]int, cap(ab.Utxos))
@@ -219,7 +219,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 				Height:   uint32(height),
 				ValueSat: valueSat,
 			}
-			if detail == AddressBalanceDetailUTXO {
+			if detail == bchain.AddressBalanceDetailUTXO {
 				ab.Utxos = append(ab.Utxos, u)
 			} else {
 				ab.AddUtxo(&u)
