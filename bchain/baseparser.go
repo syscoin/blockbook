@@ -326,3 +326,4 @@ func (p *BaseParser) packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
 func (p *BaseParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
 	return nil, errors.New("Not supported")
 }
+

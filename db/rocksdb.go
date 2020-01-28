@@ -531,67 +531,6 @@ type TxAddresses struct {
 }
 
 
-// ReceivedSat computes received amount from total balance and sent amount
-func (ab *bchain.AddrBalance) ReceivedSat() *big.Int {
-	var r big.Int
-	r.Add(&ab.BalanceSat, &ab.SentSat)
-	return &r
-}
-
-// addUtxo
-func (ab *bchain.AddrBalance) addUtxo(u *bchain.Utxo) {
-	ab.Utxos = append(ab.Utxos, *u)
-	l := len(ab.Utxos)
-	if l >= 16 {
-		if len(ab.utxosMap) == 0 {
-			ab.utxosMap = make(map[string]int, 32)
-			for i := 0; i < l; i++ {
-				s := string(ab.Utxos[i].BtxID)
-				if _, e := ab.utxosMap[s]; !e {
-					ab.utxosMap[s] = i
-				}
-			}
-		} else {
-			s := string(u.BtxID)
-			if _, e := ab.utxosMap[s]; !e {
-				ab.utxosMap[s] = l - 1
-			}
-		}
-	}
-}
-
-// markUtxoAsSpent finds outpoint btxID:vout in utxos and marks it as spent
-// for small number of utxos the linear search is done, for larger number there is a hashmap index
-// it is much faster than removing the utxo from the slice as it would cause in memory copy operations
-func (ab *bchain.AddrBalance) markUtxoAsSpent(btxID []byte, vout int32) {
-	if len(ab.utxosMap) == 0 {
-		for i := range ab.Utxos {
-			utxo := &ab.Utxos[i]
-			if utxo.Vout == vout && *(*int)(unsafe.Pointer(&utxo.BtxID[0])) == *(*int)(unsafe.Pointer(&btxID[0])) && bytes.Equal(utxo.BtxID, btxID) {
-				// mark utxo as spent by setting vout=-1
-				utxo.Vout = -1
-				return
-			}
-		}
-	} else {
-		if i, e := ab.utxosMap[string(btxID)]; e {
-			l := len(ab.Utxos)
-			for ; i < l; i++ {
-				utxo := &ab.Utxos[i]
-				if utxo.Vout == vout {
-					if bytes.Equal(utxo.BtxID, btxID) {
-						// mark utxo as spent by setting vout=-1
-						utxo.Vout = -1
-						return
-					}
-					break
-				}
-			}
-		}
-	}
-	glog.Errorf("Utxo %s:%d not found, using in map %v", hex.EncodeToString(btxID), vout, len(ab.utxosMap) != 0)
-}
-
 type blockTxs struct {
 	btxID  []byte
 	inputs []outpoint
