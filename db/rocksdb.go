@@ -780,7 +780,7 @@ func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.BlockTxs, error) {
 		}
 		bt = append(bt, bchain.BlockTxs{
 			BtxID:  txid,
-			inputs: o,
+			Inputs: o,
 		})
 		i += ol
 	}
