@@ -595,7 +595,7 @@ func (p *BitcoinParser) unpackTxOutput(to *bchain.TxOutput, buf []byte) int {
 	return l + al
 }
 
-func (p *BitcoinParser) packTxIndexes(txi []bchain.txIndexes) []byte {
+func (p *BitcoinParser) packTxIndexes(txi []bchain.TxIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	// store the txs in reverse order for ordering from newest to oldest
@@ -614,7 +614,7 @@ func (p *BitcoinParser) packTxIndexes(txi []bchain.txIndexes) []byte {
 	return buf
 }
 
-func (p *BitcoinParser) packOutpoints(outpoints []bchain.outpoint) []byte {
+func (p *BitcoinParser) packOutpoints(outpoints []bchain.DbOutpoint) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	for _, o := range outpoints {
@@ -625,10 +625,10 @@ func (p *BitcoinParser) packOutpoints(outpoints []bchain.outpoint) []byte {
 	return buf
 }
 
-func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]bchain.outpoint, int, error) {
+func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]bchain.DbOutpoint, int, error) {
 	txidUnpackedLen := p.BaseParser.packedTxidLen()
 	n, p := p.BaseParser.unpackVaruint(buf)
-	outpoints := make([]bchain.outpoint, n)
+	outpoints := make([]bchain.DbOutpoint, n)
 	for i := uint(0); i < n; i++ {
 		if p+txidUnpackedLen >= len(buf) {
 			return nil, 0, errors.New("Inconsistent data in unpackNOutpoints")
@@ -637,7 +637,7 @@ func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]bchain.outpoint, int, er
 		p += txidUnpackedLen
 		vout, voutLen := p.BaseParser.unpackVarint32(buf[p:])
 		p += voutLen
-		outpoints[i] = bchain.outpoint{
+		outpoints[i] = bchain.DbOutpoint{
 			btxID: btxID,
 			index: vout,
 		}

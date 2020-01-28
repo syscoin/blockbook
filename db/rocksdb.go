@@ -677,7 +677,7 @@ func addToAddressesMap(addresses bchain.addressesMap, strAddrDesc string, btxID 
 			}
 		}
 	}
-	addresses[strAddrDesc] = append(at, bchain.txIndexes{
+	addresses[strAddrDesc] = append(at, bchain.TxIndexes{
 		btxID:   btxID,
 		indexes: []int32{index},
 	})
@@ -748,7 +748,7 @@ func (d *RocksDB) storeAndCleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchai
 	zeroTx := make([]byte, pl)
 	for i := range block.Txs {
 		tx := &block.Txs[i]
-		o := make([]bchain.outpoint, len(tx.Vin))
+		o := make([]bchain.DbOutpoint, len(tx.Vin))
 		for v := range tx.Vin {
 			vin := &tx.Vin[v]
 			btxID, err := d.chainParser.PackTxid(vin.Txid)
@@ -950,7 +950,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 
 // Disconnect blocks
 
-func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32, btxID []byte, inputs []bchain.outpoint, txa *bchain.TxAddresses,
+func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32, btxID []byte, inputs []bchain.DbOutpoint, txa *bchain.TxAddresses,
 	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance) error {
 	var err error
 	var balance *bchain.AddrBalance

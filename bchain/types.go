@@ -294,7 +294,7 @@ type OnNewTxAddrFunc func(tx *Tx, desc AddressDescriptor)
 type AddrDescForOutpointFunc func(outpoint Outpoint) AddressDescriptor
 
 // Addresses index
-type txIndexes struct {
+type TxIndexes struct {
 	btxID   []byte
 	indexes []int32
 }
@@ -302,7 +302,7 @@ type txIndexes struct {
 // addressesMap is a map of addresses in a block
 // each address contains a slice of transactions with indexes where the address appears
 // slice is used instead of map so that order is defined and also search in case of few items
-type addressesMap map[string][]txIndexes
+type AddressesMap map[string][]TxIndexes
 
 // TxInput holds input data of the transaction in TxAddresses
 type TxInput struct {
@@ -333,14 +333,14 @@ type TxAddresses struct {
 	Outputs []TxOutput
 }
 
-type outpoint struct {
+type DbOutpoint struct {
 	btxID []byte
 	index int32
 }
 
 type blockTxs struct {
 	btxID  []byte
-	inputs []outpoint
+	inputs []DbOutpoint
 }
 
 // BlockChain defines common interface to block chain daemon
@@ -429,7 +429,7 @@ type BlockChainParser interface {
 	unpackTxAddresses(buf []byte) (*TxAddresses, error)
 	unpackTxInput(ti *TxInput, buf []byte) int
 	unpackTxOutput(to *TxOutput, buf []byte) int
-	packTxIndexes(txi []txIndexes) []byte
+	packTxIndexes(txi []TxIndexes) []byte
 	packOutpoints(outpoints []outpoint) []byte
 	unpackNOutpoints(buf []byte) ([]outpoint, int, error)
 	packBlockInfo(block *DbBlockInfo) ([]byte, error)

@@ -458,15 +458,15 @@ func (p *BaseParser) unpackTxOutput(to *TxOutput, buf []byte) int {
 	return 0
 }
 
-func (p *BaseParser) packTxIndexes(txi []txIndexes) []byte {
+func (p *BaseParser) packTxIndexes(txi []TxIndexes) []byte {
 	return nil
 }
 
-func (p *BaseParser) packOutpoints(outpoints []outpoint) []byte {
+func (p *BaseParser) packOutpoints(outpoints []DbOutpoint) []byte {
 	return nil
 }
 
-func (p *BaseParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
+func (p *BaseParser) unpackNOutpoints(buf []byte) ([]DbOutpoint, int, error) {
 	return nil, 0, errors.New("Not supported")
 }
 
