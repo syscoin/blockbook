@@ -448,7 +448,7 @@ func (p *BaseParser) UnpackBigint(buf []byte) (big.Int, int) {
 	return r, l
 }
 
-func (p *BaseParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
+func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	// store the txs in reverse order for ordering from newest to oldest
