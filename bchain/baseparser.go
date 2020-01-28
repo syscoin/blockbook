@@ -329,12 +329,22 @@ func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail A
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
-	return nil
+const packedHeightBytes = 4
+func (p *BasecoinParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
+	buf := make([]byte, len(addrDesc)+packedHeightBytes)
+	copy(buf, addrDesc)
+	// pack height as binary complement to achieve ordering from newest to oldest block
+	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
+	return buf
 }
 
-func (p *BaseParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
-	return nil, 0, errors.New("Not supported")
+func (p *BasecoinParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
+	i := len(key) - packedHeightBytes
+	if i <= 0 {
+		return nil, 0, errors.New("Invalid address key")
+	}
+	// height is packed in binary complement, convert it
+	return key[:i], ^p.UnpackUint(key[i : i+packedHeightBytes]), nil
 }
 
 func (p *BaseParser) PackUint(i uint32) []byte {

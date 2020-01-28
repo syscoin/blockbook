@@ -496,24 +496,6 @@ func (p *BitcoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	return ab, nil
 }
 
-const packedHeightBytes = 4
-func (p *BitcoinParser) PackAddressKey(addrDesc bchain.AddressDescriptor, height uint32) []byte {
-	buf := make([]byte, len(addrDesc)+packedHeightBytes)
-	copy(buf, addrDesc)
-	// pack height as binary complement to achieve ordering from newest to oldest block
-	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
-	return buf
-}
-
-func (p *BitcoinParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
-	i := len(key) - packedHeightBytes
-	if i <= 0 {
-		return nil, 0, errors.New("Invalid address key")
-	}
-	// height is packed in binary complement, convert it
-	return key[:i], ^p.UnpackUint(key[i : i+packedHeightBytes]), nil
-}
-
 func (p *BitcoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	l := p.BaseParser.PackVaruint(uint(ta.Height), varBuf)
