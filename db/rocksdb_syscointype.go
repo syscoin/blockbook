@@ -33,7 +33,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 	}
 	balance, e := balances[senderStr]
 	if !e {
-		balance, err = d.GetAddrDescBalance(assetSenderAddrDesc, AddressBalanceDetailUTXOIndexed)
+		balance, err = d.GetAddrDescBalance(assetSenderAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		balanceTransfer, e := balances[transferStr]
 		if !e {
-			balanceTransfer, err = d.GetAddrDescBalance(assetTransferWitnessAddrDesc, AddressBalanceDetailUTXOIndexed)
+			balanceTransfer, err = d.GetAddrDescBalance(assetTransferWitnessAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return err
 			}
@@ -148,7 +148,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		strAddrDesc := string(addrDesc)
 		balance, e := balances[strAddrDesc]
 		if !e {
-			balance, err = d.GetAddrDescBalance(addrDesc, AddressBalanceDetailUTXOIndexed)
+			balance, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return err
 			}
@@ -194,7 +194,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		s := string(addrDesc)
 		b, fb := balances[s]
 		if !fb {
-			b, err = d.GetAddrDescBalance(addrDesc, AddressBalanceDetailUTXOIndexed)
+			b, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return nil, err
 			}
@@ -275,7 +275,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
-		balance, err := d.GetAddrDescBalance(assetSenderAddrDesc, AddressBalanceDetailUTXOIndexed)
+		balance, err := d.GetAddrDescBalance(assetSenderAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
 		}
@@ -337,7 +337,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		s := string(addrDesc)
 		b, fb := balances[s]
 		if !fb {
-			b, err = d.GetAddrDescBalance(addrDesc, AddressBalanceDetailUTXOIndexed)
+			b, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return nil, err
 			}
@@ -414,7 +414,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
-		balance, err := d.GetAddrDescBalance(assetSenderAddrDesc, AddressBalanceDetailUTXOIndexed)
+		balance, err := d.GetAddrDescBalance(assetSenderAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
 		}

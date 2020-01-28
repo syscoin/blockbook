@@ -318,12 +318,14 @@ type DbBlockInfo struct {
 	Size   uint32
 	Height uint32 // Height is not packed!
 }
+
 // TxOutput holds output data of the transaction in TxAddresses
 type TxOutput struct {
 	AddrDesc AddressDescriptor
 	Spent    bool
 	ValueSat big.Int
 }
+
 // Addresses converts AddressDescriptor of the input to array of strings
 func (ti *TxInput) Addresses(p BlockChainParser) ([]string, bool, error) {
 	return p.GetAddressesFromAddrDesc(ti.AddrDesc)
@@ -333,6 +335,7 @@ func (ti *TxInput) Addresses(p BlockChainParser) ([]string, bool, error) {
 func (to *TxOutput) Addresses(p BlockChainParser) ([]string, bool, error) {
 	return p.GetAddressesFromAddrDesc(to.AddrDesc)
 }
+
 // TxAddresses stores transaction inputs and outputs with amounts
 type TxAddresses struct {
 	Version int32
@@ -462,7 +465,7 @@ type BlockChainParser interface {
 	UnpackVaruint(buf []byte) (uint, int)
 	PackBigint(bi *big.Int, buf []byte) int
 	UnpackBigint(buf []byte) (big.Int, int)
-	MaxPackedBigintBytes(bi *big.Int, buf []byte) int
+	MaxPackedBigintBytes() int
 
 	// blocks
 	PackBlockHash(hash string) ([]byte, error)

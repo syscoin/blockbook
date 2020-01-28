@@ -384,7 +384,7 @@ const (
 	maxPackedBigintBytes = 249
 )
 
-func (p *BaseParser) MaxPackedBigintBytes(bi *big.Int, buf []byte) int {
+func (p *BaseParser) MaxPackedBigintBytes() int {
 	return maxPackedBigintBytes
 }
 

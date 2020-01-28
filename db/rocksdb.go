@@ -524,7 +524,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				strAddrDesc := string(addrDesc)
 				balance, e := balances[strAddrDesc]
 				if !e {
-					balance, err = d.GetAddrDescBalance(addrDesc, AddressBalanceDetailUTXOIndexed)
+					balance, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 					if err != nil {
 						return err
 					}
@@ -613,7 +613,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				strAddrDesc := string(spentOutput.AddrDesc)
 				balance, e := balances[strAddrDesc]
 				if !e {
-					balance, err = d.GetAddrDescBalance(spentOutput.AddrDesc, AddressBalanceDetailUTXOIndexed)
+					balance, err = d.GetAddrDescBalance(spentOutput.AddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 					if err != nil {
 						return err
 					}
@@ -859,7 +859,7 @@ func (d *RocksDB) GetBestBlock() (uint32, string, error) {
 	defer it.Close()
 	if it.SeekToLast(); it.Valid() {
 		bestHeight := d.chainParser.UnpackUint(it.Key().Data())
-		info, err := d.UnpackBlockInfo(it.Value().Data())
+		info, err := d.chainParser.UnpackBlockInfo(it.Value().Data())
 		if info != nil {
 			if glog.V(1) {
 				glog.Infof("rocksdb: bestblock %d %+v", bestHeight, info)
@@ -941,7 +941,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 		s := string(addrDesc)
 		b, fb := balances[s]
 		if !fb {
-			b, err = d.GetAddrDescBalance(addrDesc, AddressBalanceDetailUTXOIndexed)
+			b, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return nil, err
 			}
@@ -1080,7 +1080,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 				glog.Warning("TxAddress for txid ", ut, " not found")
 				continue
 			}
-			if err := d.disconnectTxAddresses(wb, height, btxID, blockTxs[i].inputs, txa, txAddressesToUpdate, balances); err != nil {
+			if err := d.disconnectTxAddresses(wb, height, btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, balances); err != nil {
 				return err
 			}
 		}
@@ -1107,7 +1107,7 @@ func (d *RocksDB) storeBalancesDisconnect(wb *gorocksdb.WriteBatch, balances map
 	for _, b := range balances {
 		if b != nil {
 			// remove spent utxos
-			us := make([]Utxo, 0, len(b.Utxos))
+			us := make([]bchain.Utxo, 0, len(b.Utxos))
 			for _, u := range b.Utxos {
 				// remove utxos marked as spent
 				if u.Vout >= 0 {
@@ -1227,7 +1227,7 @@ func (d *RocksDB) loadBlockTimes() ([]uint32, error) {
 			}
 		}
 		counter++
-		info, err := d.UnpackBlockInfo(it.Value().Data())
+		info, err := d.chainParser.UnpackBlockInfo(it.Value().Data())
 		if err != nil {
 			return nil, err
 		}
