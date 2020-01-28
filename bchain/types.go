@@ -293,6 +293,56 @@ type OnNewTxAddrFunc func(tx *Tx, desc AddressDescriptor)
 // AddrDescForOutpointFunc defines function that returns address descriptorfor given outpoint or nil if outpoint not found
 type AddrDescForOutpointFunc func(outpoint Outpoint) AddressDescriptor
 
+// Addresses index
+type txIndexes struct {
+	btxID   []byte
+	indexes []int32
+}
+
+// addressesMap is a map of addresses in a block
+// each address contains a slice of transactions with indexes where the address appears
+// slice is used instead of map so that order is defined and also search in case of few items
+type addressesMap map[string][]txIndexes
+
+// TxInput holds input data of the transaction in TxAddresses
+type TxInput struct {
+	AddrDesc AddressDescriptor
+	ValueSat big.Int
+}
+
+// BlockInfo holds information about blocks kept in column height
+type DbBlockInfo struct {
+	Hash   string
+	Time   int64
+	Txs    uint32
+	Size   uint32
+	Height uint32 // Height is not packed!
+}
+// TxOutput holds output data of the transaction in TxAddresses
+type TxOutput struct {
+	AddrDesc AddressDescriptor
+	Spent    bool
+	ValueSat big.Int
+}
+
+// TxAddresses stores transaction inputs and outputs with amounts
+type TxAddresses struct {
+	Version int32
+	Height  uint32
+	Inputs  []TxInput
+	Outputs []TxOutput
+}
+
+type outpoint struct {
+	btxID []byte
+	index int32
+}
+
+type blockTxs struct {
+	btxID  []byte
+	inputs []outpoint
+}
+
 // BlockChain defines common interface to block chain daemon
 type BlockChain interface {
 	// life-cycle methods
@@ -423,55 +473,4 @@ type Mempool interface {
 	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
 	GetTransactionTime(txid string) uint32
-}
-
-// Addresses index
-
-type txIndexes struct {
-	btxID   []byte
-	indexes []int32
-}
-
-// addressesMap is a map of addresses in a block
-// each address contains a slice of transactions with indexes where the address appears
-// slice is used instead of map so that order is defined and also search in case of few items
-type addressesMap map[string][]txIndexes
-
-// TxInput holds input data of the transaction in TxAddresses
-type TxInput struct {
-	AddrDesc AddressDescriptor
-	ValueSat big.Int
-}
-
-// BlockInfo holds information about blocks kept in column height
-type DbBlockInfo struct {
-	Hash   string
-	Time   int64
-	Txs    uint32
-	Size   uint32
-	Height uint32 // Height is not packed!
-}
-// TxOutput holds output data of the transaction in TxAddresses
-type TxOutput struct {
-	AddrDesc AddressDescriptor
-	Spent    bool
-	ValueSat big.Int
-}
-
-// TxAddresses stores transaction inputs and outputs with amounts
-type TxAddresses struct {
-	Version int32
-	Height  uint32
-	Inputs  []TxInput
-	Outputs []TxOutput
-}
-
-type outpoint struct {
-	btxID []byte
-	index int32
-}
-
-type blockTxs struct {
-	btxID  []byte
-	inputs []outpoint
 }
