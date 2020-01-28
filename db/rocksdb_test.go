@@ -116,7 +116,7 @@ func txIndexesHex(tx string, indexes []int32) string {
 		if i == len(indexes)-1 {
 			index |= 1
 		}
-		l := packVarint32(index, buf)
+		l := bchain.packVarint32(index, buf)
 		tx += hex.EncodeToString(buf[:l])
 	}
 	return tx

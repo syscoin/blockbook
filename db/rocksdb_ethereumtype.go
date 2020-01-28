@@ -60,16 +60,16 @@ func (d *RocksDB) GetAddrDescContracts(addrDesc bchain.AddressDescriptor) (*Addr
 	if len(buf) == 0 {
 		return nil, nil
 	}
-	tt, l := unpackVaruint(buf)
+	tt, l := bchain.unpackVaruint(buf)
 	buf = buf[l:]
-	nct, l := unpackVaruint(buf)
+	nct, l := bchain.unpackVaruint(buf)
 	buf = buf[l:]
 	c := make([]AddrContract, 0, 4)
 	for len(buf) > 0 {
 		if len(buf) < eth.EthereumTypeAddressDescriptorLen {
 			return nil, errors.New("Invalid data stored in cfAddressContracts for AddrDesc " + addrDesc.String())
 		}
-		txs, l := unpackVaruint(buf[eth.EthereumTypeAddressDescriptorLen:])
+		txs, l := bchain.unpackVaruint(buf[eth.EthereumTypeAddressDescriptorLen:])
 		contract := append(bchain.AddressDescriptor(nil), buf[:eth.EthereumTypeAddressDescriptorLen]...)
 		c = append(c, AddrContract{
 			Contract: contract,
@@ -317,7 +317,7 @@ func (d *RocksDB) getBlockTxsEthereumType(height uint32) ([]ethBlockTx, error) {
 		if err != nil {
 			return nil, err
 		}
-		cc, l := unpackVaruint(buf[i:])
+		cc, l := bchain.unpackVaruint(buf[i:])
 		i += l
 		contracts := make([]ethBlockTxContract, cc)
 		for j := range contracts {
@@ -420,7 +420,7 @@ func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, heigh
 		wb.DeleteCF(d.cfh[cfTransactions], blockTx.btxID)
 	}
 	for a := range addresses {
-		key := packAddressKey([]byte(a), height)
+		key := bchain.packAddressKey([]byte(a), height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
 	return nil

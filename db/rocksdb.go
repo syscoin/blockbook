@@ -371,8 +371,8 @@ func (d *RocksDB) GetTransactions(address string, lower uint32, higher uint32, f
 // Transaction are passed to callback function in the order from newest block to the oldest
 func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, lower uint32, higher uint32, fn GetTransactionsCallback) (err error) {
 	txidUnpackedLen := d.chainParser.PackedTxidLen()
-	startKey := packAddressKey(addrDesc, higher)
-	stopKey := packAddressKey(addrDesc, lower)
+	startKey := bchain.packAddressKey(addrDesc, higher)
+	stopKey := bchain.packAddressKey(addrDesc, lower)
 	indexes := make([]int32, 0, 16)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAddresses])
 	defer it.Close()
@@ -385,7 +385,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 		if glog.V(2) {
 			glog.Infof("rocksdb: addresses %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
 		}
-		_, height, err := unpackAddressKey(key)
+		_, height, err := bchain.unpackAddressKey(key)
 		if err != nil {
 			return err
 		}
@@ -397,7 +397,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			indexes = indexes[:0]
 			val = val[txidUnpackedLen:]
 			for {
-				index, l := unpackVarint32(val)
+				index, l := bchain.unpackVarint32(val)
 				indexes = append(indexes, index>>1)
 				val = val[l:]
 				if index&1 == 1 {
@@ -732,7 +732,7 @@ func addToAddressesMap(addresses addressesMap, strAddrDesc string, btxID []byte,
 func (d *RocksDB) storeAddresses(wb *gorocksdb.WriteBatch, height uint32, addresses addressesMap) error {
 	for addrDesc, txi := range addresses {
 		ba := bchain.AddressDescriptor(addrDesc)
-		key := packAddressKey(ba, height)
+		key := bchain.packAddressKey(ba, height)
 		val := d.packTxIndexes(txi)
 		wb.PutCF(d.cfh[cfAddresses], key, val)
 	}
@@ -813,18 +813,18 @@ func (d *RocksDB) storeAndCleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchai
 			return err
 		}
 		buf = append(buf, btxID...)
-		l := packVaruint(uint(len(o)), varBuf)
+		l := bchain.packVaruint(uint(len(o)), varBuf)
 		buf = append(buf, varBuf[:l]...)
 		buf = append(buf, d.packOutpoints(o)...)
 	}
-	key := packUint(block.Height)
+	key := bchain.packUint(block.Height)
 	wb.PutCF(d.cfh[cfBlockTxs], key, buf)
 	return d.cleanupBlockTxs(wb, block)
 }
 
 func (d *RocksDB) getBlockTxs(height uint32) ([]blockTxs, error) {
 	pl := d.chainParser.PackedTxidLen()
-	val, err := d.db.GetCF(d.ro, d.cfh[cfBlockTxs], packUint(height))
+	val, err := d.db.GetCF(d.ro, d.cfh[cfBlockTxs], bchain.packUint(height))
 	if err != nil {
 		return nil, err
 	}
@@ -952,7 +952,7 @@ func appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
 	if txo.Spent {
 		la = ^la
 	}
-	l := packVarint(la, varBuf)
+	l := bchain.packVarint(la, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, txo.AddrDesc...)
 	l = packBigint(&txo.ValueSat, varBuf)
@@ -962,18 +962,18 @@ func appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
 
 func unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	ta := TxAddresses{}
-	version, l := unpackVaruint(buf)
+	version, l := bchain.unpackVaruint(buf)
 	ta.Version = int32(version)
-	height, ll := unpackVaruint(buf[l:])
+	height, ll := bchain.unpackVaruint(buf[l:])
 	ta.Height = uint32(height)
 	l += ll
-	inputs, ll := unpackVaruint(buf[l:])
+	inputs, ll := bchain.unpackVaruint(buf[l:])
 	l += ll
 	ta.Inputs = make([]TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
 		l += unpackTxInput(&ta.Inputs[i], buf[l:])
 	}
-	outputs, ll := unpackVaruint(buf[l:])
+	outputs, ll := bchain.unpackVaruint(buf[l:])
 	l += ll
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
@@ -983,22 +983,22 @@ func unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 }
 
 func unpackTxInput(ti *TxInput, buf []byte) int {
-	al, l := unpackVaruint(buf)
+	al, l := bchain.unpackVaruint(buf)
 	ti.AddrDesc = append([]byte(nil), buf[l:l+int(al)]...)
 	al += uint(l)
-	ti.ValueSat, l = unpackBigint(buf[al:])
+	ti.ValueSat, l = bchain.unpackBigint(buf[al:])
 	return l + int(al)
 }
 
 func unpackTxOutput(to *TxOutput, buf []byte) int {
-	al, l := unpackVarint(buf)
+	al, l := bchain.unpackVarint(buf)
 	if al < 0 {
 		to.Spent = true
 		al = ^al
 	}
 	to.AddrDesc = append([]byte(nil), buf[l:l+al]...)
 	al += l
-	to.ValueSat, l = unpackBigint(buf[al:])
+	to.ValueSat, l = bchain.unpackBigint(buf[al:])
 	return l + al
 }
 
@@ -1014,7 +1014,7 @@ func (d *RocksDB) packTxIndexes(txi []txIndexes) []byte {
 			if i == len(t.indexes)-1 {
 				index |= 1
 			}
-			l := packVarint32(index, bvout)
+			l := bchain.packVarint32(index, bvout)
 			buf = append(buf, bvout[:l]...)
 		}
 	}
@@ -1025,7 +1025,7 @@ func (d *RocksDB) packOutpoints(outpoints []outpoint) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	for _, o := range outpoints {
-		l := packVarint32(o.index, bvout)
+		l := bchain.packVarint32(o.index, bvout)
 		buf = append(buf, []byte(o.btxID)...)
 		buf = append(buf, bvout[:l]...)
 	}
@@ -1034,7 +1034,7 @@ func (d *RocksDB) packOutpoints(outpoints []outpoint) []byte {
 
 func (d *RocksDB) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
 	txidUnpackedLen := d.chainParser.PackedTxidLen()
-	n, p := unpackVaruint(buf)
+	n, p := bchain.unpackVaruint(buf)
 	outpoints := make([]outpoint, n)
 	for i := uint(0); i < n; i++ {
 		if p+txidUnpackedLen >= len(buf) {
@@ -1042,7 +1042,7 @@ func (d *RocksDB) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
 		}
 		btxID := append([]byte(nil), buf[p:p+txidUnpackedLen]...)
 		p += txidUnpackedLen
-		vout, voutLen := unpackVarint32(buf[p:])
+		vout, voutLen := bchain.unpackVarint32(buf[p:])
 		p += voutLen
 		outpoints[i] = outpoint{
 			btxID: btxID,
@@ -1089,9 +1089,9 @@ func (d *RocksDB) unpackBlockInfo(buf []byte) (*BlockInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := unpackUint(buf[pl:])
-	txs, l := unpackVaruint(buf[pl+4:])
-	size, _ := unpackVaruint(buf[pl+4+l:])
+	t := bchain.unpackUint(buf[pl:])
+	txs, l := bchain.unpackVaruint(buf[pl+4:])
+	size, _ := bchain.unpackVaruint(buf[pl+4+l:])
 	return &BlockInfo{
 		Hash: txid,
 		Time: int64(t),
@@ -1105,7 +1105,7 @@ func (d *RocksDB) GetBestBlock() (uint32, string, error) {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfHeight])
 	defer it.Close()
 	if it.SeekToLast(); it.Valid() {
-		bestHeight := unpackUint(it.Key().Data())
+		bestHeight := bchain.unpackUint(it.Key().Data())
 		info, err := d.unpackBlockInfo(it.Value().Data())
 		if info != nil {
 			if glog.V(1) {
@@ -1119,7 +1119,7 @@ func (d *RocksDB) GetBestBlock() (uint32, string, error) {
 
 // GetBlockHash returns block hash at given height or empty string if not found
 func (d *RocksDB) GetBlockHash(height uint32) (string, error) {
-	key := packUint(height)
+	key := bchain.packUint(height)
 	val, err := d.db.GetCF(d.ro, d.cfh[cfHeight], key)
 	if err != nil {
 		return "", err
@@ -1134,7 +1134,7 @@ func (d *RocksDB) GetBlockHash(height uint32) (string, error) {
 
 // GetBlockInfo returns block info stored in db
 func (d *RocksDB) GetBlockInfo(height uint32) (*BlockInfo, error) {
-	key := packUint(height)
+	key := bchain.packUint(height)
 	val, err := d.db.GetCF(d.ro, d.cfh[cfHeight], key)
 	if err != nil {
 		return nil, err
@@ -1159,7 +1159,7 @@ func (d *RocksDB) writeHeightFromBlock(wb *gorocksdb.WriteBatch, block *bchain.B
 }
 
 func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *BlockInfo, op int) error {
-	key := packUint(height)
+	key := bchain.packUint(height)
 	switch op {
 	case opInsert:
 		val, err := d.packBlockInfo(bi)
@@ -1283,7 +1283,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 		}
 	}
 	for a := range addresses {
-		key := packAddressKey([]byte(a), height)
+		key := bchain.packAddressKey([]byte(a), height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
 	return nil
@@ -1331,7 +1331,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 				return err
 			}
 		}
-		key := packUint(height)
+		key := bchain.packUint(height)
 		wb.DeleteCF(d.cfh[cfBlockTxs], key)
 		wb.DeleteCF(d.cfh[cfHeight], key)
 	}
@@ -1466,7 +1466,7 @@ func (d *RocksDB) loadBlockTimes() ([]uint32, error) {
 	counter := uint32(0)
 	time := uint32(0)
 	for it.SeekToFirst(); it.Valid(); it.Next() {
-		height := unpackUint(it.Key().Data())
+		height := bchain.unpackUint(it.Key().Data())
 		if height > counter {
 			glog.Warning("gap in cfHeight: expecting ", counter, ", got ", height)
 			for ; counter < height; counter++ {
@@ -1635,120 +1635,4 @@ func (d *RocksDB) ComputeInternalStateColumnStats(stopCompute chan os.Signal) er
 	}
 	glog.Info("db: ComputeInternalStateColumnStats finished in ", time.Since(start))
 	return nil
-}
-
-// Helpers
-
-func packAddressKey(addrDesc bchain.AddressDescriptor, height uint32) []byte {
-	buf := make([]byte, len(addrDesc)+packedHeightBytes)
-	copy(buf, addrDesc)
-	// pack height as binary complement to achieve ordering from newest to oldest block
-	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
-	return buf
-}
-
-func unpackAddressKey(key []byte) ([]byte, uint32, error) {
-	i := len(key) - packedHeightBytes
-	if i <= 0 {
-		return nil, 0, errors.New("Invalid address key")
-	}
-	// height is packed in binary complement, convert it
-	return key[:i], ^unpackUint(key[i : i+packedHeightBytes]), nil
-}
-
-func packUint(i uint32) []byte {
-	buf := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf, i)
-	return buf
-}
-
-func unpackUint(buf []byte) uint32 {
-	return binary.BigEndian.Uint32(buf)
-}
-
-func packVarint32(i int32, buf []byte) int {
-	return vlq.PutInt(buf, int64(i))
-}
-
-func packVarint(i int, buf []byte) int {
-	return vlq.PutInt(buf, int64(i))
-}
-
-func packVaruint(i uint, buf []byte) int {
-	return vlq.PutUint(buf, uint64(i))
-}
-
-func unpackVarint32(buf []byte) (int32, int) {
-	i, ofs := vlq.Int(buf)
-	return int32(i), ofs
-}
-
-func unpackVarint(buf []byte) (int, int) {
-	i, ofs := vlq.Int(buf)
-	return int(i), ofs
-}
-
-func unpackVaruint(buf []byte) (uint, int) {
-	i, ofs := vlq.Uint(buf)
-	return uint(i), ofs
-}
-
-const (
-	// number of bits in a big.Word
-	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
-	// number of bytes in a big.Word
-	wordBytes = wordBits / 8
-	// max packed bigint words
-	maxPackedBigintWords = (256 - wordBytes) / wordBytes
-	maxPackedBigintBytes = 249
-)
-
-// big int is packed in BigEndian order without memory allocation as 1 byte length followed by bytes of big int
-// number of written bytes is returned
-// limitation: bigints longer than 248 bytes are truncated to 248 bytes
-// caution: buffer must be big enough to hold the packed big int, buffer 249 bytes big is always safe
-func packBigint(bi *big.Int, buf []byte) int {
-	w := bi.Bits()
-	lw := len(w)
-	// zero returns only one byte - zero length
-	if lw == 0 {
-		buf[0] = 0
-		return 1
-	}
-	// pack the most significant word in a special way - skip leading zeros
-	w0 := w[lw-1]
-	fb := 8
-	mask := big.Word(0xff) << (wordBits - 8)
-	for w0&mask == 0 {
-		fb--
-		mask >>= 8
-	}
-	for i := fb; i > 0; i-- {
-		buf[i] = byte(w0)
-		w0 >>= 8
-	}
-	// if the big int is too big (> 2^1984), the number of bytes would not fit to 1 byte
-	// in this case, truncate the number, it is not expected to work with this big numbers as amounts
-	s := 0
-	if lw > maxPackedBigintWords {
-		s = lw - maxPackedBigintWords
-	}
-	// pack the rest of the words in reverse order
-	for j := lw - 2; j >= s; j-- {
-		d := w[j]
-		for i := fb + wordBytes; i > fb; i-- {
-			buf[i] = byte(d)
-			d >>= 8
-		}
-		fb += wordBytes
-	}
-	buf[0] = byte(fb)
-	return fb + 1
-}
-
-func unpackBigint(buf []byte) (big.Int, int) {
-	var r big.Int
-	l := int(buf[0]) + 1
-	r.SetBytes(buf[1:l])
-	return r, l
 }
