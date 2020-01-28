@@ -435,21 +435,21 @@ func (p *BitcoinParser) DerivationBasePath(xpub string) (string, error) {
 }
 func (p *BitcoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []byte) []byte {
 	buf = buf[:0]
-	l := bchain.packVaruint(uint(ab.Txs), varBuf)
+	l := p.packVaruint(uint(ab.Txs), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = bchain.packBigint(&ab.SentSat, varBuf)
+	l = p.packBigint(&ab.SentSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = bchain.packBigint(&ab.BalanceSat, varBuf)
+	l = p.packBigint(&ab.BalanceSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for _, utxo := range ab.Utxos {
 		// if Vout < 0, utxo is marked as spent
 		if utxo.Vout >= 0 {
 			buf = append(buf, utxo.BtxID...)
-			l = bchain.packVaruint(uint(utxo.Vout), varBuf)
+			l = p.packVaruint(uint(utxo.Vout), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = bchain.packVaruint(uint(utxo.Height), varBuf)
+			l = p.packVaruint(uint(utxo.Height), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = bchain.packBigint(&utxo.ValueSat, varBuf)
+			l = p.packBigint(&utxo.ValueSat, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
@@ -474,11 +474,11 @@ func (p *BitcoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		for len(buf[l:]) >= txidUnpackedLen+3 {
 			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
 			l += txidUnpackedLen
-			vout, ll := bchain.unpackVaruint(buf[l:])
+			vout, ll := p.unpackVaruint(buf[l:])
 			l += ll
-			height, ll := bchain.unpackVaruint(buf[l:])
+			height, ll := p.unpackVaruint(buf[l:])
 			l += ll
-			valueSat, ll := bchain.unpackBigint(buf[l:])
+			valueSat, ll := p.unpackBigint(buf[l:])
 			l += ll
 			u := bchain.Utxo{
 				BtxID:    btxID,
