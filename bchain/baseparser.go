@@ -330,7 +330,7 @@ func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail A
 }
 
 const packedHeightBytes = 4
-func (p *BasecoinParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
+func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
 	buf := make([]byte, len(addrDesc)+packedHeightBytes)
 	copy(buf, addrDesc)
 	// pack height as binary complement to achieve ordering from newest to oldest block
@@ -338,7 +338,7 @@ func (p *BasecoinParser) PackAddressKey(addrDesc AddressDescriptor, height uint3
 	return buf
 }
 
-func (p *BasecoinParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
+func (p *BaseParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
 	i := len(key) - packedHeightBytes
 	if i <= 0 {
 		return nil, 0, errors.New("Invalid address key")
