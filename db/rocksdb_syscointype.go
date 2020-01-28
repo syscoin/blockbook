@@ -168,9 +168,6 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAssetAllocatedSat.Add(&balanceAssetAllocatedSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
-		if receiverStr == "sys1qd7wt50kaf33yd03vlz3h4ztlpzhjnxnau6uwuf" {
-			glog.Warningf("Connecting to allocation sys1qd7wt50kaf33yd03vlz3h4ztlpzhjnxnau6uwuf value %f new balance %f", amount, balance.BalanceAssetAllocatedSat[assetGuid])
-		}
 	}
 	return d.ConnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
