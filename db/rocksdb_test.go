@@ -84,7 +84,7 @@ func spentAddressToPubKeyHexWithLength(addr string, t *testing.T, d *RocksDB) st
 
 func bigintToHex(i *big.Int, d *RocksDB) string {
 	b := make([]byte, maxPackedBigintBytes)
-	l := d.chainParser.packBigint(i, b)
+	l := d.chainParser.PackBigint(i, b)
 	return hex.EncodeToString(b[:l])
 }
 
@@ -116,7 +116,7 @@ func txIndexesHex(tx string, indexes []int32, d *RocksDB) string {
 		if i == len(indexes)-1 {
 			index |= 1
 		}
-		l := d.chainParser.packVarint32(index, buf)
+		l := d.chainParser.PackVarint32(index, buf)
 		tx += hex.EncodeToString(buf[:l])
 	}
 	return tx
@@ -867,33 +867,33 @@ func Test_packBigint_unpackBigint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// packBigint
-			got := d.chainParser.packBigint(tt.bi, tt.buf)
+			// PackBigint
+			got := d.chainParser.PackBigint(tt.bi, tt.buf)
 			if tt.toobiglen == 0 {
 				// create buffer that we expect
 				bb := tt.bi.Bytes()
 				want := append([]byte(nil), byte(len(bb)))
 				want = append(want, bb...)
 				if got != len(want) {
-					t.Errorf("packBigint() = %v, want %v", got, len(want))
+					t.Errorf("PackBigint() = %v, want %v", got, len(want))
 				}
 				for i := 0; i < got; i++ {
 					if tt.buf[i] != want[i] {
-						t.Errorf("packBigint() buf = %v, want %v", tt.buf[:got], want)
+						t.Errorf("PackBigint() buf = %v, want %v", tt.buf[:got], want)
 						break
 					}
 				}
-				// unpackBigint
-				got1, got2 := d.chainParser.unpackBigint(tt.buf)
+				// UnpackBigint
+				got1, got2 := d.chainParser.UnpackBigint(tt.buf)
 				if got2 != len(want) {
-					t.Errorf("unpackBigint() = %v, want %v", got2, len(want))
+					t.Errorf("UnpackBigint() = %v, want %v", got2, len(want))
 				}
 				if tt.bi.Cmp(&got1) != 0 {
-					t.Errorf("unpackBigint() = %v, want %v", got1, tt.bi)
+					t.Errorf("UnpackBigint() = %v, want %v", got1, tt.bi)
 				}
 			} else {
 				if got != tt.toobiglen {
-					t.Errorf("packBigint() = %v, want toobiglen %v", got, tt.toobiglen)
+					t.Errorf("PackBigint() = %v, want toobiglen %v", got, tt.toobiglen)
 				}
 			}
 		})
@@ -1022,18 +1022,18 @@ func Test_packTxAddresses_unpackTxAddresses(t *testing.T) {
 	buf := make([]byte, 1024)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := packTxAddresses(tt.data, buf, varBuf)
+			b := PackTxAddresses(tt.data, buf, varBuf)
 			hex := hex.EncodeToString(b)
 			if !reflect.DeepEqual(hex, tt.hex) {
-				t.Errorf("packTxAddresses() = %v, want %v", hex, tt.hex)
+				t.Errorf("PackTxAddresses() = %v, want %v", hex, tt.hex)
 			}
-			got1, err := unpackTxAddresses(b)
+			got1, err := UnpackTxAddresses(b)
 			if err != nil {
-				t.Errorf("unpackTxAddresses() error = %v", err)
+				t.Errorf("UnpackTxAddresses() error = %v", err)
 				return
 			}
 			if !reflect.DeepEqual(got1, tt.data) {
-				t.Errorf("unpackTxAddresses() = %+v, want %+v", got1, tt.data)
+				t.Errorf("UnpackTxAddresses() = %+v, want %+v", got1, tt.data)
 			}
 		})
 	}
@@ -1097,18 +1097,18 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 	buf := make([]byte, 32)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := parser.packAddrBalance(tt.data, buf, varBuf)
+			b := parser.PackAddrBalance(tt.data, buf, varBuf)
 			hex := hex.EncodeToString(b)
 			if !reflect.DeepEqual(hex, tt.hex) {
-				t.Errorf("packTxAddresses() = %v, want %v", hex, tt.hex)
+				t.Errorf("PackTxAddresses() = %v, want %v", hex, tt.hex)
 			}
-			got1, err := parser.unpackAddrBalance(b, parser.PackedTxidLen(), AddressBalanceDetailUTXO)
+			got1, err := parser.UnpackAddrBalance(b, parser.PackedTxidLen(), AddressBalanceDetailUTXO)
 			if err != nil {
-				t.Errorf("unpackTxAddresses() error = %v", err)
+				t.Errorf("UnpackTxAddresses() error = %v", err)
 				return
 			}
 			if !reflect.DeepEqual(got1, tt.data) {
-				t.Errorf("unpackTxAddresses() = %+v, want %+v", got1, tt.data)
+				t.Errorf("UnpackTxAddresses() = %+v, want %+v", got1, tt.data)
 			}
 		})
 	}

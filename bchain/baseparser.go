@@ -322,54 +322,54 @@ func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 func (p *BaseParser) GetMaxAddrLength() int {
 	return 1024
 }
-func (p *BaseParser) packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
+func (p *BaseParser) PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 	return nil
 }
-func (p *BaseParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
+func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) packAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
+func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
 	return nil
 }
 
-func (p *BaseParser) unpackAddressKey(key []byte) ([]byte, uint32, error) {
+func (p *BaseParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
 	return nil, 0, errors.New("Not supported")
 }
 
-func (p *BaseParser) packUint(i uint32) []byte {
+func (p *BaseParser) PackUint(i uint32) []byte {
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, i)
 	return buf
 }
 
-func (p *BaseParser) unpackUint(buf []byte) uint32 {
+func (p *BaseParser) UnpackUint(buf []byte) uint32 {
 	return binary.BigEndian.Uint32(buf)
 }
 
-func (p *BaseParser) packVarint32(i int32, buf []byte) int {
+func (p *BaseParser) PackVarint32(i int32, buf []byte) int {
 	return vlq.PutInt(buf, int64(i))
 }
 
-func (p *BaseParser) packVarint(i int, buf []byte) int {
+func (p *BaseParser) PackVarint(i int, buf []byte) int {
 	return vlq.PutInt(buf, int64(i))
 }
 
-func (p *BaseParser) packVaruint(i uint, buf []byte) int {
+func (p *BaseParser) PackVaruint(i uint, buf []byte) int {
 	return vlq.PutUint(buf, uint64(i))
 }
 
-func (p *BaseParser) unpackVarint32(buf []byte) (int32, int) {
+func (p *BaseParser) UnpackVarint32(buf []byte) (int32, int) {
 	i, ofs := vlq.Int(buf)
 	return int32(i), ofs
 }
 
-func (p *BaseParser) unpackVarint(buf []byte) (int, int) {
+func (p *BaseParser) UnpackVarint(buf []byte) (int, int) {
 	i, ofs := vlq.Int(buf)
 	return int(i), ofs
 }
 
-func (p *BaseParser) unpackVaruint(buf []byte) (uint, int) {
+func (p *BaseParser) UnpackVaruint(buf []byte) (uint, int) {
 	i, ofs := vlq.Uint(buf)
 	return uint(i), ofs
 }
@@ -388,7 +388,7 @@ const (
 // number of written bytes is returned
 // limitation: bigints longer than 248 bytes are truncated to 248 bytes
 // caution: buffer must be big enough to hold the packed big int, buffer 249 bytes big is always safe
-func (p *BaseParser) packBigint(bi *big.Int, buf []byte) int {
+func (p *BaseParser) PackBigint(bi *big.Int, buf []byte) int {
 	w := bi.Bits()
 	lw := len(w)
 	// zero returns only one byte - zero length
@@ -427,53 +427,53 @@ func (p *BaseParser) packBigint(bi *big.Int, buf []byte) int {
 	return fb + 1
 }
 
-func (p *BaseParser) unpackBigint(buf []byte) (big.Int, int) {
+func (p *BaseParser) UnpackBigint(buf []byte) (big.Int, int) {
 	var r big.Int
 	l := int(buf[0]) + 1
 	r.SetBytes(buf[1:l])
 	return r, l
 }
 
-func (p *BaseParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
+func (p *BaseParser) PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
 	return nil
 }
 
-func (p *BaseParser) appendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte {
+func (p *BaseParser) AppendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte {
 	return nil
 }
 
-func (p *BaseParser) appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
+func (p *BaseParser) AppendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
 	return nil
 }
 
-func (p *BaseParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
+func (p *BaseParser) UnpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) unpackTxInput(ti *TxInput, buf []byte) int {
+func (p *BaseParser) UnpackTxInput(ti *TxInput, buf []byte) int {
 	return 0
 }
 
-func (p *BaseParser) unpackTxOutput(to *TxOutput, buf []byte) int {
+func (p *BaseParser) UnpackTxOutput(to *TxOutput, buf []byte) int {
 	return 0
 }
 
-func (p *BaseParser) packTxIndexes(txi []TxIndexes) []byte {
+func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
 	return nil
 }
 
-func (p *BaseParser) packOutpoints(outpoints []DbOutpoint) []byte {
+func (p *BaseParser) PackOutpoints(outpoints []DbOutpoint) []byte {
 	return nil
 }
 
-func (p *BaseParser) unpackNOutpoints(buf []byte) ([]DbOutpoint, int, error) {
+func (p *BaseParser) UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error) {
 	return nil, 0, errors.New("Not supported")
 }
 
-func (p *BaseParser) packBlockInfo(block *DbBlockInfo) ([]byte, error) {
+func (p *BaseParser) PackBlockInfo(block *DbBlockInfo) ([]byte, error) {
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) unpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
+func (p *BaseParser) UnpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
 	return nil, errors.New("Not supported")
 }

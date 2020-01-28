@@ -419,32 +419,32 @@ type BlockChainParser interface {
 	PackTx(tx *Tx, height uint32, blockTime int64) ([]byte, error)
 	UnpackTx(buf []byte) (*Tx, uint32, error)
 	GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor
-	packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
-	unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
-	packAddressKey(addrDesc AddressDescriptor, height uint32) []byte
-	unpackAddressKey(key []byte) ([]byte, uint32, error)
-	packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte
-	appendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte
-	appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte
-	unpackTxAddresses(buf []byte) (*TxAddresses, error)
-	unpackTxInput(ti *TxInput, buf []byte) int
-	unpackTxOutput(to *TxOutput, buf []byte) int
-	packTxIndexes(txi []TxIndexes) []byte
-	packOutpoints(outpoints []DbOutpoint) []byte
-	unpackNOutpoints(buf []byte) ([]DbOutpoint, int, error)
-	packBlockInfo(block *DbBlockInfo) ([]byte, error)
-	unpackBlockInfo(buf []byte) (*DbBlockInfo, error)
+	PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
+	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
+	PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte
+	UnpackAddressKey(key []byte) ([]byte, uint32, error)
+	PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte
+	AppendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte
+	AppendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte
+	UnpackTxAddresses(buf []byte) (*TxAddresses, error)
+	UnpackTxInput(ti *TxInput, buf []byte) int
+	UnpackTxOutput(to *TxOutput, buf []byte) int
+	PackTxIndexes(txi []TxIndexes) []byte
+	PackOutpoints(outpoints []DbOutpoint) []byte
+	UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error)
+	PackBlockInfo(block *DbBlockInfo) ([]byte, error)
+	UnpackBlockInfo(buf []byte) (*DbBlockInfo, error)
 	// packing/unpacking generic to all chain (expect this to be in baseparser)
-	packUint(i uint32) []byte
-	unpackUint(buf []byte) uint32
-	packVarint32(i int32, buf []byte) int
-	packVarint(i int, buf []byte) int
-	packVaruint(i uint, buf []byte) int
-	unpackVarint32(buf []byte) (int32, int)
-	unpackVarint(buf []byte) (int, int)
-	unpackVaruint(buf []byte) (uint, int)
-	packBigint(bi *big.Int, buf []byte) int
-	unpackBigint(buf []byte) (big.Int, int)
+	PackUint(i uint32) []byte
+	UnpackUint(buf []byte) uint32
+	PackVarint32(i int32, buf []byte) int
+	PackVarint(i int, buf []byte) int
+	PackVaruint(i uint, buf []byte) int
+	UnpackVarint32(buf []byte) (int32, int)
+	UnpackVarint(buf []byte) (int, int)
+	UnpackVaruint(buf []byte) (uint, int)
+	PackBigint(bi *big.Int, buf []byte) int
+	UnpackBigint(buf []byte) (big.Int, int)
 
 
 	// blocks

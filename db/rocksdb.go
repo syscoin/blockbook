@@ -369,8 +369,8 @@ func (d *RocksDB) GetTransactions(address string, lower uint32, higher uint32, f
 // Transaction are passed to callback function in the order from newest block to the oldest
 func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, lower uint32, higher uint32, fn GetTransactionsCallback) (err error) {
 	txidUnpackedLen := d.chainParser.PackedTxidLen()
-	startKey := d.chainParser.packAddressKey(addrDesc, higher)
-	stopKey := d.chainParser.packAddressKey(addrDesc, lower)
+	startKey := d.chainParser.PackAddressKey(addrDesc, higher)
+	stopKey := d.chainParser.PackAddressKey(addrDesc, lower)
 	indexes := make([]int32, 0, 16)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAddresses])
 	defer it.Close()
@@ -383,7 +383,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 		if glog.V(2) {
 			glog.Infof("rocksdb: addresses %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
 		}
-		_, height, err := d.chainParser.unpackAddressKey(key)
+		_, height, err := d.chainParser.UnpackAddressKey(key)
 		if err != nil {
 			return err
 		}
@@ -395,7 +395,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			indexes = indexes[:0]
 			val = val[txidUnpackedLen:]
 			for {
-				index, l := d.chainParser.unpackVarint32(val)
+				index, l := d.chainParser.UnpackVarint32(val)
 				indexes = append(indexes, index>>1)
 				val = val[l:]
 				if index&1 == 1 {
@@ -687,8 +687,8 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 func (d *RocksDB) storeAddresses(wb *gorocksdb.WriteBatch, height uint32, addresses bchain.AddressesMap) error {
 	for addrDesc, txi := range addresses {
 		ba := bchain.AddressDescriptor(addrDesc)
-		key := d.chainParser.packAddressKey(ba, height)
-		val := d.chainParser.packTxIndexes(txi)
+		key := d.chainParser.PackAddressKey(ba, height)
+		val := d.chainParser.PackTxIndexes(txi)
 		wb.PutCF(d.cfh[cfAddresses], key, val)
 	}
 	return nil
@@ -698,7 +698,7 @@ func (d *RocksDB) storeTxAddresses(wb *gorocksdb.WriteBatch, am map[string]*bcha
 	varBuf := make([]byte, maxPackedBigintBytes)
 	buf := make([]byte, 1024)
 	for txID, ta := range am {
-		buf = d.chainParser.packTxAddresses(ta, buf, varBuf)
+		buf = d.chainParser.PackTxAddresses(ta, buf, varBuf)
 		wb.PutCF(d.cfh[cfTxAddresses], []byte(txID), buf)
 	}
 	return nil
@@ -713,7 +713,7 @@ func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*bchain
 		if ab == nil || ab.Txs <= 0 {
 			wb.DeleteCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc))
 		} else {
-			buf = d.chainParser.packAddrBalance(ab, buf, varBuf)
+			buf = d.chainParser.PackAddrBalance(ab, buf, varBuf)
 			wb.PutCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc), buf)
 		}
 	}
@@ -725,7 +725,7 @@ func (d *RocksDB) cleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchain.Block)
 	// cleanup old block address
 	if block.Height > uint32(keep) {
 		for rh := block.Height - uint32(keep); rh > 0; rh-- {
-			key := d.chainParser.packUint(rh)
+			key := d.chainParser.PackUint(rh)
 			val, err := d.db.GetCF(d.ro, d.cfh[cfBlockTxs], key)
 			if err != nil {
 				return err
@@ -768,18 +768,18 @@ func (d *RocksDB) storeAndCleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchai
 			return err
 		}
 		buf = append(buf, btxID...)
-		l := d.chainParser.packVaruint(uint(len(o)), varBuf)
+		l := d.chainParser.PackVaruint(uint(len(o)), varBuf)
 		buf = append(buf, varBuf[:l]...)
-		buf = append(buf, d.chainParser.packOutpoints(o)...)
+		buf = append(buf, d.chainParser.PackOutpoints(o)...)
 	}
-	key := d.chainParser.packUint(block.Height)
+	key := d.chainParser.PackUint(block.Height)
 	wb.PutCF(d.cfh[cfBlockTxs], key, buf)
 	return d.cleanupBlockTxs(wb, block)
 }
 
 func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.BlockTxs, error) {
 	pl := d.chainParser.PackedTxidLen()
-	val, err := d.db.GetCF(d.ro, d.cfh[cfBlockTxs], d.chainParser.packUint(height))
+	val, err := d.db.GetCF(d.ro, d.cfh[cfBlockTxs], d.chainParser.PackUint(height))
 	if err != nil {
 		return nil, err
 	}
@@ -793,7 +793,7 @@ func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.BlockTxs, error) {
 		}
 		txid := append([]byte(nil), buf[i:i+pl]...)
 		i += pl
-		o, ol, err := d.chainParser.unpackNOutpoints(buf[i:])
+		o, ol, err := d.chainParser.UnpackNOutpoints(buf[i:])
 		if err != nil {
 			glog.Error("rocksdb: Inconsistent data in blockTxs ", hex.EncodeToString(buf))
 			return nil, errors.New("Inconsistent data in blockTxs")
@@ -819,7 +819,7 @@ func (d *RocksDB) GetAddrDescBalance(addrDesc bchain.AddressDescriptor, detail A
 	if len(buf) < 3 {
 		return nil, nil
 	}
-	return d.chainParser.unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), detail)
+	return d.chainParser.UnpackAddrBalance(buf, d.chainParser.PackedTxidLen(), detail)
 }
 
 // GetAddressBalance returns address balance for an address or nil if address not found
@@ -842,7 +842,7 @@ func (d *RocksDB) getTxAddresses(btxID []byte) (*bchain.TxAddresses, error) {
 	if len(buf) < 3 {
 		return nil, nil
 	}
-	return d.chainParser.unpackTxAddresses(buf)
+	return d.chainParser.UnpackTxAddresses(buf)
 }
 
 // GetTxAddresses returns TxAddresses for given txid or nil if not found
@@ -878,8 +878,8 @@ func (d *RocksDB) GetBestBlock() (uint32, string, error) {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfHeight])
 	defer it.Close()
 	if it.SeekToLast(); it.Valid() {
-		bestHeight := d.chainParser.unpackUint(it.Key().Data())
-		info, err := d.unpackBlockInfo(it.Value().Data())
+		bestHeight := d.chainParser.UnpackUint(it.Key().Data())
+		info, err := d.UnpackBlockInfo(it.Value().Data())
 		if info != nil {
 			if glog.V(1) {
 				glog.Infof("rocksdb: bestblock %d %+v", bestHeight, info)
@@ -892,13 +892,13 @@ func (d *RocksDB) GetBestBlock() (uint32, string, error) {
 
 // GetBlockHash returns block hash at given height or empty string if not found
 func (d *RocksDB) GetBlockHash(height uint32) (string, error) {
-	key := d.chainParser.packUint(height)
+	key := d.chainParser.PackUint(height)
 	val, err := d.db.GetCF(d.ro, d.cfh[cfHeight], key)
 	if err != nil {
 		return "", err
 	}
 	defer val.Free()
-	info, err := d.chainParser.unpackBlockInfo(val.Data())
+	info, err := d.chainParser.UnpackBlockInfo(val.Data())
 	if info == nil {
 		return "", err
 	}
@@ -907,13 +907,13 @@ func (d *RocksDB) GetBlockHash(height uint32) (string, error) {
 
 // GetBlockInfo returns block info stored in db
 func (d *RocksDB) GetBlockInfo(height uint32) (*bchain.DbBlockInfo, error) {
-	key := d.chainParser.packUint(height)
+	key := d.chainParser.PackUint(height)
 	val, err := d.db.GetCF(d.ro, d.cfh[cfHeight], key)
 	if err != nil {
 		return nil, err
 	}
 	defer val.Free()
-	bi, err := d.chainParser.unpackBlockInfo(val.Data())
+	bi, err := d.chainParser.UnpackBlockInfo(val.Data())
 	if err != nil || bi == nil {
 		return nil, err
 	}
@@ -932,10 +932,10 @@ func (d *RocksDB) writeHeightFromBlock(wb *gorocksdb.WriteBatch, block *bchain.B
 }
 
 func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchain.DbBlockInfo, op int) error {
-	key := d.chainParser.packUint(height)
+	key := d.chainParser.PackUint(height)
 	switch op {
 	case opInsert:
-		val, err := d.chainParser.packBlockInfo(bi)
+		val, err := d.chainParser.PackBlockInfo(bi)
 		if err != nil {
 			return err
 		}
@@ -1056,7 +1056,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 		}
 	}
 	for a := range addresses {
-		key := d.chainParser.packAddressKey([]byte(a), height)
+		key := d.chainParser.PackAddressKey([]byte(a), height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
 	return nil
@@ -1104,7 +1104,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 				return err
 			}
 		}
-		key := d.chainParser.packUint(height)
+		key := d.chainParser.PackUint(height)
 		wb.DeleteCF(d.cfh[cfBlockTxs], key)
 		wb.DeleteCF(d.cfh[cfHeight], key)
 	}
@@ -1239,7 +1239,7 @@ func (d *RocksDB) loadBlockTimes() ([]uint32, error) {
 	counter := uint32(0)
 	time := uint32(0)
 	for it.SeekToFirst(); it.Valid(); it.Next() {
-		height := d.chainParser.unpackUint(it.Key().Data())
+		height := d.chainParser.UnpackUint(it.Key().Data())
 		if height > counter {
 			glog.Warning("gap in cfHeight: expecting ", counter, ", got ", height)
 			for ; counter < height; counter++ {
@@ -1247,7 +1247,7 @@ func (d *RocksDB) loadBlockTimes() ([]uint32, error) {
 			}
 		}
 		counter++
-		info, err := d.unpackBlockInfo(it.Value().Data())
+		info, err := d.UnpackBlockInfo(it.Value().Data())
 		if err != nil {
 			return nil, err
 		}

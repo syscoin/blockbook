@@ -160,10 +160,10 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 
-func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
-	txs, l := p.BaseParser.unpackVaruint(buf)
-	sentSat, sl := p.BaseParser.unpackBigint(buf[l:])
-	balanceSat, bl := p.BaseParser.unpackBigint(buf[l+sl:])
+func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
+	txs, l := p.BaseParser.UnpackVaruint(buf)
+	sentSat, sl := p.BaseParser.UnpackBigint(buf[l:])
+	balanceSat, bl := p.BaseParser.UnpackBigint(buf[l+sl:])
 	l = l + sl + bl
 	ab := &bchain.AddrBalance{
 		Txs:        uint32(txs),
@@ -171,32 +171,32 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		BalanceSat: balanceSat,
 	}
 	// unpack asset balance information
-	numSentAssetAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
+	numSentAssetAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
 	ab.SentAssetAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numSentAssetAllocatedSat; i++ {
-		key, l := p.BaseParser.unpackVaruint(buf[l:])
-		value, l := p.BaseParser.unpackBigint(buf[l:])
+		key, l := p.BaseParser.UnpackVaruint(buf[l:])
+		value, l := p.BaseParser.UnpackBigint(buf[l:])
 		ab.SentAssetAllocatedSat[uint32(key)] = value
 	}
-	numBalanceAssetAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
+	numBalanceAssetAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
 	ab.BalanceAssetAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numBalanceAssetAllocatedSat; i++ {
-		key, l := p.BaseParser.unpackVaruint(buf[l:])
-		value, l := p.BaseParser.unpackBigint(buf[l:])
+		key, l := p.BaseParser.UnpackVaruint(buf[l:])
+		value, l := p.BaseParser.UnpackBigint(buf[l:])
 		ab.BalanceAssetAllocatedSat[uint32(key)] = value
 	}
-	numSentAssetUnAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
+	numSentAssetUnAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
 	ab.SentAssetUnAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numSentAssetUnAllocatedSat; i++ {
-		key, l := p.BaseParser.unpackVaruint(buf[l:])
-		value, l := p.BaseParser.unpackBigint(buf[l:])
+		key, l := p.BaseParser.UnpackVaruint(buf[l:])
+		value, l := p.BaseParser.UnpackBigint(buf[l:])
 		ab.SentAssetUnAllocatedSat[uint32(key)] = value
 	}
-	numBalanceAssetUnAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
+	numBalanceAssetUnAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
 	ab.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numBalanceAssetUnAllocatedSat; i++ {
-		key, l := p.BaseParser.unpackVaruint(buf[l:])
-		value, l := p.BaseParser.unpackBigint(buf[l:])
+		key, l := p.BaseParser.UnpackVaruint(buf[l:])
+		value, l := p.BaseParser.UnpackBigint(buf[l:])
 		ab.BalanceAssetUnAllocatedSat[uint32(key)] = value
 	}	
 
@@ -207,11 +207,11 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		for len(buf[l:]) >= txidUnpackedLen+3 {
 			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
 			l += txidUnpackedLen
-			vout, ll := p.BaseParser.unpackVaruint(buf[l:])
+			vout, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			l += ll
-			height, ll := p.BaseParser.unpackVaruint(buf[l:])
+			height, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			l += ll
-			valueSat, ll := p.BaseParser.unpackBigint(buf[l:])
+			valueSat, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
 			u := bchain.Utxo{
 				BtxID:    btxID,
@@ -229,52 +229,52 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	return ab, nil
 }
 
-func (p *SyscoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []byte) []byte {
+func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []byte) []byte {
 	buf = buf[:0]
-	l := p.BaseParser.packVaruint(uint(ab.Txs), varBuf)
+	l := p.BaseParser.PackVaruint(uint(ab.Txs), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.packBigint(&ab.SentSat, varBuf)
+	l = p.BaseParser.PackBigint(&ab.SentSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.packBigint(&ab.BalanceSat, varBuf)
+	l = p.BaseParser.PackBigint(&ab.BalanceSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	// pack asset balance information
-	l = p.BaseParser.packVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetAllocatedSat {
 		if value.Int64() > 0 {
-			l = p.BaseParser.packVaruint(uint(key), varBuf)
+			l = p.BaseParser.PackVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = p.BaseParser.packBigint(&value, varBuf)
+			l = p.BaseParser.PackBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	l = p.BaseParser.packVaruint(uint(len(ab.BalanceAssetAllocatedSat)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(len(ab.BalanceAssetAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.BalanceAssetAllocatedSat {
 		if value.Int64() > 0 {
-			l = p.BaseParser.packVaruint(uint(key), varBuf)
+			l = p.BaseParser.PackVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = p.BaseParser.packBigint(&value, varBuf)
+			l = p.BaseParser.PackBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	l = p.BaseParser.packVaruint(uint(len(ab.SentAssetUnAllocatedSat)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(len(ab.SentAssetUnAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetUnAllocatedSat {
 		if value.Int64() > 0 {
-			l = p.BaseParser.packVaruint(uint(key), varBuf)
+			l = p.BaseParser.PackVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = p.BaseParser.packBigint(&value, varBuf)
+			l = p.BaseParser.PackBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	l = p.BaseParser.packVaruint(uint(len(ab.BalanceAssetUnAllocatedSat)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(len(ab.BalanceAssetUnAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.BalanceAssetUnAllocatedSat {
 		if value.Int64() > 0 {
-			l = p.BaseParser.packVaruint(uint(key), varBuf)
+			l = p.BaseParser.PackVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = p.BaseParser.packBigint(&value, varBuf)
+			l = p.BaseParser.PackBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
@@ -282,56 +282,56 @@ func (p *SyscoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 		// if Vout < 0, utxo is marked as spent
 		if utxo.Vout >= 0 {
 			buf = append(buf, utxo.BtxID...)
-			l = p.BaseParser.packVaruint(uint(utxo.Vout), varBuf)
+			l = p.BaseParser.PackVaruint(uint(utxo.Vout), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = p.BaseParser.packVaruint(uint(utxo.Height), varBuf)
+			l = p.BaseParser.PackVaruint(uint(utxo.Height), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = p.BaseParser.packBigint(&utxo.ValueSat, varBuf)
+			l = p.BaseParser.PackBigint(&utxo.ValueSat, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
 	return buf
 }
 
-func (p *SyscoinParser) packTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
+func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	// pack version info for syscoin to detect sysx tx types
-	l := p.BaseParser.packVaruint(uint(ta.Version), varBuf)
+	l := p.BaseParser.PackVaruint(uint(ta.Version), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.packVaruint(uint(ta.Height), varBuf)
+	l = p.BaseParser.PackVaruint(uint(ta.Height), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.packVaruint(uint(len(ta.Inputs)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
-		buf = p.BitcoinParser.appendTxInput(&ta.Inputs[i], buf, varBuf)
+		buf = p.BitcoinParser.AppendTxInput(&ta.Inputs[i], buf, varBuf)
 	}
-	l = p.BaseParser.packVaruint(uint(len(ta.Outputs)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
-		buf = p.BitcoinParser.appendTxOutput(&ta.Outputs[i], buf, varBuf)
+		buf = p.BitcoinParser.AppendTxOutput(&ta.Outputs[i], buf, varBuf)
 	}
 	return buf
 }
 
-func (p *SyscoinParser) unpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
+func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
 	ta := bchain.TxAddresses{}
 	// unpack version info for syscoin to detect sysx tx types
-	version, l := p.BaseParser.unpackVaruint(buf)
+	version, l := p.BaseParser.UnpackVaruint(buf)
 	ta.Version = int32(version)
-	height, ll := p.BaseParser.unpackVaruint(buf[l:])
+	height, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	ta.Height = uint32(height)
 	l += ll
-	inputs, ll := p.BaseParser.unpackVaruint(buf[l:])
+	inputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	ta.Inputs = make([]TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
-		l += p.BitcoinParser.unpackTxInput(&ta.Inputs[i], buf[l:])
+		l += p.BitcoinParser.UnpackTxInput(&ta.Inputs[i], buf[l:])
 	}
-	outputs, ll := p.BaseParser.unpackVaruint(buf[l:])
+	outputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
-		l += p.BitcoinParser.unpackTxOutput(&ta.Outputs[i], buf[l:])
+		l += p.BitcoinParser.UnpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
 	return &ta, nil
 }
