@@ -157,9 +157,9 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 }
 
 func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
-	txs, l := unpackVaruint(buf)
-	sentSat, sl := unpackBigint(buf[l:])
-	balanceSat, bl := unpackBigint(buf[l+sl:])
+	txs, l := p.BaseParser.unpackVaruint(buf)
+	sentSat, sl := p.BaseParser.unpackBigint(buf[l:])
+	balanceSat, bl := p.BaseParser.unpackBigint(buf[l+sl:])
 	l = l + sl + bl
 	ab := &bchain.AddrBalance{
 		Txs:        uint32(txs),
@@ -167,32 +167,32 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		BalanceSat: balanceSat,
 	}
 	// unpack asset balance information
-	numSentAssetAllocatedSat, l := unpackVaruint(buf[l:])
+	numSentAssetAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
 	ab.SentAssetAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numSentAssetAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
+		key, l := p.BaseParser.unpackVaruint(buf[l:])
+		value, l := p.BaseParser.unpackBigint(buf[l:])
 		ab.SentAssetAllocatedSat[uint32(key)] = value
 	}
-	numBalanceAssetAllocatedSat, l := unpackVaruint(buf[l:])
+	numBalanceAssetAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
 	ab.BalanceAssetAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numBalanceAssetAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
+		key, l := p.BaseParser.unpackVaruint(buf[l:])
+		value, l := p.BaseParser.unpackBigint(buf[l:])
 		ab.BalanceAssetAllocatedSat[uint32(key)] = value
 	}
-	numSentAssetUnAllocatedSat, l := unpackVaruint(buf[l:])
+	numSentAssetUnAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
 	ab.SentAssetUnAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numSentAssetUnAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
+		key, l := p.BaseParser.unpackVaruint(buf[l:])
+		value, l := p.BaseParser.unpackBigint(buf[l:])
 		ab.SentAssetUnAllocatedSat[uint32(key)] = value
 	}
-	numBalanceAssetUnAllocatedSat, l := unpackVaruint(buf[l:])
+	numBalanceAssetUnAllocatedSat, l := p.BaseParser.unpackVaruint(buf[l:])
 	ab.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
 	for i := uint(0); i < numBalanceAssetUnAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
+		key, l := p.BaseParser.unpackVaruint(buf[l:])
+		value, l := p.BaseParser.unpackBigint(buf[l:])
 		ab.BalanceAssetUnAllocatedSat[uint32(key)] = value
 	}	
 
@@ -203,11 +203,11 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		for len(buf[l:]) >= txidUnpackedLen+3 {
 			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
 			l += txidUnpackedLen
-			vout, ll := unpackVaruint(buf[l:])
+			vout, ll := p.BaseParser.unpackVaruint(buf[l:])
 			l += ll
-			height, ll := unpackVaruint(buf[l:])
+			height, ll := p.BaseParser.unpackVaruint(buf[l:])
 			l += ll
-			valueSat, ll := unpackBigint(buf[l:])
+			valueSat, ll := p.BaseParser.unpackBigint(buf[l:])
 			l += ll
 			u := bchain.Utxo{
 				BtxID:    btxID,
@@ -227,50 +227,50 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 
 func (p *SyscoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []byte) []byte {
 	buf = buf[:0]
-	l := packVaruint(uint(ab.Txs), varBuf)
+	l := p.BaseParser.packVaruint(uint(ab.Txs), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = packBigint(&ab.SentSat, varBuf)
+	l = p.BaseParser.packBigint(&ab.SentSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = packBigint(&ab.BalanceSat, varBuf)
+	l = p.BaseParser.packBigint(&ab.BalanceSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	// pack asset balance information
-	l = packVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
+	l = p.BaseParser.packVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetAllocatedSat {
 		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
+			l = p.BaseParser.packVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
+			l = p.BaseParser.packBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	l = packVaruint(uint(len(ab.BalanceAssetAllocatedSat)), varBuf)
+	l = p.BaseParser.packVaruint(uint(len(ab.BalanceAssetAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.BalanceAssetAllocatedSat {
 		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
+			l = p.BaseParser.packVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
+			l = p.BaseParser.packBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	l = packVaruint(uint(len(ab.SentAssetUnAllocatedSat)), varBuf)
+	l = p.BaseParser.packVaruint(uint(len(ab.SentAssetUnAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetUnAllocatedSat {
 		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
+			l = p.BaseParser.packVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
+			l = p.BaseParser.packBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	l = packVaruint(uint(len(ab.BalanceAssetUnAllocatedSat)), varBuf)
+	l = p.BaseParser.packVaruint(uint(len(ab.BalanceAssetUnAllocatedSat)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.BalanceAssetUnAllocatedSat {
 		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
+			l = p.BaseParser.packVaruint(uint(key), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
+			l = p.BaseParser.packBigint(&value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
@@ -278,11 +278,11 @@ func (p *SyscoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 		// if Vout < 0, utxo is marked as spent
 		if utxo.Vout >= 0 {
 			buf = append(buf, utxo.BtxID...)
-			l = packVaruint(uint(utxo.Vout), varBuf)
+			l = p.BaseParser.packVaruint(uint(utxo.Vout), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = packVaruint(uint(utxo.Height), varBuf)
+			l = p.BaseParser.packVaruint(uint(utxo.Height), varBuf)
 			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&utxo.ValueSat, varBuf)
+			l = p.BaseParser.packBigint(&utxo.ValueSat, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
@@ -292,16 +292,16 @@ func (p *SyscoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 func (p *SyscoinParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	// pack version info for syscoin to detect sysx tx types
-	l := packVaruint(uint(ta.Version), varBuf)
+	l := p.BaseParser.packVaruint(uint(ta.Version), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = packVaruint(uint(ta.Height), varBuf)
+	l = p.BaseParser.packVaruint(uint(ta.Height), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = packVaruint(uint(len(ta.Inputs)), varBuf)
+	l = p.BaseParser.packVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
 		buf = p.appendTxInput(&ta.Inputs[i], buf, varBuf)
 	}
-	l = packVaruint(uint(len(ta.Outputs)), varBuf)
+	l = p.BaseParser.packVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
 		buf = appendTxOutput(&ta.Outputs[i], buf, varBuf)
@@ -312,22 +312,22 @@ func (p *SyscoinParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []by
 func (p *SyscoinParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	ta := TxAddresses{}
 	// unpack version info for syscoin to detect sysx tx types
-	version, l := unpackVaruint(buf)
+	version, l := p.BaseParser.unpackVaruint(buf)
 	ta.Version = int32(version)
-	height, ll := unpackVaruint(buf[l:])
+	height, ll := p.BaseParser.unpackVaruint(buf[l:])
 	ta.Height = uint32(height)
 	l += ll
-	inputs, ll := unpackVaruint(buf[l:])
+	inputs, ll := p.BaseParser.unpackVaruint(buf[l:])
 	l += ll
 	ta.Inputs = make([]TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
-		l += unpackTxInput(&ta.Inputs[i], buf[l:])
+		l += = p.BaseParser.packunpackTxInput(&ta.Inputs[i], buf[l:])
 	}
-	outputs, ll := unpackVaruint(buf[l:])
+	outputs, ll := p.BaseParser.unpackVaruint(buf[l:])
 	l += ll
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
-		l += unpackTxOutput(&ta.Outputs[i], buf[l:])
+		l += = p.BaseParser.packunpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
 	return &ta, nil
 }
