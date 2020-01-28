@@ -460,7 +460,7 @@ func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
 			if i == len(t.Indexes)-1 {
 				index |= 1
 			}
-			l := p.BaseParser.PackVarint32(index, bvout)
+			l := p.PackVarint32(index, bvout)
 			buf = append(buf, bvout[:l]...)
 		}
 	}
