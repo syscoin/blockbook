@@ -1054,6 +1054,14 @@ func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDet
 		SentSat:    sentSat,
 		BalanceSat: balanceSat,
 	}
+	numSentAllocatedBalances, l := unpackVaruint(buf[l:])
+	ab.SentAssetAllocatedSat = map[uint32]big.Int{}
+	for i := uint(0); i < numSentAllocatedBalances; i++ {
+		key, l := unpackVaruint(buf[l:])
+		value, l := unpackBigint(buf[l:])
+		ab.SentAssetAllocatedSat[key] = value
+	}
+	
 	if detail != AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
 		ab.Utxos = make([]Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
@@ -1091,6 +1099,16 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 	buf = append(buf, varBuf[:l]...)
 	l = packBigint(&ab.BalanceSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
+	l = packVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
+	for key, value := range ab.SentAssetAllocatedSat {
+		if value.Int64() > 0 {
+			l = packVaruint(uint(key), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = packBigint(&value, varBuf)
+			buf = append(buf, varBuf[:l]...)
+		}
+	}
+	
 	for _, utxo := range ab.Utxos {
 		// if Vout < 0, utxo is marked as spent
 		if utxo.Vout >= 0 {
