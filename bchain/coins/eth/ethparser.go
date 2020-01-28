@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/juju/errors"
 	"golang.org/x/crypto/sha3"
+	vlq "github.com/bsm/go-vlq"
 )
 
 // EthereumTypeAddressDescriptorLen - in case of EthereumType, the AddressDescriptor has fixed length
