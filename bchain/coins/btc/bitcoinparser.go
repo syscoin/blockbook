@@ -497,7 +497,7 @@ func (p *BitcoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 }
 
 const packedHeightBytes = 4
-func (p *BitcoinParser) packAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
+func (p *BitcoinParser) packAddressKey(addrDesc bchain.AddressDescriptor, height uint32) []byte {
 	buf := make([]byte, len(addrDesc)+packedHeightBytes)
 	copy(buf, addrDesc)
 	// pack height as binary complement to achieve ordering from newest to oldest block
@@ -514,7 +514,7 @@ func (p *BitcoinParser) unpackAddressKey(key []byte) ([]byte, uint32, error) {
 	return key[:i], ^p.unpackUint(key[i : i+packedHeightBytes]), nil
 }
 
-func (p *BitcoinParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
+func (p *BitcoinParser) packTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	l := packVaruint(uint(ta.Height), varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -531,7 +531,7 @@ func (p *BitcoinParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []by
 	return buf
 }
 
-func (p *BitcoinParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
+func (p *BitcoinParser) unpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
 	ta := TxAddresses{}
 	height, l := unpackVaruint(buf[l:])
 	ta.Height = uint32(height)
@@ -551,7 +551,7 @@ func (p *BitcoinParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	return &ta, nil
 }
 
-func (p *BitcoinParser) appendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte {
+func (p *BitcoinParser) appendTxInput(txi *bchain.TxInput, buf []byte, varBuf []byte) []byte {
 	la := len(txi.AddrDesc)
 	l := packVaruint(uint(la), varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -561,7 +561,7 @@ func (p *BitcoinParser) appendTxInput(txi *TxInput, buf []byte, varBuf []byte) [
 	return buf
 }
 
-func (p *BitcoinParser) appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
+func (p *BitcoinParser) appendTxOutput(txo *bchain.TxOutput, buf []byte, varBuf []byte) []byte {
 	la := len(txo.AddrDesc)
 	if txo.Spent {
 		la = ^la
@@ -575,7 +575,7 @@ func (p *BitcoinParser) appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte)
 }
 
 
-func (p *BitcoinParser) unpackTxInput(ti *TxInput, buf []byte) int {
+func (p *BitcoinParser) unpackTxInput(ti *bchain.TxInput, buf []byte) int {
 	al, l := unpackVaruint(buf)
 	ti.AddrDesc = append([]byte(nil), buf[l:l+int(al)]...)
 	al += uint(l)
@@ -583,7 +583,7 @@ func (p *BitcoinParser) unpackTxInput(ti *TxInput, buf []byte) int {
 	return l + int(al)
 }
 
-func (p *BitcoinParser) unpackTxOutput(to *TxOutput, buf []byte) int {
+func (p *BitcoinParser) unpackTxOutput(to *bchain.TxOutput, buf []byte) int {
 	al, l := unpackVarint(buf)
 	if al < 0 {
 		to.Spent = true
@@ -595,7 +595,7 @@ func (p *BitcoinParser) unpackTxOutput(to *TxOutput, buf []byte) int {
 	return l + al
 }
 
-func (p *BitcoinParser) packTxIndexes(txi []txIndexes) []byte {
+func (p *BitcoinParser) packTxIndexes(txi []bchain.txIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	// store the txs in reverse order for ordering from newest to oldest
@@ -614,7 +614,7 @@ func (p *BitcoinParser) packTxIndexes(txi []txIndexes) []byte {
 	return buf
 }
 
-func (p *BitcoinParser) packOutpoints(outpoints []outpoint) []byte {
+func (p *BitcoinParser) packOutpoints(outpoints []bchain.outpoint) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	for _, o := range outpoints {
@@ -625,7 +625,7 @@ func (p *BitcoinParser) packOutpoints(outpoints []outpoint) []byte {
 	return buf
 }
 
-func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
+func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]bchain.outpoint, int, error) {
 	txidUnpackedLen := PackedTxidLen()
 	n, p := unpackVaruint(buf)
 	outpoints := make([]outpoint, n)
@@ -647,7 +647,7 @@ func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
 
 // Block index
 
-func (p *BitcoinParser) packBlockInfo(block *BlockInfo) ([]byte, error) {
+func (p *BitcoinParser) packBlockInfo(block *bchain.DbBlockInfo) ([]byte, error) {
 	packed := make([]byte, 0, 64)
 	varBuf := make([]byte, vlq.MaxLen64)
 	b, err := PackBlockHash(block.Hash)
