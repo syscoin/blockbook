@@ -88,7 +88,8 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBa
 			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
 		}
 		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = balance.BalanceAssetUnAllocatedSat[assetGuid]
-		balance.BalanceAssetUnAllocatedSat[assetGuid].Set(float64(0))
+		valueSat.Set(float64(0))
+		balance.BalanceAssetUnAllocatedSat[assetGuid] = valueSat
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
 			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
@@ -99,7 +100,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBa
 		}
 		valueSat := big.NewInt(asset.Balance)
 		balanceAssetUnAllocatedSat.Add(&balanceAssetUnAllocatedSat, valueSat)
-		valueSat.Set(float(0))
+		valueSat.Set(float64(0))
 		balance.BalanceAssetUnAllocatedSat[assetGuid] = valueSat
 	}
 	return nil
