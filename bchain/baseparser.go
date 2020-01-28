@@ -470,7 +470,7 @@ func (p *BaseParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
 	return nil, 0, errors.New("Not supported")
 }
 
-func (p *BaseParser) packBlockInfo(block *BlockInfo) ([]byte, error) {
+func (p *BaseParser) packBlockInfo(block *DbBlockInfo) ([]byte, error) {
 	return nil, errors.New("Not supported")
 }
 
