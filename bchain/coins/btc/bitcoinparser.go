@@ -521,7 +521,7 @@ func (p *BitcoinParser) packTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	l = p.BaseParser.packVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
-		buf = p.appendTxInput(&ta.Inputs[i], buf, varBuf)
+		buf = appendTxInput(&ta.Inputs[i], buf, varBuf)
 	}
 	l = p.BaseParser.packVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)

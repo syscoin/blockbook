@@ -293,7 +293,7 @@ func (p *SyscoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	return buf
 }
 
-func (p *SyscoinParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
+func (p *SyscoinParser) packTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	// pack version info for syscoin to detect sysx tx types
 	l := p.BaseParser.packVaruint(uint(ta.Version), varBuf)
@@ -303,18 +303,18 @@ func (p *SyscoinParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []by
 	l = p.BaseParser.packVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
-		buf = p.appendTxInput(&ta.Inputs[i], buf, varBuf)
+		buf = p.BitcoinParser.appendTxInput(&ta.Inputs[i], buf, varBuf)
 	}
 	l = p.BaseParser.packVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
-		buf = appendTxOutput(&ta.Outputs[i], buf, varBuf)
+		buf = p.BitcoinParser.appendTxOutput(&ta.Outputs[i], buf, varBuf)
 	}
 	return buf
 }
 
-func (p *SyscoinParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
-	ta := TxAddresses{}
+func (p *SyscoinParser) unpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
+	ta := bchain.TxAddresses{}
 	// unpack version info for syscoin to detect sysx tx types
 	version, l := p.BaseParser.unpackVaruint(buf)
 	ta.Version = int32(version)
@@ -331,7 +331,7 @@ func (p *SyscoinParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	l += ll
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
-		l += unpackTxOutput(&ta.Outputs[i], buf[l:])
+		l += p.BitcoinParser.unpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
 	return &ta, nil
 }
