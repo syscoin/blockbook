@@ -156,12 +156,12 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 
-func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
+func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
 	txs, l := unpackVaruint(buf)
 	sentSat, sl := unpackBigint(buf[l:])
 	balanceSat, bl := unpackBigint(buf[l+sl:])
 	l = l + sl + bl
-	ab := &AddrBalance{
+	ab := &bchain.AddrBalance{
 		Txs:        uint32(txs),
 		SentSat:    sentSat,
 		BalanceSat: balanceSat,
@@ -197,7 +197,7 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 
 	if detail != AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
-		ab.Utxos = make([]Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
+		ab.Utxos = make([]bchain.Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
 		// ab.utxosMap = make(map[string]int, cap(ab.Utxos))
 		for len(buf[l:]) >= txidUnpackedLen+3 {
 			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
@@ -208,7 +208,7 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			l += ll
 			valueSat, ll := unpackBigint(buf[l:])
 			l += ll
-			u := Utxo{
+			u := bchain.Utxo{
 				BtxID:    btxID,
 				Vout:     int32(vout),
 				Height:   uint32(height),
@@ -224,7 +224,7 @@ func (p *SyscoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	return ab, nil
 }
 
-func (p *SyscoinParser) packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
+func (p *SyscoinParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []byte) []byte {
 	buf = buf[:0]
 	l := packVaruint(uint(ab.Txs), varBuf)
 	buf = append(buf, varBuf[:l]...)

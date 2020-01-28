@@ -498,9 +498,9 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*db.AddrBalance, []Token, *bchain.Erc20Contract, uint64, int, int, error) {
+func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []Token, *bchain.Erc20Contract, uint64, int, int, error) {
 	var (
-		ba             *db.AddrBalance
+		ba             *bchain.AddrBalance
 		tokens         []Token
 		ci             *bchain.Erc20Contract
 		n              uint64
@@ -517,7 +517,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 		return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetBalance %v", addrDesc)
 	}
 	if ca != nil {
-		ba = &db.AddrBalance{
+		ba = &bchain.AddrBalance{
 			Txs: uint32(ca.TotalTxs),
 		}
 		if b != nil {
@@ -601,7 +601,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 	} else {
 		// addresses without any normal transactions can have internal transactions and therefore balance
 		if b != nil {
-			ba = &db.AddrBalance{
+			ba = &bchain.AddrBalance{
 				BalanceSat: *b,
 			}
 		}
@@ -672,7 +672,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		page = 0
 	}
 	var (
-		ba                       *db.AddrBalance
+		ba                       *bchain.AddrBalance
 		tokens                   []Token
 		erc20c                   *bchain.Erc20Contract
 		txm                      []string
@@ -699,7 +699,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		nonce = strconv.Itoa(int(n))
 	} else {
 		// ba can be nil if the address is only in mempool!
-		ba, err = w.db.GetAddrDescBalance(addrDesc, db.AddressBalanceDetailNoUTXO)
+		ba, err = w.db.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailNoUTXO)
 		if err != nil {
 			return nil, NewAPIError(fmt.Sprintf("Address not found, %v", err), true)
 		}
@@ -714,7 +714,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	}
 	// if there are only unconfirmed transactions, there is no paging
 	if ba == nil {
-		ba = &db.AddrBalance{}
+		ba = &bchain.AddrBalance{}
 		page = 0
 	}
 	// process mempool, only if toHeight is not specified
@@ -978,7 +978,7 @@ func (w *Worker) waitForBackendSync() {
 	}
 }
 
-func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *db.AddrBalance, onlyConfirmed bool, onlyMempool bool) (Utxos, error) {
+func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.AddrBalance, onlyConfirmed bool, onlyMempool bool) (Utxos, error) {
 	w.waitForBackendSync()
 	var err error
 	utxos := make(Utxos, 0, 8)
@@ -1040,7 +1040,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *db.AddrB
 	if !onlyMempool {
 		// get utxo from index
 		if ba == nil {
-			ba, err = w.db.GetAddrDescBalance(addrDesc, db.AddressBalanceDetailUTXO)
+			ba, err = w.db.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXO)
 			if err != nil {
 				return nil, NewAPIError(fmt.Sprintf("Address not found, %v", err), true)
 			}

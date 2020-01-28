@@ -74,8 +74,6 @@ type connectBlockStats struct {
 	balancesMiss    int
 }
 
-// AddressBalanceDetail specifies what data are returned by GetAddressBalance
-type AddressBalanceDetail int
 
 const (
 	// AddressBalanceDetailNoUTXO returns address balance without utxos
@@ -446,7 +444,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	addresses := make(addressesMap)
 	if chainType == bchain.ChainBitcoinType {
 		txAddressesMap := make(map[string]*TxAddresses)
-		balances := make(map[string]*AddrBalance)
+		balances := make(map[string]*bchain.AddrBalance)
 		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances); err != nil {
 			return err
 		}
@@ -532,36 +530,16 @@ type TxAddresses struct {
 	Outputs []TxOutput
 }
 
-// Utxo holds information about unspent transaction output
-type Utxo struct {
-	BtxID    []byte
-	Vout     int32
-	Height   uint32
-	ValueSat big.Int
-}
-
-// AddrBalance stores number of transactions and balances of an address
-type AddrBalance struct {
-	Txs        uint32
-	SentSat    big.Int
-	BalanceSat big.Int
-	Utxos      []Utxo
-	utxosMap   map[string]int
-	SentAssetAllocatedSat map[uint32]big.Int
-	BalanceAssetAllocatedSat map[uint32]big.Int
-	SentAssetUnAllocatedSat map[uint32]big.Int
-	BalanceAssetUnAllocatedSat map[uint32]big.Int
-}
 
 // ReceivedSat computes received amount from total balance and sent amount
-func (ab *AddrBalance) ReceivedSat() *big.Int {
+func (ab *bchain.AddrBalance) ReceivedSat() *big.Int {
 	var r big.Int
 	r.Add(&ab.BalanceSat, &ab.SentSat)
 	return &r
 }
 
 // addUtxo
-func (ab *AddrBalance) addUtxo(u *Utxo) {
+func (ab *bchain.AddrBalance) addUtxo(u *bchain.Utxo) {
 	ab.Utxos = append(ab.Utxos, *u)
 	l := len(ab.Utxos)
 	if l >= 16 {
@@ -585,7 +563,7 @@ func (ab *AddrBalance) addUtxo(u *Utxo) {
 // markUtxoAsSpent finds outpoint btxID:vout in utxos and marks it as spent
 // for small number of utxos the linear search is done, for larger number there is a hashmap index
 // it is much faster than removing the utxo from the slice as it would cause in memory copy operations
-func (ab *AddrBalance) markUtxoAsSpent(btxID []byte, vout int32) {
+func (ab *bchain.AddrBalance) markUtxoAsSpent(btxID []byte, vout int32) {
 	if len(ab.utxosMap) == 0 {
 		for i := range ab.Utxos {
 			utxo := &ab.Utxos[i]
@@ -636,7 +614,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses addressesMap, txAddressesMap map[string]*TxAddresses, balances map[string]*AddrBalance) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses addressesMap, txAddressesMap map[string]*TxAddresses, balances map[string]*bchain.AddrBalance) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*TxAddresses, len(block.Txs))
 	// first process all outputs so that inputs can refer to txs in this block
@@ -678,7 +656,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 						return err
 					}
 					if balance == nil {
-						balance = &AddrBalance{}
+						balance = &bchain.AddrBalance{}
 					}
 					balances[strAddrDesc] = balance
 					d.cbs.balancesMiss++
@@ -767,7 +745,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 						return err
 					}
 					if balance == nil {
-						balance = &AddrBalance{}
+						balance = &bchain.AddrBalance{}
 					}
 					balances[strAddrDesc] = balance
 					d.cbs.balancesMiss++
@@ -833,7 +811,7 @@ func (d *RocksDB) storeTxAddresses(wb *gorocksdb.WriteBatch, am map[string]*TxAd
 	return nil
 }
 
-func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*AddrBalance) error {
+func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*bchain.AddrBalance) error {
 	// allocate buffer initial buffer
 	buf := make([]byte, 1024)
 	varBuf := make([]byte, maxPackedBigintBytes)
@@ -937,7 +915,7 @@ func (d *RocksDB) getBlockTxs(height uint32) ([]blockTxs, error) {
 }
 
 // GetAddrDescBalance returns AddrBalance for given addrDesc
-func (d *RocksDB) GetAddrDescBalance(addrDesc bchain.AddressDescriptor, detail AddressBalanceDetail) (*AddrBalance, error) {
+func (d *RocksDB) GetAddrDescBalance(addrDesc bchain.AddressDescriptor, detail AddressBalanceDetail) (*bchain.AddrBalance, error) {
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAddressBalance], addrDesc)
 	if err != nil {
 		return nil, err
@@ -952,7 +930,7 @@ func (d *RocksDB) GetAddrDescBalance(addrDesc bchain.AddressDescriptor, detail A
 }
 
 // GetAddressBalance returns address balance for an address or nil if address not found
-func (d *RocksDB) GetAddressBalance(address string, detail AddressBalanceDetail) (*AddrBalance, error) {
+func (d *RocksDB) GetAddressBalance(address string, detail AddressBalanceDetail) (*bchain.AddrBalance, error) {
 	addrDesc, err := d.chainParser.GetAddrDescFromAddress(address)
 	if err != nil {
 		return nil, err
@@ -1262,12 +1240,12 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *Block
 // Disconnect blocks
 
 func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32, btxID []byte, inputs []outpoint, txa *TxAddresses,
-	txAddressesToUpdate map[string]*TxAddresses, balances map[string]*AddrBalance) error {
+	txAddressesToUpdate map[string]*TxAddresses, balances map[string]*bchain.AddrBalance) error {
 	var err error
-	var balance *AddrBalance
+	var balance *bchain.AddrBalance
 	addresses := make(map[string]struct{})
 	isSyscoinTx := d.chainParser.IsSyscoinTx(txa.Version)
-	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*AddrBalance, error) {
+	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
 		s := string(addrDesc)
 		b, fb := balances[s]
@@ -1319,7 +1297,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 						d.resetValueSatToZero(&balance.SentSat, t.AddrDesc, "sent amount")
 					}
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
-					balance.Utxos = append(balance.Utxos, Utxo{
+					balance.Utxos = append(balance.Utxos, bchain.Utxo{
 						BtxID:    input.btxID,
 						Vout:     input.index,
 						Height:   inputHeight,
@@ -1391,7 +1369,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	defer wb.Destroy()
 	txAddressesToUpdate := make(map[string]*TxAddresses)
 	txsToDelete := make(map[string]struct{})
-	balances := make(map[string]*AddrBalance)
+	balances := make(map[string]*bchain.AddrBalance)
 	for height := higher; height >= lower; height-- {
 		blockTxs := blocks[height-lower]
 		glog.Info("Disconnecting block ", height, " containing ", len(blockTxs), " transactions")
@@ -1434,7 +1412,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	return err
 }
 
-func (d *RocksDB) storeBalancesDisconnect(wb *gorocksdb.WriteBatch, balances map[string]*AddrBalance) {
+func (d *RocksDB) storeBalancesDisconnect(wb *gorocksdb.WriteBatch, balances map[string]*bchain.AddrBalance) {
 	for _, b := range balances {
 		if b != nil {
 			// remove spent utxos

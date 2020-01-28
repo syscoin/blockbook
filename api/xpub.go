@@ -47,7 +47,7 @@ func (a xpubTxids) Less(i, j int) bool {
 
 type xpubAddress struct {
 	addrDesc  bchain.AddressDescriptor
-	balance   *db.AddrBalance
+	balance   *bchain.AddrBalance
 	txs       uint32
 	maxHeight uint32
 	complete  bool
@@ -159,7 +159,7 @@ func (w *Worker) xpubCheckAndLoadTxids(ad *xpubAddress, filter *AddressFilter, m
 
 func (w *Worker) xpubDerivedAddressBalance(data *xpubData, ad *xpubAddress) (bool, error) {
 	var err error
-	if ad.balance, err = w.db.GetAddrDescBalance(ad.addrDesc, db.AddressBalanceDetailUTXO); err != nil {
+	if ad.balance, err = w.db.GetAddrDescBalance(ad.addrDesc, bchain.AddressBalanceDetailUTXO); err != nil {
 		return false, err
 	}
 	if ad.balance != nil {

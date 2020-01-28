@@ -192,6 +192,30 @@ type MempoolTxidEntry struct {
 	Time uint32
 }
 
+// Utxo holds information about unspent transaction output
+type Utxo struct {
+	BtxID    []byte
+	Vout     int32
+	Height   uint32
+	ValueSat big.Int
+}
+
+// AddrBalance stores number of transactions and balances of an address
+type AddrBalance struct {
+	Txs        uint32
+	SentSat    big.Int
+	BalanceSat big.Int
+	Utxos      []Utxo
+	utxosMap   map[string]int
+	SentAssetAllocatedSat map[uint32]big.Int
+	BalanceAssetAllocatedSat map[uint32]big.Int
+	SentAssetUnAllocatedSat map[uint32]big.Int
+	BalanceAssetUnAllocatedSat map[uint32]big.Int
+}
+
+// AddressBalanceDetail specifies what data are returned by GetAddressBalance
+type AddressBalanceDetail int
+
 // MempoolTxidEntries is array of MempoolTxidEntry
 type MempoolTxidEntries []MempoolTxidEntry
 

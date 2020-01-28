@@ -26,7 +26,7 @@ type BulkConnect struct {
 	bulkAddresses      []bulkAddresses
 	bulkAddressesCount int
 	txAddressesMap     map[string]*TxAddresses
-	balances           map[string]*AddrBalance
+	balances           map[string]*bchain.AddrBalance
 	addressContracts   map[string]*AddrContracts
 	height             uint32
 }
@@ -47,7 +47,7 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 		d:                d,
 		chainType:        d.chainParser.GetChainType(),
 		txAddressesMap:   make(map[string]*TxAddresses),
-		balances:         make(map[string]*AddrBalance),
+		balances:         make(map[string]*bchain.AddrBalance),
 		addressContracts: make(map[string]*AddrContracts),
 	}
 	if err := d.SetInconsistentState(true); err != nil {
@@ -116,12 +116,12 @@ func (b *BulkConnect) parallelStoreTxAddresses(c chan error, all bool) {
 }
 
 func (b *BulkConnect) storeBalances(wb *gorocksdb.WriteBatch, all bool) (int, error) {
-	var bal map[string]*AddrBalance
+	var bal map[string]*bchain.AddrBalance
 	if all {
 		bal = b.balances
-		b.balances = make(map[string]*AddrBalance)
+		b.balances = make(map[string]*bchain.AddrBalance)
 	} else {
-		bal = make(map[string]*AddrBalance)
+		bal = make(map[string]*bchain.AddrBalance)
 		// store some random balances
 		for k, a := range b.balances {
 			bal[k] = a

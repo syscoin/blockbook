@@ -9,7 +9,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"blockbook/db"
 )
 
 // BaseParser implements data parsing/handling functionality base for all other parsers
@@ -321,9 +320,9 @@ func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 func (p *BaseParser) GetMaxAddrLength() int {
 	return 1024
 }
-func (p *BaseParser) packAddrBalance(ab *db.AddrBalance, buf, varBuf []byte) []byte {
+func (p *BaseParser) packAddrBalance(ab *bchain.AddrBalance, buf, varBuf []byte) []byte {
 	return nil
 }
-func (p *BaseParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*db.AddrBalance, error) {
+func (p *BaseParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
 	return nil, errors.New("Not supported")
 }

@@ -689,11 +689,11 @@ func TestRocksDB_Index_BitcoinType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	abw := &AddrBalance{
+	abw := &bchain.AddrBalance{
 		Txs:        2,
 		SentSat:    *dbtestdata.SatB1T2A5,
 		BalanceSat: *dbtestdata.SatB2T3A5,
-		Utxos: []Utxo{
+		Utxos: []bchain.Utxo{
 			{
 				BtxID:    hexToBytes(dbtestdata.TxidB2T3),
 				Vout:     0,
@@ -1045,21 +1045,21 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 		{
 			name: "no utxos",
 			hex:  "7b060b44cc1af8520514faf980ac",
-			data: &AddrBalance{
+			data: &bchain.AddrBalance{
 				BalanceSat: *big.NewInt(90110001324),
 				SentSat:    *big.NewInt(12390110001234),
 				Txs:        123,
-				Utxos:      []Utxo{},
+				Utxos:      []bchain.Utxo{},
 			},
 		},
 		{
 			name: "utxos",
 			hex:  "7b060b44cc1af8520514faf980ac00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa38400c87c440060b2fd12177a6effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac750098faf659010105e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b0782c6df6d84ccd88552087e9cba87a275ffff",
-			data: &AddrBalance{
+			data: &bchain.AddrBalance{
 				BalanceSat: *big.NewInt(90110001324),
 				SentSat:    *big.NewInt(12390110001234),
 				Txs:        123,
-				Utxos: []Utxo{
+				Utxos: []bchain.Utxo{
 					{
 						BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 						Vout:     12,
@@ -1084,8 +1084,8 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 		{
 			name: "empty",
 			hex:  "000000",
-			data: &AddrBalance{
-				Utxos: []Utxo{},
+			data: &bchain.AddrBalance{
+				Utxos: []bchain.Utxo{},
 			},
 		},
 	}
