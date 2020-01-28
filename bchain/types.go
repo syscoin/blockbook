@@ -325,12 +325,12 @@ type TxOutput struct {
 	ValueSat big.Int
 }
 // Addresses converts AddressDescriptor of the input to array of strings
-func (ti *bchain.TxInput) Addresses(p BlockChainParser) ([]string, bool, error) {
+func (ti *TxInput) Addresses(p BlockChainParser) ([]string, bool, error) {
 	return p.GetAddressesFromAddrDesc(ti.AddrDesc)
 }
 
 // Addresses converts AddressDescriptor of the output to array of strings
-func (to *bchain.TxOutput) Addresses(p BlockChainParser) ([]string, bool, error) {
+func (to *TxOutput) Addresses(p BlockChainParser) ([]string, bool, error) {
 	return p.GetAddressesFromAddrDesc(to.AddrDesc)
 }
 // TxAddresses stores transaction inputs and outputs with amounts
