@@ -1103,7 +1103,7 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 			if !reflect.DeepEqual(hex, tt.hex) {
 				t.Errorf("PackTxAddresses() = %v, want %v", hex, tt.hex)
 			}
-			got1, err := parser.UnpackAddrBalance(b, parser.PackedTxidLen(), AddressBalanceDetailUTXO)
+			got1, err := parser.UnpackAddrBalance(b, parser.PackedTxidLen(), bchain.AddressBalanceDetailUTXO)
 			if err != nil {
 				t.Errorf("UnpackTxAddresses() error = %v", err)
 				return
