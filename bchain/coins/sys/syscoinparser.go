@@ -53,11 +53,16 @@ func init() {
 // SyscoinParser handle
 type SyscoinParser struct {
 	*btc.BitcoinParser
+	BaseParser *bchain.BaseParser
 }
 
 // NewSyscoinParser returns new SyscoinParser instance
 func NewSyscoinParser(params *chaincfg.Params, c *btc.Configuration) *SyscoinParser {
-	return &SyscoinParser{BitcoinParser: btc.NewBitcoinParser(params, c)}
+	return &SyscoinParser{
+		BitcoinParser: btc.NewBitcoinParser(params, c),
+		BaseParser:    &bchain.BaseParser{},
+	}
+}
 }
 // matches max data carrier for systx
 func (p *SyscoinParser) GetMaxAddrLength() int {
@@ -321,13 +326,13 @@ func (p *SyscoinParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	l += ll
 	ta.Inputs = make([]TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
-		l += = p.BaseParser.packunpackTxInput(&ta.Inputs[i], buf[l:])
+		l += p.BitcoinParser.unpackTxInput(&ta.Inputs[i], buf[l:])
 	}
 	outputs, ll := p.BaseParser.unpackVaruint(buf[l:])
 	l += ll
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
-		l += = p.BaseParser.packunpackTxOutput(&ta.Outputs[i], buf[l:])
+		l += unpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
 	return &ta, nil
 }

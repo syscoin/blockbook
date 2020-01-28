@@ -540,13 +540,13 @@ func (p *BitcoinParser) unpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	l += ll
 	ta.Inputs = make([]TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
-		l += p.BaseParser.unpackTxInput(&ta.Inputs[i], buf[l:])
+		l += unpackTxInput(&ta.Inputs[i], buf[l:])
 	}
 	outputs, ll := p.BaseParser.unpackVaruint(buf[l:])
 	l += ll
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
-		l += p.BaseParser.unpackTxOutput(&ta.Outputs[i], buf[l:])
+		l += unpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
 	return &ta, nil
 }
