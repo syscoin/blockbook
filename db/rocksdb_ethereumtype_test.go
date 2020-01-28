@@ -3,6 +3,7 @@
 package db
 
 import (
+	"blockbook/bchain"
 	"blockbook/bchain/coins/eth"
 	"blockbook/tests/dbtestdata"
 	"encoding/hex"
