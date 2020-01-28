@@ -363,7 +363,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 // Blocks is list of blocks with paging information
 type Blocks struct {
 	Paging
-	Blocks []db.BlockInfo `json:"blocks"`
+	Blocks []bchain.DbBlockInfo `json:"blocks"`
 }
 
 // BlockInfo contains extended block header data and a list of block txids
