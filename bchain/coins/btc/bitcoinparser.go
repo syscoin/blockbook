@@ -663,12 +663,12 @@ func (p *BitcoinParser) PackBlockInfo(block *bchain.DbBlockInfo) ([]byte, error)
 }
 
 func (p *BitcoinParser) UnpackBlockInfo(buf []byte) (*bchain.DbBlockInfo, error) {
-	pl := p.BaseParser.packedTxidLen()
+	pl := p.BaseParser.PackedTxidLen()
 	// minimum length is PackedTxidLen + 4 bytes time + 1 byte txs + 1 byte size
 	if len(buf) < pl+4+2 {
 		return nil, nil
 	}
-	txid, err := p.BaseParser.unpackBlockHash(buf[:pl])
+	txid, err := p.BaseParser.UnpackBlockHash(buf[:pl])
 	if err != nil {
 		return nil, err
 	}
