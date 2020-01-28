@@ -3,12 +3,14 @@ package bchain
 import (
 	"encoding/hex"
 	"encoding/json"
+	"encoding/binary"
 	"math/big"
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
+	vlq "github.com/bsm/go-vlq"
 )
 
 // BaseParser implements data parsing/handling functionality base for all other parsers

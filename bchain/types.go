@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
 	"unsafe"
 	"bytes"
 	"github.com/golang/glog"
-	vlq "github.com/bsm/go-vlq"
 )
 
 // ChainType is type of the blockchain
