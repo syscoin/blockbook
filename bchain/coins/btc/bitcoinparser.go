@@ -495,3 +495,191 @@ func (p *BitcoinParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	}
 	return ab, nil
 }
+
+const packedHeightBytes = 4
+func (p *BitcoinParser) packAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
+	buf := make([]byte, len(addrDesc)+packedHeightBytes)
+	copy(buf, addrDesc)
+	// pack height as binary complement to achieve ordering from newest to oldest block
+	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
+	return buf
+}
+
+func (p *BitcoinParser) unpackAddressKey(key []byte) ([]byte, uint32, error) {
+	i := len(key) - packedHeightBytes
+	if i <= 0 {
+		return nil, 0, errors.New("Invalid address key")
+	}
+	// height is packed in binary complement, convert it
+	return key[:i], ^p.unpackUint(key[i : i+packedHeightBytes]), nil
+}
+
+func (p *BitcoinParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
+	buf = buf[:0]
+	l := packVaruint(uint(ta.Height), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = packVaruint(uint(len(ta.Inputs)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	for i := range ta.Inputs {
+		buf = p.appendTxInput(&ta.Inputs[i], buf, varBuf)
+	}
+	l = packVaruint(uint(len(ta.Outputs)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	for i := range ta.Outputs {
+		buf = appendTxOutput(&ta.Outputs[i], buf, varBuf)
+	}
+	return buf
+}
+
+func (p *BitcoinParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
+	ta := TxAddresses{}
+	height, l := unpackVaruint(buf[l:])
+	ta.Height = uint32(height)
+	l += ll
+	inputs, ll := unpackVaruint(buf[l:])
+	l += ll
+	ta.Inputs = make([]TxInput, inputs)
+	for i := uint(0); i < inputs; i++ {
+		l += unpackTxInput(&ta.Inputs[i], buf[l:])
+	}
+	outputs, ll := unpackVaruint(buf[l:])
+	l += ll
+	ta.Outputs = make([]TxOutput, outputs)
+	for i := uint(0); i < outputs; i++ {
+		l += unpackTxOutput(&ta.Outputs[i], buf[l:])
+	}
+	return &ta, nil
+}
+
+func (p *BitcoinParser) appendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte {
+	la := len(txi.AddrDesc)
+	l := packVaruint(uint(la), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, txi.AddrDesc...)
+	l = packBigint(&txi.ValueSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+func (p *BitcoinParser) appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
+	la := len(txo.AddrDesc)
+	if txo.Spent {
+		la = ^la
+	}
+	l := packVarint(la, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, txo.AddrDesc...)
+	l = packBigint(&txo.ValueSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+
+func (p *BitcoinParser) unpackTxInput(ti *TxInput, buf []byte) int {
+	al, l := unpackVaruint(buf)
+	ti.AddrDesc = append([]byte(nil), buf[l:l+int(al)]...)
+	al += uint(l)
+	ti.ValueSat, l = unpackBigint(buf[al:])
+	return l + int(al)
+}
+
+func (p *BitcoinParser) unpackTxOutput(to *TxOutput, buf []byte) int {
+	al, l := unpackVarint(buf)
+	if al < 0 {
+		to.Spent = true
+		al = ^al
+	}
+	to.AddrDesc = append([]byte(nil), buf[l:l+al]...)
+	al += l
+	to.ValueSat, l = unpackBigint(buf[al:])
+	return l + al
+}
+
+func (p *BitcoinParser) packTxIndexes(txi []txIndexes) []byte {
+	buf := make([]byte, 0, 32)
+	bvout := make([]byte, vlq.MaxLen32)
+	// store the txs in reverse order for ordering from newest to oldest
+	for j := len(txi) - 1; j >= 0; j-- {
+		t := &txi[j]
+		buf = append(buf, []byte(t.btxID)...)
+		for i, index := range t.indexes {
+			index <<= 1
+			if i == len(t.indexes)-1 {
+				index |= 1
+			}
+			l := packVarint32(index, bvout)
+			buf = append(buf, bvout[:l]...)
+		}
+	}
+	return buf
+}
+
+func (p *BitcoinParser) packOutpoints(outpoints []outpoint) []byte {
+	buf := make([]byte, 0, 32)
+	bvout := make([]byte, vlq.MaxLen32)
+	for _, o := range outpoints {
+		l := packVarint32(o.index, bvout)
+		buf = append(buf, []byte(o.btxID)...)
+		buf = append(buf, bvout[:l]...)
+	}
+	return buf
+}
+
+func (p *BitcoinParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
+	txidUnpackedLen := PackedTxidLen()
+	n, p := unpackVaruint(buf)
+	outpoints := make([]outpoint, n)
+	for i := uint(0); i < n; i++ {
+		if p+txidUnpackedLen >= len(buf) {
+			return nil, 0, errors.New("Inconsistent data in unpackNOutpoints")
+		}
+		btxID := append([]byte(nil), buf[p:p+txidUnpackedLen]...)
+		p += txidUnpackedLen
+		vout, voutLen := unpackVarint32(buf[p:])
+		p += voutLen
+		outpoints[i] = outpoint{
+			btxID: btxID,
+			index: vout,
+		}
+	}
+	return outpoints, p, nil
+}
+
+// Block index
+
+func (p *BitcoinParser) packBlockInfo(block *BlockInfo) ([]byte, error) {
+	packed := make([]byte, 0, 64)
+	varBuf := make([]byte, vlq.MaxLen64)
+	b, err := PackBlockHash(block.Hash)
+	if err != nil {
+		return nil, err
+	}
+	packed = append(packed, b...)
+	packed = append(packed, packUint(uint32(block.Time))...)
+	l := packVaruint(uint(block.Txs), varBuf)
+	packed = append(packed, varBuf[:l]...)
+	l = packVaruint(uint(block.Size), varBuf)
+	packed = append(packed, varBuf[:l]...)
+	return packed, nil
+}
+
+func (p *BitcoinParser) unpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
+	pl := PackedTxidLen()
+	// minimum length is PackedTxidLen + 4 bytes time + 1 byte txs + 1 byte size
+	if len(buf) < pl+4+2 {
+		return nil, nil
+	}
+	txid, err := UnpackBlockHash(buf[:pl])
+	if err != nil {
+		return nil, err
+	}
+	t := unpackUint(buf[pl:])
+	txs, l := unpackVaruint(buf[pl+4:])
+	size, _ := unpackVaruint(buf[pl+4+l:])
+	return &BlockInfo{
+		Hash: txid,
+		Time: int64(t),
+		Txs:  uint32(txs),
+		Size: uint32(size),
+	}, nil
+}

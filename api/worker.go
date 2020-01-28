@@ -123,7 +123,7 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 // GetTransactionFromBchainTx reads transaction data from txid
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
 	var err error
-	var ta *db.TxAddresses
+	var ta *bchain.TxAddresses
 	var tokens []TokenTransfer
 	var ethSpecific *EthereumSpecific
 	var blockhash string
@@ -429,7 +429,7 @@ func GetUniqueTxids(txids []string) []string {
 	return ut[0:i]
 }
 
-func (w *Worker) txFromTxAddress(txid string, ta *db.TxAddresses, bi *db.BlockInfo, bestheight uint32) *Tx {
+func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain.DbBlockInfo, bestheight uint32) *Tx {
 	var err error
 	var valInSat, valOutSat, feesSat big.Int
 	vins := make([]Vin, len(ta.Inputs))
@@ -609,7 +609,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 	return ba, tokens, ci, n, nonContractTxs, totalResults, nil
 }
 
-func (w *Worker) txFromTxid(txid string, bestheight uint32, option AccountDetails, blockInfo *db.BlockInfo) (*Tx, error) {
+func (w *Worker) txFromTxid(txid string, bestheight uint32, option AccountDetails, blockInfo *bchain.DbBlockInfo) (*Tx, error) {
 	var tx *Tx
 	var err error
 	// only ChainBitcoinType supports TxHistoryLight
@@ -634,7 +634,7 @@ func (w *Worker) txFromTxid(txid string, bestheight uint32, option AccountDetail
 				if blockInfo == nil {
 					glog.Warning("DB inconsistency:  block height ", ta.Height, ": not found in db")
 					// provide empty BlockInfo to return the rest of tx data
-					blockInfo = &db.BlockInfo{}
+					blockInfo = &bchain.DbBlockInfo{}
 				}
 			}
 			tx = w.txFromTxAddress(txid, ta, blockInfo, bestheight)
@@ -820,7 +820,7 @@ func (w *Worker) balanceHistoryHeightsFromTo(fromTime, toTime time.Time) (uint32
 func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid string, fromUnix, toUnix uint32) (*BalanceHistory, error) {
 	var time uint32
 	var err error
-	var ta *db.TxAddresses
+	var ta *bchain.TxAddresses
 	var bchainTx *bchain.Tx
 	var height uint32
 	if w.chainType == bchain.ChainBitcoinType {
@@ -1129,7 +1129,7 @@ func (w *Worker) GetBlocks(page int, blocksOnPage int) (*Blocks, error) {
 	}
 	pg, from, to, page := computePaging(bestheight+1, page, blocksOnPage)
 	r := &Blocks{Paging: pg}
-	r.Blocks = make([]db.BlockInfo, to-from)
+	r.Blocks = make([]bchain.DbBlockInfo, to-from)
 	for i := from; i < to; i++ {
 		bi, err := w.db.GetBlockInfo(uint32(bestheight - i))
 		if err != nil {
@@ -1193,7 +1193,7 @@ func (w *Worker) GetFiatRatesForBlockID(bid string, currency string) (*db.Result
 		}
 		return nil, NewAPIError(fmt.Sprintf("Block %v not found, error: %v", bid, err), false)
 	}
-	dbi := &db.BlockInfo{Time: bi.Time} // get Unix timestamp from block
+	dbi := &bchain.DbBlockInfo{Time: bi.Time} // get Unix timestamp from block
 	tm := time.Unix(dbi.Time, 0)        // convert it to Time object
 	ticker, err = w.db.FiatRatesFindTicker(&tm)
 	if err != nil {
@@ -1279,7 +1279,7 @@ func (w *Worker) GetFiatRatesTickersList(timestamp int64) (*db.ResultTickerListA
 }
 
 // getBlockInfoFromBlockID returns block info from block height or block hash
-func (w *Worker) getBlockInfoFromBlockID(bid string) (*bchain.BlockInfo, error) {
+func (w *Worker) getBlockInfoFromBlockID(bid string) (*bchain.DbBlockInfo, error) {
 	// try to decide if passed string (bid) is block height or block hash
 	// if it's a number, must be less than int32
 	var hash string
@@ -1419,7 +1419,7 @@ func (w *Worker) GetBlock(bid string, page int, txsOnPage int) (*Block, error) {
 		}
 		return nil, NewAPIError(fmt.Sprintf("Block not found, %v", err), true)
 	}
-	dbi := &db.BlockInfo{
+	dbi := &bchain.DbBlockInfo{
 		Hash:   bi.Hash,
 		Height: bi.Height,
 		Time:   bi.Time,
@@ -1487,7 +1487,7 @@ func (w *Worker) ComputeFeeStats(blockFrom, blockTo int, stopCompute chan os.Sig
 		}
 		// process only blocks with enough transactions
 		if len(bi.Txids) > 20 {
-			dbi := &db.BlockInfo{
+			dbi := &bchain.DbBlockInfo{
 				Hash:   bi.Hash,
 				Height: bi.Height,
 				Time:   bi.Time,

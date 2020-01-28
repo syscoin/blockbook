@@ -238,7 +238,7 @@ func TestRocksDB_Index_EthereumType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	iw := &BlockInfo{
+	iw := &bchain.DbBlockInfo{
 		Hash:   "0x2b57e15e93a0ed197417a34c2498b7187df79099572c04a6b6e6ff418f74e6ee",
 		Txs:    2,
 		Size:   2345678,

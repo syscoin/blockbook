@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 )
 
-func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
+func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.addressesMap, btxID []byte, outputIndex int32) error {
 	r := bytes.NewReader(sptData)
 	var asset wire.AssetType
 	err := asset.Deserialize(r)
@@ -108,7 +108,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 	return nil
 }
 
-func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
+func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.addressesMap, btxID []byte, outputIndex int32) error {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
 	err := assetAllocation.Deserialize(r)
@@ -461,7 +461,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	return nil
 
 }
-func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
+func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.addressesMap, btxID []byte, outputIndex int32) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err

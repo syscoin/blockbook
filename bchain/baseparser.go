@@ -326,3 +326,152 @@ func (p *BaseParser) packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
 func (p *BaseParser) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
 	return nil, errors.New("Not supported")
 }
+
+func (p *BaseParser) packAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
+	return nil
+}
+
+func (p *BaseParser) unpackAddressKey(key []byte) ([]byte, uint32, error) {
+	return nil, 0, errors.New("Not supported")
+}
+
+func (p *BaseParser) packUint(i uint32) []byte {
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, i)
+	return buf
+}
+
+func (p *BaseParser) unpackUint(buf []byte) uint32 {
+	return binary.BigEndian.Uint32(buf)
+}
+
+func (p *BaseParser) packVarint32(i int32, buf []byte) int {
+	return vlq.PutInt(buf, int64(i))
+}
+
+func (p *BaseParser) packVarint(i int, buf []byte) int {
+	return vlq.PutInt(buf, int64(i))
+}
+
+func (p *BaseParser) packVaruint(i uint, buf []byte) int {
+	return vlq.PutUint(buf, uint64(i))
+}
+
+func (p *BaseParser) unpackVarint32(buf []byte) (int32, int) {
+	i, ofs := vlq.Int(buf)
+	return int32(i), ofs
+}
+
+func (p *BaseParser) unpackVarint(buf []byte) (int, int) {
+	i, ofs := vlq.Int(buf)
+	return int(i), ofs
+}
+
+func (p *BaseParser) unpackVaruint(buf []byte) (uint, int) {
+	i, ofs := vlq.Uint(buf)
+	return uint(i), ofs
+}
+
+const (
+	// number of bits in a big.Word
+	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
+	// number of bytes in a big.Word
+	wordBytes = wordBits / 8
+	// max packed bigint words
+	maxPackedBigintWords = (256 - wordBytes) / wordBytes
+	maxPackedBigintBytes = 249
+)
+
+// big int is packed in BigEndian order without memory allocation as 1 byte length followed by bytes of big int
+// number of written bytes is returned
+// limitation: bigints longer than 248 bytes are truncated to 248 bytes
+// caution: buffer must be big enough to hold the packed big int, buffer 249 bytes big is always safe
+func (p *BaseParser) packBigint(bi *big.Int, buf []byte) int {
+	w := bi.Bits()
+	lw := len(w)
+	// zero returns only one byte - zero length
+	if lw == 0 {
+		buf[0] = 0
+		return 1
+	}
+	// pack the most significant word in a special way - skip leading zeros
+	w0 := w[lw-1]
+	fb := 8
+	mask := big.Word(0xff) << (wordBits - 8)
+	for w0&mask == 0 {
+		fb--
+		mask >>= 8
+	}
+	for i := fb; i > 0; i-- {
+		buf[i] = byte(w0)
+		w0 >>= 8
+	}
+	// if the big int is too big (> 2^1984), the number of bytes would not fit to 1 byte
+	// in this case, truncate the number, it is not expected to work with this big numbers as amounts
+	s := 0
+	if lw > maxPackedBigintWords {
+		s = lw - maxPackedBigintWords
+	}
+	// pack the rest of the words in reverse order
+	for j := lw - 2; j >= s; j-- {
+		d := w[j]
+		for i := fb + wordBytes; i > fb; i-- {
+			buf[i] = byte(d)
+			d >>= 8
+		}
+		fb += wordBytes
+	}
+	buf[0] = byte(fb)
+	return fb + 1
+}
+
+func (p *BaseParser) unpackBigint(buf []byte) (big.Int, int) {
+	var r big.Int
+	l := int(buf[0]) + 1
+	r.SetBytes(buf[1:l])
+	return r, l
+}
+
+func (p *BaseParser) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
+	return nil
+}
+
+func (p *BaseParser) appendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte {
+	return nil
+}
+
+func (p *BaseParser) appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
+	return nil
+}
+
+func (p *BaseParser) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
+	return nil, errors.New("Not supported")
+}
+
+func (p *BaseParser) unpackTxInput(ti *TxInput, buf []byte) int {
+	return 0
+}
+
+func (p *BaseParser) unpackTxOutput(to *TxOutput, buf []byte) int {
+	return 0
+}
+
+func (p *BaseParser) packTxIndexes(txi []txIndexes) []byte {
+	return nil
+}
+
+func (p *BaseParser) packOutpoints(outpoints []outpoint) []byte {
+	return nil
+}
+
+func (p *BaseParser) unpackNOutpoints(buf []byte) ([]outpoint, int, error) {
+	return nil, 0, errors.New("Not supported")
+}
+
+func (p *BaseParser) packBlockInfo(block *BlockInfo) ([]byte, error) {
+	return nil, errors.New("Not supported")
+}
+
+func (p *BaseParser) unpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
+	return nil, errors.New("Not supported")
+}

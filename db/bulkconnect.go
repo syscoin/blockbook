@@ -15,8 +15,8 @@ import (
 // 2) rocksdb seems to handle better fewer larger batches than continuous stream of smaller batches
 
 type bulkAddresses struct {
-	bi        BlockInfo
-	addresses addressesMap
+	bi        bchain.DbBlockInfo
+	addresses bchain.addressesMap
 }
 
 // BulkConnect is used to connect blocks in bulk, faster but if interrupted inconsistent way
@@ -25,7 +25,7 @@ type BulkConnect struct {
 	chainType          bchain.ChainType
 	bulkAddresses      []bulkAddresses
 	bulkAddressesCount int
-	txAddressesMap     map[string]*TxAddresses
+	txAddressesMap     map[string]*bchain.TxAddresses
 	balances           map[string]*bchain.AddrBalance
 	addressContracts   map[string]*AddrContracts
 	height             uint32
@@ -46,7 +46,7 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 	b := &BulkConnect{
 		d:                d,
 		chainType:        d.chainParser.GetChainType(),
-		txAddressesMap:   make(map[string]*TxAddresses),
+		txAddressesMap:   make(map[string]*bchain.TxAddresses),
 		balances:         make(map[string]*bchain.AddrBalance),
 		addressContracts: make(map[string]*AddrContracts),
 	}
@@ -58,13 +58,13 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 }
 
 func (b *BulkConnect) storeTxAddresses(wb *gorocksdb.WriteBatch, all bool) (int, int, error) {
-	var txm map[string]*TxAddresses
+	var txm map[string]*bchain.TxAddresses
 	var sp int
 	if all {
 		txm = b.txAddressesMap
-		b.txAddressesMap = make(map[string]*TxAddresses)
+		b.txAddressesMap = make(map[string]*bchain.TxAddresses)
 	} else {
-		txm = make(map[string]*TxAddresses)
+		txm = make(map[string]*bchain.TxAddresses)
 		for k, a := range b.txAddressesMap {
 			// store all completely spent transactions, they will not be modified again
 			r := true
@@ -170,7 +170,7 @@ func (b *BulkConnect) storeBulkAddresses(wb *gorocksdb.WriteBatch) error {
 }
 
 func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs bool) error {
-	addresses := make(addressesMap)
+	addresses := make(bchain.addressesMap)
 	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances); err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 		}
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
-		bi: BlockInfo{
+		bi: bchain.DbBlockInfo{
 			Hash:   block.Hash,
 			Time:   block.Time,
 			Txs:    uint32(len(block.Txs)),
@@ -275,7 +275,7 @@ func (b *BulkConnect) parallelStoreAddressContracts(c chan error, all bool) {
 }
 
 func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTxs bool) error {
-	addresses := make(addressesMap)
+	addresses := make(bchain.addressesMap)
 	blockTxs, err := b.d.processAddressesEthereumType(block, addresses, b.addressContracts)
 	if err != nil {
 		return err
@@ -288,7 +288,7 @@ func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTx
 		go b.parallelStoreAddressContracts(storeAddrContracts, false)
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
-		bi: BlockInfo{
+		bi: bchain.DbBlockInfo{
 			Hash:   block.Hash,
 			Time:   block.Time,
 			Txs:    uint32(len(block.Txs)),

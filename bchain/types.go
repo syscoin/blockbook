@@ -362,7 +362,7 @@ type BlockChainParser interface {
 	GetAddressesFromAddrDesc(addrDesc AddressDescriptor) ([]string, bool, error)
 	GetScriptFromAddrDesc(addrDesc AddressDescriptor) ([]byte, error)
 	IsAddrDescIndexable(addrDesc AddressDescriptor) bool
-	// transactions
+	// parsing/packing/unpacking specific to chain
 	PackedTxidLen() int
 	PackTxid(txid string) ([]byte, error)
 	UnpackTxid(buf []byte) (string, error)
@@ -373,6 +373,32 @@ type BlockChainParser interface {
 	GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor
 	packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
 	unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
+	packAddressKey(addrDesc AddressDescriptor, height uint32) []byte
+	unpackAddressKey(key []byte) ([]byte, uint32, error)
+	packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte
+	appendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte
+	appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte
+	unpackTxAddresses(buf []byte) (*TxAddresses, error)
+	unpackTxInput(ti *TxInput, buf []byte) int
+	unpackTxOutput(to *TxOutput, buf []byte) int
+	packTxIndexes(txi []txIndexes) []byte
+	packOutpoints(outpoints []outpoint) []byte
+	unpackNOutpoints(buf []byte) ([]outpoint, int, error)
+	packBlockInfo(block *BlockInfo) ([]byte, error)
+	unpackBlockInfo(buf []byte) (*DbBlockInfo, error)
+	// packing/unpacking generic to all chain (expect this to be in baseparser)
+	packUint(i uint32) []byte
+	unpackUint(buf []byte) uint32
+	packVarint32(i int32, buf []byte) int
+	packVarint(i int, buf []byte) int
+	packVaruint(i uint, buf []byte) int
+	unpackVarint32(buf []byte) (int32, int)
+	unpackVarint(buf []byte) (int, int)
+	unpackVaruint(buf []byte) (uint, int)
+	packBigint(bi *big.Int, buf []byte) int
+	unpackBigint(buf []byte) (big.Int, int)
+
+
 	// blocks
 	PackBlockHash(hash string) ([]byte, error)
 	UnpackBlockHash(buf []byte) (string, error)
@@ -401,119 +427,53 @@ type Mempool interface {
 	GetTransactionTime(txid string) uint32
 }
 
+// Addresses index
 
-// Helpers
-const packedHeightBytes = 4
-func packAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
-	buf := make([]byte, len(addrDesc)+packedHeightBytes)
-	copy(buf, addrDesc)
-	// pack height as binary complement to achieve ordering from newest to oldest block
-	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
-	return buf
+type txIndexes struct {
+	btxID   []byte
+	indexes []int32
 }
 
-func unpackAddressKey(key []byte) ([]byte, uint32, error) {
-	i := len(key) - packedHeightBytes
-	if i <= 0 {
-		return nil, 0, errors.New("Invalid address key")
-	}
-	// height is packed in binary complement, convert it
-	return key[:i], ^unpackUint(key[i : i+packedHeightBytes]), nil
+// addressesMap is a map of addresses in a block
+// each address contains a slice of transactions with indexes where the address appears
+// slice is used instead of map so that order is defined and also search in case of few items
+type addressesMap map[string][]txIndexes
+
+// TxInput holds input data of the transaction in TxAddresses
+type TxInput struct {
+	AddrDesc AddressDescriptor
+	ValueSat big.Int
 }
 
-func packUint(i uint32) []byte {
-	buf := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf, i)
-	return buf
+// BlockInfo holds information about blocks kept in column height
+type DbBlockInfo struct {
+	Hash   string
+	Time   int64
+	Txs    uint32
+	Size   uint32
+	Height uint32 // Height is not packed!
+}
+// TxOutput holds output data of the transaction in TxAddresses
+type TxOutput struct {
+	AddrDesc AddressDescriptor
+	Spent    bool
+	ValueSat big.Int
 }
 
-func unpackUint(buf []byte) uint32 {
-	return binary.BigEndian.Uint32(buf)
+// TxAddresses stores transaction inputs and outputs with amounts
+type TxAddresses struct {
+	Version int32
+	Height  uint32
+	Inputs  []TxInput
+	Outputs []TxOutput
 }
 
-func packVarint32(i int32, buf []byte) int {
-	return vlq.PutInt(buf, int64(i))
+type outpoint struct {
+	btxID []byte
+	index int32
 }
 
-func packVarint(i int, buf []byte) int {
-	return vlq.PutInt(buf, int64(i))
-}
-
-func packVaruint(i uint, buf []byte) int {
-	return vlq.PutUint(buf, uint64(i))
-}
-
-func unpackVarint32(buf []byte) (int32, int) {
-	i, ofs := vlq.Int(buf)
-	return int32(i), ofs
-}
-
-func unpackVarint(buf []byte) (int, int) {
-	i, ofs := vlq.Int(buf)
-	return int(i), ofs
-}
-
-func unpackVaruint(buf []byte) (uint, int) {
-	i, ofs := vlq.Uint(buf)
-	return uint(i), ofs
-}
-
-const (
-	// number of bits in a big.Word
-	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
-	// number of bytes in a big.Word
-	wordBytes = wordBits / 8
-	// max packed bigint words
-	maxPackedBigintWords = (256 - wordBytes) / wordBytes
-	maxPackedBigintBytes = 249
-)
-
-// big int is packed in BigEndian order without memory allocation as 1 byte length followed by bytes of big int
-// number of written bytes is returned
-// limitation: bigints longer than 248 bytes are truncated to 248 bytes
-// caution: buffer must be big enough to hold the packed big int, buffer 249 bytes big is always safe
-func packBigint(bi *big.Int, buf []byte) int {
-	w := bi.Bits()
-	lw := len(w)
-	// zero returns only one byte - zero length
-	if lw == 0 {
-		buf[0] = 0
-		return 1
-	}
-	// pack the most significant word in a special way - skip leading zeros
-	w0 := w[lw-1]
-	fb := 8
-	mask := big.Word(0xff) << (wordBits - 8)
-	for w0&mask == 0 {
-		fb--
-		mask >>= 8
-	}
-	for i := fb; i > 0; i-- {
-		buf[i] = byte(w0)
-		w0 >>= 8
-	}
-	// if the big int is too big (> 2^1984), the number of bytes would not fit to 1 byte
-	// in this case, truncate the number, it is not expected to work with this big numbers as amounts
-	s := 0
-	if lw > maxPackedBigintWords {
-		s = lw - maxPackedBigintWords
-	}
-	// pack the rest of the words in reverse order
-	for j := lw - 2; j >= s; j-- {
-		d := w[j]
-		for i := fb + wordBytes; i > fb; i-- {
-			buf[i] = byte(d)
-			d >>= 8
-		}
-		fb += wordBytes
-	}
-	buf[0] = byte(fb)
-	return fb + 1
-}
-
-func unpackBigint(buf []byte) (big.Int, int) {
-	var r big.Int
-	l := int(buf[0]) + 1
-	r.SetBytes(buf[1:l])
-	return r, l
+type blockTxs struct {
+	btxID  []byte
+	inputs []outpoint
 }
