@@ -11,6 +11,7 @@ import (
 	"unsafe"
 	"bytes"
 	"github.com/golang/glog"
+	vlq "github.com/bsm/go-vlq"
 )
 
 // ChainType is type of the blockchain
