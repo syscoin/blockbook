@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -401,8 +402,8 @@ type Mempool interface {
 
 
 // Helpers
-
-func packAddressKey(addrDesc bchain.AddressDescriptor, height uint32) []byte {
+const packedHeightBytes = 4
+func packAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
 	buf := make([]byte, len(addrDesc)+packedHeightBytes)
 	copy(buf, addrDesc)
 	// pack height as binary complement to achieve ordering from newest to oldest block

@@ -4,7 +4,6 @@ import (
 	"blockbook/bchain"
 	"blockbook/common"
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -24,7 +23,6 @@ import (
 
 const dbVersion = 5
 
-const packedHeightBytes = 4
 const maxAddrDescLen = 1024
 // iterator creates snapshot, which takes lots of resources
 // when doing huge scan, it is better to close it and reopen from time to time to free the resources
