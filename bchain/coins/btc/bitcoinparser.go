@@ -474,11 +474,11 @@ func (p *BitcoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		for len(buf[l:]) >= txidUnpackedLen+3 {
 			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
 			l += txidUnpackedLen
-			vout, ll := p.UnpackVaruint(buf[l:])
+			vout, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			l += ll
-			height, ll := p.UnpackVaruint(buf[l:])
+			height, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			l += ll
-			valueSat, ll := p.UnpackBigint(buf[l:])
+			valueSat, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
 			u := bchain.Utxo{
 				BtxID:    btxID,
@@ -574,25 +574,6 @@ func (p *BitcoinParser) UnpackTxOutput(to *bchain.TxOutput, buf []byte) int {
 	al += l
 	to.ValueSat, l = p.BaseParser.UnpackBigint(buf[al:])
 	return l + al
-}
-
-func (p *BitcoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
-	buf := make([]byte, 0, 32)
-	bvout := make([]byte, vlq.MaxLen32)
-	// store the txs in reverse order for ordering from newest to oldest
-	for j := len(txi) - 1; j >= 0; j-- {
-		t := &txi[j]
-		buf = append(buf, []byte(t.BtxID)...)
-		for i, index := range t.Indexes {
-			index <<= 1
-			if i == len(t.Indexes)-1 {
-				index |= 1
-			}
-			l := p.BaseParser.PackVarint32(index, bvout)
-			buf = append(buf, bvout[:l]...)
-		}
-	}
-	return buf
 }
 
 func (p *BitcoinParser) PackOutpoints(outpoints []bchain.DbOutpoint) []byte {

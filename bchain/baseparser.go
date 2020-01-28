@@ -448,6 +448,25 @@ func (p *BaseParser) UnpackBigint(buf []byte) (big.Int, int) {
 	return r, l
 }
 
+func (p *BaseParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
+	buf := make([]byte, 0, 32)
+	bvout := make([]byte, vlq.MaxLen32)
+	// store the txs in reverse order for ordering from newest to oldest
+	for j := len(txi) - 1; j >= 0; j-- {
+		t := &txi[j]
+		buf = append(buf, []byte(t.BtxID)...)
+		for i, index := range t.Indexes {
+			index <<= 1
+			if i == len(t.Indexes)-1 {
+				index |= 1
+			}
+			l := p.BaseParser.PackVarint32(index, bvout)
+			buf = append(buf, bvout[:l]...)
+		}
+	}
+	return buf
+}
+
 func (p *BaseParser) PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
 	return nil
 }
@@ -470,10 +489,6 @@ func (p *BaseParser) UnpackTxInput(ti *TxInput, buf []byte) int {
 
 func (p *BaseParser) UnpackTxOutput(to *TxOutput, buf []byte) int {
 	return 0
-}
-
-func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
-	return nil
 }
 
 func (p *BaseParser) PackOutpoints(outpoints []DbOutpoint) []byte {
