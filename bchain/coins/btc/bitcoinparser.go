@@ -521,12 +521,12 @@ func (p *BitcoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	l = p.BaseParser.PackVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
-		buf = AppendTxInput(&ta.Inputs[i], buf, varBuf)
+		buf = p.AppendTxInput(&ta.Inputs[i], buf, varBuf)
 	}
 	l = p.BaseParser.PackVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
-		buf = AppendTxOutput(&ta.Outputs[i], buf, varBuf)
+		buf = p.AppendTxOutput(&ta.Outputs[i], buf, varBuf)
 	}
 	return buf
 }
@@ -540,13 +540,13 @@ func (p *BitcoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	l += ll
 	ta.Inputs = make([]TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
-		l += UnpackTxInput(&ta.Inputs[i], buf[l:])
+		l += p.UnpackTxInput(&ta.Inputs[i], buf[l:])
 	}
 	outputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
-		l += UnpackTxOutput(&ta.Outputs[i], buf[l:])
+		l += p.UnpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
 	return &ta, nil
 }
