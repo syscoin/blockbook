@@ -654,7 +654,7 @@ func (p *BitcoinParser) PackBlockInfo(block *bchain.DbBlockInfo) ([]byte, error)
 		return nil, err
 	}
 	packed = append(packed, b...)
-	packed = append(packed, PackUint(uint32(block.Time))...)
+	packed = append(packed, p.BaseParser.PackUint(uint32(block.Time))...)
 	l := p.BaseParser.PackVaruint(uint(block.Txs), varBuf)
 	packed = append(packed, varBuf[:l]...)
 	l = p.BaseParser.PackVaruint(uint(block.Size), varBuf)
