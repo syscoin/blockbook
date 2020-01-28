@@ -7,6 +7,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
+	"encoding/hex"
 )
 
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses addressesMap, btxID []byte, outputIndex int32) error {
@@ -175,7 +176,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
-	return d.ConnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
 func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*AddrBalance, version int32, addresses map[string]struct{}) error {
@@ -267,7 +268,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
-func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance) error {
+func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*AddrBalance) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
@@ -295,6 +296,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(assetGuid uint32, version int32, t
 		balanceAssetUnAllocatedSat.Sub(&balanceAssetUnAllocatedSat, totalAssetSentValue)
 		sentAssetUnAllocatedSat.Add(&sentAssetUnAllocatedSat, totalAssetSentValue)
 		if balanceAssetUnAllocatedSat.Sign() < 0 {
+			glog.Warningf("ConnectAssetAllocationInput asset send negative assetguid %v txid %v", assetGuid, hex.EncodeToString(btxID))
 			d.resetValueSatToZero(&balanceAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
 		}
 		balance.SentAssetUnAllocatedSat[assetGuid] = sentAssetUnAllocatedSat
