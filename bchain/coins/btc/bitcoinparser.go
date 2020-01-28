@@ -533,7 +533,7 @@ func (p *BitcoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 
 func (p *BitcoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
 	ta := bchain.TxAddresses{}
-	height, l := p.BaseParser.UnpackVaruint(buf[l:])
+	height, l := p.BaseParser.UnpackVaruint(buf)
 	ta.Height = uint32(height)
 	inputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
@@ -625,23 +625,23 @@ func (p *BitcoinParser) PackOutpoints(outpoints []bchain.DbOutpoint) []byte {
 }
 
 func (p *BitcoinParser) UnpackNOutpoints(buf []byte) ([]bchain.DbOutpoint, int, error) {
-	txidUnpackedLen := p.BaseParser.packedTxidLen()
-	n, p := p.BaseParser.UnpackVaruint(buf)
+	txidUnpackedLen := p.BaseParser.PackedTxidLen()
+	n, m := p.BaseParser.UnpackVaruint(buf)
 	outpoints := make([]bchain.DbOutpoint, n)
 	for i := uint(0); i < n; i++ {
-		if p+txidUnpackedLen >= len(buf) {
+		if m+txidUnpackedLen >= len(buf) {
 			return nil, 0, errors.New("Inconsistent data in UnpackNOutpoints")
 		}
-		btxID := append([]byte(nil), buf[p:p+txidUnpackedLen]...)
-		p += txidUnpackedLen
-		vout, voutLen := p.BaseParser.UnpackVarint32(buf[p:])
-		p += voutLen
+		btxID := append([]byte(nil), buf[m:m+txidUnpackedLen]...)
+		m += txidUnpackedLen
+		vout, voutLen := p.BaseParser.UnpackVarint32(buf[m:])
+		m += voutLen
 		outpoints[i] = bchain.DbOutpoint{
 			BtxID: btxID,
 			index: vout,
 		}
 	}
-	return outpoints, p, nil
+	return outpoints, m, nil
 }
 
 // Block index
