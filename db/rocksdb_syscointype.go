@@ -65,24 +65,30 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*AddrBa
 			}
 			return errors.New("ConnectAssetOutput Skipping asset transfer tx")
 		}
-		balance, e := balances[transferStr]
+		balanceTransfer, e := balances[transferStr]
 		if !e {
-			balance, err = d.GetAddrDescBalance(assetTransferWitnessAddrDesc, addressBalanceDetailUTXOIndexed)
+			balanceTransfer, err = d.GetAddrDescBalance(assetTransferWitnessAddrDesc, addressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return err
 			}
 			if balance == nil {
-				balance = &AddrBalance{}
+				balanceTransfer = &AddrBalance{}
 			}
-			balances[transferStr] = balance
+			balances[transferStr] = balanceTransfer
 			d.cbs.balancesMiss++
 		} else {
 			d.cbs.balancesHit++
 		}
 		counted := addToAddressesMap(addresses, transferStr, btxID, outputIndex)
 		if !counted {
-			balance.Txs++
+			balanceTransfer.Txs++
 		}
+		// transfer balance from old address to transfered address
+		if balance.BalanceAssetUnAllocatedSat == nil{
+			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
+		}
+		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = balance.BalanceAssetUnAllocatedSat[assetGuid]
+		balance.BalanceAssetUnAllocatedSat[assetGuid].Set(big.NewInt(0))
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
 			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
@@ -362,19 +368,22 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*Add
 		if !exist {
 			addresses[assetStrSenderAddrDesc] = struct{}{}
 		}
-		balance, err := getAddressBalance(assetTransferWitnessAddrDesc)
+		balanceTransfer, err := getAddressBalance(assetTransferWitnessAddrDesc)
 		if err != nil {
 			return err
 		}
-		if balance != nil {
+		if balanceTransfer != nil {
 			// subtract number of txs only once
 			if !exist {
-				balance.Txs--
+				balanceTransfer.Txs--
 			}
 		} else {
 			ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(assetTransferWitnessAddrDesc)
 			glog.Warningf("DisconnectAssetOutput Balance for transfer asset address %s (%s) not found", ad, assetTransferWitnessAddrDesc)
 		}
+		// transfer values back to original owner and 0 out the transferee balance
+		balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid]
+		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid].Set(big.NewInt(0))
 	} else if balance.SentAssetUnAllocatedSat != nil {
 		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
 		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
