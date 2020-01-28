@@ -343,6 +343,15 @@ type BlockTxs struct {
 	inputs []DbOutpoint
 }
 
+const (
+	// AddressBalanceDetailNoUTXO returns address balance without utxos
+	AddressBalanceDetailNoUTXO = 0
+	// AddressBalanceDetailUTXO returns address balance with utxos
+	AddressBalanceDetailUTXO = 1
+	// addressBalanceDetailUTXOIndexed returns address balance with utxos and index for updates, used only internally
+	addressBalanceDetailUTXOIndexed = 2
+)
+
 // BlockChain defines common interface to block chain daemon
 type BlockChain interface {
 	// life-cycle methods

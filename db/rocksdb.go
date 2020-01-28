@@ -72,15 +72,6 @@ type connectBlockStats struct {
 }
 
 
-const (
-	// AddressBalanceDetailNoUTXO returns address balance without utxos
-	AddressBalanceDetailNoUTXO = 0
-	// AddressBalanceDetailUTXO returns address balance with utxos
-	AddressBalanceDetailUTXO = 1
-	// addressBalanceDetailUTXOIndexed returns address balance with utxos and index for updates, used only internally
-	addressBalanceDetailUTXOIndexed = 2
-)
-
 // RocksDB handle
 type RocksDB struct {
 	path         string
