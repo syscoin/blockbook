@@ -1054,14 +1054,35 @@ func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDet
 		SentSat:    sentSat,
 		BalanceSat: balanceSat,
 	}
-	numSentAllocatedBalances, l := unpackVaruint(buf[l:])
+	numSentAssetAllocatedSat, l := unpackVaruint(buf[l:])
 	ab.SentAssetAllocatedSat = map[uint32]big.Int{}
-	for i := uint(0); i < numSentAllocatedBalances; i++ {
+	for i := uint(0); i < numSentAssetAllocatedSat; i++ {
 		key, l := unpackVaruint(buf[l:])
 		value, l := unpackBigint(buf[l:])
 		ab.SentAssetAllocatedSat[uint32(key)] = value
 	}
-	
+	numBalanceAssetAllocatedSat, l := unpackVaruint(buf[l:])
+	ab.BalanceAssetAllocatedSat = map[uint32]big.Int{}
+	for i := uint(0); i < numBalanceAssetAllocatedSat; i++ {
+		key, l := unpackVaruint(buf[l:])
+		value, l := unpackBigint(buf[l:])
+		ab.BalanceAssetAllocatedSat[uint32(key)] = value
+	}
+	numSentAssetUnAllocatedSat, l := unpackVaruint(buf[l:])
+	ab.SentAssetUnAllocatedSat = map[uint32]big.Int{}
+	for i := uint(0); i < numSentAssetUnAllocatedSat; i++ {
+		key, l := unpackVaruint(buf[l:])
+		value, l := unpackBigint(buf[l:])
+		ab.SentAssetUnAllocatedSat[uint32(key)] = value
+	}
+	numBalanceAssetUnAllocatedSat, l := unpackVaruint(buf[l:])
+	ab.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
+	for i := uint(0); i < numBalanceAssetUnAllocatedSat; i++ {
+		key, l := unpackVaruint(buf[l:])
+		value, l := unpackBigint(buf[l:])
+		ab.BalanceAssetUnAllocatedSat[uint32(key)] = value
+	}	
+
 	if detail != AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
 		ab.Utxos = make([]Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
@@ -1108,7 +1129,33 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	
+	l = packVaruint(uint(len(ab.BalanceAssetAllocatedSat)), varBuf)
+	for key, value := range ab.BalanceAssetAllocatedSat {
+		if value.Int64() > 0 {
+			l = packVaruint(uint(key), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = packBigint(&value, varBuf)
+			buf = append(buf, varBuf[:l]...)
+		}
+	}
+	l = packVaruint(uint(len(ab.SentAssetUnAllocatedSat)), varBuf)
+	for key, value := range ab.SentAssetUnAllocatedSat {
+		if value.Int64() > 0 {
+			l = packVaruint(uint(key), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = packBigint(&value, varBuf)
+			buf = append(buf, varBuf[:l]...)
+		}
+	}
+	l = packVaruint(uint(len(ab.BalanceAssetUnAllocatedSat)), varBuf)
+	for key, value := range ab.BalanceAssetUnAllocatedSat {
+		if value.Int64() > 0 {
+			l = packVaruint(uint(key), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = packBigint(&value, varBuf)
+			buf = append(buf, varBuf[:l]...)
+		}
+	}
 	for _, utxo := range ab.Utxos {
 		// if Vout < 0, utxo is marked as spent
 		if utxo.Vout >= 0 {
