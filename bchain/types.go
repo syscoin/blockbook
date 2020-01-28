@@ -430,8 +430,8 @@ type BlockChainParser interface {
 	unpackTxInput(ti *TxInput, buf []byte) int
 	unpackTxOutput(to *TxOutput, buf []byte) int
 	packTxIndexes(txi []TxIndexes) []byte
-	packOutpoints(outpoints []outpoint) []byte
-	unpackNOutpoints(buf []byte) ([]outpoint, int, error)
+	packOutpoints(outpoints []DbOutpoint) []byte
+	unpackNOutpoints(buf []byte) ([]DbOutpoint, int, error)
 	packBlockInfo(block *DbBlockInfo) ([]byte, error)
 	unpackBlockInfo(buf []byte) (*DbBlockInfo, error)
 	// packing/unpacking generic to all chain (expect this to be in baseparser)
