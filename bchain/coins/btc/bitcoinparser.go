@@ -532,19 +532,19 @@ func (p *BitcoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 }
 
 func (p *BitcoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
-	ta := TxAddresses{}
+	ta := bchain.TxAddresses{}
 	height, l := p.BaseParser.UnpackVaruint(buf[l:])
 	ta.Height = uint32(height)
 	l += ll
 	inputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.Inputs = make([]TxInput, inputs)
+	ta.Inputs = make([]bchain.TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
 		l += p.UnpackTxInput(&ta.Inputs[i], buf[l:])
 	}
 	outputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.Outputs = make([]TxOutput, outputs)
+	ta.Outputs = make([]bchain.TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
 		l += p.UnpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
