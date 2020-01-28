@@ -842,7 +842,7 @@ func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*AddrBa
 		if ab == nil || ab.Txs <= 0 {
 			wb.DeleteCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc))
 		} else {
-			buf = packAddrBalance(ab, buf, varBuf)
+			buf = d.chainParser.packAddrBalance(ab, buf, varBuf)
 			wb.PutCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc), buf)
 		}
 	}
@@ -948,7 +948,7 @@ func (d *RocksDB) GetAddrDescBalance(addrDesc bchain.AddressDescriptor, detail A
 	if len(buf) < 3 {
 		return nil, nil
 	}
-	return unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), detail)
+	return d.chainParser.unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), detail)
 }
 
 // GetAddressBalance returns address balance for an address or nil if address not found
@@ -1041,137 +1041,6 @@ func appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
 	buf = append(buf, txo.AddrDesc...)
 	l = packBigint(&txo.ValueSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
-	return buf
-}
-
-func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
-	txs, l := unpackVaruint(buf)
-	sentSat, sl := unpackBigint(buf[l:])
-	balanceSat, bl := unpackBigint(buf[l+sl:])
-	l = l + sl + bl
-	ab := &AddrBalance{
-		Txs:        uint32(txs),
-		SentSat:    sentSat,
-		BalanceSat: balanceSat,
-	}
-	numSentAssetAllocatedSat, l := unpackVaruint(buf[l:])
-	ab.SentAssetAllocatedSat = map[uint32]big.Int{}
-	for i := uint(0); i < numSentAssetAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
-		ab.SentAssetAllocatedSat[uint32(key)] = value
-	}
-	numBalanceAssetAllocatedSat, l := unpackVaruint(buf[l:])
-	ab.BalanceAssetAllocatedSat = map[uint32]big.Int{}
-	for i := uint(0); i < numBalanceAssetAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
-		ab.BalanceAssetAllocatedSat[uint32(key)] = value
-	}
-	numSentAssetUnAllocatedSat, l := unpackVaruint(buf[l:])
-	ab.SentAssetUnAllocatedSat = map[uint32]big.Int{}
-	for i := uint(0); i < numSentAssetUnAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
-		ab.SentAssetUnAllocatedSat[uint32(key)] = value
-	}
-	numBalanceAssetUnAllocatedSat, l := unpackVaruint(buf[l:])
-	ab.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
-	for i := uint(0); i < numBalanceAssetUnAllocatedSat; i++ {
-		key, l := unpackVaruint(buf[l:])
-		value, l := unpackBigint(buf[l:])
-		ab.BalanceAssetUnAllocatedSat[uint32(key)] = value
-	}	
-
-	if detail != AddressBalanceDetailNoUTXO {
-		// estimate the size of utxos to avoid reallocation
-		ab.Utxos = make([]Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
-		// ab.utxosMap = make(map[string]int, cap(ab.Utxos))
-		for len(buf[l:]) >= txidUnpackedLen+3 {
-			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
-			l += txidUnpackedLen
-			vout, ll := unpackVaruint(buf[l:])
-			l += ll
-			height, ll := unpackVaruint(buf[l:])
-			l += ll
-			valueSat, ll := unpackBigint(buf[l:])
-			l += ll
-			u := Utxo{
-				BtxID:    btxID,
-				Vout:     int32(vout),
-				Height:   uint32(height),
-				ValueSat: valueSat,
-			}
-			if detail == AddressBalanceDetailUTXO {
-				ab.Utxos = append(ab.Utxos, u)
-			} else {
-				ab.addUtxo(&u)
-			}
-		}
-	}
-	return ab, nil
-}
-
-func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
-	buf = buf[:0]
-	l := packVaruint(uint(ab.Txs), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	l = packBigint(&ab.SentSat, varBuf)
-	buf = append(buf, varBuf[:l]...)
-	l = packBigint(&ab.BalanceSat, varBuf)
-	buf = append(buf, varBuf[:l]...)
-	l = packVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	for key, value := range ab.SentAssetAllocatedSat {
-		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
-			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
-			buf = append(buf, varBuf[:l]...)
-		}
-	}
-	l = packVaruint(uint(len(ab.BalanceAssetAllocatedSat)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	for key, value := range ab.BalanceAssetAllocatedSat {
-		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
-			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
-			buf = append(buf, varBuf[:l]...)
-		}
-	}
-	l = packVaruint(uint(len(ab.SentAssetUnAllocatedSat)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	for key, value := range ab.SentAssetUnAllocatedSat {
-		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
-			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
-			buf = append(buf, varBuf[:l]...)
-		}
-	}
-	l = packVaruint(uint(len(ab.BalanceAssetUnAllocatedSat)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	for key, value := range ab.BalanceAssetUnAllocatedSat {
-		if value.Int64() > 0 {
-			l = packVaruint(uint(key), varBuf)
-			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&value, varBuf)
-			buf = append(buf, varBuf[:l]...)
-		}
-	}
-	for _, utxo := range ab.Utxos {
-		// if Vout < 0, utxo is marked as spent
-		if utxo.Vout >= 0 {
-			buf = append(buf, utxo.BtxID...)
-			l = packVaruint(uint(utxo.Vout), varBuf)
-			buf = append(buf, varBuf[:l]...)
-			l = packVaruint(uint(utxo.Height), varBuf)
-			buf = append(buf, varBuf[:l]...)
-			l = packBigint(&utxo.ValueSat, varBuf)
-			buf = append(buf, varBuf[:l]...)
-		}
-	}
 	return buf
 }
 

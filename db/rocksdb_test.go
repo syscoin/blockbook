@@ -1093,12 +1093,12 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 	buf := make([]byte, 32)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := packAddrBalance(tt.data, buf, varBuf)
+			b := parser.packAddrBalance(tt.data, buf, varBuf)
 			hex := hex.EncodeToString(b)
 			if !reflect.DeepEqual(hex, tt.hex) {
 				t.Errorf("packTxAddresses() = %v, want %v", hex, tt.hex)
 			}
-			got1, err := unpackAddrBalance(b, parser.PackedTxidLen(), AddressBalanceDetailUTXO)
+			got1, err := parser.unpackAddrBalance(b, parser.PackedTxidLen(), AddressBalanceDetailUTXO)
 			if err != nil {
 				t.Errorf("unpackTxAddresses() error = %v", err)
 				return
