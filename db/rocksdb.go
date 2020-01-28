@@ -14,7 +14,6 @@ import (
 	"sort"
 	"strconv"
 	"time"
-	"unsafe"
 	"github.com/martinboehm/btcutil/txscript"
 
 	vlq "github.com/bsm/go-vlq"
