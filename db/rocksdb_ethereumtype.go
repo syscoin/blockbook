@@ -102,7 +102,7 @@ func isZeroAddress(addrDesc bchain.AddressDescriptor) bool {
 	return true
 }
 
-func (d *RocksDB) addToAddressesAndContractsEthereumType(addrDesc bchain.AddressDescriptor, btxID []byte, index int32, contract bchain.AddressDescriptor, addresses bchain.addressesMap, addressContracts map[string]*AddrContracts, addTxCount bool) error {
+func (d *RocksDB) addToAddressesAndContractsEthereumType(addrDesc bchain.AddressDescriptor, btxID []byte, index int32, contract bchain.AddressDescriptor, addresses bchain.AddressesMap, addressContracts map[string]*AddrContracts, addTxCount bool) error {
 	var err error
 	strAddrDesc := string(addrDesc)
 	ac, e := addressContracts[strAddrDesc]
@@ -160,7 +160,7 @@ type ethBlockTx struct {
 	contracts []ethBlockTxContract
 }
 
-func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bchain.addressesMap, addressContracts map[string]*AddrContracts) ([]ethBlockTx, error) {
+func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bchain.AddressesMap, addressContracts map[string]*AddrContracts) ([]ethBlockTx, error) {
 	blockTxs := make([]ethBlockTx, len(block.Txs))
 	for txi, tx := range block.Txs {
 		btxID, err := d.chainParser.PackTxid(tx.Txid)
@@ -243,7 +243,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 	return blockTxs, nil
 }
 
-func (d *RocksDB) storeAndCleanupBlockTxsEthereumType(wb *gorocksdb.WriteBatch, block *bchain.Block, blockTxs []ethBlockTx) error {
+func (d *RocksDB) storeAndCleanupBlockTxsEthereumType(wb *gorocksdb.WriteBatch, block *bchain.Block, bchain.BlockTxs []ethBlockTx) error {
 	pl := d.chainParser.PackedTxidLen()
 	buf := make([]byte, 0, (pl+2*eth.EthereumTypeAddressDescriptorLen)*len(blockTxs))
 	varBuf := make([]byte, vlq.MaxLen64)

@@ -299,7 +299,7 @@ type TxIndexes struct {
 	indexes []int32
 }
 
-// addressesMap is a map of addresses in a block
+// AddressesMap is a map of addresses in a block
 // each address contains a slice of transactions with indexes where the address appears
 // slice is used instead of map so that order is defined and also search in case of few items
 type AddressesMap map[string][]TxIndexes
@@ -338,7 +338,7 @@ type DbOutpoint struct {
 	index int32
 }
 
-type blockTxs struct {
+type BlockTxs struct {
 	btxID  []byte
 	inputs []DbOutpoint
 }

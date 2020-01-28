@@ -16,7 +16,7 @@ import (
 
 type bulkAddresses struct {
 	bi        bchain.DbBlockInfo
-	addresses bchain.addressesMap
+	addresses bchain.AddressesMap
 }
 
 // BulkConnect is used to connect blocks in bulk, faster but if interrupted inconsistent way
@@ -170,7 +170,7 @@ func (b *BulkConnect) storeBulkAddresses(wb *gorocksdb.WriteBatch) error {
 }
 
 func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs bool) error {
-	addresses := make(bchain.addressesMap)
+	addresses := make(bchain.AddressesMap)
 	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances); err != nil {
 		return err
 	}
@@ -275,7 +275,7 @@ func (b *BulkConnect) parallelStoreAddressContracts(c chan error, all bool) {
 }
 
 func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTxs bool) error {
-	addresses := make(bchain.addressesMap)
+	addresses := make(bchain.AddressesMap)
 	blockTxs, err := b.d.processAddressesEthereumType(block, addresses, b.addressContracts)
 	if err != nil {
 		return err

@@ -438,7 +438,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	if err := d.writeHeightFromBlock(wb, block, opInsert); err != nil {
 		return err
 	}
-	addresses := make(bchain.addressesMap)
+	addresses := make(bchain.AddressesMap)
 	if chainType == bchain.ChainBitcoinType {
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
@@ -507,7 +507,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.addressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	// first process all outputs so that inputs can refer to txs in this block
@@ -664,7 +664,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 // addToAddressesMap maintains mapping between addresses and transactions in one block
 // the method assumes that outpus in the block are processed before the inputs
 // the return value is true if the tx was processed before, to not to count the tx multiple times
-func addToAddressesMap(addresses bchain.addressesMap, strAddrDesc string, btxID []byte, index int32) bool {
+func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID []byte, index int32) bool {
 	// check that the address was already processed in this block
 	// if not found, it has certainly not been counted
 	at, found := addresses[strAddrDesc]
@@ -684,7 +684,7 @@ func addToAddressesMap(addresses bchain.addressesMap, strAddrDesc string, btxID 
 	return false
 }
 
-func (d *RocksDB) storeAddresses(wb *gorocksdb.WriteBatch, height uint32, addresses bchain.addressesMap) error {
+func (d *RocksDB) storeAddresses(wb *gorocksdb.WriteBatch, height uint32, addresses bchain.AddressesMap) error {
 	for addrDesc, txi := range addresses {
 		ba := bchain.AddressDescriptor(addrDesc)
 		key := d.chainParser.packAddressKey(ba, height)
@@ -777,7 +777,7 @@ func (d *RocksDB) storeAndCleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchai
 	return d.cleanupBlockTxs(wb, block)
 }
 
-func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.blockTxs, error) {
+func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.BlockTxs, error) {
 	pl := d.chainParser.PackedTxidLen()
 	val, err := d.db.GetCF(d.ro, d.cfh[cfBlockTxs], d.chainParser.packUint(height))
 	if err != nil {
@@ -785,7 +785,7 @@ func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.blockTxs, error) {
 	}
 	defer val.Free()
 	buf := val.Data()
-	bt := make([]bchain.blockTxs, 0, 8)
+	bt := make([]bchain.BlockTxs, 0, 8)
 	for i := 0; i < len(buf); {
 		if len(buf)-i < pl {
 			glog.Error("rocksdb: Inconsistent data in blockTxs ", hex.EncodeToString(buf))
@@ -798,7 +798,7 @@ func (d *RocksDB) getBlockTxs(height uint32) ([]bchain.blockTxs, error) {
 			glog.Error("rocksdb: Inconsistent data in blockTxs ", hex.EncodeToString(buf))
 			return nil, errors.New("Inconsistent data in blockTxs")
 		}
-		bt = append(bt, bchain.blockTxs{
+		bt = append(bt, bchain.BlockTxs{
 			btxID:  txid,
 			inputs: o,
 		})
@@ -1065,7 +1065,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 // DisconnectBlockRangeBitcoinType removes all data belonging to blocks in range lower-higher
 // it is able to disconnect only blocks for which there are data in the blockTxs column
 func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) error {
-	blocks := make([][]bchain.blockTxs, higher-lower+1)
+	blocks := make([][]bchain.BlockTxs, higher-lower+1)
 	for height := lower; height <= higher; height++ {
 		blockTxs, err := d.getBlockTxs(height)
 		if err != nil {
