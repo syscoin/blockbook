@@ -39,6 +39,7 @@ import (
 	"blockbook/bchain/coins/xzc"
 	"blockbook/bchain/coins/zec"
 	"blockbook/bchain/coins/sys"
+	"blockbook/bchain/coins/omotenashicoin"
 	"blockbook/common"
 	"context"
 	"encoding/json"
@@ -110,6 +111,8 @@ func init() {
 	BlockChainFactories["Bitcore"] = bitcore.NewBitcoreRPC
 	BlockChainFactories["Syscoin"] = syscoin.NewSyscoinRPC
 	BlockChainFactories["Syscoin Testnet"] = syscoin.NewSyscoinRPC
+	BlockChainFactories["Omotenashicoin"] = omotenashicoin.NewOmotenashiCoinRPC
+	BlockChainFactories["Omotenashicoin Testnet"] = omotenashicoin.NewOmotenashiCoinRPC
 }
 
 // GetCoinNameFromConfig gets coin name and coin shortcut from config file
