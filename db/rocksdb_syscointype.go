@@ -255,9 +255,9 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 			balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 			if ok {
 				amount := big.NewInt(allocation.ValueSat)
-				balanceAssetAllocatedSat.Sub(&balanceAssetAllocatedSat, amount)
+				balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, amount)
 				if balanceAssetAllocatedSat.Sign() < 0 {
-					d.resetValueSatToZero(&balanceAssetAllocatedSat, addrDesc, "balance")
+					d.resetValueSatToZero(balanceAssetAllocatedSat, addrDesc, "balance")
 				}
 				totalAssetSentValue.Add(totalAssetSentValue, amount)
 			} else {
@@ -289,7 +289,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	}
 	if d.chainParser.IsSyscoinAssetSend(version) {
 		if balance.SentAssetUnAllocatedSat == nil {
-			balance.SentAssetUnAllocatedSat = map[uint32]big.Int{}
+			balance.SentAssetUnAllocatedSat = map[uint32]*big.Int{}
 		}
 		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
 		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
@@ -297,15 +297,15 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 			balanceAssetUnAllocatedSat = big.NewInt(0)
 			balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
 		}
-		balanceAssetUnAllocatedSat.Sub(&balanceAssetUnAllocatedSat, totalAssetSentValue)
-		sentAssetUnAllocatedSat.Add(&sentAssetUnAllocatedSat, totalAssetSentValue)
+		balanceAssetUnAllocatedSat.Sub(balanceAssetUnAllocatedSat, totalAssetSentValue)
+		sentAssetUnAllocatedSat.Add(sentAssetUnAllocatedSat, totalAssetSentValue)
 		if balanceAssetUnAllocatedSat.Sign() < 0 {
 			glog.Warningf("ConnectAssetAllocationInput asset send negative assetguid %v txid %v", assetGuid, hex.EncodeToString(btxID))
-			d.resetValueSatToZero(&balanceAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
+			d.resetValueSatToZero(balanceAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
 		}
 	} else {
 		if balance.SentAssetAllocatedSat == nil {
-			balance.SentAssetAllocatedSat = map[uint32]big.Int{}
+			balance.SentAssetAllocatedSat = map[uint32]*big.Int{}
 		}
 		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
@@ -386,7 +386,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		}
 		// transfer values back to original owner and 0 out the
 		balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid]
-		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = *big.NewInt(0)
+		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = big.NewInt(0)
 	} else if balance.SentAssetUnAllocatedSat != nil {
 		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
 		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
