@@ -225,33 +225,41 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		BalanceSat: balanceSat,
 	}
 	// unpack asset balance information
-	numSentAssetAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
+	numSentAssetAllocatedSat, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	l += ll
 	ab.SentAssetAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numSentAssetAllocatedSat; i++ {
-		key, l := p.BaseParser.UnpackVaruint(buf[l:])
-		value, l := p.BaseParser.UnpackBigint(buf[l:])
+		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
+		value, lv := p.BaseParser.UnpackBigint(buf[l:])
 		ab.SentAssetAllocatedSat[uint32(key)] = &value
+		l += lk + lv
 	}
-	numBalanceAssetAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
+	numBalanceAssetAllocatedSat, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	l += ll
 	ab.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numBalanceAssetAllocatedSat; i++ {
-		key, l := p.BaseParser.UnpackVaruint(buf[l:])
-		value, l := p.BaseParser.UnpackBigint(buf[l:])
+		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
+		value, lv := p.BaseParser.UnpackBigint(buf[l:])
 		ab.BalanceAssetAllocatedSat[uint32(key)] = &value
+		l += lk + lv
 	}
-	numSentAssetUnAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
+	numSentAssetUnAllocatedSat, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	l += ll
 	ab.SentAssetUnAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numSentAssetUnAllocatedSat; i++ {
-		key, l := p.BaseParser.UnpackVaruint(buf[l:])
-		value, l := p.BaseParser.UnpackBigint(buf[l:])
+		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
+		value, lv := p.BaseParser.UnpackBigint(buf[l:])
 		ab.SentAssetUnAllocatedSat[uint32(key)] = &value
+		l += lk + lv
 	}
-	numBalanceAssetUnAllocatedSat, l := p.BaseParser.UnpackVaruint(buf[l:])
+	numBalanceAssetUnAllocatedSat, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	l += ll
 	ab.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numBalanceAssetUnAllocatedSat; i++ {
-		key, l := p.BaseParser.UnpackVaruint(buf[l:])
-		value, l := p.BaseParser.UnpackBigint(buf[l:])
+		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
+		value, lv := p.BaseParser.UnpackBigint(buf[l:])
 		ab.BalanceAssetUnAllocatedSat[uint32(key)] = &value
+		l += lk + lv
 	}	
 	if numSentAssetAllocatedSat > 0 || numBalanceAssetAllocatedSat > 0 ||  numSentAssetUnAllocatedSat > 0 || numBalanceAssetUnAllocatedSat > 0 {
 		glog.Warningf("UnpackAddrBalance numSentAssetAllocatedSat %v numBalanceAssetAllocatedSat %v numSentAssetUnAllocatedSat %v numBalanceAssetUnAllocatedSat %v",numSentAssetAllocatedSat, numBalanceAssetAllocatedSat, numSentAssetUnAllocatedSat, numBalanceAssetUnAllocatedSat)
@@ -359,9 +367,6 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 			l = p.BaseParser.PackBigint(value, varBuf)
 			buf = append(buf, varBuf[:l]...)
 		}
-	}
-	if countSentAssetAllocatedSat > 0 || countBalanceAssetAllocatedSat > 0||  countSentAssetUnAllocatedSat > 0 || countBalanceAssetUnAllocatedSat > 0 {
-		glog.Warningf("PackAddrBalance SentAssetAllocatedSat %v BalanceAssetAllocatedSat %v SentAssetUnAllocatedSat %v BalanceAssetUnAllocatedSat %v",countSentAssetAllocatedSat, countBalanceAssetAllocatedSat, countSentAssetUnAllocatedSat, countBalanceAssetUnAllocatedSat)
 	}
 	for _, utxo := range ab.Utxos {
 		// if Vout < 0, utxo is marked as spent

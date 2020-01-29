@@ -63,7 +63,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			}
 			return errors.New("ConnectAssetOutput Skipping asset transfer tx")
 		}
-		glog.Warningf("transfering asset %v to %v from %v", assetGuid, asset.WitnessAddressTransfer.ToString("sys"), asset.WitnessAddress.ToString("sys"))
 		transferStr := string(assetTransferWitnessAddrDesc)
 		balanceTransfer, e1 := balances[transferStr]
 		if !e1 {
@@ -90,7 +89,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		valueSat := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = big.NewInt(valueSat.Int64())
 		valueSat.Set(big.NewInt(0))
-		glog.Warningf("transfer done asset %v to %v from %v new balance on sender %v", assetGuid, asset.WitnessAddressTransfer.ToString("sys"), asset.WitnessAddress.ToString("sys"), balance.BalanceAssetUnAllocatedSat[assetGuid])
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
 			balance.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
