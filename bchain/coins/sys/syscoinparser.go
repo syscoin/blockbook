@@ -247,6 +247,9 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	if len(ab.SentAssetAllocatedSat) > 0 || len(ab.BalanceAssetAllocatedSat) > 0 ||  len(ab.SentAssetUnAllocatedSat) > 0 || len(ab.BalanceAssetUnAllocatedSat) > 0 {
 		glog.Warningf("PackAddrBalance SentAssetAllocatedSat %v BalanceAssetAllocatedSat %v SentAssetUnAllocatedSat %v BalanceAssetUnAllocatedSat %v",ab.SentAssetAllocatedSat, ab.BalanceAssetAllocatedSat, ab.SentAssetUnAllocatedSat, ab.BalanceAssetUnAllocatedSat)
 	}
+	else{
+		glog.Warningf("PackAddrBalance empty")
+	}
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetAllocatedSat {
 		if value.Int64() > 0 {
