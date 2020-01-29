@@ -261,6 +261,9 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 }
 
 func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
+	if totalAssetSentValue == nil {
+		return errors.New("totalAssetSentValue was nil cannot connect allocation input")
+	}
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
@@ -433,6 +436,153 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	return nil
 
 }
+func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32) error {
+	r := bytes.NewReader(sptData)
+	var mintasset = wire.MintSyscoinType
+	err := asset.Deserialize(r)
+	if err != nil {
+		return err
+	}
+	assetGuid := mintasset.AssetAllocationTuple.Asset
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress("burn")
+	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
+		if err != nil {
+			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+			if err != bchain.ErrAddressMissing {
+				glog.Warningf("ConnectMintAssetOutput sender with asset %v (%v) could not be decoded error %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys"), err)
+			}
+		} else {
+			glog.Warningf("ConnectMintAssetOutput sender with asset %v (%v) has invalid length: %d", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys"), len(assetSenderAddrDesc))
+		}
+		return errors.New("ConnectMintAssetOutput Skipping asset mint tx")
+	}
+	addrDesc, err := d.chainParser.GetAddrDescFromAddress(mintasset.AssetAllocationTuple.WitnessAddress.ToString("sys"))
+	if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
+		if err != nil {
+			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+			if err != bchain.ErrAddressMissing {
+				glog.Warningf("ConnectMintAssetOutput receiver with asset %v (%v) could not be decoded error %v", assetGuid, allocation.WitnessAddress.ToString("sys"), err)
+			}
+		} else {
+			glog.Warningf("ConnectMintAssetOutput receiver with asset %v (%v) has invalid length: %d", assetGuid, allocation.WitnessAddress.ToString("sys"), len(addrDesc))
+		}
+		continue
+	}
+	receiverStr := string(addrDesc)
+	balance, e := balances[receiverStr]
+	if !e {
+		balance, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
+		if err != nil {
+			return err
+		}
+		if balance == nil {
+			balance = &bchain.AddrBalance{}
+		}
+		balances[receiverStr] = balance
+		d.cbs.balancesMiss++
+	} else {
+		d.cbs.balancesHit++
+	}
+
+	// for each address returned, add it to map
+	counted := addToAddressesMap(addresses, receiverStr, btxID, outputIndex)
+	if !counted {
+		balance.Txs++
+	}
+
+	if balance.BalanceAssetAllocatedSat == nil {
+		balance.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
+	}
+	balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
+	if !ok {
+		balanceAssetAllocatedSat = big.NewInt(0)
+		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
+	}
+	amount := big.NewInt(mintassetallocation.ValueSat)
+	balanceAssetAllocatedSat.Add(balanceAssetAllocatedSat, amount)
+	
+	
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances)
+}
+func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
+	r := bytes.NewReader(sptData)
+	var mintasset wire.MintSyscoinType
+	err := mintasset.Deserialize(r)
+	if err != nil {
+		return err
+	}
+	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
+		var err error
+		s := string(addrDesc)
+		b, fb := balances[s]
+		if !fb {
+			b, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
+			if err != nil {
+				return nil, err
+			}
+			balances[s] = b
+		}
+		return b, nil
+	}
+	assetGuid := mintasset.AssetAllocationTuple.Asset
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress("burn")
+	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
+		if err != nil {
+			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+			if err != bchain.ErrAddressMissing {
+				glog.Warningf("DisconnectMintAssetOutput sender with asset %v (%v) could not be decoded error %v", assetGuid, string(assetSenderAddrDesc), err)
+			}
+		} else {
+			glog.Warningf("DisconnectMintAssetOutput sender with asset %v (%v) has invalid length: %d", assetGuid, string(assetSenderAddrDesc), len(assetSenderAddrDesc))
+		}
+		return errors.New("DisconnectMintAssetOutput Skipping disconnect asset mint tx")
+	}
+	
+	addrDesc, err := d.chainParser.GetAddrDescFromAddress(mintasset.WitnessAddress.ToString("sys"))
+	if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
+		if err != nil {
+			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
+			if err != bchain.ErrAddressMissing {
+				glog.Warningf("DisconnectMintAssetOutput receiver with asset %v (%v) could not be decoded error %v", assetGuid, string(addrDesc), err)
+			}
+		} else {
+			glog.Warningf("DisconnectMintAssetOutput receiver with asset %v (%v) has invalid length: %d", assetGuid, string(addrDesc), len(addrDesc))
+		}
+		continue
+	}
+	receiverStr := string(addrDesc)
+	_, exist := addresses[receiverStr]
+	if !exist {
+		addresses[receiverStr] = struct{}{}
+	}
+	balance, err := getAddressBalance(addrDesc)
+	if err != nil {
+		return err
+	}
+	if balance != nil {
+		// subtract number of txs only once
+		if !exist {
+			balance.Txs--
+		}
+	} else {
+		ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
+		glog.Warningf("DisconnectMintAssetOutput Balance for asset address %v (%v) not found", ad, addrDesc)
+	}
+	var totalAssetSentValue *big.Int
+	if balance.BalanceAssetAllocatedSat != nil{
+		balanceAssetAllocatedSat := balance.BalanceAssetAllocatedSat[assetGuid]
+		totalAssetSentValue := big.NewInt(allocation.ValueSat)
+		balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, amount)
+		if balanceAssetAllocatedSat.Sign() < 0 {
+			d.resetValueSatToZero(balanceAssetAllocatedSat, addrDesc, "balance")
+		}
+	} else {
+		ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
+		glog.Warningf("DisconnectMintAssetOutput Asset Balance for asset address %v (%v) not found", ad, addrDesc)
+	}
+	
+	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
+}
 func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
@@ -446,6 +596,8 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 		return d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex)
 	} else if d.chainParser.IsAssetTx(version) {
 		return d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex)
+	} else if d.chainParser.IsSyscoinMintTx(version) {
+		return d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex)
 	}
 	return nil
 }
@@ -463,6 +615,8 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 		return d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses)
 	} else if d.chainParser.IsAssetTx(version) {
 		return d.DisconnectAssetOutput(sptData, balances, version, addresses)
+	} else if d.chainParser.IsSyscoinMintTx(version) {
+		return d.DisconnectMintAssetOutput(sptData, balances, version, addresses)
 	}
 	return nil
 }
