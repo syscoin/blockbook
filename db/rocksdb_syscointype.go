@@ -88,7 +88,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		if balanceTransfer.BalanceAssetUnAllocatedSat == nil{
 			balanceTransfer.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
 		}
-		valueSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
+		valueSat := &(balance.BalanceAssetUnAllocatedSat[assetGuid])
 		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = *big.NewInt(valueSat.Int64())
 		valueSat.Set(big.NewInt(0))
 	} else {
