@@ -141,6 +141,56 @@ func (p *SyscoinParser) IsSyscoinTx(nVersion int32) bool {
 func (p *SyscoinParser) IsSyscoinAssetSend(nVersion int32) bool {
 	return nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
 }
+
+// addressToOutputScript converts bitcoin address to ScriptPubKey
+func (p *SyscoinParser) addressToOutputScript(address string) ([]byte, error) {
+	if(address == "burn")
+		return []byte("burn"), nil
+	da, err := btcutil.DecodeAddress(address, p.Params)
+	if err != nil {
+		return nil, err
+	}
+	script, err := txscript.PayToAddrScript(da)
+	if err != nil {
+		return nil, err
+	}
+	return script, nil
+}
+
+// outputScriptToAddresses converts ScriptPubKey to bitcoin addresses
+func (p *SyscoinParser) outputScriptToAddresses(script []byte) ([]string, bool, error) {
+	if(string(script) == "burn"){
+		return []string{"burn", true, nil}
+	}
+	sc, addresses, _, err := txscript.ExtractPkScriptAddrs(script, p.Params)
+	if err != nil {
+		return nil, false, err
+	}
+	rv := make([]string, len(addresses))
+	for i, a := range addresses {
+		rv[i] = a.EncodeAddress()
+	}
+	var s bool
+	if sc == txscript.PubKeyHashTy || sc == txscript.WitnessV0PubKeyHashTy || sc == txscript.ScriptHashTy || sc == txscript.WitnessV0ScriptHashTy {
+		s = true
+	} else if len(rv) == 0 {
+		or := p.TryParseOPReturn(script)
+		if or != "" {
+			rv = []string{or}
+		}
+	}
+	return rv, s, nil
+}
+
+// GetAddrDescFromAddress returns internal address representation (descriptor) of given address
+func (p *SyscoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
+	return p.addressToOutputScript(address)
+}
+
+// GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
+func (p *SyscoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
+	return p.OutputScriptToAddressesFunc(addrDesc)
+}
 // TryGetOPReturn tries to process OP_RETURN script and return data
 func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	if len(script) > 1 && script[0] == txscript.OP_RETURN {
