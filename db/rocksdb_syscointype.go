@@ -98,6 +98,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		if !ok {
 			balanceAssetUnAllocatedSat = big.NewInt(0)
+			balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
 		}
 		valueSat := big.NewInt(asset.Balance)
 		balanceAssetUnAllocatedSat.Add(balanceAssetUnAllocatedSat, valueSat)
@@ -173,6 +174,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if !ok {
 			balanceAssetAllocatedSat = big.NewInt(0)
+			balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 		}
 		amount := big.NewInt(allocation.ValueSat)
 		balanceAssetAllocatedSat.Add(balanceAssetAllocatedSat, amount)
@@ -286,6 +288,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		sentAssetUnAllocatedSat, ok := balance.SentAssetUnAllocatedSat[assetGuid]
 		if !ok {
 			sentAssetUnAllocatedSat = big.NewInt(0)
+			balance.SentAssetUnAllocatedSat[assetGuid] = sentAssetUnAllocatedSat
 		}
 		balanceAssetUnAllocatedSat := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		balanceAssetUnAllocatedSat.Sub(balanceAssetUnAllocatedSat, totalAssetSentValue)
@@ -302,6 +305,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		sentAssetAllocatedSat, ok := balance.SentAssetAllocatedSat[assetGuid]
 		if !ok {
 			sentAssetAllocatedSat = big.NewInt(0)
+			balance.SentAssetAllocatedSat[assetGuid] = sentAssetAllocatedSat
 		}
 		balanceAssetAllocatedSat := balance.BalanceAssetAllocatedSat[assetGuid]
 		balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, totalAssetSentValue)
