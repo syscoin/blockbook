@@ -249,9 +249,9 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	l += ll
 	ab.SentAssetUnAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numSentAssetUnAllocatedSat; i++ {
-		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
+		key, ll := p.BaseParser.UnpackVaruint(buf[l:])
 		l += ll
-		value, lv := p.BaseParser.UnpackBigint(buf[l:])
+		value, ll := p.BaseParser.UnpackBigint(buf[l:])
 		ab.SentAssetUnAllocatedSat[uint32(key)] = &value
 		l += ll
 	}
