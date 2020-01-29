@@ -616,6 +616,15 @@ func (p *BitcoinParser) PackBlockInfo(block *bchain.DbBlockInfo) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
+	pl := p.BaseParser.PackedTxidLen()
+	if len(b) != pl {
+		glog.Warning("Non standard block hash for height ", block.Height, ", hash [", block.Hash, "]")
+		if len(b) > pl {
+			b = b[:pl]
+		} else {
+			b = append(b, make([]byte, len(b)-pl)...)
+		}
+	}
 	packed = append(packed, b...)
 	packed = append(packed, p.BaseParser.PackUint(uint32(block.Time))...)
 	l := p.BaseParser.PackVaruint(uint(block.Txs), varBuf)

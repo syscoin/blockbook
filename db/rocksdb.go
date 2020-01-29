@@ -1254,7 +1254,9 @@ func (d *RocksDB) loadBlockTimes() ([]uint32, error) {
 		if err != nil {
 			return nil, err
 		}
-		time = uint32(info.Time)
+		if info != nil {
+			time = uint32(info.Time)
+		}
 		times = append(times, time)
 	}
 	glog.Info("loaded ", len(times), " block times")
