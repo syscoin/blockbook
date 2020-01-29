@@ -86,14 +86,14 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		// transfer balance from old address to transfered address
 		if balanceTransfer.BalanceAssetUnAllocatedSat == nil{
-			balanceTransfer.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
+			balanceTransfer.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
 		}
 		valueSat := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = big.NewInt(valueSat.Int64())
 		valueSat.Set(big.NewInt(0))
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
-			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
+			balance.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
 		}
 		balanceAssetUnAllocatedSat := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		valueSat := big.NewInt(asset.Balance)
@@ -165,7 +165,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 
 		if balance.BalanceAssetAllocatedSat == nil {
-			balance.BalanceAssetAllocatedSat = map[uint32]big.Int{}
+			balance.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
 		}
 		balanceAssetAllocatedSat := balance.BalanceAssetAllocatedSat[assetGuid]
 		amount := big.NewInt(allocation.ValueSat)
@@ -275,10 +275,10 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	}
 	if d.chainParser.IsSyscoinAssetSend(version) {
 		if balance.SentAssetUnAllocatedSat == nil {
-			balance.SentAssetUnAllocatedSat = map[uint32]big.Int{}
+			balance.SentAssetUnAllocatedSat = map[uint32]*big.Int{}
 		}
 		if balance.BalanceAssetUnAllocatedSat == nil {
-			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
+			balance.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
 			glog.Warningf("ConnectAssetAllocationInput BalanceAssetUnAllocatedSat was nil on asset %v sender %v", assetGuid, assetStrSenderAddrDesc)
 		}	
 		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
@@ -292,10 +292,10 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 
 	} else {
 		if balance.SentAssetAllocatedSat == nil {
-			balance.SentAssetAllocatedSat = map[uint32]big.Int{}
+			balance.SentAssetAllocatedSat = map[uint32]*big.Int{}
 		}
 		if balance.BalanceAssetAllocatedSat == nil {
-			balance.BalanceAssetAllocatedSat = map[uint32]big.Int{}
+			balance.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
 			glog.Warningf("ConnectAssetAllocationInput BalanceAssetAllocatedSat was nil")
 		}
 		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
