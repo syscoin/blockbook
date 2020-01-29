@@ -18,8 +18,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		return err
 	}
 	assetGuid := asset.Asset
-	senderStr := asset.WitnessAddress.ToString("sys")
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddress.ToString("sys"))
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -31,6 +30,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		return errors.New("ConnectAssetOutput Skipping asset tx")
 	}
+	senderStr := string(assetSenderAddrDesc)
 	balance, e := balances[senderStr]
 	if !e {
 		balance, err = d.GetAddrDescBalance(assetSenderAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
@@ -53,8 +53,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 	}
 
 	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
-		transferStr := asset.WitnessAddressTransfer.ToString("sys")
-		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(transferStr)
+		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddressTransfer.ToString("sys"))
 		if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -66,6 +65,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			}
 			return errors.New("ConnectAssetOutput Skipping asset transfer tx")
 		}
+		transferStr := string(assetTransferWitnessAddrDesc)
 		balanceTransfer, e := balances[transferStr]
 		if !e {
 			balanceTransfer, err = d.GetAddrDescBalance(assetTransferWitnessAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
@@ -101,7 +101,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		if assetGuid == 135354521 {
 			glog.Warningf("asset tx %v assetGuid balance %v", assetGuid, balance.BalanceAssetUnAllocatedSat[assetGuid])
 			testbalance, _ := balances[senderStr]
-			glog.Warningf("new balance %v", testbalance.BalanceAssetUnAllocatedSat[assetGuid])
+			glog.Warningf("new balance %v on sender %v", testbalance.BalanceAssetUnAllocatedSat[assetGuid], senderStr)
 		}
 	}
 	return nil
@@ -117,8 +117,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	senderStr := assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys")
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys"))
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -130,9 +129,9 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		return errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
+	senderStr := string(assetSenderAddrDesc)
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
-		receiverStr := allocation.WitnessAddress.ToString("sys")
-		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverStr)
+		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.WitnessAddress.ToString("sys"))
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -144,8 +143,8 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			}
 			continue
 		}
-		strAddrDesc := string(addrDesc)
-		balance, e := balances[strAddrDesc]
+		receiverStr := string(addrDesc)
+		balance, e := balances[receiverStr]
 		if !e {
 			balance, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
@@ -154,14 +153,14 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			if balance == nil {
 				balance = &bchain.AddrBalance{}
 			}
-			balances[strAddrDesc] = balance
+			balances[receiverStr] = balance
 			d.cbs.balancesMiss++
 		} else {
 			d.cbs.balancesHit++
 		}
 
 		// for each address returned, add it to map
-		counted := addToAddressesMap(addresses, strAddrDesc, btxID, outputIndex)
+		counted := addToAddressesMap(addresses, receiverStr, btxID, outputIndex)
 		if !counted {
 			balance.Txs++
 		}
@@ -200,8 +199,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 	}
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	senderStr := assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys")
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys"))
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -213,9 +211,9 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		}
 		return errors.New("DisconnectAssetAllocationOutput Skipping disconnect asset allocation tx")
 	}
+	senderStr := string(assetSenderAddrDesc)
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
-		receiverStr := allocation.WitnessAddress.ToString("sys")
-		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverStr)
+		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.WitnessAddress.ToString("sys"))
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -227,10 +225,10 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 			}
 			continue
 		}
-		strAddrDesc := string(addrDesc)
-		_, exist := addresses[strAddrDesc]
+		receiverStr := string(addrDesc)
+		_, exist := addresses[receiverStr]
 		if !exist {
-			addresses[strAddrDesc] = struct{}{}
+			addresses[receiverStr] = struct{}{}
 		}
 		balance, err := getAddressBalance(addrDesc)
 		if err != nil {
@@ -284,7 +282,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		}
 		if balance.BalanceAssetUnAllocatedSat == nil {
 			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
-			glog.Warningf("ConnectAssetAllocationInput BalanceAssetUnAllocatedSat was nil")
+			glog.Warningf("ConnectAssetAllocationInput BalanceAssetUnAllocatedSat was nil on asset %v sender %v", assetGuid, assetStrSenderAddrDesc)
 		}	
 		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
 		balanceAssetUnAllocatedSat := balance.BalanceAssetUnAllocatedSat[assetGuid]
@@ -340,8 +338,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		return b, nil
 	}
 	assetGuid := asset.Asset
-	senderStr := asset.WitnessAddress.ToString("sys")
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderStr)
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddress.ToString("sys"))
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	_, exist := addresses[assetStrSenderAddrDesc]
 	if !exist {
@@ -361,11 +358,11 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		glog.Warningf("DisconnectAssetOutput Balance for asset address %s (%s) not found", ad, assetSenderAddrDesc)
 	}
 	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
-		transferStr := asset.WitnessAddressTransfer.ToString("sys")
-		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(transferStr)
-		_, exist := addresses[assetStrSenderAddrDesc]
+		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddressTransfer.ToString("sys"))
+		transferStr := string(assetTransferWitnessAddrDesc)
+		_, exist := addresses[transferStr]
 		if !exist {
-			addresses[assetStrSenderAddrDesc] = struct{}{}
+			addresses[transferStr] = struct{}{}
 		}
 		balanceTransfer, err := getAddressBalance(assetTransferWitnessAddrDesc)
 		if err != nil {
