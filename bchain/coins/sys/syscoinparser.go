@@ -9,6 +9,7 @@ import (
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"math/big"
+	"github.com/golang/glog"
 )
 
 // magic numbers
@@ -200,6 +201,9 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		value, l := p.BaseParser.UnpackBigint(buf[l:])
 		ab.BalanceAssetUnAllocatedSat[uint32(key)] = value
 	}	
+	if numSentAssetAllocatedSat > 0 || numBalanceAssetAllocatedSat > 0 ||  numSentAssetUnAllocatedSat > 0 || numBalanceAssetUnAllocatedSat > 0 {
+		glog.Warningf("UnpackAddrBalance numSentAssetAllocatedSat %v numBalanceAssetAllocatedSat %v numSentAssetUnAllocatedSat %v numBalanceAssetUnAllocatedSat %v",numSentAssetAllocatedSat, numBalanceAssetAllocatedSat, numSentAssetUnAllocatedSat, numBalanceAssetUnAllocatedSat)
+	}
 
 	if detail != bchain.AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
@@ -240,6 +244,9 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	buf = append(buf, varBuf[:l]...)
 	// pack asset balance information
 	l = p.BaseParser.PackVaruint(uint(len(ab.SentAssetAllocatedSat)), varBuf)
+	if len(ab.SentAssetAllocatedSat) > 0 || len(ab.BalanceAssetAllocatedSat) > 0 ||  len(ab.SentAssetUnAllocatedSat) > 0 || len(ab.BalanceAssetUnAllocatedSat) > 0 {
+		glog.Warningf("PackAddrBalance SentAssetAllocatedSat %v BalanceAssetAllocatedSat %v SentAssetUnAllocatedSat %v BalanceAssetUnAllocatedSat %v",ab.SentAssetAllocatedSat, ab.BalanceAssetAllocatedSat, ab.SentAssetUnAllocatedSat, ab.BalanceAssetUnAllocatedSat)
+	}
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.SentAssetAllocatedSat {
 		if value.Int64() > 0 {
