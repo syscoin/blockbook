@@ -538,7 +538,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 		return errors.New("DisconnectMintAssetOutput Skipping disconnect asset mint tx")
 	}
 	
-	addrDesc, err := d.chainParser.GetAddrDescFromAddress(mintasset.WitnessAddress.ToString("sys"))
+	addrDesc, err := d.chainParser.GetAddrDescFromAddress(mintasset.AssetAllocationTuple.WitnessAddress.ToString("sys"))
 	if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
