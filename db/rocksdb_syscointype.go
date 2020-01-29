@@ -438,7 +438,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 }
 func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32) error {
 	r := bytes.NewReader(sptData)
-	var mintasset = wire.MintSyscoinType
+	var mintasset wire.MintSyscoinType
 	err := mintasset.Deserialize(r)
 	if err != nil {
 		return err
