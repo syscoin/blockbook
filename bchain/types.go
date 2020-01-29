@@ -210,10 +210,10 @@ type AddrBalance struct {
 	BalanceSat big.Int
 	Utxos      []Utxo
 	utxosMap   map[string]int
-	SentAssetAllocatedSat map[uint32]*big.Int
-	BalanceAssetAllocatedSat map[uint32]*big.Int
-	SentAssetUnAllocatedSat map[uint32]*big.Int
-	BalanceAssetUnAllocatedSat map[uint32]*big.Int
+	SentAssetAllocatedSat map[uint32]big.Int
+	BalanceAssetAllocatedSat map[uint32]big.Int
+	SentAssetUnAllocatedSat map[uint32]big.Int
+	BalanceAssetUnAllocatedSat map[uint32]big.Int
 }
 
 

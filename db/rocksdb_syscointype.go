@@ -86,21 +86,17 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		// transfer balance from old address to transfered address
 		if balanceTransfer.BalanceAssetUnAllocatedSat == nil{
-			balanceTransfer.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
+			balanceTransfer.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
 		}
-		if valueSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]; ok {
-			balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = big.NewInt(valueSat.Int64())
-			valueSat.Set(big.NewInt(0))
+		valueSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
+		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = *big.NewInt(valueSat.Int64())
+		valueSat.Set(big.NewInt(0))
 		}
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
-			balance.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
+			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
 		}
-		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
-		if !ok {
-			balanceAssetUnAllocatedSat = big.NewInt(0)
-			balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
-		}
+		balanceAssetUnAllocatedSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
 		valueSat := big.NewInt(asset.Balance)
 		balanceAssetUnAllocatedSat.Add(balanceAssetUnAllocatedSat, valueSat)
 		if assetGuid == 135354521 {
@@ -172,13 +168,9 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 
 		if balance.BalanceAssetAllocatedSat == nil {
-			balance.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
+			balance.BalanceAssetAllocatedSat = map[uint32]big.Int{}
 		}
-		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
-		if !ok {
-			balanceAssetAllocatedSat = big.NewInt(0)
-			balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
-		}
+		balanceAssetAllocatedSat := &balance.BalanceAssetAllocatedSat[assetGuid]
 		amount := big.NewInt(allocation.ValueSat)
 		balanceAssetAllocatedSat.Add(balanceAssetAllocatedSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
@@ -255,17 +247,13 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		}
 
 		if balance.BalanceAssetAllocatedSat != nil{
-			balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
-			if ok {
-				amount := big.NewInt(allocation.ValueSat)
-				balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, amount)
-				if balanceAssetAllocatedSat.Sign() < 0 {
-					d.resetValueSatToZero(balanceAssetAllocatedSat, addrDesc, "balance")
-				}
-				totalAssetSentValue.Add(totalAssetSentValue, amount)
-			} else {
-				glog.Warningf("DisconnectAssetAllocationOutput Asset Balance for guid %v (%v) not found", assetGuid, addrDesc)
+			balanceAssetAllocatedSat := &balance.BalanceAssetAllocatedSat[assetGuid]
+			amount := big.NewInt(allocation.ValueSat)
+			balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, amount)
+			if balanceAssetAllocatedSat.Sign() < 0 {
+				d.resetValueSatToZero(balanceAssetAllocatedSat, addrDesc, "balance")
 			}
+			totalAssetSentValue.Add(totalAssetSentValue, amount)
 		} else {
 			ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
 			glog.Warningf("DisconnectAssetAllocationOutput Asset Balance for asset address %v (%v) not found", ad, addrDesc)
@@ -292,22 +280,14 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	}
 	if d.chainParser.IsSyscoinAssetSend(version) {
 		if balance.SentAssetUnAllocatedSat == nil {
-			balance.SentAssetUnAllocatedSat = map[uint32]*big.Int{}
+			balance.SentAssetUnAllocatedSat = map[uint32]big.Int{}
 		}
 		if balance.BalanceAssetUnAllocatedSat == nil {
-			balance.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
+			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
 			glog.Warningf("ConnectAssetAllocationInput BalanceAssetUnAllocatedSat was nil")
 		}	
-		sentAssetUnAllocatedSat, ok := balance.SentAssetUnAllocatedSat[assetGuid]
-		if !ok {
-			sentAssetUnAllocatedSat = big.NewInt(0)
-			balance.SentAssetUnAllocatedSat[assetGuid] = sentAssetUnAllocatedSat
-		}
-		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
-		if !ok {
-			balanceAssetUnAllocatedSat = big.NewInt(0)
-			balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
-		}
+		sentAssetUnAllocatedSat := &balance.SentAssetUnAllocatedSat[assetGuid]
+		balanceAssetUnAllocatedSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
 		balanceAssetUnAllocatedSat.Sub(balanceAssetUnAllocatedSat, totalAssetSentValue)
 		sentAssetUnAllocatedSat.Add(sentAssetUnAllocatedSat, totalAssetSentValue)
 		if balanceAssetUnAllocatedSat.Sign() < 0 {
@@ -316,22 +296,14 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		}
 	} else {
 		if balance.SentAssetAllocatedSat == nil {
-			balance.SentAssetAllocatedSat = map[uint32]*big.Int{}
+			balance.SentAssetAllocatedSat = map[uint32]big.Int{}
 		}
 		if balance.BalanceAssetAllocatedSat == nil {
-			balance.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
+			balance.BalanceAssetAllocatedSat = map[uint32]big.Int{}
 			glog.Warningf("ConnectAssetAllocationInput BalanceAssetAllocatedSat was nil")
 		}
-		sentAssetAllocatedSat, ok := balance.SentAssetAllocatedSat[assetGuid]
-		if !ok {
-			sentAssetAllocatedSat = big.NewInt(0)
-			balance.SentAssetAllocatedSat[assetGuid] = sentAssetAllocatedSat
-		}
-		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
-		if !ok {
-			balanceAssetAllocatedSat = big.NewInt(0)
-			balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
-		}
+		sentAssetAllocatedSat := &balance.SentAssetAllocatedSat[assetGuid]
+		balanceAssetAllocatedSat := &balance.BalanceAssetAllocatedSat[assetGuid]
 		balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, totalAssetSentValue)
 		sentAssetAllocatedSat.Add(sentAssetAllocatedSat, totalAssetSentValue)
 		if balanceAssetAllocatedSat.Sign() < 0 {
@@ -409,15 +381,13 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 			valueSat.Set(big.NewInt(0))
 		}
 	} else if balance.SentAssetUnAllocatedSat != nil {
-		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
-		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
-		if ok {
-			valueSat := big.NewInt(asset.Balance)
-			balanceAssetUnAllocatedSat.Add(balanceAssetUnAllocatedSat, valueSat)
-			sentAssetUnAllocatedSat.Sub(sentAssetUnAllocatedSat, valueSat)
-			if sentAssetUnAllocatedSat.Sign() < 0 {
-				d.resetValueSatToZero(sentAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
-			}
+		sentAssetUnAllocatedSat := &balance.SentAssetUnAllocatedSat[assetGuid]
+		balanceAssetUnAllocatedSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
+		valueSat := big.NewInt(asset.Balance)
+		balanceAssetUnAllocatedSat.Add(balanceAssetUnAllocatedSat, valueSat)
+		sentAssetUnAllocatedSat.Sub(sentAssetUnAllocatedSat, valueSat)
+		if sentAssetUnAllocatedSat.Sign() < 0 {
+			d.resetValueSatToZero(sentAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
 		} else {
 			glog.Warningf("DisconnectAssetOutput: Asset balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
 		}
@@ -442,31 +412,23 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	}
 	if d.chainParser.IsSyscoinAssetSend(version) {
 		if balance.SentAssetUnAllocatedSat != nil {
-			sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
-			balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
-			if ok {	
-				balanceAssetUnAllocatedSat.Add(balanceAssetUnAllocatedSat, totalAssetSentValue)
-				sentAssetUnAllocatedSat.Sub(sentAssetUnAllocatedSat, totalAssetSentValue)
-				if sentAssetUnAllocatedSat.Sign() < 0 {
-					d.resetValueSatToZero(sentAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
-				}
-			} else {
-				glog.Warningf("DisconnectAssetAllocationInput: AssetSend UnAllocated balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
+			sentAssetUnAllocatedSat := &balance.SentAssetUnAllocatedSat[assetGuid]
+			balanceAssetUnAllocatedSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
+			balanceAssetUnAllocatedSat.Add(balanceAssetUnAllocatedSat, totalAssetSentValue)
+			sentAssetUnAllocatedSat.Sub(sentAssetUnAllocatedSat, totalAssetSentValue)
+			if sentAssetUnAllocatedSat.Sign() < 0 {
+				d.resetValueSatToZero(sentAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
 			}
 		} else {
 			glog.Warningf("DisconnectAssetAllocationInput: AssetSend SentUnAllocated balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
 		}
 	} else if balance.SentAssetAllocatedSat != nil {
-		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
-		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
-		if ok {	
-			balanceAssetAllocatedSat.Add(balanceAssetAllocatedSat, totalAssetSentValue)
-			sentAssetAllocatedSat.Sub(sentAssetAllocatedSat, totalAssetSentValue)
-			if sentAssetAllocatedSat.Sign() < 0 {
-				d.resetValueSatToZero(sentAssetAllocatedSat, assetSenderAddrDesc, "balance")
-			}
-		} else {
-			glog.Warningf("DisconnectAssetAllocationInput: Asset Allocated balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
+		sentAssetAllocatedSat := &balance.SentAssetAllocatedSat[assetGuid]
+		balanceAssetAllocatedSat := &balance.BalanceAssetAllocatedSat[assetGuid]
+		balanceAssetAllocatedSat.Add(balanceAssetAllocatedSat, totalAssetSentValue)
+		sentAssetAllocatedSat.Sub(sentAssetAllocatedSat, totalAssetSentValue)
+		if sentAssetAllocatedSat.Sign() < 0 {
+			d.resetValueSatToZero(sentAssetAllocatedSat, assetSenderAddrDesc, "balance")
 		}
 	} else {
 		glog.Warningf("DisconnectAssetAllocationInput: Asset Sent Allocated balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
