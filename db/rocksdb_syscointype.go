@@ -439,7 +439,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32) error {
 	r := bytes.NewReader(sptData)
 	var mintasset = wire.MintSyscoinType
-	err := asset.Deserialize(r)
+	err := mintasset.Deserialize(r)
 	if err != nil {
 		return err
 	}
@@ -449,10 +449,10 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 			if err != bchain.ErrAddressMissing {
-				glog.Warningf("ConnectMintAssetOutput sender with asset %v (%v) could not be decoded error %v", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys"), err)
+				glog.Warningf("ConnectMintAssetOutput sender with asset %v (%v) could not be decoded error %v", assetGuid, mintasset.AssetAllocationTuple.WitnessAddress.ToString("sys"), err)
 			}
 		} else {
-			glog.Warningf("ConnectMintAssetOutput sender with asset %v (%v) has invalid length: %d", assetGuid, assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys"), len(assetSenderAddrDesc))
+			glog.Warningf("ConnectMintAssetOutput sender with asset %v (%v) has invalid length: %d", assetGuid, mintasset.AssetAllocationTuple.WitnessAddress.ToString("sys"), len(assetSenderAddrDesc))
 		}
 		return errors.New("ConnectMintAssetOutput Skipping asset mint tx")
 	}
@@ -461,12 +461,12 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		if err != nil {
 			// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 			if err != bchain.ErrAddressMissing {
-				glog.Warningf("ConnectMintAssetOutput receiver with asset %v (%v) could not be decoded error %v", assetGuid, allocation.WitnessAddress.ToString("sys"), err)
+				glog.Warningf("ConnectMintAssetOutput receiver with asset %v (%v) could not be decoded error %v", assetGuid, mintasset.AssetAllocationTuple.WitnessAddress.ToString("sys"), err)
 			}
 		} else {
-			glog.Warningf("ConnectMintAssetOutput receiver with asset %v (%v) has invalid length: %d", assetGuid, allocation.WitnessAddress.ToString("sys"), len(addrDesc))
+			glog.Warningf("ConnectMintAssetOutput receiver with asset %v (%v) has invalid length: %d", assetGuid, mintasset.AssetAllocationTuple.WitnessAddress.ToString("sys"), len(addrDesc))
 		}
-		continue
+		return errors.New("ConnectMintAssetOutput Skipping asset mint tx")
 	}
 	receiverStr := string(addrDesc)
 	balance, e := balances[receiverStr]
@@ -498,7 +498,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		balanceAssetAllocatedSat = big.NewInt(0)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
-	amount := big.NewInt(mintassetallocation.ValueSat)
+	amount := big.NewInt(mintasset.ValueSat)
 	balanceAssetAllocatedSat.Add(balanceAssetAllocatedSat, amount)
 	
 	
@@ -548,7 +548,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 		} else {
 			glog.Warningf("DisconnectMintAssetOutput receiver with asset %v (%v) has invalid length: %d", assetGuid, string(addrDesc), len(addrDesc))
 		}
-		continue
+		return errors.New("DisconnectMintAssetOutput Skipping disconnect asset mint tx")
 	}
 	receiverStr := string(addrDesc)
 	_, exist := addresses[receiverStr]
@@ -571,8 +571,8 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	var totalAssetSentValue *big.Int
 	if balance.BalanceAssetAllocatedSat != nil{
 		balanceAssetAllocatedSat := balance.BalanceAssetAllocatedSat[assetGuid]
-		totalAssetSentValue := big.NewInt(allocation.ValueSat)
-		balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, amount)
+		totalAssetSentValue := big.NewInt(mintasset.ValueSat)
+		balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, totalAssetSentValue)
 		if balanceAssetAllocatedSat.Sign() < 0 {
 			d.resetValueSatToZero(balanceAssetAllocatedSat, addrDesc, "balance")
 		}
