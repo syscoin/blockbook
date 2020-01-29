@@ -688,6 +688,7 @@ func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*bchain
 	// allocate buffer initial buffer
 	buf := make([]byte, 1024)
 	varBuf := make([]byte, d.chainParser.MaxPackedBigintBytes())
+	glog.Warning("storeBalances size %v", len(abm))
 	for addrDesc, ab := range abm {
 		// balance with 0 transactions is removed from db - happens on disconnect
 		if ab == nil || ab.Txs <= 0 {
