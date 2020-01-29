@@ -7,7 +7,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
-	"encoding/hex"
 )
 
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32) error {
