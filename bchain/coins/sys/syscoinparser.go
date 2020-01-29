@@ -296,7 +296,7 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	buf = append(buf, varBuf[:l]...)
 	
 	// pack asset balance information
-	var countSentAssetAllocatedSat uint := 0
+	var countSentAssetAllocatedSat uint = 0
 	for _, value := range ab.SentAssetAllocatedSat {
 		if value.Int64() > 0 {
 			countSentAssetAllocatedSat++
@@ -312,7 +312,7 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	var countBalanceAssetAllocatedSat uint := 0
+	var countBalanceAssetAllocatedSat uint = 0
 	for _, value := range ab.BalanceAssetAllocatedSat {
 		if value.Int64() > 0 {
 			countBalanceAssetAllocatedSat++
@@ -328,7 +328,7 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	var countSentAssetUnAllocatedSat uint := 0
+	var countSentAssetUnAllocatedSat uint = 0
 	for _, value := range ab.SentAssetUnAllocatedSat {
 		if value.Int64() > 0 {
 			countSentAssetUnAllocatedSat++
@@ -344,7 +344,7 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	var countBalanceAssetUnAllocatedSat uint := 0
+	var countBalanceAssetUnAllocatedSat uint = 0
 	for _, value := range ab.BalanceAssetUnAllocatedSat {
 		if value.Int64() > 0 {
 			countBalanceAssetUnAllocatedSat++
