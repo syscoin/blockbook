@@ -229,37 +229,41 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	l += ll
 	ab.SentAssetAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numSentAssetAllocatedSat; i++ {
-		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
-		value, lv := p.BaseParser.UnpackBigint(buf[l:])
+		key, ll := p.BaseParser.UnpackVaruint(buf[l:])
+		l += ll
+		value, ll := p.BaseParser.UnpackBigint(buf[l:])
 		ab.SentAssetAllocatedSat[uint32(key)] = &value
-		l += lk + lv
+		l += ll
 	}
 	numBalanceAssetAllocatedSat, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	ab.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numBalanceAssetAllocatedSat; i++ {
-		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
-		value, lv := p.BaseParser.UnpackBigint(buf[l:])
+		key, ll := p.BaseParser.UnpackVaruint(buf[l:])
+		l += ll
+		value, ll := p.BaseParser.UnpackBigint(buf[l:])
 		ab.BalanceAssetAllocatedSat[uint32(key)] = &value
-		l += lk + lv
+		l += ll
 	}
 	numSentAssetUnAllocatedSat, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	ab.SentAssetUnAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numSentAssetUnAllocatedSat; i++ {
 		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
+		l += ll
 		value, lv := p.BaseParser.UnpackBigint(buf[l:])
 		ab.SentAssetUnAllocatedSat[uint32(key)] = &value
-		l += lk + lv
+		l += ll
 	}
 	numBalanceAssetUnAllocatedSat, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	ab.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
 	for i := uint(0); i < numBalanceAssetUnAllocatedSat; i++ {
-		key, lk := p.BaseParser.UnpackVaruint(buf[l:])
-		value, lv := p.BaseParser.UnpackBigint(buf[l:])
+		key, ll := p.BaseParser.UnpackVaruint(buf[l:])
+		l += ll
+		value, ll := p.BaseParser.UnpackBigint(buf[l:])
 		ab.BalanceAssetUnAllocatedSat[uint32(key)] = &value
-		l += lk + lv
+		l += ll
 	}	
 	if numSentAssetAllocatedSat > 0 || numBalanceAssetAllocatedSat > 0 ||  numSentAssetUnAllocatedSat > 0 || numBalanceAssetUnAllocatedSat > 0 {
 		glog.Warningf("UnpackAddrBalance numSentAssetAllocatedSat %v numBalanceAssetAllocatedSat %v numSentAssetUnAllocatedSat %v numBalanceAssetUnAllocatedSat %v",numSentAssetAllocatedSat, numBalanceAssetAllocatedSat, numSentAssetUnAllocatedSat, numBalanceAssetUnAllocatedSat)
