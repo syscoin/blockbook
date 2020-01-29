@@ -71,7 +71,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			if err != nil {
 				return err
 			}
-			if balance == nil {
+			if balanceTransfer == nil {
 				balanceTransfer = &bchain.AddrBalance{}
 			}
 			balances[transferStr] = balanceTransfer
