@@ -46,10 +46,10 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		d.cbs.balancesHit++
 	}
 
-	// for each address returned, add it to map
 	counted := addToAddressesMap(addresses, senderStr, btxID, outputIndex)
 	if !counted {
 		balance.Txs++
+		glog.Warningf("asset output tx goes up %v", balance.Txs)
 	}
 
 	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {

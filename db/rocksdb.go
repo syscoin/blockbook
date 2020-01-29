@@ -691,8 +691,10 @@ func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*bchain
 	for addrDesc, ab := range abm {
 		// balance with 0 transactions is removed from db - happens on disconnect
 		if ab == nil || ab.Txs <= 0 {
+			glog.Warning("txs <= 0")
 			wb.DeleteCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc))
 		} else {
+			glog.Warning("storeBalances packing")
 			buf = d.chainParser.PackAddrBalance(ab, buf, varBuf)
 			wb.PutCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc), buf)
 		}
