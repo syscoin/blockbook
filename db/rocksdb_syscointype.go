@@ -91,7 +91,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		valueSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
 		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = *big.NewInt(valueSat.Int64())
 		valueSat.Set(big.NewInt(0))
-		}
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
 			balance.BalanceAssetUnAllocatedSat = map[uint32]big.Int{}
@@ -376,10 +375,10 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 			glog.Warningf("DisconnectAssetOutput Balance for transfer asset address %s (%s) not found", ad, assetTransferWitnessAddrDesc)
 		}
 		// transfer values back to original owner and 0 out the
-		if valueSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]; ok {
-			balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = big.NewInt(valueSat.Int64())
-			valueSat.Set(big.NewInt(0))
-		}
+		valueSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
+		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = *big.NewInt(valueSat.Int64())
+		valueSat.Set(big.NewInt(0))
+		
 	} else if balance.SentAssetUnAllocatedSat != nil {
 		sentAssetUnAllocatedSat := &balance.SentAssetUnAllocatedSat[assetGuid]
 		balanceAssetUnAllocatedSat := &balance.BalanceAssetUnAllocatedSat[assetGuid]
