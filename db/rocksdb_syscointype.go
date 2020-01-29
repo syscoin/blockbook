@@ -129,7 +129,6 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		return errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
-	senderStr := string(assetSenderAddrDesc)
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.WitnessAddress.ToString("sys"))
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
@@ -211,7 +210,6 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		}
 		return errors.New("DisconnectAssetAllocationOutput Skipping disconnect asset allocation tx")
 	}
-	senderStr := string(assetSenderAddrDesc)
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(allocation.WitnessAddress.ToString("sys"))
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
