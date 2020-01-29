@@ -49,7 +49,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 	counted := addToAddressesMap(addresses, senderStr, btxID, outputIndex)
 	if !counted {
 		balance.Txs++
-		glog.Warningf("asset output tx goes up %v", balance.Txs)
 	}
 
 	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
@@ -65,6 +64,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			}
 			return errors.New("ConnectAssetOutput Skipping asset transfer tx")
 		}
+		glog.Warningf("transfering asset %v to %v from %v", assetGuid, asset.WitnessAddressTransfer.ToString("sys"), asset.WitnessAddress.ToString("sys"))
 		transferStr := string(assetTransferWitnessAddrDesc)
 		balanceTransfer, e := balances[transferStr]
 		if !e {
@@ -91,6 +91,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		valueSat := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = big.NewInt(valueSat.Int64())
 		valueSat.Set(big.NewInt(0))
+		glog.Warningf("transfer done asset %v to %v from %v new balance on sender %v", assetGuid, asset.WitnessAddressTransfer.ToString("sys"), asset.WitnessAddress.ToString("sys"), balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid])
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
 			balance.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
@@ -102,11 +103,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		valueSat := big.NewInt(asset.Balance)
 		balanceAssetUnAllocatedSat.Add(balanceAssetUnAllocatedSat, valueSat)
-		if assetGuid == 135354521 {
-			glog.Warningf("asset tx %v assetGuid balance %v", assetGuid, balance.BalanceAssetUnAllocatedSat[assetGuid])
-			testbalance, _ := balances[senderStr]
-			glog.Warningf("new balance %v on sender %v", testbalance.BalanceAssetUnAllocatedSat[assetGuid], senderStr)
-		}
 	}
 	return nil
 }
@@ -294,7 +290,6 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		balanceAssetUnAllocatedSat.Sub(balanceAssetUnAllocatedSat, totalAssetSentValue)
 		sentAssetUnAllocatedSat.Add(sentAssetUnAllocatedSat, totalAssetSentValue)
 		if balanceAssetUnAllocatedSat.Sign() < 0 {
-			glog.Warningf("ConnectAssetAllocationInput asset send negative assetguid %v txid %v", assetGuid, hex.EncodeToString(btxID))
 			d.resetValueSatToZero(balanceAssetUnAllocatedSat, assetSenderAddrDesc, "balance")
 		}
 
