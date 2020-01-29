@@ -90,6 +90,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		valueSat := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid] = big.NewInt(valueSat.Int64())
 		valueSat.Set(big.NewInt(0))
+		balance.BalanceAssetUnAllocatedSat[assetGuid] = valueSat
 		glog.Warningf("transfer done asset %v to %v from %v new balance on sender %v", assetGuid, asset.WitnessAddressTransfer.ToString("sys"), asset.WitnessAddress.ToString("sys"), balanceTransfer.BalanceAssetUnAllocatedSat[assetGuid])
 	} else {
 		if balance.BalanceAssetUnAllocatedSat == nil{
