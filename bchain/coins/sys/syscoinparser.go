@@ -162,7 +162,7 @@ func (p *SyscoinParser) addressToOutputScript(address string) ([]byte, error) {
 // outputScriptToAddresses converts ScriptPubKey to bitcoin addresses
 func (p *SyscoinParser) outputScriptToAddresses(script []byte) ([]string, bool, error) {
 	if(string(script) == "burn"){
-		return []string{"burn", true, nil}
+		return []string{"burn"}, true, nil
 	}
 	sc, addresses, _, err := txscript.ExtractPkScriptAddrs(script, p.Params)
 	if err != nil {
