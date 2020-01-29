@@ -298,7 +298,11 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 			balance.BalanceAssetUnAllocatedSat = map[uint32]*big.Int{}
 			glog.Warningf("ConnectAssetAllocationInput BalanceAssetUnAllocatedSat was nil")
 		}	
-		sentAssetUnAllocatedSat := balance.SentAssetUnAllocatedSat[assetGuid]
+		sentAssetUnAllocatedSat, ok := balance.SentAssetUnAllocatedSat[assetGuid]
+		if !ok {
+			sentAssetUnAllocatedSat = big.NewInt(0)
+			balance.SentAssetUnAllocatedSat[assetGuid] = sentAssetUnAllocatedSat
+		}
 		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		if !ok {
 			balanceAssetUnAllocatedSat = big.NewInt(0)
@@ -318,7 +322,11 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 			balance.BalanceAssetAllocatedSat = map[uint32]*big.Int{}
 			glog.Warningf("ConnectAssetAllocationInput BalanceAssetAllocatedSat was nil")
 		}
-		sentAssetAllocatedSat := balance.SentAssetAllocatedSat[assetGuid]
+		sentAssetAllocatedSat, ok := balance.SentAssetAllocatedSat[assetGuid]
+		if !ok {
+			sentAssetAllocatedSat = big.NewInt(0)
+			balance.SentAssetAllocatedSat[assetGuid] = sentAssetAllocatedSat
+		}
 		balanceAssetAllocatedSat, ok := balance.BalanceAssetAllocatedSat[assetGuid]
 		if !ok {
 			balanceAssetAllocatedSat = big.NewInt(0)
