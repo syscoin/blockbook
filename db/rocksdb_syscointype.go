@@ -498,7 +498,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		balanceAssetAllocatedSat = big.NewInt(0)
 		balance.BalanceAssetAllocatedSat[assetGuid] = balanceAssetAllocatedSat
 	}
-	amount := big.NewInt(mintasset.ValueSat)
+	amount := big.NewInt(mintasset.ValueAsset)
 	balanceAssetAllocatedSat.Add(balanceAssetAllocatedSat, amount)
 	
 	
@@ -571,7 +571,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	var totalAssetSentValue *big.Int
 	if balance.BalanceAssetAllocatedSat != nil{
 		balanceAssetAllocatedSat := balance.BalanceAssetAllocatedSat[assetGuid]
-		totalAssetSentValue := big.NewInt(mintasset.ValueSat)
+		totalAssetSentValue := big.NewInt(mintasset.ValueAsset)
 		balanceAssetAllocatedSat.Sub(balanceAssetAllocatedSat, totalAssetSentValue)
 		if balanceAssetAllocatedSat.Sign() < 0 {
 			d.resetValueSatToZero(balanceAssetAllocatedSat, addrDesc, "balance")
