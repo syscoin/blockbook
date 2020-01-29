@@ -96,11 +96,11 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		balanceAssetUnAllocatedSat, ok := balance.BalanceAssetUnAllocatedSat[assetGuid]
 		if !ok {
-			balanceAssetUnAllocatedSat.Set(big.NewInt(0))
+			balance.BalanceAssetUnAllocatedSat[assetGuid].Set(big.NewInt(0))
 		}
 		valueSat := big.NewInt(asset.Balance)
-		balanceAssetUnAllocatedSat.Add(&balanceAssetUnAllocatedSat, valueSat)
-		balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
+		balance.BalanceAssetUnAllocatedSat[assetGuid].Add(&balance.BalanceAssetUnAllocatedSat[assetGuid], valueSat)
+		//balance.BalanceAssetUnAllocatedSat[assetGuid] = balanceAssetUnAllocatedSat
 		if assetGuid == 135354521 {
 			glog.Warningf("asset tx %v assetGuid balance %v", assetGuid, balance.BalanceAssetUnAllocatedSat[assetGuid])
 			testbalance, _ := balances[senderStr]
