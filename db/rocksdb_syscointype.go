@@ -65,8 +65,8 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		glog.Warningf("transfering asset %v to %v from %v", assetGuid, asset.WitnessAddressTransfer.ToString("sys"), asset.WitnessAddress.ToString("sys"))
 		transferStr := string(assetTransferWitnessAddrDesc)
-		balanceTransfer, e := balances[transferStr]
-		if !e {
+		balanceTransfer, e1 := balances[transferStr]
+		if !e1 {
 			balanceTransfer, err = d.GetAddrDescBalance(assetTransferWitnessAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return err
