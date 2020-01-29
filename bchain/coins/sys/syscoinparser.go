@@ -8,6 +8,7 @@ import (
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
+	"github.com/martinboehm/btcutil"
 	"math/big"
 	"github.com/golang/glog"
 )
@@ -144,8 +145,9 @@ func (p *SyscoinParser) IsSyscoinAssetSend(nVersion int32) bool {
 
 // addressToOutputScript converts bitcoin address to ScriptPubKey
 func (p *SyscoinParser) addressToOutputScript(address string) ([]byte, error) {
-	if(address == "burn")
+	if(address == "burn") {
 		return []byte("burn"), nil
+	}
 	da, err := btcutil.DecodeAddress(address, p.Params)
 	if err != nil {
 		return nil, err
