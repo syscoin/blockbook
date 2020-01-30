@@ -225,6 +225,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 		ab.AssetBalances = make(map[uint32]*bchain.AssetBalance, numAssetBalances)
 		for i := uint(0); i < numAssetBalances; i++ {
 			asset, ll := p.BaseParser.UnpackVaruint(buf[l:])
+			l += ll
 			balancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
 			sentvalue, ll := p.BaseParser.UnpackBigint(buf[l:])
