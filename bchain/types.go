@@ -225,24 +225,15 @@ func (ab *AddrBalance) ReceivedSat() *big.Int {
 	r.Add(&ab.BalanceSat, &ab.SentSat)
 	return &r
 }
-// calc asset allocated received per asset guid
-func (ab *AddrBalance) ReceivedAssetAllocatedSat(assetGuid uint32) *big.Int {
+// calc asset received per asset guid
+func (ab *AddrBalance) ReceivedAssetSat(assetGuid uint32) *big.Int {
 	var r big.Int
 	if balance, ok := ab.AssetBalances[assetGuid]; ok {
-		r.Add(balance.BalanceAssetAllocatedSat, balance.SentAssetAllocatedSat)
+		r.Add(balance.BalanceAssetSat, balance.SentAssetSat)
 	}
 	return &r
 }
-// calc asset non-allocated received(minted) per asset guid
-func (ab *AddrBalance) ReceivedAssetUnAllocatedSat(assetGuid uint32) *big.Int {
-	var r big.Int
-	if balanceAssetUnAllocatedSat, okb := ab.BalanceAssetUnAllocatedSat[assetGuid]; okb {
-		if sentAssetUnAllocatedSat, oks := ab.SentAssetUnAllocatedSat[assetGuid]; oks {
-			r.Add(balanceAssetUnAllocatedSat, sentAssetUnAllocatedSat)
-		}
-	}
-	return &r
-}
+
 
 // AddUtxo
 func (ab *AddrBalance) AddUtxo(u *Utxo) {
