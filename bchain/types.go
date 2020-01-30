@@ -202,6 +202,11 @@ type Utxo struct {
 	Height   uint32
 	ValueSat big.Int
 }
+// holds balance information for an asset indexed by a uint32 asset guid
+type AssetBalance {
+	SentAssetAllocatedSat big.Int
+	BalanceAssetAllocatedSat big.Int
+}
 
 // AddrBalance stores number of transactions and balances of an address
 type AddrBalance struct {
@@ -210,10 +215,7 @@ type AddrBalance struct {
 	BalanceSat big.Int
 	Utxos      []Utxo
 	utxosMap   map[string]int
-	SentAssetAllocatedSat map[uint32]*big.Int
-	BalanceAssetAllocatedSat map[uint32]*big.Int
-	SentAssetUnAllocatedSat map[uint32]*big.Int
-	BalanceAssetUnAllocatedSat map[uint32]*big.Int
+	AssetBalances map[uint32]*AssetBalance
 }
 
 
@@ -226,10 +228,8 @@ func (ab *AddrBalance) ReceivedSat() *big.Int {
 // calc asset allocated received per asset guid
 func (ab *AddrBalance) ReceivedAssetAllocatedSat(assetGuid uint32) *big.Int {
 	var r big.Int
-	if balanceAssetAllocatedSat, okb := ab.BalanceAssetAllocatedSat[assetGuid]; okb {
-		if sentAssetAllocatedSat, oks := ab.SentAssetAllocatedSat[assetGuid]; oks {
-			r.Add(balanceAssetAllocatedSat, sentAssetAllocatedSat)
-		}
+	if balance, ok := ab.AssetBalances[assetGuid]; ok {
+		r.Add(balance.BalanceAssetAllocatedSat, balance.SentAssetAllocatedSat)
 	}
 	return &r
 }
