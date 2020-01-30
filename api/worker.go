@@ -296,7 +296,38 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			Nonce:    ethTxData.Nonce,
 			Status:   ethTxData.Status,
 		}
-	}
+	/*} else if w.chainType == bchain.ChainSyscoinType && w.chainParser.IsSyscoinTx(bchainTx.Version) {
+		sts, err := w.chainParser.SyscoinTypeGetSPTFromTx(bchainTx)
+		if err != nil {
+			glog.Errorf("SyscoinTypeGetSPTFromTx error %v, %v", err, bchainTx)
+		}
+		tokens = make([]TokenTransfer, len(sts))
+		for i := range sts {
+			s := &sts[i]
+			cd, err := w.chainParser.GetAddrDescFromAddress(e.AssetGuid)
+			if err != nil {
+				glog.Errorf("GetAddrDescFromAddress error %v, spt %v", err, s.AssetGuid)
+				continue
+			}
+			sptc, err := w.chain.SyscoinTypeGetSPTInfo(cd)
+			if err != nil {
+				glog.Errorf("SyscoinTypeGetSPTInfo error %v, spt %v", err, s.AssetGuid)
+			}
+			if sptc == nil {
+				sptc = &bchain.SPTContract{Name: s.AssetGuid}
+			}
+			tokens[i] = TokenTransfer{
+				Type:     SPTTokenType,
+				Token:    s.AssetGuid,
+				From:     s.From,
+				To:       s.To,
+				Decimals: sptc.Decimals,
+				Value:    (*Amount)(&s.ValueSat),
+				Name:     sptc.Name,
+				Symbol:   sptc.Symbol,
+			}
+		}
+	}*/
 	// for now do not return size, we would have to compute vsize of segwit transactions
 	// size:=len(bchainTx.Hex) / 2
 	var sj json.RawMessage
@@ -780,6 +811,23 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if w.chainType == bchain.ChainBitcoinType {
 		totalReceived = ba.ReceivedSat()
 		totalSent = &ba.SentSat
+	} else if w.chainType == bchain.ChainSyscoinType && option > AccountDetailsBasic {
+		transfers := int(ba.balance.Txs)
+		for k, v := range ba.balance.AssetBalances {
+			totalReceived := balance.Add(v.BalanceAssetSat, v.SentAssetSat)
+			// add token as unallocated if address matches asset owner address other wise its allocated
+			tokens = append(tokens, Token{
+				Type:             SPTAllocatedTokenType,
+				Name:             address,
+				Decimals:         w.chainParser.AmountDecimals(),
+				Symbol:			  "SPT",
+				BalanceSat:       (*Amount)(v.BalanceAssetSat),
+				TotalReceivedSat: (*Amount)(totalReceived),
+				TotalSentSat:     (*Amount)(v.SentAssetSat),
+				Transfers:        transfers,
+				Contract:		  k,
+			})
+		}
 	}
 	r := &Address{
 		Paging:                pg,

@@ -230,8 +230,8 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 	if ad.balance != nil {
 		transfers := int(ad.balance.Txs)
 		if option >= AccountDetailsTokenBalances {
-			balance := ad.balance.BalanceSat
-			totalSent := ad.balance.SentSat
+			balance := &ad.balance.BalanceSat
+			totalSent := &ad.balance.SentSat
 			totalReceived := ad.balance.ReceivedSat()
 			tokens = append(tokens, Token{
 				Type:             XPUBAddressTokenType,
@@ -244,16 +244,16 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 			})
 			for k, v := range ad.balance.AssetBalances {
-				totalReceived := balance.Add(v.BalanceAssetSat, v.SentAssetSat)
+				totalReceived := v.BalanceAssetSat.Add(v.BalanceAssetSat, v.SentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
 				tokens = append(tokens, Token{
 					Type:             SPTAllocatedTokenType,
 					Name:             address,
 					Decimals:         w.chainParser.AmountDecimals(),
 					Symbol:			  "SPT",
-					BalanceSat:       (*Amount)(v.BalanceAssetSat),
-					TotalReceivedSat: (*Amount)(totalReceived),
-					TotalSentSat:     (*Amount)(v.SentAssetSat),
+					BalanceSat:       (*Amount)(&v.BalanceAssetSat),
+					TotalReceivedSat: (*Amount)(&totalReceived),
+					TotalSentSat:     (*Amount)(&v.SentAssetSat),
 					Transfers:        transfers,
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  k,
