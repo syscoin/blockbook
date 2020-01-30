@@ -813,11 +813,10 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalSent = &ba.SentSat
 	} 
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
-		transfers := int(ba.Txs)
 		for k, v := range ba.AssetBalances {
 			balanceAssetSat := &v.BalanceAssetSat
 			sentAssetSat := &v.SentAssetSat
-			totalReceived := balanceAssetSat.Add(balanceAssetSat, sentAssetSat)
+			totalReceived := v.ReceivedSat(balanceAssetSat, sentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
 			tokens = append(tokens, Token{
 				Type:             SPTAllocatedTokenType,
@@ -827,7 +826,6 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				BalanceSat:       (*Amount)(balanceAssetSat),
 				TotalReceivedSat: (*Amount)(totalReceived),
 				TotalSentSat:     (*Amount)(sentAssetSat),
-				Transfers:        transfers,
 				Contract:		  strconv.FormatUint(uint64(k), 10),
 			})
 		}

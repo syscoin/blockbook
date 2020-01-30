@@ -247,7 +247,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			for k, v := range ad.balance.AssetBalances {
 				balanceAssetSat := &v.BalanceAssetSat
 				sentAssetSat := &v.SentAssetSat
-				totalReceived := balanceAssetSat.Add(balanceAssetSat, sentAssetSat)
+				totalReceived := v.ReceivedSat(balanceAssetSat, sentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
 				tokens = append(tokens, Token{
 					Type:             SPTAllocatedTokenType,

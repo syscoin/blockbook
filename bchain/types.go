@@ -225,6 +225,13 @@ func (ab *AddrBalance) ReceivedSat() *big.Int {
 	r.Add(&ab.BalanceSat, &ab.SentSat)
 	return &r
 }
+
+func (ab *AddrBalance) ReceivedSat(balance *big.Int, sent *big.Int) *big.Int {
+	var r big.Int
+	r.Add(balance sent)
+	return &r
+}
+
 // calc asset received per asset guid
 func (ab *AddrBalance) ReceivedAssetSat(assetGuid uint32) *big.Int {
 	var r big.Int
