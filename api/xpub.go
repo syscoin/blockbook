@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -256,11 +257,12 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					TotalSentSat:     (*Amount)(&v.SentAssetSat),
 					Transfers:        transfers,
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-					Contract:		  k,
+					Contract:		  strconv.FormatUint(uint64(k), 10),
 				})
 			}
 		}
 	}
+	return tokens
 }
 
 func evictXpubCacheItems() {
@@ -537,8 +539,8 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				tokens := w.tokenFromXpubAddress(data, ad, ci, i, option)
 				for token := range tokens {
 					if filter.TokensToReturn == TokensToReturnDerived ||
-						filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
-						filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && !IsZeroBigInt(&token.BalanceSat) {
+						filter.TokensToReturn == TokensToReturnUsed && token.balanceSat != nil ||
+						filter.TokensToReturn == TokensToReturnNonzeroBalance && token.balanceSat != nil && !IsZeroBigInt(&token.balanceSat) {
 						tokens = append(tokens, token)
 					}
 					xpubAddresses[token.Name] = struct{}{}

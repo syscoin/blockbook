@@ -326,8 +326,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				Name:     sptc.Name,
 				Symbol:   sptc.Symbol,
 			}
-		}
-	}*/
+		}*/
+	}
 	// for now do not return size, we would have to compute vsize of segwit transactions
 	// size:=len(bchainTx.Hex) / 2
 	var sj json.RawMessage
