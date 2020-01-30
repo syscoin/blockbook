@@ -811,7 +811,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if w.chainType == bchain.ChainBitcoinType {
 		totalReceived = ba.ReceivedSat()
 		totalSent = &ba.SentSat
-	} else if ba.AssetBalances != nil && option > AccountDetailsBasic {
+	} 
+	if ba.AssetBalances != nil && option > AccountDetailsBasic {
 		transfers := int(ba.Txs)
 		for k, v := range ba.AssetBalances {
 			balanceAssetSat := &v.BalanceAssetSat
