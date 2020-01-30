@@ -204,8 +204,8 @@ type Utxo struct {
 }
 // holds balance information for an asset indexed by a uint32 asset guid
 type AssetBalance {
-	SentAssetAllocatedSat big.Int
-	BalanceAssetAllocatedSat big.Int
+	SentAssetSat big.Int
+	BalanceAssetSat big.Int
 }
 
 // AddrBalance stores number of transactions and balances of an address
