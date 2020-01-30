@@ -219,31 +219,47 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 	return lastUsed, addresses, nil
 }
 
-func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) Token {
+func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) []Token {
 	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
+	var tokens []Token
 	var address string
 	if len(a) > 0 {
 		address = a[0]
 	}
-	var balance, totalReceived, totalSent *big.Int
-	var transfers int
+
 	if ad.balance != nil {
-		transfers = int(ad.balance.Txs)
+		transfers := int(ad.balance.Txs)
 		if option >= AccountDetailsTokenBalances {
-			balance = &ad.balance.BalanceSat
-			totalSent = &ad.balance.SentSat
-			totalReceived = ad.balance.ReceivedSat()
+			balance := ad.balance.BalanceSat
+			totalSent := ad.balance.SentSat
+			totalReceived := ad.balance.ReceivedSat()
+			tokens = append(tokens, Token{
+				Type:             XPUBAddressTokenType,
+				Name:             address,
+				Decimals:         w.chainParser.AmountDecimals(),
+				BalanceSat:       (*Amount)(balance),
+				TotalReceivedSat: (*Amount)(totalReceived),
+				TotalSentSat:     (*Amount)(totalSent),
+				Transfers:        transfers,
+				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
+			})
+			for k, v := range ad.balance.AssetBalances {
+				totalReceived := balance.Add(v.BalanceAssetSat, v.SentAssetSat)
+				// add token as unallocated if address matches asset owner address other wise its allocated
+				tokens = append(tokens, Token{
+					Type:             SPTAllocatedTokenType,
+					Name:             address,
+					Decimals:         w.chainParser.AmountDecimals(),
+					Symbol:			  "SPT",
+					BalanceSat:       (*Amount)(v.BalanceAssetSat),
+					TotalReceivedSat: (*Amount)(totalReceived),
+					TotalSentSat:     (*Amount)(v.SentAssetSat),
+					Transfers:        transfers,
+					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
+					Contract:		  k,
+				})
+			}
 		}
-	}
-	return Token{
-		Type:             XPUBAddressTokenType,
-		Name:             address,
-		Decimals:         w.chainParser.AmountDecimals(),
-		BalanceSat:       (*Amount)(balance),
-		TotalReceivedSat: (*Amount)(totalReceived),
-		TotalSentSat:     (*Amount)(totalSent),
-		Transfers:        transfers,
-		Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 	}
 }
 
@@ -518,13 +534,15 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				usedTokens++
 			}
 			if option > AccountDetailsBasic {
-				token := w.tokenFromXpubAddress(data, ad, ci, i, option)
-				if filter.TokensToReturn == TokensToReturnDerived ||
-					filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
-					filter.TokensToReturn == TokensToReturnNonzeroBalance && ad.balance != nil && !IsZeroBigInt(&ad.balance.BalanceSat) {
-					tokens = append(tokens, token)
+				tokens := w.tokenFromXpubAddress(data, ad, ci, i, option)
+				for token := range tokens {
+					if filter.TokensToReturn == TokensToReturnDerived ||
+						filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
+						filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && !IsZeroBigInt(&token.BalanceSat) {
+						tokens = append(tokens, token)
+					}
+					xpubAddresses[token.Name] = struct{}{}
 				}
-				xpubAddresses[token.Name] = struct{}{}
 			}
 		}
 	}
@@ -575,11 +593,13 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 				return nil, err
 			}
 			if len(utxos) > 0 {
-				t := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
-				for j := range utxos {
-					a := &utxos[j]
-					a.Address = t.Name
-					a.Path = t.Path
+				txs := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
+				for t := range txs {
+					for j := range utxos {
+						a := &utxos[j]
+						a.Address = t.Name
+						a.Path = t.Path
+					}
 				}
 				r = append(r, utxos...)
 			}

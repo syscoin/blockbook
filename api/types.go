@@ -139,6 +139,9 @@ const ERC20TokenType TokenType = "ERC20"
 // XPUBAddressTokenType is address derived from xpub
 const XPUBAddressTokenType TokenType = "XPUBAddress"
 
+// Syscoin SPT transaction
+const SPTAllocatedTokenType TokenType = "SPTAllocated"
+const SPTUnAllocatedTokenType TokenType = "SPTUnAllocated"
 // Token contains info about tokens held by an address
 type Token struct {
 	Type             TokenType `json:"type"`
