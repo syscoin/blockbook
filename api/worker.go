@@ -296,7 +296,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			Nonce:    ethTxData.Nonce,
 			Status:   ethTxData.Status,
 		}
-	/*} else if w.chainType == bchain.ChainSyscoinType && w.chainParser.IsSyscoinTx(bchainTx.Version) {
+	/*} else if w.chainParser.IsSyscoinTx(bchainTx.Version) {
 		sts, err := w.chainParser.SyscoinTypeGetSPTFromTx(bchainTx)
 		if err != nil {
 			glog.Errorf("SyscoinTypeGetSPTFromTx error %v, %v", err, bchainTx)
@@ -811,7 +811,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if w.chainType == bchain.ChainBitcoinType {
 		totalReceived = ba.ReceivedSat()
 		totalSent = &ba.SentSat
-	} else if w.chainType == bchain.ChainSyscoinType && option > AccountDetailsBasic {
+	} else if ba.AssetBalances != nil && option > AccountDetailsBasic {
 		transfers := int(ba.Txs)
 		for k, v := range ba.AssetBalances {
 			balanceAssetSat := &v.BalanceAssetSat
