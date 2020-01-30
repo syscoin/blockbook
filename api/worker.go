@@ -296,37 +296,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			Nonce:    ethTxData.Nonce,
 			Status:   ethTxData.Status,
 		}
-	/*} else if w.chainParser.IsSyscoinTx(bchainTx.Version) {
-		sts, err := w.chainParser.SyscoinTypeGetSPTFromTx(bchainTx)
-		if err != nil {
-			glog.Errorf("SyscoinTypeGetSPTFromTx error %v, %v", err, bchainTx)
-		}
-		tokens = make([]TokenTransfer, len(sts))
-		for i := range sts {
-			s := &sts[i]
-			cd, err := w.chainParser.GetAddrDescFromAddress(e.AssetGuid)
-			if err != nil {
-				glog.Errorf("GetAddrDescFromAddress error %v, spt %v", err, s.AssetGuid)
-				continue
-			}
-			sptc, err := w.chain.SyscoinTypeGetSPTInfo(cd)
-			if err != nil {
-				glog.Errorf("SyscoinTypeGetSPTInfo error %v, spt %v", err, s.AssetGuid)
-			}
-			if sptc == nil {
-				sptc = &bchain.SPTContract{Name: s.AssetGuid}
-			}
-			tokens[i] = TokenTransfer{
-				Type:     SPTTokenType,
-				Token:    s.AssetGuid,
-				From:     s.From,
-				To:       s.To,
-				Decimals: sptc.Decimals,
-				Value:    (*Amount)(&s.ValueSat),
-				Name:     sptc.Name,
-				Symbol:   sptc.Symbol,
-			}
-		}*/
 	}
 	// for now do not return size, we would have to compute vsize of segwit transactions
 	// size:=len(bchainTx.Hex) / 2
@@ -358,7 +327,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Vout:             vouts,
 		CoinSpecificData: bchainTx.CoinSpecificData,
 		CoinSpecificJSON: sj,
-		TokenTransfers:   tokens,
+		TokenTransfers:   w.chainType == bchain.ChainBitcoinType? ta.tokens: tokens
 		EthereumSpecific: ethSpecific,
 	}
 	return r, nil
@@ -504,6 +473,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*Amount)(&valOutSat),
 		Vin:           vins,
 		Vout:          vouts,
+		TokenTransfers:  ta.tokens
 	}
 	return r
 }
@@ -904,6 +874,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		SentSat:     &Amount{},
 		ReceivedSat: &Amount{},
 		Txid:        txid,
+		Tokens:		 TokenHistory{}
 	}
 	if w.chainType == bchain.ChainBitcoinType {
 		for i := range ta.Inputs {
@@ -918,6 +889,30 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				(*big.Int)(bh.ReceivedSat).Add((*big.Int)(bh.ReceivedSat), &tao.ValueSat)
 			}
 		}
+		if len(ta.TokenTransfers) > 0 {
+			// only need to check one from, as from for all token transfers should be the same per tx
+			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
+			tatt := &ta.TokenTransfers[0]
+			token := &bh.Tokens[tatt.Token]
+			tattAddrFromDesc, err = w.chainParser.GetAddrDescFromAddress(tatt.From)
+			if err != nil {
+				return nil, err
+			}
+			if bytes.Equal(tattAddrFromDesc, ta.AddrDesc) {
+				(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), &tatt.Value)
+			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
+			} else {
+				for i := range ta.TokenTransfers {
+					tattAddrToDesc, err = w.chainParser.GetAddrDescFromAddress(tatt.To)
+					if err != nil {
+						return nil, err
+					}
+					if bytes.Equal(tattAddrToDesc, ta.AddrDesc) {
+						(*big.Int)(token.ReceivedSat).Add((*big.Int)(token.ReceivedSat), &tatt.Value)
+					}
+				}
+			}
+		}	
 	} else if w.chainType == bchain.ChainEthereumType {
 		var value big.Int
 		ethTxData := eth.GetEthereumTxData(bchainTx)

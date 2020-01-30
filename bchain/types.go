@@ -352,6 +352,7 @@ type TxAddresses struct {
 	Height  uint32
 	Inputs  []TxInput
 	Outputs []TxOutput
+	TokenTransfers []TokenTransfer
 }
 
 type DbOutpoint struct {
