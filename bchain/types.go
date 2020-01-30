@@ -228,7 +228,7 @@ func (ab *AddrBalance) ReceivedSat() *big.Int {
 
 func (ab *AddrBalance) ReceivedSat(balance *big.Int, sent *big.Int) *big.Int {
 	var r big.Int
-	r.Add(balance sent)
+	r.Add(balance,sent)
 	return &r
 }
 
