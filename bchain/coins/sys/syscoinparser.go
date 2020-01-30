@@ -232,7 +232,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			balancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
 			sentvalue, ll := p.BaseParser.UnpackBigint(buf[l:])
-			ab.AssetBalances[uint32(asset)] = &AssetBalance{SentAssetSat: sentvalue, BalanceAssetSat: balancevalue}
+			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{SentAssetSat: sentvalue, BalanceAssetSat: balancevalue}
 			l += ll
 		}
 	}
