@@ -9,8 +9,6 @@ import (
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/martinboehm/btcutil"
-	"math/big"
-	"github.com/golang/glog"
 )
 
 // magic numbers
@@ -228,7 +226,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	numAssetBalances, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	if numAssetBalances > 0 {
-		ab.AssetBalances = make(map[uint32]*AssetBalance, numAssetBalances)
+		ab.AssetBalances = make(map[uint32]*bchain.AssetBalance, numAssetBalances)
 		for i := uint(0); i < numAssetBalances; i++ {
 			asset, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			balancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])

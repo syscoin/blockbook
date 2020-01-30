@@ -84,14 +84,14 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		// transfer balance from old address to transfered address
 		if balanceTransfer.AssetBalances == nil{
-			balanceTransfer.AssetBalances = map[uint32]*AssetBalance{}
+			balanceTransfer.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		valueSat := &balance.AssetBalances[assetGuid].BalanceAssetSat
 		balanceTransfer.AssetBalances[assetGuid].BalanceAssetSat = *valueSat
 		valueSat.Set(big.NewInt(0))
 	} else {
-		if balance.BalanceAssetSat == nil{
-			balance.BalanceAssetSat = map[uint32]*AssetBalance{}
+		if balance.AssetBalances == nil{
+			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		assetBalance := balance.AssetBalances[assetGuid]
 		valueSat := *big.NewInt(asset.Balance)
@@ -158,7 +158,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 
 		if balance.AssetBalances == nil {
-			balance.AssetBalances = map[uint32]*AssetBalance{}
+			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		balanceAssetSat := &balance.AssetBalances[assetGuid].BalanceAssetSat
 		amount := big.NewInt(allocation.ValueSat)
@@ -272,7 +272,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	}
 	if d.chainParser.IsSyscoinAssetSend(version) {
 		if balance.AssetBalances == nil {
-			balance.AssetBalances = map[uint32]*AssetBalance{}
+			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		sentAssetSat := &balance.AssetBalances[assetGuid].SentAssetSat
 		balanceAssetSat := &balance.AssetBalances[assetGuid].BalanceAssetSat
@@ -284,7 +284,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 
 	} else {
 		if balance.AssetBalances == nil {
-			balance.AssetBalances = map[uint32]*AssetBalance{}
+			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		sentAssetSat := &balance.AssetBalances[assetGuid].SentAssetSat
 
@@ -476,7 +476,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	}
 
 	if balance.AssetBalances == nil {
-		balance.AssetBalances = map[uint32]*AssetBalance{}
+		balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 	}
 	balanceAssetSat := &balance.AssetBalances[assetGuid].BalanceAssetSat
 	amount := big.NewInt(mintasset.ValueAsset)
