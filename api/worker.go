@@ -825,7 +825,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				Symbol:			  "SPT",
 				BalanceSat:       (*Amount)(balanceAssetSat),
 				TotalReceivedSat: (*Amount)(totalReceived),
-				TotalSentSat:     (*Amount)sentAssetSat),
+				TotalSentSat:     (*Amount)(sentAssetSat),
 				Transfers:        transfers,
 				Contract:		  strconv.FormatUint(uint64(k), 10),
 			})
