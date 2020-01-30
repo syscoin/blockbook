@@ -229,7 +229,7 @@ func (ab *AddrBalance) ReceivedSat() *big.Int {
 func (ab *AddrBalance) ReceivedAssetSat(assetGuid uint32) *big.Int {
 	var r big.Int
 	if balance, ok := ab.AssetBalances[assetGuid]; ok {
-		r.Add(balance.BalanceAssetSat, balance.SentAssetSat)
+		r.Add(&balance.BalanceAssetSat, &balance.SentAssetSat)
 	}
 	return &r
 }
