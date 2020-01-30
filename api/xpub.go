@@ -253,7 +253,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Decimals:         w.chainParser.AmountDecimals(),
 					Symbol:			  "SPT",
 					BalanceSat:       (*Amount)(&v.BalanceAssetSat),
-					TotalReceivedSat: (*Amount)(&totalReceived),
+					TotalReceivedSat: (*Amount)(totalReceived),
 					TotalSentSat:     (*Amount)(&v.SentAssetSat),
 					Transfers:        transfers,
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
@@ -537,10 +537,10 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			}
 			if option > AccountDetailsBasic {
 				tokens := w.tokenFromXpubAddress(data, ad, ci, i, option)
-				for token := range tokens {
+				for token, _ := range tokens {
 					if filter.TokensToReturn == TokensToReturnDerived ||
-						filter.TokensToReturn == TokensToReturnUsed && token.balanceSat != nil ||
-						filter.TokensToReturn == TokensToReturnNonzeroBalance && token.balanceSat != nil && !IsZeroBigInt(&token.balanceSat) {
+						filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
+						filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && !IsZeroBigInt(token.BalanceSat) {
 						tokens = append(tokens, token)
 					}
 					xpubAddresses[token.Name] = struct{}{}
@@ -596,7 +596,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 			}
 			if len(utxos) > 0 {
 				txs := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
-				for t := range txs {
+				for t, _ := range txs {
 					for j := range utxos {
 						a := &utxos[j]
 						a.Address = t.Name

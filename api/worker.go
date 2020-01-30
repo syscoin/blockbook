@@ -812,18 +812,18 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalReceived = ba.ReceivedSat()
 		totalSent = &ba.SentSat
 	} else if w.chainType == bchain.ChainSyscoinType && option > AccountDetailsBasic {
-		transfers := int(ba.balance.Txs)
-		for k, v := range ba.balance.AssetBalances {
-			totalReceived := balance.Add(v.BalanceAssetSat, v.SentAssetSat)
+		transfers := int(ba.Txs)
+		for k, v := range ba.AssetBalances {
+			totalReceived := v.BalanceAssetSat.Add(v.BalanceAssetSat, v.SentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
 			tokens = append(tokens, Token{
 				Type:             SPTAllocatedTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
 				Symbol:			  "SPT",
-				BalanceSat:       (*Amount)(v.BalanceAssetSat),
+				BalanceSat:       (*Amount)(&v.BalanceAssetSat),
 				TotalReceivedSat: (*Amount)(totalReceived),
-				TotalSentSat:     (*Amount)(v.SentAssetSat),
+				TotalSentSat:     (*Amount)(&v.SentAssetSat),
 				Transfers:        transfers,
 				Contract:		  k,
 			})
