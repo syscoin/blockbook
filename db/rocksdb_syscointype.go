@@ -100,7 +100,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		valueSat := big.NewInt(asset.Balance)
 		balanceAssetSat := &assetBalance.BalanceAssetSat
-		balanceAssetSat.Add(&balanceAssetSat, valueSat)
+		balanceAssetSat.Add(balanceAssetSat, valueSat)
 	}
 	return nil
 }
