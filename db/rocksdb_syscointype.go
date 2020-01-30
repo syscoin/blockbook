@@ -94,8 +94,8 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		assetBalance := balance.AssetBalances[assetGuid]
-		valueSat := *big.NewInt(asset.Balance)
-		assetBalance.BalanceAssetSat.Add(assetBalance.BalanceAssetSat, valueSat)
+		valueSat := big.NewInt(asset.Balance)
+		assetBalance.BalanceAssetSat.Add(&assetBalance.BalanceAssetSat, valueSat)
 	}
 	return nil
 }
@@ -235,7 +235,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		}
 
 		if balance.AssetBalances != nil{
-			balanceAssetSat := &balance.AssetBalances.BalanceAssetSat[assetGuid]
+			balanceAssetSat := &balance.AssetBalances[assetGuid].BalanceAssetSat
 			amount := big.NewInt(allocation.ValueSat)
 			balanceAssetSat.Sub(balanceAssetSat, amount)
 			if balanceAssetSat.Sign() < 0 {
@@ -276,7 +276,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		}
 		sentAssetSat := &balance.AssetBalances[assetGuid].SentAssetSat
 		balanceAssetSat := &balance.AssetBalances[assetGuid].BalanceAssetSat
-		balanceAssetSat.Sub(balanceAssetUnAllocatedSat, totalAssetSentValue)
+		balanceAssetSat.Sub(balanceAssetSat, totalAssetSentValue)
 		sentAssetSat.Add(sentAssetSat, totalAssetSentValue)
 		if balanceAssetSat.Sign() < 0 {
 			d.resetValueSatToZero(balanceAssetSat, assetSenderAddrDesc, "balance")
@@ -404,7 +404,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 			}
 
 		} else {
-			glog.Warningf("DisconnectAssetAllocationInput: AssetSend SentUnAllocated balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
+			glog.Warningf("DisconnectAssetAllocationInput: Asset Sent balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
 		}
 	} else if balance.AssetBalances != nil {
 		sentAssetSat := &balance.AssetBalances[assetGuid].SentAssetSat
@@ -416,7 +416,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 		}
 
 	} else {
-		glog.Warningf("DisconnectAssetAllocationInput: Asset Sent Allocated balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
+		glog.Warningf("DisconnectAssetAllocationInput: Asset Sent balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
 	}
 	return nil
 
