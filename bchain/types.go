@@ -203,7 +203,7 @@ type Utxo struct {
 	ValueSat big.Int
 }
 // holds balance information for an asset indexed by a uint32 asset guid
-type AssetBalance {
+type AssetBalance struct {
 	SentAssetSat big.Int
 	BalanceAssetSat big.Int
 }
