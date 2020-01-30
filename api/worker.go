@@ -816,7 +816,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		for k, v := range ba.AssetBalances {
 			balanceAssetSat := &v.BalanceAssetSat
 			sentAssetSat := &v.SentAssetSat
-			totalReceived := v.ReceivedSat(balanceAssetSat, sentAssetSat)
+			totalReceived := bchain.ReceivedSatFromBalances(balanceAssetSat, sentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
 			tokens = append(tokens, Token{
 				Type:             SPTAllocatedTokenType,
