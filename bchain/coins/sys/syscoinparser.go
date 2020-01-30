@@ -69,8 +69,8 @@ func (p *SyscoinParser) GetMaxAddrLength() int {
 	return 8000
 }
 // GetChainType is type of the blockchain, default is ChainBitcoinType
-func (p *SyscoinParser) GetChainType() ChainType {
-	return ChainSyscoinType
+func (p *SyscoinParser) GetChainType() bchain.ChainType {
+	return bchain.ChainSyscoinType
 }
 // GetChainParams returns network parameters
 func GetChainParams(chain string) *chaincfg.Params {

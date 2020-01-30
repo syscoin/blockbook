@@ -245,16 +245,18 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 			})
 			for k, v := range ad.balance.AssetBalances {
-				totalReceived := v.BalanceAssetSat.Add(v.BalanceAssetSat, v.SentAssetSat)
+				balanceAssetSat := &v.BalanceAssetSat
+				sentAssetSat := &v.SentAssetSat
+				totalReceived := balanceAssetSat.Add(balanceAssetSat, sentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
 				tokens = append(tokens, Token{
 					Type:             SPTAllocatedTokenType,
 					Name:             address,
 					Decimals:         w.chainParser.AmountDecimals(),
 					Symbol:			  "SPT",
-					BalanceSat:       (*Amount)(&v.BalanceAssetSat),
+					BalanceSat:       (*Amount)(balanceAssetSat),
 					TotalReceivedSat: (*Amount)(totalReceived),
-					TotalSentSat:     (*Amount)(&v.SentAssetSat),
+					TotalSentSat:     (*Amount)(sentAssetSat),
 					Transfers:        transfers,
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  strconv.FormatUint(uint64(k), 10),
@@ -537,7 +539,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			}
 			if option > AccountDetailsBasic {
 				tokens := w.tokenFromXpubAddress(data, ad, ci, i, option)
-				for token, _ := range tokens {
+				for _, token := range tokens {
 					if filter.TokensToReturn == TokensToReturnDerived ||
 						filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
 						filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && !IsZeroBigInt(token.BalanceSat) {
@@ -596,7 +598,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 			}
 			if len(utxos) > 0 {
 				txs := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
-				for t, _ := range txs {
+				for _ , t := range txs {
 					for j := range utxos {
 						a := &utxos[j]
 						a.Address = t.Name
