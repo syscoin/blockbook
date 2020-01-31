@@ -335,7 +335,7 @@ func txToResTx(tx *api.Tx) resTx {
 	if len(*tx.TokenTransfers) > 0 {
 		mapTokens := map[uint32]big.Int{}
 		for i, tokenTransfer := range *tx.TokenTransfers {
-			a := addressInSlice(addr, {tokenTransfer.From, tokenTransfer.To})
+			a := addressInSlice(addr, []string{tokenTransfer.From, tokenTransfer.To})
 			if a != "" {
 				token := &mapTokens[tokenTransfer.Token]
 				token.Add(token, tokenTransfer.Value)
