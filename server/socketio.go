@@ -278,6 +278,8 @@ type resTx struct {
 	Outputs        []txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`
+	TokenTransfers *[]bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenOutputSatoshis  map[uint32]int64    `json:"tokenOutputSatoshis,omitempty"`
 }
 
 type addressHistoryItem struct {
@@ -285,6 +287,8 @@ type addressHistoryItem struct {
 	Satoshis      int64                             `json:"satoshis"`
 	Confirmations int                               `json:"confirmations"`
 	Tx            resTx                             `json:"tx"`
+	TokenReceivedSatoshis int64                     `json:"tokenReceivedSatoshis,omitempty"`
+	TokenSentSatoshis int64                         `json:"tokenSentSatoshis,omitempty"`
 }
 
 type resultGetAddressHistory struct {
@@ -295,9 +299,10 @@ type resultGetAddressHistory struct {
 }
 
 func txToResTx(tx *api.Tx) resTx {
-	inputs := make([]txInputs, len(tx.Vin))
-	for i := range tx.Vin {
-		vin := &tx.Vin[i]
+	var resultTx resTx 
+	inputs := make([]txInputs, len(*tx.Vin))
+	for i := range *tx.Vin {
+		vin := &(*tx.Vin)[i]
 		txid := vin.Txid
 		script := vin.Hex
 		input := txInputs{
@@ -314,8 +319,8 @@ func txToResTx(tx *api.Tx) resTx {
 		inputs[i] = input
 	}
 	outputs := make([]txOutputs, len(tx.Vout))
-	for i := range tx.Vout {
-		vout := &tx.Vout[i]
+	for i := range *tx.Vout {
+		vout := &(*tx.Vout)[i]
 		script := vout.Hex
 		output := txOutputs{
 			Satoshis: vout.ValueSat.AsInt64(),
@@ -327,6 +332,20 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		outputs[i] = output
 	}
+	if len(*tx.TokenTransfers) > 0{
+		mapTokens := map[uint32]big.Int
+		for i, tokenTransfer := range *tx.TokenTransfers {
+			a := addressInSlice(addr, {tokenTransfer.From, tokenTransfer.To})
+			if a != "" {
+				token := &mapTokens[tokenTransfer.Token]
+				token.Add(token, tokenTransfer.Value)
+			}
+		}
+		for k, v := range mapTokens {
+			resultTx.TokenOutputSatoshis[k] = v.Int64()
+		}
+		resultTx.TokenTransfers = tx.TokenTransfers
+	}
 	var h int
 	var blocktime int64
 	if tx.Confirmations == 0 {
@@ -335,19 +354,18 @@ func txToResTx(tx *api.Tx) resTx {
 		h = int(tx.Blockheight)
 		blocktime = tx.Blocktime
 	}
-	return resTx{
-		BlockTimestamp: blocktime,
-		FeeSatoshis:    tx.FeesSat.AsInt64(),
-		Hash:           tx.Txid,
-		Height:         h,
-		Hex:            tx.Hex,
-		Inputs:         inputs,
-		InputSatoshis:  tx.ValueInSat.AsInt64(),
-		Locktime:       int(tx.Locktime),
-		Outputs:        outputs,
-		OutputSatoshis: tx.ValueOutSat.AsInt64(),
-		Version:        int(tx.Version),
-	}
+	resultTx.BlockTimestamp = blocktime
+	resultTx.FeeSatoshis =    tx.FeesSat.AsInt64()
+	resultTx.Hash =           tx.Txid
+	resultTx.Height =         h,
+	resultTx.Hex =            tx.Hex,
+	resultTx.Inputs =         inputs,
+	resultTx.InputSatoshis =  tx.ValueInSat.AsInt64(),
+	resultTx.Locktime =       int(tx.Locktime),
+	resultTx.Outputs =        outputs,
+	resultTx.OutputSatoshis = tx.ValueOutSat.AsInt64(),
+	resultTx.Version =        int(tx.Version),
+
 }
 
 func addressInSlice(s, t []string) string {
@@ -360,7 +378,15 @@ func addressInSlice(s, t []string) string {
 	}
 	return ""
 }
-
+// Contains tells whether a contains x.
+func containsAddress(a []string, x string) bool {
+    for _, n := range a {
+        if x == n {
+            return true
+        }
+    }
+    return false
+}
 func (s *SocketIoServer) getAddressesFromVout(vout *bchain.Vout) ([]string, error) {
 	addrDesc, err := s.chainParser.GetAddrDescFromVout(vout)
 	if err != nil {
@@ -385,6 +411,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	if to > opts.To {
 		to = opts.To
 	}
+	ahi := addressHistoryItem{}
 	for txi := opts.From; txi < to; txi++ {
 		tx, err := s.api.GetTransaction(txids[txi], false, false)
 		if err != nil {
@@ -422,7 +449,29 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 			}
 		}
-		ahi := addressHistoryItem{}
+		if len(*tx.TokenTransfers) > 0{
+			mapTokensIn := map[uint32]big.Int
+			mapTokensOut := map[uint32]big.Int
+			for i, tokenTransfer := range *tx.TokenTransfers {
+				a := addressInSlice(addr, tokenTransfer.From)
+				if a != "" {
+					token := &mapTokensOut[tokenTransfer.Token]
+					token.Add(token, tokenTransfer.Value)
+				}
+				b := addressInSlice(addr, tokenTransfer.To)
+				if b != "" {
+					token := &mapTokensIn[tokenTransfer.Token]
+					token.Add(token, tokenTransfer.Value)
+				}
+			}
+			for k, v := range mapTokensIn {
+				ahi.TokenReceivedSatoshis[k] = v.Int64()
+			}
+			for k, v := range mapTokensOut {
+				ahi.TokenSentSatoshis[k] = v.Int64()
+			}
+		}
+		
 		ahi.Addresses = ads
 		ahi.Confirmations = int(tx.Confirmations)
 		ahi.Satoshis = totalSat.Int64()
