@@ -236,7 +236,7 @@ type BalanceHistory struct {
 	SentSat     *bchain.Amount `json:"sent"`
 	FiatRate    float64 `json:"fiatRate,omitempty"`
 	Txid        string  `json:"txid,omitempty"`
-	Tokens		map[uint32]TokenBalanceHistory `json:"tokens,omitempty"`	
+	Tokens		map[uint32]*TokenBalanceHistory `json:"tokens,omitempty"`	
 }
 
 // BalanceHistories is array of BalanceHistory
@@ -260,7 +260,6 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 		bha := BalanceHistory{
 			SentSat:     &bchain.Amount{},
 			ReceivedSat: &bchain.Amount{},
-			Tokens: 	 &TokenBalanceHistory{},
 		}
 		sort.Sort(a)
 		for i := range a {
@@ -276,7 +275,6 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 					Time:        time,
 					SentSat:     &bchain.Amount{},
 					ReceivedSat: &bchain.Amount{},
-					Tokens: 	 &TokenBalanceHistory{},
 				}
 			}
 			if bha.Txid != bh.Txid {
@@ -288,7 +286,13 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 
 			if len(bh.Tokens) > 0 {
 				for i, token := range bh.Tokens {
-					bhaToken := &bha.Tokens[i]
+					if bha.Tokens == nil {
+						bha.Tokens = map[uint32]*TokenBalanceHistory{}
+					}
+					if bhaToken, ok := bha.Tokens[i]; !ok {
+						bhaToken.SentSat := (*Amount)(big.NewInt(0))
+						bhaToken.ReceivedSat := (*Amount)(big.NewInt(0))
+					}
 					(*big.Int)(bhaToken.SentSat).Add((*big.Int)(bhaToken.SentSat), (*big.Int)(token.SentSat))
 					(*big.Int)(bhaToken.ReceivedSat).Add((*big.Int)(bhaToken.ReceivedSat), (*big.Int)(token.ReceivedSat))
 				}
