@@ -97,15 +97,15 @@ func (w *Worker) GetSpendingTxid(txid string, n int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if n >= len(tx.Vout) || n < 0 {
-		return "", NewAPIError(fmt.Sprintf("Passed incorrect vout index %v for tx %v, len vout %v", n, tx.Txid, len(tx.Vout)), false)
+	if n >= len(*tx.Vout) || n < 0 {
+		return "", NewAPIError(fmt.Sprintf("Passed incorrect vout index %v for tx %v, len vout %v", n, tx.Txid, len(*tx.Vout)), false)
 	}
-	err = w.setSpendingTxToVout(&tx.Vout[n], tx.Txid, uint32(tx.Blockheight))
+	err = w.setSpendingTxToVout(&(*tx.Vout[n]), tx.Txid, uint32(tx.Blockheight))
 	if err != nil {
 		return "", err
 	}
 	glog.Info("GetSpendingTxid ", txid, " ", n, " finished in ", time.Since(start))
-	return tx.Vout[n].SpentTxID, nil
+	return (*tx.Vout[n]).SpentTxID, nil
 }
 
 // GetTransaction reads transaction data from txid
@@ -502,7 +502,7 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []Token, *bchain.Erc20Contract, uint64, int, int, error) {
+func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
 	var (
 		ba             *bchain.AddrBalance
 		tokens         []Token
