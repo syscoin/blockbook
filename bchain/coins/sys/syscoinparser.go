@@ -347,7 +347,7 @@ func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	ll += uint(l)
 	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
 	tt.Value = (*bchain.Amount)(&Value)
-	return ll+l
+	return int(ll)+l
 }
 
 func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
