@@ -287,8 +287,8 @@ type addressHistoryItem struct {
 	Satoshis      int64                             `json:"satoshis"`
 	Confirmations int                               `json:"confirmations"`
 	Tx            resTx                             `json:"tx"`
-	TokenReceivedSatoshis int64                     `json:"tokenReceivedSatoshis,omitempty"`
-	TokenSentSatoshis int64                         `json:"tokenSentSatoshis,omitempty"`
+	TokenReceivedSatoshis map[uint32]int64                     `json:"tokenReceivedSatoshis,omitempty"`
+	TokenSentSatoshis map[uint32]int64                         `json:"tokenSentSatoshis,omitempty"`
 }
 
 type resultGetAddressHistory struct {
@@ -342,8 +342,9 @@ func txToResTx(tx *api.Tx) resTx {
 			if token, ok := mapTokens[assetGuid]; !ok {
 				token = big.NewInt(0)
 			}
-			token.Add(token, *big.Int)(tokenTransfer.Value))
+			token.Add(token, (*big.Int)(tokenTransfer.Value))
 		}
+		resultTx.TokenOutputSatoshis = make(map[uint32]int64, len(mapTokens))
 		for k, v := range mapTokens {
 			resultTx.TokenOutputSatoshis[k] = v.Int64()
 		}
@@ -467,9 +468,11 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 					token.Add(token, (*big.Int)(tokenTransfer.Value))
 				}
 			}
+			resultTx.TokenReceivedSatoshis = make(map[uint32]int64, len(mapTokensIn))
 			for k, v := range mapTokensIn {
 				ahi.TokenReceivedSatoshis[k] = v.Int64()
 			}
+			resultTx.TokenSentSatoshis = make(map[uint32]int64, len(mapTokensOut))
 			for k, v := range mapTokensOut {
 				ahi.TokenSentSatoshis[k] = v.Int64()
 			}
