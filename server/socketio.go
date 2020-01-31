@@ -357,14 +357,14 @@ func txToResTx(tx *api.Tx) resTx {
 	resultTx.BlockTimestamp = blocktime
 	resultTx.FeeSatoshis =    tx.FeesSat.AsInt64()
 	resultTx.Hash =           tx.Txid
-	resultTx.Height =         h,
-	resultTx.Hex =            tx.Hex,
-	resultTx.Inputs =         inputs,
-	resultTx.InputSatoshis =  tx.ValueInSat.AsInt64(),
-	resultTx.Locktime =       int(tx.Locktime),
-	resultTx.Outputs =        outputs,
-	resultTx.OutputSatoshis = tx.ValueOutSat.AsInt64(),
-	resultTx.Version =        int(tx.Version),
+	resultTx.Height =         h
+	resultTx.Hex =            tx.Hex
+	resultTx.Inputs =         inputs
+	resultTx.InputSatoshis =  tx.ValueInSat.AsInt64()
+	resultTx.Locktime =       int(tx.Locktime)
+	resultTx.Outputs =        outputs
+	resultTx.OutputSatoshis = tx.ValueOutSat.AsInt64()
+	resultTx.Version =        int(tx.Version)
 
 }
 
