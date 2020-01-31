@@ -130,44 +130,6 @@ type Vout struct {
 	Type        string                   `json:"type,omitempty"`
 }
 
-// TokenType specifies type of token
-type TokenType string
-
-// ERC20TokenType is Ethereum ERC20 token
-const ERC20TokenType TokenType = "ERC20"
-
-// XPUBAddressTokenType is address derived from xpub
-const XPUBAddressTokenType TokenType = "XPUBAddress"
-
-// Syscoin SPT transaction
-const SPTAllocatedTokenType TokenType = "SPTAllocated"
-const SPTUnAllocatedTokenType TokenType = "SPTUnAllocated"
-// Token contains info about tokens held by an address
-type Token struct {
-	Type             TokenType `json:"type"`
-	Name             string    `json:"name"`
-	Path             string    `json:"path,omitempty"`
-	Contract         string    `json:"contract,omitempty"`
-	Transfers        int       `json:"transfers"`
-	Symbol           string    `json:"symbol,omitempty"`
-	Decimals         int       `json:"decimals,omitempty"`
-	BalanceSat       *Amount   `json:"balance,omitempty"`
-	TotalReceivedSat *Amount   `json:"totalReceived,omitempty"`
-	TotalSentSat     *Amount   `json:"totalSent,omitempty"`
-	ContractIndex    string    `json:"-"`
-}
-
-// TokenTransfer contains info about a token transfer done in a transaction
-type TokenTransfer struct {
-	Type     TokenType `json:"type"`
-	From     string    `json:"from"`
-	To       string    `json:"to"`
-	Token    string    `json:"token"`
-	Name     string    `json:"name"`
-	Symbol   string    `json:"symbol"`
-	Decimals int       `json:"decimals"`
-	Value    *Amount   `json:"value"`
-}
 
 // EthereumSpecific contains ethereum specific transaction data
 type EthereumSpecific struct {
@@ -197,7 +159,7 @@ type Tx struct {
 	Rbf              bool              `json:"rbf,omitempty"`
 	CoinSpecificData *interface{}       `json:"-"`
 	CoinSpecificJSON *json.RawMessage   `json:"-"`
-	TokenTransfers   *[]TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers   *[]bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 

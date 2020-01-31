@@ -272,8 +272,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			if erc20c == nil {
 				erc20c = &bchain.Erc20Contract{Name: e.Contract}
 			}
-			tokensEth[i] = TokenTransfer{
-				Type:     ERC20TokenType,
+			tokensEth[i] = bchain.TokenTransfer{
+				Type:     bchain.ERC20TokenType,
 				Token:    e.Contract,
 				From:     e.From,
 				To:       e.To,
@@ -329,7 +329,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Vin:              &vins,
 		Vout:             &vouts,
 		CoinSpecificData: &bchainTx.CoinSpecificData,
-		CoinSpecificJSON: &sj,
+		CoinSpecificJSON: sj,
 		TokenTransfers:   tokens,
 		EthereumSpecific: ethSpecific,
 	}
@@ -573,8 +573,8 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 				} else {
 					b = nil
 				}
-				tokens[j] = Token{
-					Type:          ERC20TokenType,
+				tokens[j] = bchain.Token{
+					Type:          bchain.ERC20TokenType,
 					BalanceSat:    (*Amount)(b),
 					Contract:      ci.Contract,
 					Name:          ci.Name,
@@ -791,8 +791,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			sentAssetSat := &v.SentAssetSat
 			totalReceived := bchain.ReceivedSatFromBalances(balanceAssetSat, sentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
-			tokens = append(tokens, Token{
-				Type:             SPTAllocatedTokenType,
+			tokens = append(tokens, bchain.Token{
+				Type:             bchain.SPTAllocatedTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
 				Symbol:			  "SPT",
@@ -1377,7 +1377,7 @@ func (w *Worker) GetFeeStats(bid string) (*FeeStats, error) {
 
 		// Serialize the raw JSON into TxSpecific struct
 		var txSpec txSpecific
-		err = json.Unmarshal(txSpecificJSON, &txSpec)
+		err = json.Unmarshal(*txSpecificJSON, &txSpec)
 		if err != nil {
 			return nil, errors.Annotatef(err, "Unmarshal")
 		}
