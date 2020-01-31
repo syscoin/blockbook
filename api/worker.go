@@ -124,7 +124,7 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
 	var err error
 	var ta *bchain.TxAddresses
-	var tokens *[]bchain.TokenTransfer
+	var tokens []*bchain.TokenTransfer
 	var ethSpecific *EthereumSpecific
 	var blockhash string
 	if bchainTx.Confirmations > 0 {
@@ -250,14 +250,14 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		tokens =  &ta.TokenTransfers
+		tokens =  ta.TokenTransfers
 	} else if w.chainType == bchain.ChainEthereumType {
 		ets, err := w.chainParser.EthereumTypeGetErc20FromTx(bchainTx)
 		if err != nil {
 			glog.Errorf("GetErc20FromTx error %v, %v", err, bchainTx)
 		}
-		var tokensEth []bchain.TokenTransfer
-		tokensEth = make([]bchain.TokenTransfer, len(ets))
+		var tokensEth []*bchain.TokenTransfer
+		tokensEth = make([]*bchain.TokenTransfer, len(ets))
 		for i := range ets {
 			e := &ets[i]
 			cd, err := w.chainParser.GetAddrDescFromAddress(e.Contract)
@@ -272,7 +272,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			if erc20c == nil {
 				erc20c = &bchain.Erc20Contract{Name: e.Contract}
 			}
-			tokensEth[i] = bchain.TokenTransfer{
+			tokensEth[i] = &bchain.TokenTransfer{
 				Type:     bchain.ERC20TokenType,
 				Token:    e.Contract,
 				From:     e.From,
@@ -476,7 +476,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
 		Vin:           &vins,
 		Vout:          &vouts,
-		TokenTransfers:  &ta.TokenTransfers,
+		TokenTransfers:  ta.TokenTransfers,
 	}
 	return r
 }
@@ -899,7 +899,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			var ok bool
 			var err error
 			var assetGuid int
-			tatt := &ta.TokenTransfers[0]
+			tatt := ta.TokenTransfers[0]
 			if bh.Tokens == nil {
 				bh.Tokens = map[uint32]*TokenBalanceHistory{}
 			}
