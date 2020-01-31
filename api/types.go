@@ -290,8 +290,8 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 						bha.Tokens = map[uint32]*TokenBalanceHistory{}
 					}
 					if bhaToken, ok := bha.Tokens[i]; !ok {
-						bhaToken.SentSat := (*Amount)(big.NewInt(0))
-						bhaToken.ReceivedSat := (*Amount)(big.NewInt(0))
+						bhaToken.SentSat = (*Amount)(big.NewInt(0))
+						bhaToken.ReceivedSat = (*Amount)(big.NewInt(0))
 					}
 					(*big.Int)(bhaToken.SentSat).Add((*big.Int)(bhaToken.SentSat), (*big.Int)(token.SentSat))
 					(*big.Int)(bhaToken.ReceivedSat).Add((*big.Int)(bhaToken.ReceivedSat), (*big.Int)(token.ReceivedSat))
