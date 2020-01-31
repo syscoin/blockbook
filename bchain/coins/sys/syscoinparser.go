@@ -316,7 +316,7 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	buf = append(buf, []byte(tt.Symbol)...)
 	l = p.BaseParser.PackVaruint(uint(tt.Decimals), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.PackBigint(tt.Value, varBuf)
+	l = p.BaseParser.PackBigint((*big.Int)(tt.Value), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
