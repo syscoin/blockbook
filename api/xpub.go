@@ -230,9 +230,10 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 
 	if ad.balance != nil {
 		transfers := int(ad.balance.Txs)
-		tokens = make([]*bchain.Token, 1 + len(ad.balance.AssetBalances))
+		
 		var i uint = 0
 		if option >= AccountDetailsTokenBalances {
+			tokens = make([]*bchain.Token, 1 + len(ad.balance.AssetBalances))
 			balance := &ad.balance.BalanceSat
 			totalSent := &ad.balance.SentSat
 			totalReceived := ad.balance.ReceivedSat()
