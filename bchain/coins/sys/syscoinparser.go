@@ -313,38 +313,39 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	l = p.BaseParser.PackVaruint(uint(len(tt.Symbol)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, []byte(tt.Symbol)...)
-	l = p.BaseParser.PackVaruint(uint(len(tt.Decimals)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(tt.Decimals), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.PackBigint(&tt.Value.AsBigInt(), varBuf)
+	l = p.BaseParser.PackBigint(&(tt.Value.AsBigInt()), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
 
-func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte, varBuf []byte) int {
+func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte) int {
 	var Decimals uint
 	al, l := p.BaseParser.UnpackVaruint(buf)
 	tt.Type = string(append([]byte(nil), buf[l:l+int(al)]...))
-	ll := l+al
+	ll := uint(l)+al
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += l
+	ll += uint(l)
 	tt.From = string(append([]byte(nil), buf[l:l+int(al)]...))
 	ll += al
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += l
+	ll += uint(l)
 	tt.To = string(append([]byte(nil), buf[l:l+int(al)]...))
 	ll += al
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += l
+	ll += uint(l)
 	tt.Token = string(append([]byte(nil), buf[l:l+int(al)]...))
 	ll += al
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += l
+	ll += uint(l)
 	tt.Symbol = string(append([]byte(nil), buf[l:l+int(al)]...))
 	ll += al
 	Decimals, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	tt.Decimals = int(Decimals)
-	ll += l
-	tt.Value, l = (*bchain.Amount)(p.BaseParser.UnpackBigint(buf[ll:]))
+	ll += uint(l)
+	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
+	tt.Value = (*bchain.Amount)(Value)
 	return ll+l
 }
 
