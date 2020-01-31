@@ -1,6 +1,7 @@
 package api
 
 import (
+	"blockbook/bchain"
 	"math/big"
 )
 
