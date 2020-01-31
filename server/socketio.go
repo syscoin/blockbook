@@ -339,7 +339,8 @@ func txToResTx(tx *api.Tx) resTx {
 			if err != nil {
 				return resultTx
 			}
-			if token, ok := mapTokens[assetGuid]; !ok {
+			token, ok := mapTokens[uint32(assetGuid)]
+			if !ok {
 				token = big.NewInt(0)
 			}
 			token.Add(token, (*big.Int)(tokenTransfer.Value))
@@ -455,14 +456,16 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 				a := addressInSlice([]string{tokenTransfer.From}, addr)
 				if a != "" {
-					if token, ok := mapTokensOut[assetGuid]; !ok {
+					token, ok := mapTokensOut[uint32(assetGuid)]
+					if !ok {
 						token = big.NewInt(0)
 					}
 					token.Add(token, (*big.Int)(tokenTransfer.Value))
 				}
 				b := addressInSlice([]string{tokenTransfer.To}, addr)
 				if b != "" {
-					if token, ok := mapTokensIn[assetGuid]; !ok {
+					token, ok := mapTokensIn[uint32(assetGuid)]
+					if !ok {
 						token = big.NewInt(0)
 					}
 					token.Add(token, (*big.Int)(tokenTransfer.Value))
