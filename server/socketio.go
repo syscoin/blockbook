@@ -333,10 +333,16 @@ func txToResTx(tx *api.Tx) resTx {
 		outputs[i] = output
 	}
 	if len(*tx.TokenTransfers) > 0 {
-		mapTokens := map[uint32]big.Int{}
+		mapTokens := map[uint32]*big.Int{}
 		for _, tokenTransfer := range *tx.TokenTransfers {
-			token := &mapTokens[tokenTransfer.Token]
-			token.Add(token, tokenTransfer.Value)
+			assetGuid, err := strconv.Atoi(tokenTransfer.Token)
+			if err != nil {
+				return resultTx
+			}
+			if token, ok := mapTokens[assetGuid]; !ok {
+				token = big.NewInt(0)
+			}
+			token.Add(token, *big.Int)(tokenTransfer.Value))
 		}
 		for k, v := range mapTokens {
 			resultTx.TokenOutputSatoshis[k] = v.Int64()
@@ -439,22 +445,26 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 			}
 		}
 		if len(*tx.TokenTransfers) > 0{
-			mapTokensIn := map[uint32]big.Int{}
-			mapTokensOut := map[uint32]big.Int{}
+			mapTokensIn := map[uint32]*big.Int{}
+			mapTokensOut := map[uint32]*big.Int{}
 			for i, tokenTransfer := range *tx.TokenTransfers {
 				assetGuid, err := strconv.Atoi(tokenTransfer.Token)
 				if err != nil {
 					return res, err
 				}
-				a := addressInSlice(addr, []string{tokenTransfer.From})
+				a := addressInSlice([]string{tokenTransfer.From}, addr)
 				if a != "" {
-					token := &mapTokensOut[assetGuid]
-					token.Add(token, tokenTransfer.Value)
+					if token, ok := mapTokensOut[assetGuid]; !ok {
+						token = big.NewInt(0)
+					}
+					token.Add(token, *big.Int)(tokenTransfer.Value))
 				}
-				b := addressInSlice(addr, []string{tokenTransfer.To})
+				b := addressInSlice([]string{tokenTransfer.To}, addr)
 				if b != "" {
-					token := &mapTokensIn[assetGuid]
-					token.Add(token, tokenTransfer.Value)
+					if token, ok := mapTokensIn[assetGuid]; !ok {
+						token = big.NewInt(0)
+					}
+					token.Add(token, (*big.Int)(tokenTransfer.Value))
 				}
 			}
 			for k, v := range mapTokensIn {
