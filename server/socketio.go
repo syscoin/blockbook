@@ -318,7 +318,7 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		inputs[i] = input
 	}
-	outputs := make([]txOutputs, len(tx.Vout))
+	outputs := make([]txOutputs, len(*tx.Vout))
 	for i := range *tx.Vout {
 		vout := &(*tx.Vout)[i]
 		script := vout.Hex
@@ -334,12 +334,9 @@ func txToResTx(tx *api.Tx) resTx {
 	}
 	if len(*tx.TokenTransfers) > 0 {
 		mapTokens := map[uint32]big.Int{}
-		for i, tokenTransfer := range *tx.TokenTransfers {
-			a := addressInSlice(addr, []string{tokenTransfer.From, tokenTransfer.To})
-			if a != "" {
-				token := &mapTokens[tokenTransfer.Token]
-				token.Add(token, tokenTransfer.Value)
-			}
+		for _, tokenTransfer := range *tx.TokenTransfers {
+			token := &mapTokens[tokenTransfer.Token]
+			token.Add(token, tokenTransfer.Value)
 		}
 		for k, v := range mapTokens {
 			resultTx.TokenOutputSatoshis[k] = v.Int64()
@@ -365,7 +362,7 @@ func txToResTx(tx *api.Tx) resTx {
 	resultTx.Outputs =        outputs
 	resultTx.OutputSatoshis = tx.ValueOutSat.AsInt64()
 	resultTx.Version =        int(tx.Version)
-
+	return resultTx
 }
 
 func addressInSlice(s, t []string) string {
@@ -378,15 +375,7 @@ func addressInSlice(s, t []string) string {
 	}
 	return ""
 }
-// Contains tells whether a contains x.
-func containsAddress(a []string, x string) bool {
-    for _, n := range a {
-        if x == n {
-            return true
-        }
-    }
-    return false
-}
+
 func (s *SocketIoServer) getAddressesFromVout(vout *bchain.Vout) ([]string, error) {
 	addrDesc, err := s.chainParser.GetAddrDescFromVout(vout)
 	if err != nil {
@@ -419,8 +408,8 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 		}
 		ads := make(map[string]*addressHistoryIndexes)
 		var totalSat big.Int
-		for i := range tx.Vin {
-			vin := &tx.Vin[i]
+		for i := range *tx.Vin {
+			vin := &(*tx.Vin)[i]
 			a := addressInSlice(vin.Addresses, addr)
 			if a != "" {
 				hi := ads[a]
@@ -434,8 +423,8 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 			}
 		}
-		for i := range tx.Vout {
-			vout := &tx.Vout[i]
+		for i := range *tx.Vout {
+			vout := &(*tx.Vout)[i]
 			a := addressInSlice(vout.Addresses, addr)
 			if a != "" {
 				hi := ads[a]
@@ -453,14 +442,18 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 			mapTokensIn := map[uint32]big.Int{}
 			mapTokensOut := map[uint32]big.Int{}
 			for i, tokenTransfer := range *tx.TokenTransfers {
-				a := addressInSlice(addr, tokenTransfer.From)
+				assetGuid, err := strconv.Atoi(tokenTransfer.Token)
+				if err != nil {
+					return res, err
+				}
+				a := addressInSlice(addr, []string{tokenTransfer.From})
 				if a != "" {
-					token := &mapTokensOut[tokenTransfer.Token]
+					token := &mapTokensOut[assetGuid]
 					token.Add(token, tokenTransfer.Value)
 				}
-				b := addressInSlice(addr, tokenTransfer.To)
+				b := addressInSlice(addr, []string{tokenTransfer.To})
 				if b != "" {
-					token := &mapTokensIn[tokenTransfer.Token]
+					token := &mapTokensIn[assetGuid]
 					token.Add(token, tokenTransfer.Value)
 				}
 			}
