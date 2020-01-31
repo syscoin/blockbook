@@ -222,7 +222,7 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 
 func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) []Token {
 	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
-	var tokens []Token
+	var tokens []bchain.Token
 	var address string
 	if len(a) > 0 {
 		address = a[0]
