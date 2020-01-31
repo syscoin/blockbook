@@ -262,7 +262,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 			ValueSat: vs,
 		}
 	}
-	tx := Tx{
+	tx := &Tx{
 		Blocktime: int64(pt.Blocktime),
 		Hex:       hex.EncodeToString(pt.Hex),
 		LockTime:  pt.Locktime,
@@ -272,7 +272,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 		Vout:      vout,
 		Version:   pt.Version,
 	}
-	return &tx, pt.Height, nil
+	return tx, pt.Height, nil
 }
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
