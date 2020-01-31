@@ -297,6 +297,57 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	return buf
 }
 
+func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte, varBuf []byte) []byte {
+	l := p.BaseParser.PackVaruint(uint(len(tt.Type)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tt.Type)...)
+	l = p.BaseParser.PackVaruint(uint(len(tt.From)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tt.From)...)
+	l = p.BaseParser.PackVaruint(uint(len(tt.To)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tt.To)...)
+	l = p.BaseParser.PackVaruint(uint(len(tt.Token)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tt.Token)...)
+	l = p.BaseParser.PackVaruint(uint(len(tt.Symbol)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tt.Symbol)...)
+	l = p.BaseParser.PackVaruint(uint(len(tt.Decimals)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackBigint(&tt.Value.AsBigInt(), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte, varBuf []byte) int {
+	var Decimals
+	al, l := p.BaseParser.UnpackVaruint(buf)
+	tt.Type = string(append([]byte(nil), buf[l:l+int(al)]...))
+	ll := l+al
+	al, l = p.BaseParser.UnpackVaruint((buf[ll:])
+	ll += l
+	tt.From = string(append([]byte(nil), buf[l:l+int(al)]...))
+	ll += al
+	al, l = p.BaseParser.UnpackVaruint((buf[ll:])
+	ll += l
+	tt.To = string(append([]byte(nil), buf[l:l+int(al)]...))
+	ll += al
+	al, l = p.BaseParser.UnpackVaruint((buf[ll:])
+	ll += l
+	tt.Token = string(append([]byte(nil), buf[l:l+int(al)]...))
+	ll += al
+	al, l = p.BaseParser.UnpackVaruint((buf[ll:])
+	ll += l
+	tt.Symbol = string(append([]byte(nil), buf[l:l+int(al)]...))
+	ll += al
+	Decimals, l = p.BaseParser.UnpackVaruint((buf[ll:])
+	tt.Decimals = int(Decimals)
+	ll += l
+	tt.Value, l := (*bchain.Amount)p.BaseParser.UnpackBigint(buf[ll:])
+	return ll+l
+}
+
 func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	// pack version info for syscoin to detect sysx tx types
