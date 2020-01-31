@@ -330,7 +330,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Vout:             vouts,
 		CoinSpecificData: bchainTx.CoinSpecificData,
 		CoinSpecificJSON: sj,
-		TokenTransfers:   *tokens
+		TokenTransfers:   *tokens,
 		EthereumSpecific: ethSpecific,
 	}
 	return r, nil
