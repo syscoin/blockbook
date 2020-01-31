@@ -183,8 +183,8 @@ type Tx struct {
 	Txid             string            `json:"txid"`
 	Version          int32             `json:"version,omitempty"`
 	Locktime         uint32            `json:"lockTime,omitempty"`
-	Vin              []Vin             `json:"vin"`
-	Vout             []Vout            `json:"vout"`
+	Vin              *[]Vin             `json:"vin"`
+	Vout             *[]Vout            `json:"vout"`
 	Blockhash        string            `json:"blockHash,omitempty"`
 	Blockheight      int               `json:"blockHeight"`
 	Confirmations    uint32            `json:"confirmations"`
@@ -195,9 +195,9 @@ type Tx struct {
 	FeesSat          *Amount           `json:"fees,omitempty"`
 	Hex              string            `json:"hex,omitempty"`
 	Rbf              bool              `json:"rbf,omitempty"`
-	CoinSpecificData interface{}       `json:"-"`
-	CoinSpecificJSON json.RawMessage   `json:"-"`
-	TokenTransfers   []TokenTransfer   `json:"tokenTransfers,omitempty"`
+	CoinSpecificData *interface{}       `json:"-"`
+	CoinSpecificJSON *json.RawMessage   `json:"-"`
+	TokenTransfers   *[]TokenTransfer   `json:"tokenTransfers,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 

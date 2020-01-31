@@ -326,11 +326,11 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Version:          bchainTx.Version,
 		Hex:              bchainTx.Hex,
 		Rbf:              rbf,
-		Vin:              vins,
-		Vout:             vouts,
-		CoinSpecificData: bchainTx.CoinSpecificData,
-		CoinSpecificJSON: sj,
-		TokenTransfers:   *tokens,
+		Vin:              &vins,
+		Vout:             &vouts,
+		CoinSpecificData: &bchainTx.CoinSpecificData,
+		CoinSpecificJSON: &sj,
+		TokenTransfers:   tokens,
 		EthereumSpecific: ethSpecific,
 	}
 	return r, nil
@@ -474,8 +474,8 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		Txid:          txid,
 		ValueInSat:    (*Amount)(&valInSat),
 		ValueOutSat:   (*Amount)(&valOutSat),
-		Vin:           vins,
-		Vout:          vouts,
+		Vin:           &vins,
+		Vout:          &vouts,
 		TokenTransfers:  ta.tokens,
 	}
 	return r
