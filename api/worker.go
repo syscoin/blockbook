@@ -677,7 +677,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	}
 	var (
 		ba                       *bchain.AddrBalance
-		tokens                   []bchain.Token
+		tokens                   []*bchain.Token
 		erc20c                   *bchain.Erc20Contract
 		txm                      []string
 		txs                      []*Tx
@@ -786,12 +786,13 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalSent = &ba.SentSat
 	} 
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
+		tokens = make([]*bhain.Token, len(ba.AssetBalances))
 		for k, v := range ba.AssetBalances {
 			balanceAssetSat := &v.BalanceAssetSat
 			sentAssetSat := &v.SentAssetSat
 			totalReceived := bchain.ReceivedSatFromBalances(balanceAssetSat, sentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
-			tokens = append(tokens, bchain.Token{
+			tokens[i] = &bchain.Token{
 				Type:             bchain.SPTAllocatedTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
@@ -800,7 +801,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				TotalReceivedSat: (*bchain.Amount)(totalReceived),
 				TotalSentSat:     (*bchain.Amount)(sentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
-			})
+			}
 		}
 	}
 	r := &Address{
