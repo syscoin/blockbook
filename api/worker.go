@@ -476,7 +476,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*Amount)(&valOutSat),
 		Vin:           vins,
 		Vout:          vouts,
-		TokenTransfers:  ta.tokens
+		TokenTransfers:  ta.tokens,
 	}
 	return r
 }
