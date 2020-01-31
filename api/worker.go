@@ -250,7 +250,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		tokens =  &ta.Tokens
+		tokens =  &ta.TokenTransfers
 	} else if w.chainType == bchain.ChainEthereumType {
 		ets, err := w.chainParser.EthereumTypeGetErc20FromTx(bchainTx)
 		if err != nil {
@@ -476,7 +476,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
 		Vin:           &vins,
 		Vout:          &vouts,
-		TokenTransfers:  ta.tokens,
+		TokenTransfers:  ta.TokenTransfers,
 	}
 	return r
 }
@@ -894,6 +894,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		if len(ta.TokenTransfers) > 0 {
 			var token *TokenBalanceHistory
 			var ok bool
+			tatt := &ta.TokenTransfers[0]
 			if bh.Tokens == nil {
 				bh.Tokens = map[uint32]*TokenBalanceHistory{}
 			}
@@ -902,13 +903,12 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
 			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
-			tatt := &ta.TokenTransfers[0]
 			tattAddrFromDesc, err = w.chainParser.GetAddrDescFromAddress(tatt.From)
 			if err != nil {
 				return nil, err
 			}
 			if bytes.Equal(tattAddrFromDesc, ta.AddrDesc) {
-				sentSat := &bhaToken.SentSat
+				sentSat := &token.SentSat
 				(*big.Int)(sentSat).Add((*big.Int)(sentSat), &tatt.Value)
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
 			} else {
@@ -918,7 +918,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 						return nil, err
 					}
 					if bytes.Equal(tattAddrToDesc, ta.AddrDesc) {
-						receivedSat := &bhaToken.ReceivedSat
+						receivedSat := &token.ReceivedSat
 						(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), &tatt.Value)
 					}
 				}
