@@ -458,7 +458,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 					if token, ok := mapTokensOut[assetGuid]; !ok {
 						token = big.NewInt(0)
 					}
-					token.Add(token, *big.Int)(tokenTransfer.Value))
+					token.Add(token, (*big.Int)(tokenTransfer.Value))
 				}
 				b := addressInSlice([]string{tokenTransfer.To}, addr)
 				if b != "" {
