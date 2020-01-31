@@ -877,7 +877,6 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		SentSat:     &bchain.Amount{},
 		ReceivedSat: &bchain.Amount{},
 		Txid:        txid,
-		Tokens:		 map[uint32]TokenBalanceHistory{},
 	}
 	if w.chainType == bchain.ChainBitcoinType {
 		for i := range ta.Inputs {
@@ -893,10 +892,17 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			}
 		}
 		if len(ta.TokenTransfers) > 0 {
+			if bh.Tokens == nil {
+				bh.Tokens = map[uint32]*TokenBalanceHistory{}
+			}
+			if token, ok := bh.Tokens[tatt.Token]; !ok {
+				token.SentSat := (*Amount)(big.NewInt(0))
+				token.ReceivedSat := (*Amount)(big.NewInt(0))
+			}
 			// only need to check one from, as from for all token transfers should be the same per tx
 			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
 			tatt := &ta.TokenTransfers[0]
-			token := &bh.Tokens[tatt.Token]
+			token := bh.Tokens[tatt.Token]
 			tattAddrFromDesc, err = w.chainParser.GetAddrDescFromAddress(tatt.From)
 			if err != nil {
 				return nil, err
