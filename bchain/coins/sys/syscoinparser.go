@@ -344,7 +344,7 @@ func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	Decimals, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	tt.Decimals = int(Decimals)
 	ll += l
-	tt.Value, l = (*bchain.Amount)p.BaseParser.UnpackBigint(buf[ll:])
+	tt.Value, l = (*bchain.Amount)(p.BaseParser.UnpackBigint(buf[ll:]))
 	return ll+l
 }
 
