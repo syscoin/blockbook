@@ -476,7 +476,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
 		Vin:           &vins,
 		Vout:          &vouts,
-		TokenTransfers:  ta.TokenTransfers,
+		TokenTransfers:  &ta.TokenTransfers,
 	}
 	return r
 }
@@ -539,7 +539,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 			}
 		}
 		if details > AccountDetailsBasic {
-			tokens = make([]Token, len(ca.Contracts))
+			tokens = make([]bchain.Token, len(ca.Contracts))
 			var j int
 			for i, c := range ca.Contracts {
 				if len(filterDesc) > 0 {
@@ -677,7 +677,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	}
 	var (
 		ba                       *bchain.AddrBalance
-		tokens                   []Token
+		tokens                   []bchain.Token
 		erc20c                   *bchain.Erc20Contract
 		txm                      []string
 		txs                      []*Tx
@@ -894,11 +894,17 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		if len(ta.TokenTransfers) > 0 {
 			var token *TokenBalanceHistory
 			var ok bool
+			var err error
+			var assetGuid uint32
 			tatt := &ta.TokenTransfers[0]
 			if bh.Tokens == nil {
 				bh.Tokens = map[uint32]*TokenBalanceHistory{}
 			}
-			if token, ok = bh.Tokens[tatt.Token]; !ok {
+			assetGuid, err = strconv.Atoi(tatt.Token)
+			if err != nil {
+				return nil, err
+			}
+			if token, ok = bh.Tokens[assetGuid]; !ok {
 				token = &TokenBalanceHistory{}
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
@@ -907,7 +913,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			if err != nil {
 				return nil, err
 			}
-			if bytes.Equal(tattAddrFromDesc, ta.AddrDesc) {
+			if bytes.Equal(addrDesc, tattAddrFromDesc) {
 				sentSat := &token.SentSat
 				(*big.Int)(sentSat).Add((*big.Int)(sentSat), &tatt.Value)
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
@@ -917,7 +923,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					if err != nil {
 						return nil, err
 					}
-					if bytes.Equal(tattAddrToDesc, ta.AddrDesc) {
+					if bytes.Equal(addrDesc, tattAddrToDesc) {
 						receivedSat := &token.ReceivedSat
 						(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), &tatt.Value)
 					}
