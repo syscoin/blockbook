@@ -471,11 +471,11 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 					token.Add(token, (*big.Int)(tokenTransfer.Value))
 				}
 			}
-			resultTx.TokenReceivedSatoshis = make(map[uint32]int64, len(mapTokensIn))
+			ahi.TokenReceivedSatoshis = make(map[uint32]int64, len(mapTokensIn))
 			for k, v := range mapTokensIn {
 				ahi.TokenReceivedSatoshis[k] = v.Int64()
 			}
-			resultTx.TokenSentSatoshis = make(map[uint32]int64, len(mapTokensOut))
+			ahi.TokenSentSatoshis = make(map[uint32]int64, len(mapTokensOut))
 			for k, v := range mapTokensOut {
 				ahi.TokenSentSatoshis[k] = v.Int64()
 			}
