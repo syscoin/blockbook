@@ -895,7 +895,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			var token *TokenBalanceHistory
 			var ok bool
 			var err error
-			var assetGuid uint32
+			var assetGuid int
 			tatt := &ta.TokenTransfers[0]
 			if bh.Tokens == nil {
 				bh.Tokens = map[uint32]*TokenBalanceHistory{}
@@ -904,7 +904,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			if err != nil {
 				return nil, err
 			}
-			if token, ok = bh.Tokens[assetGuid]; !ok {
+			if token, ok = bh.Tokens[uint32(assetGuid)]; !ok {
 				token = &TokenBalanceHistory{}
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
@@ -915,7 +915,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			}
 			if bytes.Equal(addrDesc, tattAddrFromDesc) {
 				sentSat := &token.SentSat
-				(*big.Int)(sentSat).Add((*big.Int)(sentSat), &tatt.Value)
+				(*big.Int)(sentSat).Add((*big.Int)(sentSat), tatt.Value)
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
 			} else {
 				for i := range ta.TokenTransfers {
@@ -925,7 +925,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					}
 					if bytes.Equal(addrDesc, tattAddrToDesc) {
 						receivedSat := &token.ReceivedSat
-						(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), &tatt.Value)
+						(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), tatt.Value)
 					}
 				}
 			}
@@ -1391,7 +1391,7 @@ func (w *Worker) GetFeeStats(bid string) (*FeeStats, error) {
 
 		// Serialize the raw JSON into TxSpecific struct
 		var txSpec txSpecific
-		err = json.Unmarshal(*txSpecificJSON, &txSpec)
+		err = json.Unmarshal(txSpecificJSON, &txSpec)
 		if err != nil {
 			return nil, errors.Annotatef(err, "Unmarshal")
 		}

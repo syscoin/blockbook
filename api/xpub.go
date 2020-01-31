@@ -524,10 +524,10 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		txCount = int(data.txCountEstimate)
 	}
 	usedTokens := 0
-	var tokens []Token
+	var tokens []bchain.Token
 	var xpubAddresses map[string]struct{}
 	if option > AccountDetailsBasic {
-		tokens = make([]Token, 0, 4)
+		tokens = make([]bchain.Token, 0, 4)
 		xpubAddresses = make(map[string]struct{})
 	}
 	for ci, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
