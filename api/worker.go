@@ -893,7 +893,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		}
 		if len(ta.TokenTransfers) > 0 {
 			if bh.Tokens == nil {
-				bh.Tokens = map[uint32]*bchain.TokenBalanceHistory{}
+				bh.Tokens = map[uint32]*TokenBalanceHistory{}
 			}
 			if token, ok := bh.Tokens[tatt.Token]; !ok {
 				token.SentSat = (*bchain.Amount)(big.NewInt(0))
