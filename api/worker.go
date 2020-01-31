@@ -893,11 +893,11 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		}
 		if len(ta.TokenTransfers) > 0 {
 			if bh.Tokens == nil {
-				bh.Tokens = map[uint32]*TokenBalanceHistory{}
+				bh.Tokens = map[uint32]*bchain.TokenBalanceHistory{}
 			}
 			if token, ok := bh.Tokens[tatt.Token]; !ok {
-				token.SentSat = (*Amount)(big.NewInt(0))
-				token.ReceivedSat = (*Amount)(big.NewInt(0))
+				token.SentSat = (*bchain.Amount)(big.NewInt(0))
+				token.ReceivedSat = (*bchain.Amount)(big.NewInt(0))
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
 			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
