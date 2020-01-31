@@ -106,7 +106,7 @@ func (w *Worker) TxToV1(tx *Tx) *TxV1 {
 	d := w.chainParser.AmountDecimals()
 	vinV1 := make([]VinV1, len(*tx.Vin))
 	for i := range *tx.Vin {
-		v := &(*tx.Vin[i])
+		v := &tx.Vin[0][i]
 		vinV1[i] = VinV1{
 			AddrDesc:  v.AddrDesc,
 			Addresses: v.Addresses,
@@ -125,7 +125,7 @@ func (w *Worker) TxToV1(tx *Tx) *TxV1 {
 	}
 	voutV1 := make([]VoutV1, len(*tx.Vout))
 	for i := range *tx.Vout {
-		v := &(*tx.Vout[i])
+		v := &tx.Vout[0][i]
 		voutV1[i] = VoutV1{
 			N: v.N,
 			ScriptPubKey: ScriptPubKeyV1{
