@@ -892,14 +892,13 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			}
 		}
 		if len(ta.TokenTransfers) > 0 {
-			var token *bchain.Amount
+			var token *TokenBalanceHistory
 			var ok bool
 			if bh.Tokens == nil {
 				bh.Tokens = map[uint32]*TokenBalanceHistory{}
 			}
 			if token, ok = bh.Tokens[tatt.Token]; !ok {
-				token.SentSat = (*bchain.Amount)(big.NewInt(0))
-				token.ReceivedSat = (*bchain.Amount)(big.NewInt(0))
+				token = &TokenBalanceHistory{}
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
 			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
@@ -909,7 +908,8 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				return nil, err
 			}
 			if bytes.Equal(tattAddrFromDesc, ta.AddrDesc) {
-				(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), &tatt.Value)
+				sentSat := &bhaToken.SentSat
+				(*big.Int)(sentSat).Add((*big.Int)(sentSat), &tatt.Value)
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
 			} else {
 				for i := range ta.TokenTransfers {
@@ -918,7 +918,8 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 						return nil, err
 					}
 					if bytes.Equal(tattAddrToDesc, ta.AddrDesc) {
-						(*big.Int)(token.ReceivedSat).Add((*big.Int)(token.ReceivedSat), &tatt.Value)
+						receivedSat := &bhaToken.ReceivedSat
+						(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), &tatt.Value)
 					}
 				}
 			}

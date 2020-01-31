@@ -292,7 +292,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 						bha.Tokens = map[uint32]*TokenBalanceHistory{}
 					}
 					if bhaToken, ok = bha.Tokens[i]; !ok {
-						bhaToken = TokenBalanceHistory{}
+						bhaToken = &TokenBalanceHistory{}
 					}
 					sentSat := &bhaToken.SentSat
 					receivedSat := &bhaToken.ReceivedSat
