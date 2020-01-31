@@ -360,6 +360,46 @@ const SPTAllocatedTokenType TokenType = "SPTAllocated"
 const SPTUnAllocatedTokenType TokenType = "SPTUnAllocated"
 
 
+// Amount is datatype holding amounts
+type Amount big.Int
+// MarshalJSON Amount serialization
+func (a *Amount) MarshalJSON() (out []byte, err error) {
+	if a == nil {
+		return []byte(`"0"`), nil
+	}
+	return []byte(`"` + (*big.Int)(a).String() + `"`), nil
+}
+
+func (a *Amount) String() string {
+	if a == nil {
+		return ""
+	}
+	return (*big.Int)(a).String()
+}
+
+// DecimalString returns amount with decimal point placed according to parameter d
+func (a *Amount) DecimalString(d int) string {
+	return AmountToDecimalString((*big.Int)(a), d)
+}
+
+// AsBigInt returns big.Int type for the Amount (empty if Amount is nil)
+func (a *Amount) AsBigInt() big.Int {
+	if a == nil {
+		return *new(big.Int)
+	}
+	return big.Int(*a)
+}
+
+// AsInt64 returns Amount as int64 (0 if Amount is nil).
+// It is used only for legacy interfaces (socket.io)
+// and generally not recommended to use for possible loss of precision.
+func (a *Amount) AsInt64() int64 {
+	if a == nil {
+		return 0
+	}
+	return (*big.Int)(a).Int64()
+}
+
 // Token contains info about tokens held by an address
 type Token struct {
 	Type             TokenType `json:"type"`

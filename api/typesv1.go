@@ -87,7 +87,7 @@ type AddressV1 struct {
 type AddressUtxoV1 struct {
 	Txid          string  `json:"txid"`
 	Vout          uint32  `json:"vout"`
-	Amount        string  `json:"amount"`
+	bchain.Amount        string  `json:"amount"`
 	AmountSat     big.Int `json:"satoshis"`
 	Height        int     `json:"height,omitempty"`
 	Confirmations int     `json:"confirmations"`
@@ -199,7 +199,7 @@ func (w *Worker) AddressUtxoToV1(au Utxos) []AddressUtxoV1 {
 		utxo := &au[i]
 		v1[i] = AddressUtxoV1{
 			AmountSat:     utxo.AmountSat.AsBigInt(),
-			Amount:        utxo.AmountSat.DecimalString(d),
+			bchain.Amount:        utxo.AmountSat.DecimalString(d),
 			Confirmations: utxo.Confirmations,
 			Height:        utxo.Height,
 			Txid:          utxo.Txid,

@@ -189,7 +189,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 					}
 					if len(otx.Vout) > int(vin.Vout) {
 						vout := &otx.Vout[vin.Vout]
-						vin.ValueSat = (*Amount)(&vout.ValueSat)
+						vin.ValueSat = (*bchain.Amount)(&vout.ValueSat)
 						vin.AddrDesc, vin.Addresses, vin.IsAddress, err = w.getAddressesFromVout(vout)
 						if err != nil {
 							glog.Errorf("getAddressesFromVout error %v, vout %+v", err, vout)
@@ -198,7 +198,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				} else {
 					if len(tas.Outputs) > int(vin.Vout) {
 						output := &tas.Outputs[vin.Vout]
-						vin.ValueSat = (*Amount)(&output.ValueSat)
+						vin.ValueSat = (*bchain.Amount)(&output.ValueSat)
 						vin.AddrDesc = output.AddrDesc
 						vin.Addresses, vin.IsAddress, err = output.Addresses(w.chainParser)
 						if err != nil {
@@ -226,7 +226,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		bchainVout := &bchainTx.Vout[i]
 		vout := &vouts[i]
 		vout.N = i
-		vout.ValueSat = (*Amount)(&bchainVout.ValueSat)
+		vout.ValueSat = (*bchain.Amount)(&bchainVout.ValueSat)
 		valOutSat.Add(&valOutSat, &bchainVout.ValueSat)
 		vout.Hex = bchainVout.ScriptPubKey.Hex
 		vout.AddrDesc, vout.Addresses, vout.IsAddress, err = w.getAddressesFromVout(bchainVout)
@@ -278,7 +278,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				From:     e.From,
 				To:       e.To,
 				Decimals: erc20c.Decimals,
-				Value:    (*Amount)(&e.Tokens),
+				Value:    (*bchain.Amount)(&e.Tokens),
 				Name:     erc20c.Name,
 				Symbol:   erc20c.Symbol,
 			}
@@ -293,7 +293,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		}
 		ethSpecific = &EthereumSpecific{
 			GasLimit: ethTxData.GasLimit,
-			GasPrice: (*Amount)(ethTxData.GasPrice),
+			GasPrice: (*bchain.Amount)(ethTxData.GasPrice),
 			GasUsed:  ethTxData.GasUsed,
 			Nonce:    ethTxData.Nonce,
 			Status:   ethTxData.Status,
@@ -318,11 +318,11 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Blockheight:      height,
 		Blocktime:        bchainTx.Blocktime,
 		Confirmations:    bchainTx.Confirmations,
-		FeesSat:          (*Amount)(&feesSat),
+		FeesSat:          (*bchain.Amount)(&feesSat),
 		Locktime:         bchainTx.LockTime,
 		Txid:             bchainTx.Txid,
-		ValueInSat:       (*Amount)(pValInSat),
-		ValueOutSat:      (*Amount)(&valOutSat),
+		ValueInSat:       (*bchain.Amount)(pValInSat),
+		ValueOutSat:      (*bchain.Amount)(&valOutSat),
 		Version:          bchainTx.Version,
 		Hex:              bchainTx.Hex,
 		Rbf:              rbf,
@@ -440,7 +440,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		tai := &ta.Inputs[i]
 		vin := &vins[i]
 		vin.N = i
-		vin.ValueSat = (*Amount)(&tai.ValueSat)
+		vin.ValueSat = (*bchain.Amount)(&tai.ValueSat)
 		valInSat.Add(&valInSat, &tai.ValueSat)
 		vin.Addresses, vin.IsAddress, err = tai.Addresses(w.chainParser)
 		if err != nil {
@@ -452,7 +452,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		tao := &ta.Outputs[i]
 		vout := &vouts[i]
 		vout.N = i
-		vout.ValueSat = (*Amount)(&tao.ValueSat)
+		vout.ValueSat = (*bchain.Amount)(&tao.ValueSat)
 		valOutSat.Add(&valOutSat, &tao.ValueSat)
 		vout.Addresses, vout.IsAddress, err = tao.Addresses(w.chainParser)
 		if err != nil {
@@ -470,10 +470,10 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		Blockheight:   int(ta.Height),
 		Blocktime:     bi.Time,
 		Confirmations: bestheight - ta.Height + 1,
-		FeesSat:       (*Amount)(&feesSat),
+		FeesSat:       (*bchain.Amount)(&feesSat),
 		Txid:          txid,
-		ValueInSat:    (*Amount)(&valInSat),
-		ValueOutSat:   (*Amount)(&valOutSat),
+		ValueInSat:    (*bchain.Amount)(&valInSat),
+		ValueOutSat:   (*bchain.Amount)(&valOutSat),
 		Vin:           &vins,
 		Vout:          &vouts,
 		TokenTransfers:  ta.tokens,
@@ -575,7 +575,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 				}
 				tokens[j] = bchain.Token{
 					Type:          bchain.ERC20TokenType,
-					BalanceSat:    (*Amount)(b),
+					BalanceSat:    (*bchain.Amount)(b),
 					Contract:      ci.Contract,
 					Name:          ci.Name,
 					Symbol:        ci.Symbol,
@@ -796,9 +796,9 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
 				Symbol:			  "SPT",
-				BalanceSat:       (*Amount)(balanceAssetSat),
-				TotalReceivedSat: (*Amount)(totalReceived),
-				TotalSentSat:     (*Amount)(sentAssetSat),
+				BalanceSat:       (*bchain.Amount)(balanceAssetSat),
+				TotalReceivedSat: (*bchain.Amount)(totalReceived),
+				TotalSentSat:     (*bchain.Amount)(sentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
 			})
 		}
@@ -806,12 +806,12 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	r := &Address{
 		Paging:                pg,
 		AddrStr:               address,
-		BalanceSat:            (*Amount)(&ba.BalanceSat),
-		TotalReceivedSat:      (*Amount)(totalReceived),
-		TotalSentSat:          (*Amount)(totalSent),
+		BalanceSat:            (*bchain.Amount)(&ba.BalanceSat),
+		TotalReceivedSat:      (*bchain.Amount)(totalReceived),
+		TotalSentSat:          (*bchain.Amount)(totalSent),
 		Txs:                   int(ba.Txs),
 		NonTokenTxs:           nonTokenTxs,
-		UnconfirmedBalanceSat: (*Amount)(&uBalSat),
+		UnconfirmedBalanceSat: (*bchain.Amount)(&uBalSat),
 		UnconfirmedTxs:        unconfirmedTxs,
 		Transactions:          txs,
 		Txids:                 txids,
@@ -874,8 +874,8 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 	bh := BalanceHistory{
 		Time:        time,
 		Txs:         1,
-		SentSat:     &Amount{},
-		ReceivedSat: &Amount{},
+		SentSat:     &bchain.Amount{},
+		ReceivedSat: &bchain.Amount{},
 		Txid:        txid,
 		Tokens:		 map[uint32]TokenBalanceHistory{},
 	}
@@ -1072,7 +1072,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 								utxos = append(utxos, Utxo{
 									Txid:      bchainTx.Txid,
 									Vout:      int32(i),
-									AmountSat: (*Amount)(&vout.ValueSat),
+									AmountSat: (*bchain.Amount)(&vout.ValueSat),
 									Locktime:  bchainTx.LockTime,
 									Coinbase:  coinbase,
 								})
@@ -1127,7 +1127,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 						utxos = append(utxos, Utxo{
 							Txid:          txid,
 							Vout:          utxo.Vout,
-							AmountSat:     (*Amount)(&utxo.ValueSat),
+							AmountSat:     (*bchain.Amount)(&utxo.ValueSat),
 							Height:        int(utxo.Height),
 							Confirmations: confirmations,
 							Coinbase:      coinbase,
@@ -1447,7 +1447,7 @@ func (w *Worker) GetFeeStats(bid string) (*FeeStats, error) {
 	return &FeeStats{
 		TxCount:         len(feesPerKb),
 		AverageFeePerKb: averageFeePerKb,
-		TotalFeesSat:    (*Amount)(totalFeesSat),
+		TotalFeesSat:    (*bchain.Amount)(totalFeesSat),
 		DecilesFeePerKb: deciles,
 	}, nil
 }

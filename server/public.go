@@ -505,14 +505,14 @@ func formatTime(t time.Time) string {
 
 // for now return the string as it is
 // in future could be used to do coin specific formatting
-func (s *PublicServer) formatAmount(a *api.Amount) string {
+func (s *PublicServer) formatAmount(a *api.bchain.Amount) string {
 	if a == nil {
 		return "0"
 	}
 	return s.chainParser.AmountToDecimalString((*big.Int)(a))
 }
 
-func formatAmountWithDecimals(a *api.Amount, d int) string {
+func formatAmountWithDecimals(a *api.bchain.Amount, d int) string {
 	if a == nil {
 		return "0"
 	}
