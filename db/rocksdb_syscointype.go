@@ -134,8 +134,8 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		return errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
-	txAddresses.TokenTransfers = make([]TokenTransfer, len(assetAllocation.ListSendingAllocationAmounts))
-	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
+	txAddresses.TokenTransfers = make([]bchain.TokenTransfer, len(assetAllocation.ListSendingAllocationAmounts))
+	for i, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		receiverAddress := allocation.WitnessAddress.ToString("sys")
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverAddress)
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
@@ -184,7 +184,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAssetSat.Add(balanceAssetSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		txAddresses.TokenTransfers[i] = bchain.TokenTransfer {
-			Type:     bchain.SPTTokenType,
+			Type:     bchain.SPTAllocatedTokenType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       receiverAddress,
@@ -587,7 +587,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 		return nil
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
-		return d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex)
+		return d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses)
 	} else if d.chainParser.IsAssetTx(version) {
 		return d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
