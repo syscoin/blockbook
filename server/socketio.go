@@ -278,7 +278,7 @@ type resTx struct {
 	Outputs        []txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`
-	TokenTransfers *[]bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	TokenOutputSatoshis  map[uint32]int64    `json:"tokenOutputSatoshis,omitempty"`
 }
 
