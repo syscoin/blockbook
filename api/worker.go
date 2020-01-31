@@ -918,7 +918,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				(*big.Int)(sentSat).Add((*big.Int)(sentSat), (*big.Int)(tatt.Value))
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
 			} else {
-				for tatt = range ta.TokenTransfers {
+				for tatt, _ = range ta.TokenTransfers {
 					tattAddrToDesc, err = w.chainParser.GetAddrDescFromAddress(tatt.To)
 					if err != nil {
 						return nil, err
