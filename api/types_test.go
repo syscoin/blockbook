@@ -3,6 +3,7 @@
 package api
 
 import (
+	"blockbook/bchain"
 	"encoding/json"
 	"math/big"
 	"reflect"
