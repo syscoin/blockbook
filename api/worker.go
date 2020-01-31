@@ -877,7 +877,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		SentSat:     &Amount{},
 		ReceivedSat: &Amount{},
 		Txid:        txid,
-		Tokens:		 TokenHistory{}
+		Tokens:		 map[uint32]TokenBalanceHistory{},
 	}
 	if w.chainType == bchain.ChainBitcoinType {
 		for i := range ta.Inputs {
