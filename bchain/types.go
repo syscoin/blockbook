@@ -295,7 +295,7 @@ func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 			}
 		}
 	}
-	glog.Errorf("Utxo %s:%d not found, using in map %v", hex.EncodeToString(btxID), vout, len(ab.utxosMap) != 0)
+	glog.Errorf("Utxo %s:%d not found, utxosMap size %d", hex.EncodeToString(btxID), vout, len(ab.utxosMap))
 }
 
 // AddressBalanceDetail specifies what data are returned by GetAddressBalance
