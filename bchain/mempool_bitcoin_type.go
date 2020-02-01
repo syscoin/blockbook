@@ -139,12 +139,12 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 		return 0, err
 	}
 	glog.V(2).Info("mempool: resync ", len(txs), " txs")
-	onNewEntry := func(txid string, entry txEntry) {
+	onNewEntry := func(txid string, entry *txEntry) {
 		if len(entry.addrIndexes) > 0 {
 			m.mux.Lock()
 			m.txEntries[txid] = entry
 			for _, si := range entry.addrIndexes {
-				m.addrDescToTx[si.addrDesc] = append(m.addrDescToTx[si.addrDesc], Outpoint{txid, si.n})
+				m.addrDescToTx[si.addrDesc] = append(m.addrDescToTx[si.addrDesc], &Outpoint{txid, si.n})
 			}
 			m.mux.Unlock()
 		}
@@ -162,7 +162,7 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 				select {
 				// store as many processed transactions as possible
 				case tio := <-m.chanAddrIndex:
-					onNewEntry(tio.txid, txEntry{tio.io, txTime})
+					onNewEntry(tio.txid, &txEntry{tio.io, txTime})
 					dispatched--
 				// send transaction to be processed
 				case m.chanTxid <- txid:
@@ -174,7 +174,7 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 	}
 	for i := 0; i < dispatched; i++ {
 		tio := <-m.chanAddrIndex
-		onNewEntry(tio.txid, txEntry{tio.io, txTime})
+		onNewEntry(tio.txid, &txEntry{tio.io, txTime})
 	}
 
 	for txid, entry := range m.txEntries {

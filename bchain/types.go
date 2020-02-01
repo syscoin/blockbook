@@ -236,7 +236,7 @@ func ReceivedSatFromBalances(balance *big.Int, sent *big.Int) *big.Int {
 
 // AddUtxo
 func (ab *AddrBalance) AddUtxo(u *Utxo) {
-	ab.Utxos = append(ab.Utxos, *u)
+	ab.Utxos = append(ab.Utxos, u)
 	l := len(ab.Utxos)
 	if l >= 16 {
 		if len(ab.utxosMap) == 0 {

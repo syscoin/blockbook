@@ -66,7 +66,7 @@ func (a MempoolTxidEntries) Less(i, j int) bool {
 }
 
 // removeEntryFromMempool removes entry from mempool structs. The caller is responsible for locking!
-func (m *BaseMempool) removeEntryFromMempool(txid string, entry txEntry) {
+func (m *BaseMempool) removeEntryFromMempool(txid string, entry *txEntry) {
 	delete(m.txEntries, txid)
 	for _, si := range entry.addrIndexes {
 		outpoints, found := m.addrDescToTx[si.addrDesc]
