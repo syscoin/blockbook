@@ -87,7 +87,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				inputOutput |= txOutput
 			}
 		}
-		txs = append(txs, xpubTxid{txid, height, inputOutput})
+		txs = append(txs, &xpubTxid{txid, height, inputOutput})
 		return nil
 	}
 	if mempool {
@@ -204,7 +204,7 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 		if err != nil {
 			return 0, nil, err
 		}
-		for i, a := range *descriptors {
+		for i, a := range descriptors {
 			ad := xpubAddress{addrDesc: a}
 			used, err := w.xpubDerivedAddressBalance(data, &ad)
 			if err != nil {
@@ -457,8 +457,8 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 						uBalSat.Add(&uBalSat, tx.getAddrVoutValue(ad.addrDesc))
 						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc))
 						// mempool txs are returned only on the first page, uniquely and filtered
-						if page == 0 && !foundTx && (txidFilter == nil || txidFilter(&txid, ad)) {
-							mempoolEntries = append(mempoolEntries, bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
+						if page == 0 && !foundTx && (txidFilter == nil || txidFilter(txid, ad)) {
+							mempoolEntries = append(mempoolEntries, &bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
 						}
 					}
 				}
@@ -488,7 +488,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 					}
 					// add tx only once
 					if !added {
-						add := txidFilter == nil || txidFilter(&txid, ad)
+						add := txidFilter == nil || txidFilter(txid, ad)
 						txcMap[txid.txid] = add
 						if add {
 							txc = append(txc, txid)
@@ -514,7 +514,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		}
 		// get confirmed transactions
 		for i := from; i < to; i++ {
-			xpubTxid := &txc[i]
+			xpubTxid := txc[i]
 			if option == AccountDetailsTxidHistory {
 				txids = append(txids, xpubTxid.txid)
 			} else {
@@ -604,7 +604,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 				txs := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
 				for _ , t := range txs {
 					for j := range utxos {
-						a := &utxos[j]
+						a := utxos[j]
 						a.Address = t.Name
 						a.Path = t.Path
 					}
@@ -645,7 +645,7 @@ func (w *Worker) GetXpubBalanceHistory(xpub string, fromTime, toTime time.Time, 
 					return nil, err
 				}
 				if bh != nil {
-					bhs = append(bhs, *bh)
+					bhs = append(bhs, bh)
 				}
 			}
 		}
