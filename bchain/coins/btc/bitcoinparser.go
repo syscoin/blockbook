@@ -355,7 +355,7 @@ func (p *BitcoinParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (*bch
 	if err != nil {
 		return nil, err
 	}
-	addrDesc, res != txscript.PayToAddrScript(a)
+	addrDesc, res := txscript.PayToAddrScript(a)
 	return &addrDesc, res
 }
 
