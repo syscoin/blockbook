@@ -189,7 +189,7 @@ func (zc *ZcoinRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 		return nil, err
 	}
 
-	tx, err := zc.Parser.ParseTxFromJson(r)
+	tx, err := zc.Parser.ParseTxFromJson(&r)
 	tx.CoinSpecificData = r
 	if err != nil {
 		return nil, errors.Annotatef(err, "txid %v", txid)

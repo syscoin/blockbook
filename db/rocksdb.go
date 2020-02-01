@@ -466,7 +466,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	if err := d.db.Write(d.wo, wb); err != nil {
 		return err
 	}
-	d.is.AppendBlockTime(uint32(block.Time))
+	d.is.AppendBlockTime(uint32(block.BlockHeader.Time))
 	return nil
 }
 
@@ -507,7 +507,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 		for i, output := range tx.Vout {
 			tao := ta.Outputs[i]
 			tao.ValueSat = output.ValueSat
-			addrDesc, err := d.chainParser.GetAddrDescFromVout(&output)
+			addrDesc, err := d.chainParser.GetAddrDescFromVout(output)
 			if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 				if err != nil {
 					// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
@@ -904,11 +904,11 @@ func (d *RocksDB) GetBlockInfo(height uint32) (*bchain.DbBlockInfo, error) {
 
 func (d *RocksDB) writeHeightFromBlock(wb *gorocksdb.WriteBatch, block *bchain.Block, op int) error {
 	return d.writeHeight(wb, block.Height, &bchain.DbBlockInfo{
-		Hash:   block.Hash,
-		Time:   block.Time,
+		Hash:   block.BlockHeader.Hash,
+		Time:   block.BlockHeader.Time,
 		Txs:    uint32(len(block.Txs)),
 		Size:   uint32(block.BlockHeader.Size),
-		Height: block.Height,
+		Height: block.BlockHeader.Height,
 	}, op)
 }
 
