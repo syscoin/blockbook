@@ -49,7 +49,7 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (*txEntr
 		if err != ErrTxNotFound {
 			glog.Warning("cannot get transaction ", txid, ": ", err)
 		}
-		return txEntry{}, false
+		return &txEntry{}, false
 	}
 	parser := m.chain.GetChainParser()
 	addrIndexes := make([]*addrIndex, 0, len(tx.Vout)+len(tx.Vin))
@@ -83,7 +83,8 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (*txEntr
 		sent := make(map[string]struct{})
 		for _, si := range addrIndexes {
 			if _, found := sent[si.addrDesc]; !found {
-				m.OnNewTxAddr(tx, &(AddressDescriptor(si.addrDesc)))
+				addrDesc := AddressDescriptor(si.addrDesc)
+				m.OnNewTxAddr(tx, &addrDesc)
 				sent[si.addrDesc] = struct{}{}
 			}
 		}
