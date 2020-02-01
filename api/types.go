@@ -263,7 +263,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 		}
 		sort.Sort(a)
 		for i := range a {
-			bh := &a[i]
+			bh := a[i]
 			time := bh.Time - bh.Time%groupByTime
 			if bha.Time != time {
 				if bha.Time != 0 {

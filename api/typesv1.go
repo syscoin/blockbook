@@ -196,7 +196,7 @@ func (w *Worker) AddressUtxoToV1(au Utxos) []AddressUtxoV1 {
 	d := w.chainParser.AmountDecimals()
 	v1 := make([]AddressUtxoV1, len(au))
 	for i := range au {
-		utxo := &au[i]
+		utxo := au[i]
 		v1[i] = AddressUtxoV1{
 			AmountSat:     utxo.AmountSat.AsBigInt(),
 			Amount:        utxo.AmountSat.DecimalString(d),
