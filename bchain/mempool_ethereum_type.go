@@ -31,14 +31,14 @@ func NewMempoolEthereumType(chain BlockChain, mempoolTxTimeoutHours int, queryBa
 	}
 }
 
-func appendAddress(io []addrIndex, i int32, a string, parser BlockChainParser) []addrIndex {
+func appendAddress(io []*addrIndex, i int32, a string, parser BlockChainParser) []*addrIndex {
 	if len(a) > 0 {
 		addrDesc, err := parser.GetAddrDescFromAddress(a)
 		if err != nil {
 			glog.Error("error in input addrDesc in ", a, ": ", err)
 			return io
 		}
-		io = append(io, addrIndex{string(addrDesc), i})
+		io = append(io, &addrIndex{string(*addrDesc), i})
 	}
 	return io
 }
@@ -52,7 +52,7 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 		return txEntry{}, false
 	}
 	parser := m.chain.GetChainParser()
-	addrIndexes := make([]addrIndex, 0, len(tx.Vout)+len(tx.Vin))
+	addrIndexes := make([]*addrIndex, 0, len(tx.Vout)+len(tx.Vin))
 	for _, output := range tx.Vout {
 		addrDesc, err := parser.GetAddrDescFromVout(&output)
 		if err != nil {
@@ -61,8 +61,8 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 			}
 			continue
 		}
-		if len(addrDesc) > 0 {
-			addrIndexes = append(addrIndexes, addrIndex{string(addrDesc), int32(output.N)})
+		if len(*addrDesc) > 0 {
+			addrIndexes = append(addrIndexes, &addrIndex{string(*addrDesc), int32(output.N)})
 		}
 	}
 	for _, input := range tx.Vin {
@@ -83,7 +83,7 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 		sent := make(map[string]struct{})
 		for _, si := range addrIndexes {
 			if _, found := sent[si.addrDesc]; !found {
-				m.OnNewTxAddr(tx, AddressDescriptor(si.addrDesc))
+				m.OnNewTxAddr(tx, &AddressDescriptor(si.addrDesc))
 				sent[si.addrDesc] = struct{}{}
 			}
 		}

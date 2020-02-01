@@ -544,9 +544,9 @@ func (b *EthereumRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	if err != nil {
 		return nil, err
 	}
-	btxs := make([]bchain.Tx, len(body.Transactions))
+	btxs := make([]*bchain.Tx, len(body.Transactions))
 	for i := range body.Transactions {
-		tx := &body.Transactions[i]
+		tx := body.Transactions[i]
 		btx, err := b.Parser.ethTxToTx(tx, &rpcReceipt{Logs: logs[tx.Hash]}, bbh.Time, uint32(bbh.Confirmations))
 		if err != nil {
 			return nil, errors.Annotatef(err, "hash %v, height %v, txid %v", hash, height, tx.Hash)
@@ -556,11 +556,11 @@ func (b *EthereumRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 			b.Mempool.RemoveTransactionFromMempool(tx.Hash)
 		}
 	}
-	bbk := bchain.Block{
+	bbk := &bchain.Block{
 		BlockHeader: *bbh,
 		Txs:         btxs,
 	}
-	return &bbk, nil
+	return bbk, nil
 }
 
 // GetBlockInfo returns extended header (more info than in bchain.BlockHeader) with a list of txids
@@ -783,14 +783,14 @@ func (b *EthereumRPC) SendRawTransaction(hex string) (string, error) {
 }
 
 // EthereumTypeGetBalance returns current balance of an address
-func (b *EthereumRPC) EthereumTypeGetBalance(addrDesc bchain.AddressDescriptor) (*big.Int, error) {
+func (b *EthereumRPC) EthereumTypeGetBalance(addrDesc *bchain.AddressDescriptor) (*big.Int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 	defer cancel()
 	return b.client.BalanceAt(ctx, ethcommon.BytesToAddress(addrDesc), nil)
 }
 
 // EthereumTypeGetNonce returns current balance of an address
-func (b *EthereumRPC) EthereumTypeGetNonce(addrDesc bchain.AddressDescriptor) (uint64, error) {
+func (b *EthereumRPC) EthereumTypeGetNonce(addrDesc *bchain.AddressDescriptor) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 	defer cancel()
 	return b.client.NonceAt(ctx, ethcommon.BytesToAddress(addrDesc), nil)

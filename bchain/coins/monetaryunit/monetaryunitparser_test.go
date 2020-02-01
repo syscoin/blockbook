@@ -161,7 +161,7 @@ func init() {
 		LockTime:  0,
 		Time:      1556387942,
 		Version:   1,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "483045022100fe1b79f38ca4b9dc2fbc50eac6c9bf050ae5a3ee37da05b950918230eb0a8c7c0220477173b60ec00a8b4b28d5db9fc5d8259eea35f91bbdd60089c5ec1be7b05f3b01",
@@ -171,7 +171,7 @@ func init() {
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(0),
 				N:        0,

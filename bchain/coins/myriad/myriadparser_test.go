@@ -139,7 +139,7 @@ func init() {
 		Txid:      "b01e2eb866ed101ed117b4ad18b753929e85c42e3d8add76bdd16e5c00519dcc",
 		LockTime:  0,
 		Version:   1,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "4830450220129c9e9a27406796f3f7d7edcc446037b38ddb3ef94745cec8e7cde618a811140221008eb3b893cdd3725e99b74c020867821e1f74199065260586f5ef3c22b133dd2a012103e2e23d38dc8fa493cde4077f650ab9f22eacafd14a10b123994f38c9f35dfee9",
@@ -149,7 +149,7 @@ func init() {
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(22161428574),
 				N:        0,

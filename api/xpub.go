@@ -32,7 +32,7 @@ type xpubTxid struct {
 	inputOutput byte
 }
 
-type xpubTxids []xpubTxid
+type xpubTxids []*xpubTxid
 
 func (a xpubTxids) Len() int      { return len(a) }
 func (a xpubTxids) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -47,7 +47,7 @@ func (a xpubTxids) Less(i, j int) bool {
 }
 
 type xpubAddress struct {
-	addrDesc  bchain.AddressDescriptor
+	addrDesc  *bchain.AddressDescriptor
 	balance   *bchain.AddrBalance
 	txs       uint32
 	maxHeight uint32
@@ -68,10 +68,10 @@ type xpubData struct {
 	changeAddresses []xpubAddress
 }
 
-func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, maxResults int) ([]xpubTxid, bool, error) {
+func (w *Worker) xpubGetAddressTxids(addrDesc *bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, maxResults int) ([]*xpubTxid, bool, error) {
 	var err error
 	complete := true
-	txs := make([]xpubTxid, 0, 4)
+	txs := make([]*xpubTxid, 0, 4)
 	var callback db.GetTransactionsCallback
 	callback = func(txid string, height uint32, indexes []int32) error {
 		// take all txs in the last found block even if it exceeds maxResults
@@ -204,7 +204,7 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 		if err != nil {
 			return 0, nil, err
 		}
-		for i, a := range descriptors {
+		for i, a := range *descriptors {
 			ad := xpubAddress{addrDesc: a}
 			used, err := w.xpubDerivedAddressBalance(data, &ad)
 			if err != nil {

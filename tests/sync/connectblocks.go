@@ -107,7 +107,7 @@ func verifyTransactions(t *testing.T, d *db.RocksDB, h *TestHandler, rng Range) 
 		txid  string
 		index int32
 	}
-	addr2txs := make(map[string][]txInfo)
+	addr2txs := make(map[string][]*txInfo)
 	checkMap := make(map[string][]bool)
 
 	for height := rng.Lower; height <= rng.Upper; height++ {
@@ -119,13 +119,13 @@ func verifyTransactions(t *testing.T, d *db.RocksDB, h *TestHandler, rng Range) 
 		for _, tx := range block.TxDetails {
 			for _, vin := range tx.Vin {
 				for _, a := range vin.Addresses {
-					addr2txs[a] = append(addr2txs[a], txInfo{tx.Txid, ^int32(vin.Vout)})
+					addr2txs[a] = append(addr2txs[a], &txInfo{tx.Txid, ^int32(vin.Vout)})
 					checkMap[a] = append(checkMap[a], false)
 				}
 			}
 			for _, vout := range tx.Vout {
 				for _, a := range vout.ScriptPubKey.Addresses {
-					addr2txs[a] = append(addr2txs[a], txInfo{tx.Txid, int32(vout.N)})
+					addr2txs[a] = append(addr2txs[a], &txInfo{tx.Txid, int32(vout.N)})
 					checkMap[a] = append(checkMap[a], false)
 				}
 			}
@@ -241,7 +241,7 @@ func getTaInfo(parser bchain.BlockChainParser, ta *bchain.TxAddresses) (*txInfo,
 	info := &txInfo{inputs: []string{}, outputs: []string{}}
 
 	for i := range ta.Inputs {
-		info.valInSat.Add(&info.valInSat, &ta.Inputs[i].ValueSat)
+		info.valInSat.Add(&info.valInSat, ta.Inputs[i].ValueSat)
 		addrs, s, err := ta.Inputs[i].Addresses(parser)
 		if err == nil && s {
 			for _, a := range addrs {
@@ -251,7 +251,7 @@ func getTaInfo(parser bchain.BlockChainParser, ta *bchain.TxAddresses) (*txInfo,
 	}
 
 	for i := range ta.Outputs {
-		info.valOutSat.Add(&info.valOutSat, &ta.Outputs[i].ValueSat)
+		info.valOutSat.Add(&info.valOutSat, ta.Outputs[i].ValueSat)
 		addrs, s, err := ta.Outputs[i].Addresses(parser)
 		if err == nil && s {
 			for _, a := range addrs {

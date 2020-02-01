@@ -99,13 +99,13 @@ func (p *MonetaryUnitParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, errors.Annotatef(err, "DecodeTransactions")
 	}
 
-	txs := make([]bchain.Tx, len(w.Transactions))
+	txs := make([]*bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: bchain.BlockHeader{
+		BlockHeader: &bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -132,7 +132,7 @@ func (p *MonetaryUnitParser) ParseTx(b []byte) (*bchain.Tx, error) {
 	}
 	tx := p.TxFromMsgTx(&t, true)
 	tx.Hex = hex.EncodeToString(b)
-	return &tx, nil
+	return tx, nil
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
@@ -144,7 +144,7 @@ func (p *MonetaryUnitParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, e
 	}
 
 	for i := range tx.Vout {
-		vout := &tx.Vout[i]
+		vout := tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {
@@ -167,7 +167,7 @@ func (p *MonetaryUnitParser) outputScriptToAddresses(script []byte) ([]string, b
 	return rv, s, nil
 }
 
-func (p *MonetaryUnitParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bchain.AddressDescriptor {
+func (p *MonetaryUnitParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) *bchain.AddressDescriptor {
 	if len(tx.Vin) > input {
 		scriptHex := tx.Vin[input].ScriptSig.Hex
 
@@ -178,5 +178,5 @@ func (p *MonetaryUnitParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int
 	}
 
 	s := make([]byte, 10)
-	return s
+	return &s
 }

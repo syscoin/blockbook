@@ -593,7 +593,7 @@ func storeInternalStateLoop() {
 	glog.Info("storeInternalStateLoop stopped")
 }
 
-func onNewTxAddr(tx *bchain.Tx, desc bchain.AddressDescriptor) {
+func onNewTxAddr(tx *bchain.Tx, desc *bchain.AddressDescriptor) {
 	for _, c := range callbacksOnNewTxAddr {
 		c(tx, desc)
 	}

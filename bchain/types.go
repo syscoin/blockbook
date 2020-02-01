@@ -83,8 +83,8 @@ type Tx struct {
 	Txid        string `json:"txid"`
 	Version     int32  `json:"version"`
 	LockTime    uint32 `json:"locktime"`
-	Vin         []Vin  `json:"vin"`
-	Vout        []Vout `json:"vout"`
+	Vin         []*Vin  `json:"vin"`
+	Vout        []*Vout `json:"vout"`
 	BlockHeight uint32 `json:"blockHeight,omitempty"`
 	// BlockHash     string `json:"blockhash,omitempty"`
 	Confirmations    uint32      `json:"confirmations,omitempty"`
@@ -95,8 +95,8 @@ type Tx struct {
 
 // Block is block header and list of transactions
 type Block struct {
-	BlockHeader
-	Txs []Tx `json:"tx"`
+	BlockHeader *BlockHeader
+	Txs []*Tx `json:"tx"`
 }
 
 // BlockHeader contains limited data (as needed for indexing) from backend block header
@@ -213,7 +213,7 @@ type AddrBalance struct {
 	Txs        uint32
 	SentSat    big.Int
 	BalanceSat big.Int
-	Utxos      []Utxo
+	Utxos      []*Utxo
 	utxosMap   map[string]int
 	AssetBalances map[uint32]*AssetBalance
 }
@@ -262,7 +262,7 @@ func (ab *AddrBalance) AddUtxo(u *Utxo) {
 func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 	if len(ab.utxosMap) == 0 {
 		for i := range ab.Utxos {
-			utxo := &ab.Utxos[i]
+			utxo := ab.Utxos[i]
 			if utxo.Vout == vout && *(*int)(unsafe.Pointer(&utxo.BtxID[0])) == *(*int)(unsafe.Pointer(&btxID[0])) && bytes.Equal(utxo.BtxID, btxID) {
 				// mark utxo as spent by setting vout=-1
 				utxo.Vout = -1
@@ -273,7 +273,7 @@ func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 		if i, e := ab.utxosMap[string(btxID)]; e {
 			l := len(ab.Utxos)
 			for ; i < l; i++ {
-				utxo := &ab.Utxos[i]
+				utxo := ab.Utxos[i]
 				if utxo.Vout == vout {
 					if bytes.Equal(utxo.BtxID, btxID) {
 						// mark utxo as spent by setting vout=-1
@@ -292,7 +292,7 @@ func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 type AddressBalanceDetail int
 
 // MempoolTxidEntries is array of MempoolTxidEntry
-type MempoolTxidEntries []MempoolTxidEntry
+type MempoolTxidEntries []*MempoolTxidEntry
 
 // OnNewBlockFunc is used to send notification about a new block
 type OnNewBlockFunc func(hash string, height uint32)
@@ -312,11 +312,11 @@ type TxIndexes struct {
 // AddressesMap is a map of addresses in a block
 // each address contains a slice of transactions with indexes where the address appears
 // slice is used instead of map so that order is defined and also search in case of few items
-type AddressesMap map[string][]TxIndexes
+type AddressesMap map[string][]*TxIndexes
 
 // TxInput holds input data of the transaction in TxAddresses
 type TxInput struct {
-	AddrDesc AddressDescriptor
+	AddrDesc *AddressDescriptor
 	ValueSat big.Int
 }
 
@@ -331,7 +331,7 @@ type DbBlockInfo struct {
 
 // TxOutput holds output data of the transaction in TxAddresses
 type TxOutput struct {
-	AddrDesc AddressDescriptor
+	AddrDesc *AddressDescriptor
 	Spent    bool
 	ValueSat big.Int
 }
@@ -431,8 +431,8 @@ type TokenTransfer struct {
 type TxAddresses struct {
 	Version int32
 	Height  uint32
-	Inputs  []TxInput
-	Outputs []TxOutput
+	Inputs  []*TxInput
+	Outputs []*TxOutput
 	TokenTransfers []*TokenTransfer
 }
 
@@ -443,7 +443,7 @@ type DbOutpoint struct {
 
 type BlockTxs struct {
 	BtxID  []byte
-	Inputs []DbOutpoint
+	Inputs []*DbOutpoint
 }
 
 const (
@@ -490,11 +490,11 @@ type BlockChain interface {
 	// parser
 	GetChainParser() BlockChainParser
 	// EthereumType specific
-	EthereumTypeGetBalance(addrDesc AddressDescriptor) (*big.Int, error)
-	EthereumTypeGetNonce(addrDesc AddressDescriptor) (uint64, error)
+	EthereumTypeGetBalance(addrDesc *AddressDescriptor) (*big.Int, error)
+	EthereumTypeGetNonce(addrDesc *AddressDescriptor) (uint64, error)
 	EthereumTypeEstimateGas(params map[string]interface{}) (uint64, error)
 	EthereumTypeGetErc20ContractInfo(contractDesc AddressDescriptor) (*Erc20Contract, error)
-	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error)
+	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc *AddressDescriptor) (*big.Int, error)
 }
 
 // BlockChainParser defines common interface to parsing and conversions of block chain data
@@ -519,9 +519,9 @@ type BlockChainParser interface {
 	// address descriptor conversions
 	GetAddrDescFromVout(output *Vout) (AddressDescriptor, error)
 	GetAddrDescFromAddress(address string) (AddressDescriptor, error)
-	GetAddressesFromAddrDesc(addrDesc AddressDescriptor) ([]string, bool, error)
-	GetScriptFromAddrDesc(addrDesc AddressDescriptor) ([]byte, error)
-	IsAddrDescIndexable(addrDesc AddressDescriptor) bool
+	GetAddressesFromAddrDesc(addrDesc *AddressDescriptor) ([]string, bool, error)
+	GetScriptFromAddrDesc(addrDesc *AddressDescriptor) ([]byte, error)
+	IsAddrDescIndexable(addrDesc *AddressDescriptor) bool
 	// parsing/packing/unpacking specific to chain
 	PackedTxidLen() int
 	PackTxid(txid string) ([]byte, error)
@@ -533,7 +533,7 @@ type BlockChainParser interface {
 	GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor
 	PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
 	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
-	PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte
+	PackAddressKey(addrDesc *AddressDescriptor, height uint32) []byte
 	UnpackAddressKey(key []byte) ([]byte, uint32, error)
 	PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte
 	AppendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte
@@ -541,9 +541,9 @@ type BlockChainParser interface {
 	UnpackTxAddresses(buf []byte) (*TxAddresses, error)
 	UnpackTxInput(ti *TxInput, buf []byte) int
 	UnpackTxOutput(to *TxOutput, buf []byte) int
-	PackTxIndexes(txi []TxIndexes) []byte
-	PackOutpoints(outpoints []DbOutpoint) []byte
-	UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error)
+	PackTxIndexes(txi []*TxIndexes) []byte
+	PackOutpoints(outpoints []*DbOutpoint) []byte
+	UnpackNOutpoints(buf []byte) ([]*DbOutpoint, int, error)
 	PackBlockInfo(block *DbBlockInfo) ([]byte, error)
 	UnpackBlockInfo(buf []byte) (*DbBlockInfo, error)
 	// packing/unpacking generic to all chain (expect this to be in baseparser)
@@ -565,8 +565,8 @@ type BlockChainParser interface {
 	ParseBlock(b []byte) (*Block, error)
 	// xpub
 	DerivationBasePath(xpub string) (string, error)
-	DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]AddressDescriptor, error)
-	DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]AddressDescriptor, error)
+	DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]*AddressDescriptor, error)
+	DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]*AddressDescriptor, error)
 	// EthereumType specific
 	EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 	// SyscoinType specific
@@ -580,8 +580,8 @@ type BlockChainParser interface {
 // Mempool defines common interface to mempool
 type Mempool interface {
 	Resync() (int, error)
-	GetTransactions(address string) ([]Outpoint, error)
-	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
+	GetTransactions(address string) ([]*Outpoint, error)
+	GetAddrDescTransactions(addrDesc *AddressDescriptor) ([]*Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
 	GetTransactionTime(txid string) uint32
 }

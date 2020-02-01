@@ -105,7 +105,7 @@ func GetChainParams(chain string) *chaincfg.Params {
 }
 
 // GetAddrDescFromAddress returns internal address representation of given address
-func (p *BCashParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
+func (p *BCashParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
 	return p.addressToOutputScript(address)
 }
 

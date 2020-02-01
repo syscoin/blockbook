@@ -273,9 +273,9 @@ type resTx struct {
 	Hash           string `json:"hash"`
 	Locktime       int    `json:"locktime,omitempty"`
 	// Size           int         `json:"size,omitempty"`
-	Inputs         []txInputs  `json:"inputs"`
+	Inputs         []*txInputs  `json:"inputs"`
 	InputSatoshis  int64       `json:"inputSatoshis,omitempty"`
-	Outputs        []txOutputs `json:"outputs"`
+	Outputs        []*txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`
 	TokenTransfers []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
@@ -300,9 +300,9 @@ type resultGetAddressHistory struct {
 
 func txToResTx(tx *api.Tx) resTx {
 	var resultTx resTx 
-	inputs := make([]txInputs, len(*tx.Vin))
-	for i := range *tx.Vin {
-		vin := &(*tx.Vin)[i]
+	inputs := make([]*txInputs, len(tx.Vin))
+	for i := range tx.Vin {
+		vin := tx.Vin[i]
 		txid := vin.Txid
 		script := vin.Hex
 		input := txInputs{
@@ -318,9 +318,9 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		inputs[i] = input
 	}
-	outputs := make([]txOutputs, len(*tx.Vout))
-	for i := range *tx.Vout {
-		vout := &(*tx.Vout)[i]
+	outputs := make([]txOutputs, len(tx.Vout))
+	for i := range tx.Vout {
+		vout := tx.Vout[i]
 		script := vout.Hex
 		output := txOutputs{
 			Satoshis: vout.ValueSat.AsInt64(),
@@ -416,8 +416,8 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 		}
 		ads := make(map[string]*addressHistoryIndexes)
 		var totalSat big.Int
-		for i := range *tx.Vin {
-			vin := &(*tx.Vin)[i]
+		for i := range tx.Vin {
+			vin := tx.Vin[i]
 			a := addressInSlice(vin.Addresses, addr)
 			if a != "" {
 				hi := ads[a]
@@ -431,8 +431,8 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 			}
 		}
-		for i := range *tx.Vout {
-			vout := &(*tx.Vout)[i]
+		for i := range tx.Vout {
+			vout := tx.Vout[i]
 			a := addressInSlice(vout.Addresses, addr)
 			if a != "" {
 				hi := ads[a]
@@ -748,7 +748,7 @@ func (s *SocketIoServer) onSubscribe(c *gosocketio.Channel, req []byte) interfac
 			return nil
 		}
 		// normalize the addresses to AddressDescriptor
-		descs := make([]bchain.AddressDescriptor, len(addrs))
+		descs := make([]*bchain.AddressDescriptor, len(addrs))
 		for i, a := range addrs {
 			d, err := s.chainParser.GetAddrDescFromAddress(a)
 			if err != nil {
@@ -779,7 +779,7 @@ func (s *SocketIoServer) OnNewBlockHash(hash string) {
 }
 
 // OnNewTxAddr notifies users subscribed to bitcoind/addresstxid about new block
-func (s *SocketIoServer) OnNewTxAddr(txid string, desc bchain.AddressDescriptor) {
+func (s *SocketIoServer) OnNewTxAddr(txid string, desc *bchain.AddressDescriptor) {
 	addr, searchable, err := s.chainParser.GetAddressesFromAddrDesc(desc)
 	if err != nil {
 		glog.Error("GetAddressesFromAddrDesc error ", err, " for descriptor ", desc)

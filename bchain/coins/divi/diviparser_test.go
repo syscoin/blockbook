@@ -117,13 +117,13 @@ func init() {
 		Hex:      "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0603de3d060101ffffffff0100000000000000000000000000",
 		Txid:     "f7a5324866ba18058ab032196f34458d19f7ec5a4ac284670c3ef07bfa724644",
 		LockTime: 0,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				Coinbase: "03de3d060101",
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(0),
 				N:        0,
@@ -140,7 +140,7 @@ func init() {
 		Hex:      "0100000001084b029489e1cddf726080c447c8a2b1d4bbe43024db31b8b19bc07585db9555010000006a473044022017422b9e3414d6233fa75f9eb7778469bebbb40686b0f7eb77d90a04c80149610220411f1063086fe205ea821ceb0de89e8158e202aba00f5ebb92b51f97381311fd012102ccb10a2f0603a0624b8708abefb5f4700631fc131c5de38b51e0359e2ffa7d1cffffffff03000000000000000000f260de1a580100001976a9145b1d583a4c270f2f14be77b298f0a9c6df97471388ac009ca6920c0000001976a914cb1196fb1b98d04b0cb8d2ffde3c2de3eb83d9fe88ac00000000",
 		Txid:     "eace41778a2940ff423b72a42033990eb5d6092810734a5806da6f3e5b340864",
 		LockTime: 0,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "473044022017422b9e3414d6233fa75f9eb7778469bebbb40686b0f7eb77d90a04c80149610220411f1063086fe205ea821ceb0de89e8158e202aba00f5ebb92b51f97381311fd012102ccb10a2f0603a0624b8708abefb5f4700631fc131c5de38b51e0359e2ffa7d1c",
@@ -150,7 +150,7 @@ func init() {
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(0),
 				N:        0,

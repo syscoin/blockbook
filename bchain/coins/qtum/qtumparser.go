@@ -115,13 +115,13 @@ func (p *QtumParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, err
 	}
 
-	txs := make([]bchain.Tx, len(w.Transactions))
+	txs := make([]*bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: bchain.BlockHeader{
+		BlockHeader: &bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -138,7 +138,7 @@ func (p *QtumParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
 	}
 
 	for i := range tx.Vout {
-		vout := &tx.Vout[i]
+		vout := tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {

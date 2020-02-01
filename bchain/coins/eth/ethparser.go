@@ -130,7 +130,7 @@ func (p *EthereumParser) ethTxToTx(tx *rpcTransaction, receipt *rpcReceipt, bloc
 		// LockTime
 		Time: blocktime,
 		Txid: txid,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				Addresses: fa,
 				// Coinbase
@@ -140,7 +140,7 @@ func (p *EthereumParser) ethTxToTx(tx *rpcTransaction, receipt *rpcReceipt, bloc
 				// Vout
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				N:        0, // there is always up to one To address
 				ValueSat: *vs,
@@ -155,7 +155,7 @@ func (p *EthereumParser) ethTxToTx(tx *rpcTransaction, receipt *rpcReceipt, bloc
 }
 
 // GetAddrDescFromVout returns internal address representation of given transaction output
-func (p *EthereumParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
+func (p *EthereumParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.AddressDescriptor, error) {
 	if len(output.ScriptPubKey.Addresses) != 1 {
 		return nil, bchain.ErrAddressMissing
 	}
@@ -167,7 +167,7 @@ func has0xPrefix(s string) bool {
 }
 
 // GetAddrDescFromAddress returns internal address representation of given address
-func (p *EthereumParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
+func (p *EthereumParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
 	// github.com/ethereum/go-ethereum/common.HexToAddress does not handle address errors, using own decoding
 	if has0xPrefix(address) {
 		address = address[2:]
@@ -175,11 +175,11 @@ func (p *EthereumParser) GetAddrDescFromAddress(address string) (bchain.AddressD
 	if len(address) != EthereumTypeAddressDescriptorLen*2 {
 		return nil, bchain.ErrAddressMissing
 	}
-	return hex.DecodeString(address)
+	return &hex.DecodeString(address)
 }
 
 // EIP55Address returns an EIP55-compliant hex string representation of the address
-func EIP55Address(addrDesc bchain.AddressDescriptor) string {
+func EIP55Address(addrDesc *bchain.AddressDescriptor) string {
 	raw := hexutil.Encode(addrDesc)
 	if len(raw) != 42 {
 		return raw
@@ -213,12 +213,12 @@ func EIP55AddressFromAddress(address string) string {
 }
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
-func (p *EthereumParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
+func (p *EthereumParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
 	return []string{EIP55Address(addrDesc)}, true, nil
 }
 
 // GetScriptFromAddrDesc returns output script for given address descriptor
-func (p *EthereumParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]byte, error) {
+func (p *EthereumParser) GetScriptFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]byte, error) {
 	return addrDesc, nil
 }
 

@@ -120,7 +120,7 @@ func (b *EthereumRPC) ethCall(data, to string) (string, error) {
 	return r, nil
 }
 
-func parseErc20NumericProperty(contractDesc bchain.AddressDescriptor, data string) *big.Int {
+func parseErc20NumericProperty(contractDesc *bchain.AddressDescriptor, data string) *big.Int {
 	if has0xPrefix(data) {
 		data = data[2:]
 	}
@@ -137,7 +137,7 @@ func parseErc20NumericProperty(contractDesc bchain.AddressDescriptor, data strin
 	return nil
 }
 
-func parseErc20StringProperty(contractDesc bchain.AddressDescriptor, data string) string {
+func parseErc20StringProperty(contractDesc *bchain.AddressDescriptor, data string) string {
 	if has0xPrefix(data) {
 		data = data[2:]
 	}
@@ -172,7 +172,7 @@ func parseErc20StringProperty(contractDesc bchain.AddressDescriptor, data string
 }
 
 // EthereumTypeGetErc20ContractInfo returns information about ERC20 contract
-func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc bchain.AddressDescriptor) (*bchain.Erc20Contract, error) {
+func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc *bchain.AddressDescriptor) (*bchain.Erc20Contract, error) {
 	cds := string(contractDesc)
 	cachedContractsMux.Lock()
 	contract, found := cachedContracts[cds]
@@ -216,7 +216,7 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc bchain.Addre
 }
 
 // EthereumTypeGetErc20ContractBalance returns balance of ERC20 contract for given address
-func (b *EthereumRPC) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc bchain.AddressDescriptor) (*big.Int, error) {
+func (b *EthereumRPC) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc *bchain.AddressDescriptor) (*big.Int, error) {
 	addr := EIP55Address(addrDesc)
 	contract := EIP55Address(contractDesc)
 	req := erc20BalanceOf + "0000000000000000000000000000000000000000000000000000000000000000"[len(addr)-2:] + addr[2:]

@@ -114,7 +114,7 @@ func (f *FloRPC) GetBlockFull(hash string) (*bchain.Block, error) {
 	for i := range res.Result.Txs {
 		tx := &res.Result.Txs[i]
 		for j := range tx.Vout {
-			vout := &tx.Vout[j]
+			vout := tx.Vout[j]
 			// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 			vout.ValueSat, err = f.Parser.AmountToBigInt(vout.JsonValue)
 			if err != nil {

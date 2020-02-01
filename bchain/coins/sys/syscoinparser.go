@@ -110,13 +110,13 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, err
 	}
 
-	txs := make([]bchain.Tx, len(w.Transactions))
+	txs := make([]*bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: bchain.BlockHeader{
+		BlockHeader: &bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -180,12 +180,12 @@ func (p *SyscoinParser) outputScriptToAddresses(script []byte) ([]string, bool, 
 }
 
 // GetAddrDescFromAddress returns internal address representation (descriptor) of given address
-func (p *SyscoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
+func (p *SyscoinParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
 	return p.addressToOutputScript(address)
 }
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
-func (p *SyscoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
+func (p *SyscoinParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
 	return p.OutputScriptToAddressesFunc(addrDesc)
 }
 // TryGetOPReturn tries to process OP_RETURN script and return data
@@ -236,7 +236,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	}
 	if detail != bchain.AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
-		ab.Utxos = make([]bchain.Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
+		ab.Utxos = make([]*bchain.Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
 		// ab.utxosMap = make(map[string]int, cap(ab.Utxos))
 		for len(buf[l:]) >= txidUnpackedLen+3 {
 			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
@@ -366,7 +366,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	l = p.BaseParser.PackVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
-		buf = p.BitcoinParser.AppendTxOutput(&ta.Outputs[i], buf, varBuf)
+		buf = p.BitcoinParser.AppendTxOutput(ta.Outputs[i], buf, varBuf)
 	}
 	l = p.BaseParser.PackVaruint(uint(len(ta.TokenTransfers)), varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -386,15 +386,15 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	l += ll
 	inputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.Inputs = make([]bchain.TxInput, inputs)
+	ta.Inputs = make([]*bchain.TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
-		l += p.BitcoinParser.UnpackTxInput(&ta.Inputs[i], buf[l:])
+		l += p.BitcoinParser.UnpackTxInput(ta.Inputs[i], buf[l:])
 	}
 	outputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.Outputs = make([]bchain.TxOutput, outputs)
+	ta.Outputs = make([]*bchain.TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
-		l += p.BitcoinParser.UnpackTxOutput(&ta.Outputs[i], buf[l:])
+		l += p.BitcoinParser.UnpackTxOutput(ta.Outputs[i], buf[l:])
 	}
 	tokenTransfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll

@@ -11,13 +11,13 @@ type addrIndex struct {
 }
 
 type txEntry struct {
-	addrIndexes []addrIndex
+	addrIndexes []*addrIndex
 	time        uint32
 }
 
 type txidio struct {
 	txid string
-	io   []addrIndex
+	io   []*addrIndex
 }
 
 // BaseMempool is mempool base handle
@@ -40,10 +40,10 @@ func (m *BaseMempool) GetTransactions(address string) ([]Outpoint, error) {
 }
 
 // GetAddrDescTransactions returns slice of mempool transactions for given address descriptor, in reverse order
-func (m *BaseMempool) GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error) {
+func (m *BaseMempool) GetAddrDescTransactions(addrDesc *AddressDescriptor) ([]Outpoint, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	outpoints := m.addrDescToTx[string(addrDesc)]
+	outpoints := m.addrDescToTx[string(*addrDesc)]
 	rv := make([]Outpoint, len(outpoints))
 	for i, j := len(outpoints)-1, 0; i >= 0; i-- {
 		rv[j] = outpoints[i]
@@ -92,7 +92,7 @@ func (m *BaseMempool) GetAllEntries() MempoolTxidEntries {
 	m.mux.Lock()
 	entries := make(MempoolTxidEntries, len(m.txEntries))
 	for txid, entry := range m.txEntries {
-		entries[i] = MempoolTxidEntry{
+		entries[i] = &MempoolTxidEntry{
 			Txid: txid,
 			Time: entry.time,
 		}

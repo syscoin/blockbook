@@ -14,7 +14,7 @@ import (
 
 // AddrContract is Contract address with number of transactions done by given address
 type AddrContract struct {
-	Contract bchain.AddressDescriptor
+	Contract *bchain.AddressDescriptor
 	Txs      uint
 }
 
@@ -50,7 +50,7 @@ func (d *RocksDB) storeAddressContracts(wb *gorocksdb.WriteBatch, acm map[string
 }
 
 // GetAddrDescContracts returns AddrContracts for given addrDesc
-func (d *RocksDB) GetAddrDescContracts(addrDesc bchain.AddressDescriptor) (*AddrContracts, error) {
+func (d *RocksDB) GetAddrDescContracts(addrDesc *bchain.AddressDescriptor) (*AddrContracts, error) {
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAddressContracts], addrDesc)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (d *RocksDB) GetAddrDescContracts(addrDesc bchain.AddressDescriptor) (*Addr
 		txs, l := d.chainParser.UnpackVaruint(buf[eth.EthereumTypeAddressDescriptorLen:])
 		contract := append(bchain.AddressDescriptor(nil), buf[:eth.EthereumTypeAddressDescriptorLen]...)
 		c = append(c, AddrContract{
-			Contract: contract,
+			Contract: &contract,
 			Txs:      txs,
 		})
 		buf = buf[eth.EthereumTypeAddressDescriptorLen+l:]
@@ -84,7 +84,7 @@ func (d *RocksDB) GetAddrDescContracts(addrDesc bchain.AddressDescriptor) (*Addr
 	}, nil
 }
 
-func findContractInAddressContracts(contract bchain.AddressDescriptor, contracts []AddrContract) (int, bool) {
+func findContractInAddressContracts(contract *bchain.AddressDescriptor, contracts []AddrContract) (int, bool) {
 	for i := range contracts {
 		if bytes.Equal(contract, contracts[i].Contract) {
 			return i, true
@@ -93,7 +93,7 @@ func findContractInAddressContracts(contract bchain.AddressDescriptor, contracts
 	return 0, false
 }
 
-func isZeroAddress(addrDesc bchain.AddressDescriptor) bool {
+func isZeroAddress(addrDesc *bchain.AddressDescriptor) bool {
 	for _, b := range addrDesc {
 		if b != 0 {
 			return false
@@ -102,9 +102,9 @@ func isZeroAddress(addrDesc bchain.AddressDescriptor) bool {
 	return true
 }
 
-func (d *RocksDB) addToAddressesAndContractsEthereumType(addrDesc bchain.AddressDescriptor, btxID []byte, index int32, contract bchain.AddressDescriptor, addresses bchain.AddressesMap, addressContracts map[string]*AddrContracts, addTxCount bool) error {
+func (d *RocksDB) addToAddressesAndContractsEthereumType(addrDesc *bchain.AddressDescriptor, btxID []byte, index int32, contract *bchain.AddressDescriptor, addresses bchain.AddressesMap, addressContracts map[string]*AddrContracts, addTxCount bool) error {
 	var err error
-	strAddrDesc := string(addrDesc)
+	strAddrDesc := string(*addrDesc)
 	ac, e := addressContracts[strAddrDesc]
 	if !e {
 		ac, err = d.GetAddrDescContracts(addrDesc)
@@ -151,12 +151,12 @@ func (d *RocksDB) addToAddressesAndContractsEthereumType(addrDesc bchain.Address
 }
 
 type ethBlockTxContract struct {
-	addr, contract bchain.AddressDescriptor
+	addr, contract *bchain.AddressDescriptor
 }
 
 type ethBlockTx struct {
 	btxID     []byte
-	from, to  bchain.AddressDescriptor
+	from, to  *bchain.AddressDescriptor
 	contracts []ethBlockTxContract
 }
 
@@ -167,9 +167,9 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 		if err != nil {
 			return nil, err
 		}
-		blockTx := &blockTxs[txi]
+		blockTx := blockTxs[txi]
 		blockTx.btxID = btxID
-		var from, to bchain.AddressDescriptor
+		var from, to *bchain.AddressDescriptor
 		// there is only one output address in EthereumType transaction, store it in format txid 0
 		if len(tx.Vout) == 1 && len(tx.Vout[0].ScriptPubKey.Addresses) == 1 {
 			to, err = d.chainParser.GetAddrDescFromAddress(tx.Vout[0].ScriptPubKey.Addresses[0])
@@ -207,7 +207,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 		blockTx.contracts = make([]ethBlockTxContract, len(erc20)*2)
 		j := 0
 		for i, t := range erc20 {
-			var contract, from, to bchain.AddressDescriptor
+			var contract, from, to *bchain.AddressDescriptor
 			contract, err = d.chainParser.GetAddrDescFromAddress(t.Contract)
 			if err == nil {
 				from, err = d.chainParser.GetAddrDescFromAddress(t.From)
@@ -222,7 +222,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 			if err = d.addToAddressesAndContractsEthereumType(to, btxID, int32(i), contract, addresses, addressContracts, true); err != nil {
 				return nil, err
 			}
-			eq := bytes.Equal(from, to)
+			eq := bytes.Equal(*from, *to)
 			bc := &blockTx.contracts[j]
 			j++
 			bc.addr = from
@@ -248,22 +248,22 @@ func (d *RocksDB) storeAndCleanupBlockTxsEthereumType(wb *gorocksdb.WriteBatch, 
 	buf := make([]byte, 0, (pl+2*eth.EthereumTypeAddressDescriptorLen)*len(blockTxs))
 	varBuf := make([]byte, vlq.MaxLen64)
 	zeroAddress := make([]byte, eth.EthereumTypeAddressDescriptorLen)
-	appendAddress := func(a bchain.AddressDescriptor) {
+	appendAddress := func(a *bchain.AddressDescriptor) {
 		if len(a) != eth.EthereumTypeAddressDescriptorLen {
 			buf = append(buf, zeroAddress...)
 		} else {
-			buf = append(buf, a...)
+			buf = append(buf, *a...)
 		}
 	}
 	for i := range blockTxs {
-		blockTx := &blockTxs[i]
+		blockTx := blockTxs[i]
 		buf = append(buf, blockTx.btxID...)
 		appendAddress(blockTx.from)
 		appendAddress(blockTx.to)
 		l := d.chainParser.PackVaruint(uint(len(blockTx.contracts)), varBuf)
 		buf = append(buf, varBuf[:l]...)
 		for j := range blockTx.contracts {
-			c := &blockTx.contracts[j]
+			c := blockTx.contracts[j]
 			appendAddress(c.addr)
 			appendAddress(c.contract)
 		}
@@ -287,7 +287,7 @@ func (d *RocksDB) getBlockTxsEthereumType(height uint32) ([]ethBlockTx, error) {
 	}
 	// buf can be empty slice, this means the block did not contain any transactions
 	bt := make([]ethBlockTx, 0, 8)
-	getAddress := func(i int) (bchain.AddressDescriptor, int, error) {
+	getAddress := func(i int) (*bchain.AddressDescriptor, int, error) {
 		if len(buf)-i < eth.EthereumTypeAddressDescriptorLen {
 			glog.Error("rocksdb: Inconsistent data in blockTxs ", hex.EncodeToString(buf))
 			return nil, 0, errors.New("Inconsistent data in blockTxs")
@@ -296,12 +296,12 @@ func (d *RocksDB) getBlockTxsEthereumType(height uint32) ([]ethBlockTx, error) {
 		// return null addresses as nil
 		for _, b := range a {
 			if b != 0 {
-				return a, i + eth.EthereumTypeAddressDescriptorLen, nil
+				return &a, i + eth.EthereumTypeAddressDescriptorLen, nil
 			}
 		}
 		return nil, i + eth.EthereumTypeAddressDescriptorLen, nil
 	}
-	var from, to bchain.AddressDescriptor
+	var from, to *bchain.AddressDescriptor
 	for i := 0; i < len(buf); {
 		if len(buf)-i < pl {
 			glog.Error("rocksdb: Inconsistent data in blockTxs ", hex.EncodeToString(buf))
@@ -343,13 +343,13 @@ func (d *RocksDB) getBlockTxsEthereumType(height uint32) ([]ethBlockTx, error) {
 func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, height uint32, blockTxs []ethBlockTx, contracts map[string]*AddrContracts) error {
 	glog.Info("Disconnecting block ", height, " containing ", len(blockTxs), " transactions")
 	addresses := make(map[string]map[string]struct{})
-	disconnectAddress := func(btxID []byte, addrDesc, contract bchain.AddressDescriptor) error {
+	disconnectAddress := func(btxID []byte, addrDesc, contract *bchain.AddressDescriptor) error {
 		var err error
 		// do not process empty address
-		if len(addrDesc) == 0 {
+		if len(*addrDesc) == 0 {
 			return nil
 		}
-		s := string(addrDesc)
+		s := string(*addrDesc)
 		txid := string(btxID)
 		// find if tx for this address was already encountered
 		mtx, ftx := addresses[s]
@@ -402,12 +402,12 @@ func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, heigh
 		return nil
 	}
 	for i := range blockTxs {
-		blockTx := &blockTxs[i]
+		blockTx := blockTxs[i]
 		if err := disconnectAddress(blockTx.btxID, blockTx.from, nil); err != nil {
 			return err
 		}
 		// if from==to, tx is counted only once and does not have to be disconnected again
-		if !bytes.Equal(blockTx.from, blockTx.to) {
+		if !*blockTx.from, *blockTx.to) {
 			if err := disconnectAddress(blockTx.btxID, blockTx.to, nil); err != nil {
 				return err
 			}
@@ -420,7 +420,7 @@ func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, heigh
 		wb.DeleteCF(d.cfh[cfTransactions], blockTx.btxID)
 	}
 	for a := range addresses {
-		key := d.chainParser.PackAddressKey([]byte(a), height)
+		key := d.chainParser.PackAddressKey(&([]byte(a)), height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
 	return nil

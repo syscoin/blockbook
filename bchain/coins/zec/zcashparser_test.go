@@ -29,7 +29,7 @@ func init() {
 		Time:      1521645728,
 		Txid:      "e64aac0c211ad210c90934f06b1cc932327329e41a9f70c6eb76f79ef798b7b8",
 		LockTime:  0,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "483045022100f220f48c5267ef92a1e7a4d3b44fe9d97cce76eeba2785d45a0e2620b70e8d7302205640bc39e197ce19d95a98a3239af0f208ca289c067f80c97d8e411e61da5dee0121021721e83315fb5282f1d9d2a11892322df589bccd9cef45517b5fb3cfd3055c83",
@@ -39,7 +39,7 @@ func init() {
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(18188266638),
 				N:        0,
@@ -59,7 +59,7 @@ func init() {
 		Time:      1521637604,
 		Txid:      "bb47a9dd926de63e9d4f8dac58c3f63f4a079569ed3b80e932274a80f60e58b5",
 		LockTime:  292206,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "483045022100c92b2f3c54918fa26288530c63a58197ea4974e5b6d92db792dd9717e6d9183c02204e577254213675466a6adad3ae6e9384cf8269fb2dd9943b86fac0c0ad8e3f98012102c99dab469e63b232488b3e7acb9cfcab7e5755f61aad318d9e06b38e5ea22880",
@@ -69,7 +69,7 @@ func init() {
 				Sequence: 4294967294,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(6520547107),
 				N:        0,
@@ -137,7 +137,7 @@ func TestGetAddrDesc(t *testing.T) {
 					t.Errorf("getAddrDescFromAddress() error = %v, vout = %d", err, n)
 					return
 				}
-				if !bytes.Equal(got1, got2) {
+				if !bytes.Equal(*got1, *got2) {
 					t.Errorf("Address descriptors mismatch: got1 = %v, got2 = %v", got1, got2)
 				}
 			}

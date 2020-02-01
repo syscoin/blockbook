@@ -111,13 +111,13 @@ func (p *DecredParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, err
 	}
 
-	txs := make([]bchain.Tx, len(w.Transactions))
+	txs := make([]*bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: bchain.BlockHeader{
+		BlockHeader: &bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -132,14 +132,14 @@ func (p *DecredParser) ParseTxFromJson(jsonTx json.RawMessage) (*bchain.Tx, erro
 		return nil, err
 	}
 
-	vins := make([]bchain.Vin, len(getTxResult.Result.Vin))
+	vins := make([]*bchain.Vin, len(getTxResult.Result.Vin))
 	for index, input := range getTxResult.Result.Vin {
 		hexData := bchain.ScriptSig{}
 		if input.ScriptSig != nil {
 			hexData.Hex = input.ScriptSig.Hex
 		}
 
-		vins[index] = bchain.Vin{
+		vins[index] = &bchain.Vin{
 			Coinbase:  input.Coinbase,
 			Txid:      input.Txid,
 			Vout:      input.Vout,
@@ -149,7 +149,7 @@ func (p *DecredParser) ParseTxFromJson(jsonTx json.RawMessage) (*bchain.Tx, erro
 		}
 	}
 
-	vouts := make([]bchain.Vout, len(getTxResult.Result.Vout))
+	vouts := make([]*bchain.Vout, len(getTxResult.Result.Vout))
 	for index, output := range getTxResult.Result.Vout {
 		addr := output.ScriptPubKey.Addresses
 		// If nulldata type found make asm field the address data.
@@ -157,7 +157,7 @@ func (p *DecredParser) ParseTxFromJson(jsonTx json.RawMessage) (*bchain.Tx, erro
 			addr = []string{output.ScriptPubKey.Asm}
 		}
 
-		vouts[index] = bchain.Vout{
+		vouts[index] = &bchain.Vout{
 			ValueSat: *big.NewInt(int64(math.Round(output.Value * 1e8))),
 			N:        output.N,
 			ScriptPubKey: bchain.ScriptPubKey{
@@ -186,18 +186,18 @@ func (p *DecredParser) ParseTxFromJson(jsonTx json.RawMessage) (*bchain.Tx, erro
 }
 
 // GetAddrDescForUnknownInput returns nil AddressDescriptor.
-func (p *DecredParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bchain.AddressDescriptor {
+func (p *DecredParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) *bchain.AddressDescriptor {
 	return nil
 }
 
 // GetAddrDescFromAddress returns internal address representation of a given address.
-func (p *DecredParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
+func (p *DecredParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
 	addressByte := []byte(address)
-	return bchain.AddressDescriptor(addressByte), nil
+	return &bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddrDescFromVout returns internal address representation of a given transaction output.
-func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
+func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.AddressDescriptor, error) {
 	script, err := hex.DecodeString(output.ScriptPubKey.Hex)
 	if err != nil {
 		return nil, err
@@ -218,14 +218,14 @@ func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressD
 	for i := range addresses {
 		addressByte = append(addressByte, addresses[i].String()...)
 	}
-	return bchain.AddressDescriptor(addressByte), nil
+	return &bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddressesFromAddrDesc returns addresses obtained from the internal address representation
-func (p *DecredParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
+func (p *DecredParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
 	var addrs []string
 	if addrDesc != nil {
-		addrs = append(addrs, string(addrDesc))
+		addrs = append(addrs, string(*addrDesc))
 	}
 	return addrs, true, nil
 }
@@ -240,18 +240,18 @@ func (p *DecredParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 	return p.baseParser.UnpackTx(buf)
 }
 
-func (p *DecredParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (bchain.AddressDescriptor, error) {
+func (p *DecredParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (*bchain.AddressDescriptor, error) {
 	var addr, err = extKey.Address(p.netConfig)
 	if err != nil {
 		return nil, err
 	}
-	return p.GetAddrDescFromAddress(addr.String())
+	return &p.GetAddrDescFromAddress(addr.String())
 }
 
 // DeriveAddressDescriptors derives address descriptors from given xpub for
 // listed indexes
 func (p *DecredParser) DeriveAddressDescriptors(xpub string, change uint32,
-	indexes []uint32) ([]bchain.AddressDescriptor, error) {
+	indexes []uint32) ([]*bchain.AddressDescriptor, error) {
 	extKey, err := hdkeychain.NewKeyFromString(xpub)
 	if err != nil {
 		return nil, err
@@ -262,7 +262,7 @@ func (p *DecredParser) DeriveAddressDescriptors(xpub string, change uint32,
 		return nil, err
 	}
 
-	ad := make([]bchain.AddressDescriptor, len(indexes))
+	ad := make([]*bchain.AddressDescriptor, len(indexes))
 	for i, index := range indexes {
 		indexExtKey, err := changeExtKey.Child(index)
 		if err != nil {
@@ -279,7 +279,7 @@ func (p *DecredParser) DeriveAddressDescriptors(xpub string, change uint32,
 // DeriveAddressDescriptorsFromTo derives address descriptors from given xpub for
 // addresses in index range
 func (p *DecredParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32,
-	fromIndex uint32, toIndex uint32) ([]bchain.AddressDescriptor, error) {
+	fromIndex uint32, toIndex uint32) ([]*bchain.AddressDescriptor, error) {
 	if toIndex <= fromIndex {
 		return nil, errors.New("toIndex<=fromIndex")
 	}
@@ -292,7 +292,7 @@ func (p *DecredParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32
 		return nil, err
 	}
 
-	ad := make([]bchain.AddressDescriptor, toIndex-fromIndex)
+	ad := make([]*bchain.AddressDescriptor, toIndex-fromIndex)
 	for index := fromIndex; index < toIndex; index++ {
 		indexExtKey, err := changeExtKey.Child(index)
 		if err != nil {

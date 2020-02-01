@@ -113,7 +113,7 @@ func (p *BaseParser) ParseTxFromJson(msg json.RawMessage) (*Tx, error) {
 	}
 
 	for i := range tx.Vout {
-		vout := &tx.Vout[i]
+		vout := tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {
@@ -232,13 +232,13 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	vin := make([]Vin, len(pt.Vin))
+	vin := make([]*Vin, len(pt.Vin))
 	for i, pti := range pt.Vin {
 		itxid, err := p.UnpackTxid(pti.Txid)
 		if err != nil {
 			return nil, 0, err
 		}
-		vin[i] = Vin{
+		vin[i] = &Vin{
 			Addresses: pti.Addresses,
 			Coinbase:  pti.Coinbase,
 			ScriptSig: ScriptSig{
@@ -249,11 +249,11 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 			Vout:     pti.Vout,
 		}
 	}
-	vout := make([]Vout, len(pt.Vout))
+	vout := make([]*Vout, len(pt.Vout))
 	for i, pto := range pt.Vout {
 		var vs big.Int
 		vs.SetBytes(pto.ValueSat)
-		vout[i] = Vout{
+		vout[i] = &Vout{
 			N: pto.N,
 			ScriptPubKey: ScriptPubKey{
 				Addresses: pto.Addresses,
@@ -277,7 +277,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // by default all AddressDescriptors are indexable
-func (p *BaseParser) IsAddrDescIndexable(addrDesc AddressDescriptor) bool {
+func (p *BaseParser) IsAddrDescIndexable(addrDesc *AddressDescriptor) bool {
 	return true
 }
 
@@ -287,12 +287,12 @@ func (p *BaseParser) DerivationBasePath(xpub string) (string, error) {
 }
 
 // DeriveAddressDescriptors is unsupported
-func (p *BaseParser) DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]AddressDescriptor, error) {
+func (p *BaseParser) DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]*AddressDescriptor, error) {
 	return nil, errors.New("Not supported")
 }
 
 // DeriveAddressDescriptorsFromTo is unsupported
-func (p *BaseParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]AddressDescriptor, error) {
+func (p *BaseParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]*AddressDescriptor, error) {
 	return nil, errors.New("Not supported")
 }
 
@@ -327,11 +327,11 @@ func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail A
 }
 
 const packedHeightBytes = 4
-func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
-	buf := make([]byte, len(addrDesc)+packedHeightBytes)
-	copy(buf, addrDesc)
+func (p *BaseParser) PackAddressKey(addrDesc *AddressDescriptor, height uint32) []byte {
+	buf := make([]byte, len(*addrDesc)+packedHeightBytes)
+	copy(buf, *addrDesc)
 	// pack height as binary complement to achieve ordering from newest to oldest block
-	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
+	binary.BigEndian.PutUint32(buf[len(*addrDesc):], ^height)
 	return buf
 }
 
@@ -445,12 +445,12 @@ func (p *BaseParser) UnpackBigint(buf []byte) (big.Int, int) {
 	return r, l
 }
 
-func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
+func (p *BaseParser) PackTxIndexes(txi []*TxIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	// store the txs in reverse order for ordering from newest to oldest
-	for j := len(txi) - 1; j >= 0; j-- {
-		t := &txi[j]
+	for j := len(*txi) - 1; j >= 0; j-- {
+		t := (*txi)[j]
 		buf = append(buf, []byte(t.BtxID)...)
 		for i, index := range t.Indexes {
 			index <<= 1
@@ -488,11 +488,11 @@ func (p *BaseParser) UnpackTxOutput(to *TxOutput, buf []byte) int {
 	return 0
 }
 
-func (p *BaseParser) PackOutpoints(outpoints []DbOutpoint) []byte {
+func (p *BaseParser) PackOutpoints(outpoints []*DbOutpoint) []byte {
 	return nil
 }
 
-func (p *BaseParser) UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error) {
+func (p *BaseParser) UnpackNOutpoints(buf []byte) ([]*DbOutpoint, int, error) {
 	return nil, 0, errors.New("Not supported")
 }
 

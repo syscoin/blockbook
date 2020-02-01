@@ -64,18 +64,18 @@ func AddressToPubKeyHex(addr string, parser bchain.BlockChainParser) string {
 // GetTestBitcoinTypeBlock1 returns block #1
 func GetTestBitcoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
 	return &bchain.Block{
-		BlockHeader: bchain.BlockHeader{
+		BlockHeader: &bchain.BlockHeader{
 			Height:        225493,
 			Hash:          "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997",
 			Size:          1234567,
 			Time:          1521515026,
 			Confirmations: 2,
 		},
-		Txs: []bchain.Tx{
+		Txs: []*bchain.Tx{
 			{
 				Txid: TxidB1T1,
-				Vin:  []bchain.Vin{},
-				Vout: []bchain.Vout{
+				Vin:  []*bchain.Vin{},
+				Vout: []*bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
@@ -97,7 +97,7 @@ func GetTestBitcoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
 			},
 			{
 				Txid: TxidB1T2,
-				Vout: []bchain.Vout{
+				Vout: []*bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
@@ -131,17 +131,17 @@ func GetTestBitcoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
 // GetTestBitcoinTypeBlock2 returns block #2
 func GetTestBitcoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 	return &bchain.Block{
-		BlockHeader: bchain.BlockHeader{
+		BlockHeader: &bchain.BlockHeader{
 			Height:        225494,
 			Hash:          "00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6",
 			Size:          2345678,
 			Time:          1521595678,
 			Confirmations: 1,
 		},
-		Txs: []bchain.Tx{
+		Txs: []*bchain.Tx{
 			{
 				Txid: TxidB2T1,
-				Vin: []bchain.Vin{
+				Vin: []*bchain.Vin{
 					// addr3
 					{
 						Txid: TxidB1T2,
@@ -153,7 +153,7 @@ func GetTestBitcoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 						Vout: 1,
 					},
 				},
-				Vout: []bchain.Vout{
+				Vout: []*bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
@@ -182,7 +182,7 @@ func GetTestBitcoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 			},
 			{
 				Txid: TxidB2T2,
-				Vin: []bchain.Vin{
+				Vin: []*bchain.Vin{
 					// spending an output in the same block - addr6
 					{
 						Txid: TxidB2T1,
@@ -194,7 +194,7 @@ func GetTestBitcoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 						Vout: 1,
 					},
 				},
-				Vout: []bchain.Vout{
+				Vout: []*bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
@@ -217,14 +217,14 @@ func GetTestBitcoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 			// transaction from the same address in the previous block
 			{
 				Txid: TxidB2T3,
-				Vin: []bchain.Vin{
+				Vin: []*bchain.Vin{
 					// addr5
 					{
 						Txid: TxidB1T2,
 						Vout: 2,
 					},
 				},
-				Vout: []bchain.Vout{
+				Vout: []*bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
@@ -240,12 +240,12 @@ func GetTestBitcoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 			// mining transaction
 			{
 				Txid: TxidB2T4,
-				Vin: []bchain.Vin{
+				Vin: []*bchain.Vin{
 					{
 						Coinbase: "03bf1e1504aede765b726567696f6e312f50726f6a65637420425443506f6f6c2f01000001bf7e000000000000",
 					},
 				},
-				Vout: []bchain.Vout{
+				Vout: []*bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{

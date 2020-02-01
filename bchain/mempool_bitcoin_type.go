@@ -41,7 +41,7 @@ func NewMempoolBitcoinType(chain BlockChain, workers int, subworkers int) *Mempo
 			for txid := range m.chanTxid {
 				io, ok := m.getTxAddrs(txid, chanInput, chanResult)
 				if !ok {
-					io = []addrIndex{}
+					io = []*addrIndex{}
 				}
 				m.chanAddrIndex <- txidio{txid, io}
 			}
@@ -52,7 +52,7 @@ func NewMempoolBitcoinType(chain BlockChain, workers int, subworkers int) *Mempo
 }
 
 func (m *MempoolBitcoinType) getInputAddress(input Outpoint) *addrIndex {
-	var addrDesc AddressDescriptor
+	var addrDesc *AddressDescriptor
 	if m.AddrDescForOutpoint != nil {
 		addrDesc = m.AddrDescForOutpoint(input)
 	}
@@ -72,26 +72,26 @@ func (m *MempoolBitcoinType) getInputAddress(input Outpoint) *addrIndex {
 			return nil
 		}
 	}
-	return &addrIndex{string(addrDesc), ^input.Vout}
+	return &addrIndex{string(*addrDesc), ^input.Vout}
 
 }
 
-func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, chanResult chan *addrIndex) ([]addrIndex, bool) {
+func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, chanResult chan *addrIndex) ([]*addrIndex, bool) {
 	tx, err := m.chain.GetTransactionForMempool(txid)
 	if err != nil {
 		glog.Error("cannot get transaction ", txid, ": ", err)
 		return nil, false
 	}
 	glog.V(2).Info("mempool: gettxaddrs ", txid, ", ", len(tx.Vin), " inputs")
-	io := make([]addrIndex, 0, len(tx.Vout)+len(tx.Vin))
+	io := make([]*addrIndex, 0, len(tx.Vout)+len(tx.Vin))
 	for _, output := range tx.Vout {
 		addrDesc, err := m.chain.GetChainParser().GetAddrDescFromVout(&output)
 		if err != nil {
 			glog.Error("error in addrDesc in ", txid, " ", output.N, ": ", err)
 			continue
 		}
-		if len(addrDesc) > 0 {
-			io = append(io, addrIndex{string(addrDesc), int32(output.N)})
+		if len(*addrDesc) > 0 {
+			io = append(io, &addrIndex{string(*addrDesc), int32(output.N)})
 		}
 		if m.OnNewTxAddr != nil {
 			m.OnNewTxAddr(tx, addrDesc)

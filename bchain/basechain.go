@@ -35,12 +35,12 @@ func (b *BaseChain) GetMempoolEntry(txid string) (*MempoolEntry, error) {
 }
 
 // EthereumTypeGetBalance is not supported
-func (b *BaseChain) EthereumTypeGetBalance(addrDesc AddressDescriptor) (*big.Int, error) {
+func (b *BaseChain) EthereumTypeGetBalance(addrDesc *AddressDescriptor) (*big.Int, error) {
 	return nil, errors.New("Not supported")
 }
 
 // EthereumTypeGetNonce is not supported
-func (b *BaseChain) EthereumTypeGetNonce(addrDesc AddressDescriptor) (uint64, error) {
+func (b *BaseChain) EthereumTypeGetNonce(addrDesc *AddressDescriptor) (uint64, error) {
 	return 0, errors.New("Not supported")
 }
 

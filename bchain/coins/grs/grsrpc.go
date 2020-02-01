@@ -78,7 +78,7 @@ func (g *GroestlcoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, er
 		return nil, errors.Annotatef(res.Error, "hash %v", hash)
 	}
 
-	txs := make([]bchain.Tx, 0, len(res.Result.Txids))
+	txs := make([]*bchain.Tx, 0, len(res.Result.Txids))
 	for _, txid := range res.Result.Txids {
 		tx, err := g.GetTransaction(txid)
 		if err != nil {
@@ -88,7 +88,7 @@ func (g *GroestlcoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, er
 			}
 			return nil, err
 		}
-		txs = append(txs, *tx)
+		txs = append(txs, tx)
 	}
 	block := &bchain.Block{
 		BlockHeader: res.Result.BlockHeader,

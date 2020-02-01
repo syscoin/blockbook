@@ -22,14 +22,14 @@ var (
 		Txid:      "132acb5b474b45b830f7961c91c87e53cce3a37a6c6f0b0933ccdf0395c81a6a",
 		LockTime:  0,
 		Version:   1,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				Txid:     "72d9e3c948b70af4ea715370dc26992d73d58d152672b12a9b2f0de88f567223",
 				Vout:     2,
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(757418852),
 				N:        0,
@@ -60,7 +60,7 @@ var (
 		Time:      1463843967,
 		LockTime:  0,
 		Version:   1,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				Txid:     "962f3a298ac959cfb0c7e451fca72134eaf09cec10cb0cb782f4df719c183c19",
 				Vout:     2,
@@ -70,7 +70,7 @@ var (
 				},
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(200312700),
 				N:        0,
@@ -101,14 +101,14 @@ var (
 		Txid:      "caf34c934d4c36b410c0265222b069f52e2df459ebb09d6797a635ceee0edd60",
 		LockTime:  0,
 		Version:   1,
-		Vin: []bchain.Vin{
+		Vin: []*bchain.Vin{
 			{
 				Txid:     "29ce1e249e74126b6e5f4df09c95cc9b0ac696f5292b54e3c67faa6e75806dc5",
 				Vout:     2,
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []bchain.Vout{
+		Vout: []*bchain.Vout{
 			{
 				ValueSat: *big.NewInt(766779599),
 				N:        0,

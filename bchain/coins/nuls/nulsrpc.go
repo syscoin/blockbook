@@ -319,7 +319,7 @@ func (n *NulsRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
 
 	nexHash, _ := n.GetBlockHash(uint32(getBlock.Data.Height + 1))
 
-	header := bchain.BlockHeader{
+	header := &bchain.BlockHeader{
 		Hash:          getBlock.Data.Hash,
 		Prev:          getBlock.Data.PreHash,
 		Next:          nexHash,
@@ -329,7 +329,7 @@ func (n *NulsRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
 		Time:          getBlock.Data.Time / 1000,
 	}
 
-	var txs []bchain.Tx
+	var txs []*bchain.Tx
 
 	for _, rawTx := range getBlock.Data.TxList {
 		tx, err := converTx(rawTx)
@@ -337,7 +337,7 @@ func (n *NulsRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
 			return nil, err
 		}
 		tx.Blocktime = header.Time
-		txs = append(txs, *tx)
+		txs = append(txs, tx)
 	}
 
 	block := &bchain.Block{
@@ -579,11 +579,11 @@ func safeDecodeResponse(body io.ReadCloser, res *interface{}) (err error) {
 
 func converTx(rawTx Tx) (*bchain.Tx, error) {
 	var lockTime int64 = 0
-	var vins = make([]bchain.Vin, 0)
-	var vouts []bchain.Vout
+	var vins = make([]*bchain.Vin, 0)
+	var vouts []*bchain.Vout
 
 	for _, input := range rawTx.Inputs {
-		vin := bchain.Vin{
+		vin := &bchain.Vin{
 			Coinbase:  "",
 			Txid:      input.FromHash,
 			Vout:      input.FromIndex,
@@ -595,7 +595,7 @@ func converTx(rawTx Tx) (*bchain.Tx, error) {
 	}
 
 	for index, output := range rawTx.Outputs {
-		vout := bchain.Vout{
+		vout := &bchain.Vout{
 			ValueSat: *big.NewInt(output.Value),
 			//JsonValue: 	"",
 			//LockTime:	output.LockTime,
