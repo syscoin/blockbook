@@ -71,26 +71,16 @@ func GetChainParams(chain string) *chaincfg.Params {
 func (p *BitcoinParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
 	ad, err := hex.DecodeString(output.ScriptPubKey.Hex)
 	if err != nil {
-		return nil, err
+		return ad, err
 	}
 	// convert possible P2PK script to P2PKH
 	// so that all transactions by given public key are indexed together
-	addrDescScript, res := txscript.ConvertP2PKtoP2PKH(p.Params.Base58CksumHasher, ad)
-	if res != nil {
-		return nil, res
-	}
-	addrDesc := bchain.AddressDescriptor(addrDescScript)
-	return &addrDesc, nil
+	return txscript.ConvertP2PKtoP2PKH(p.Params.Base58CksumHasher, ad)
 }
 
 // GetAddrDescFromAddress returns internal address representation (descriptor) of given address
 func (p *BitcoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
-	addrDescScript, res := p.addressToOutputScript(address)
-	if res != nil {
-		return nil, res
-	}
-	addrDesc := bchain.AddressDescriptor(addrDescScript)
-	return &addrDesc, nil
+	return p.addressToOutputScript(address)
 }
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
@@ -106,7 +96,7 @@ func (p *BitcoinParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor)
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // empty or OP_RETURN scripts are not indexed
 func (p *BitcoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor) bool {
-	if len(addrDesc) == 0 || (addrDesc)[0] == txscript.OP_RETURN {
+	if len(addrDesc) == 0 || addrDesc[0] == txscript.OP_RETURN {
 		return false
 	}
 	return true
@@ -364,12 +354,7 @@ func (p *BitcoinParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (bcha
 	if err != nil {
 		return nil, err
 	}
-	addrDescScript, res := txscript.PayToAddrScript(a)
-	if res != nil {
-		return nil, res
-	}
-	addrDesc := bchain.AddressDescriptor(addrDescScript)
-	return &addrDesc, nil
+	return txscript.PayToAddrScript(a)
 }
 
 // DeriveAddressDescriptors derives address descriptors from given xpub for listed indexes
