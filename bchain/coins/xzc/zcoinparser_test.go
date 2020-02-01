@@ -309,7 +309,7 @@ func TestGetAddrDesc(t *testing.T) {
 						t.Errorf("getAddrDescFromAddress() error = %v, vout = %d", err, n)
 						return
 					}
-					if !bytes.Equal(*got1, *got2) {
+					if !bytes.Equal(got1, got2) {
 						t.Errorf("Address descriptors mismatch: got1 = %v, got2 = %v", got1, got2)
 					}
 				}

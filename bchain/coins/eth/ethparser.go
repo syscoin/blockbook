@@ -175,12 +175,7 @@ func (p *EthereumParser) GetAddrDescFromAddress(address string) (bchain.AddressD
 	if len(address) != EthereumTypeAddressDescriptorLen*2 {
 		return nil, bchain.ErrAddressMissing
 	}
-	decodedBytes, err := hex.DecodeString(address)
-	if err != nil {
-		return nil, err
-	}
-	decodedString := bchain.AddressDescriptor(decodedBytes)
-	return &decodedString, nil
+	return hex.DecodeString(address)
 }
 
 // EIP55Address returns an EIP55-compliant hex string representation of the address

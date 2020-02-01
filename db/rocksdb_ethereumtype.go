@@ -222,7 +222,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 			if err = d.addToAddressesAndContractsEthereumType(to, btxID, int32(i), contract, addresses, addressContracts, true); err != nil {
 				return nil, err
 			}
-			eq := bytes.Equal(*from, *to)
+			eq := bytes.Equal(from, to)
 			bc := &blockTx.contracts[j]
 			j++
 			bc.addr = from
@@ -296,7 +296,7 @@ func (d *RocksDB) getBlockTxsEthereumType(height uint32) ([]ethBlockTx, error) {
 		// return null addresses as nil
 		for _, b := range a {
 			if b != 0 {
-				return &a, i + eth.EthereumTypeAddressDescriptorLen, nil
+				return a, i + eth.EthereumTypeAddressDescriptorLen, nil
 			}
 		}
 		return nil, i + eth.EthereumTypeAddressDescriptorLen, nil
@@ -407,7 +407,7 @@ func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, heigh
 			return err
 		}
 		// if from==to, tx is counted only once and does not have to be disconnected again
-		if !bytes.Equal(*blockTx.from, *blockTx.to) {
+		if !bytes.Equal(blockTx.from, blockTx.to) {
 			if err := disconnectAddress(blockTx.btxID, blockTx.to, nil); err != nil {
 				return err
 			}
