@@ -946,7 +946,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					if err != nil {
 						return nil, err
 					}
-					if bytes.Equal(addrDesc, *txAddrDesc) {
+					if bytes.Equal(addrDesc, txAddrDesc) {
 						(*big.Int)(bh.ReceivedSat).Add((*big.Int)(bh.ReceivedSat), &value)
 					}
 				}
@@ -959,7 +959,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				if err != nil {
 					return nil, err
 				}
-				if bytes.Equal(addrDesc, *txAddrDesc) {
+				if bytes.Equal(addrDesc, txAddrDesc) {
 					// add sent amount only for OK transactions, however fees always
 					if ethTxData.Status == 1 {
 						(*big.Int)(bh.SentSat).Add((*big.Int)(bh.SentSat), &value)
