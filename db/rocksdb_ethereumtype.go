@@ -72,7 +72,7 @@ func (d *RocksDB) GetAddrDescContracts(addrDesc bchain.AddressDescriptor) (*Addr
 		txs, l := d.chainParser.UnpackVaruint(buf[eth.EthereumTypeAddressDescriptorLen:])
 		contract := append(bchain.AddressDescriptor(nil), buf[:eth.EthereumTypeAddressDescriptorLen]...)
 		c = append(c, AddrContract{
-			Contract: &contract,
+			Contract: contract,
 			Txs:      txs,
 		})
 		buf = buf[eth.EthereumTypeAddressDescriptorLen+l:]
@@ -200,7 +200,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 			blockTx.from = from
 		}
 		// store erc20 transfers
-		erc20, err := d.chainParser.EthereumTypeGetErc20FromTx(&tx)
+		erc20, err := d.chainParser.EthereumTypeGetErc20FromTx(tx)
 		if err != nil {
 			glog.Warningf("rocksdb: GetErc20FromTx %v - height %d, tx %v", err, block.BlockHeader.Height, tx.Txid)
 		}
@@ -252,7 +252,7 @@ func (d *RocksDB) storeAndCleanupBlockTxsEthereumType(wb *gorocksdb.WriteBatch, 
 		if len(a) != eth.EthereumTypeAddressDescriptorLen {
 			buf = append(buf, zeroAddress...)
 		} else {
-			buf = append(buf, *a...)
+			buf = append(buf, a...)
 		}
 	}
 	for i := range blockTxs {

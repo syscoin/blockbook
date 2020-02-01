@@ -657,7 +657,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 			}
 		}
 	}
-	addresses[strAddrDesc] = append(at, bchain.TxIndexes{
+	addresses[strAddrDesc] = append(at, &bchain.TxIndexes{
 		BtxID:   btxID,
 		Indexes: []int32{index},
 	})
@@ -1037,7 +1037,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 		}
 	}
 	for a := range addresses {
-		key := d.chainParser.PackAddressKey(&([]byte(a)), height)
+		key := d.chainParser.PackAddressKey([]byte(a), height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
 	return nil
