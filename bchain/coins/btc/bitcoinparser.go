@@ -533,23 +533,23 @@ func (p *BitcoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 }
 
 func (p *BitcoinParser) AppendTxInput(txi *bchain.TxInput, buf []byte, varBuf []byte) []byte {
-	la := len(*txi.AddrDesc)
+	la := len(txi.AddrDesc)
 	l := p.BaseParser.PackVaruint(uint(la), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, *txi.AddrDesc...)
+	buf = append(buf, txi.AddrDesc...)
 	l = p.BaseParser.PackBigint(&txi.ValueSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
 
 func (p *BitcoinParser) AppendTxOutput(txo *bchain.TxOutput, buf []byte, varBuf []byte) []byte {
-	la := len(*txo.AddrDesc)
+	la := len(txo.AddrDesc)
 	if txo.Spent {
 		la = ^la
 	}
 	l := p.BaseParser.PackVarint(la, varBuf)
 	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, *txo.AddrDesc...)
+	buf = append(buf, txo.AddrDesc...)
 	l = p.BaseParser.PackBigint(&txo.ValueSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
