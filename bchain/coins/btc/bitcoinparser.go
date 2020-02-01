@@ -558,8 +558,7 @@ func (p *BitcoinParser) AppendTxOutput(txo *bchain.TxOutput, buf []byte, varBuf 
 
 func (p *BitcoinParser) UnpackTxInput(ti *bchain.TxInput, buf []byte) int {
 	al, l := p.BaseParser.UnpackVaruint(buf)
-	addrDesc := bchain.AddressDescriptor(append([]byte(nil), buf[l:l+int(al)]...))
-	ti.AddrDesc = &addrDesc
+	ti.AddrDesc = append([]byte(nil), buf[l:l+int(al)]...)
 	al += uint(l)
 	ti.ValueSat, l = p.BaseParser.UnpackBigint(buf[al:])
 	return l + int(al)
@@ -571,8 +570,7 @@ func (p *BitcoinParser) UnpackTxOutput(to *bchain.TxOutput, buf []byte) int {
 		to.Spent = true
 		al = ^al
 	}
-	addrDesc := bchain.AddressDescriptor(append([]byte(nil), buf[l:l+al]...))
-	to.AddrDesc = &addrDesc
+	to.AddrDesc = append([]byte(nil), buf[l:l+al]...)
 	al += l
 	to.ValueSat, l = p.BaseParser.UnpackBigint(buf[al:])
 	return l + al

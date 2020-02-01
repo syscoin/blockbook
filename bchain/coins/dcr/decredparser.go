@@ -193,7 +193,7 @@ func (p *DecredParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bcha
 // GetAddrDescFromAddress returns internal address representation of a given address.
 func (p *DecredParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
 	addressByte := []byte(address)
-	return &bchain.AddressDescriptor(addressByte), nil
+	return bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddrDescFromVout returns internal address representation of a given transaction output.
@@ -218,7 +218,7 @@ func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressD
 	for i := range addresses {
 		addressByte = append(addressByte, addresses[i].String()...)
 	}
-	return &bchain.AddressDescriptor(addressByte), nil
+	return bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddressesFromAddrDesc returns addresses obtained from the internal address representation
@@ -245,7 +245,7 @@ func (p *DecredParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (bchai
 	if err != nil {
 		return nil, err
 	}
-	return &p.GetAddrDescFromAddress(addr.String())
+	return p.GetAddrDescFromAddress(addr.String())
 }
 
 // DeriveAddressDescriptors derives address descriptors from given xpub for

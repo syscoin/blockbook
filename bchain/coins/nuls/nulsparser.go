@@ -101,7 +101,7 @@ func (p *NulsParser) PackedTxidLen() int {
 // GetAddrDescFromAddress returns internal address representation (descriptor) of given address
 func (p *NulsParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
 	addressByte := base58.Decode(address)
-	return &bchain.AddressDescriptor(addressByte), nil
+	return bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddrDescFromVout returns internal address representation (descriptor) of given transaction output

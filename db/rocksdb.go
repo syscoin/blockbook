@@ -666,7 +666,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 
 func (d *RocksDB) storeAddresses(wb *gorocksdb.WriteBatch, height uint32, addresses bchain.AddressesMap) error {
 	for addrDesc, txi := range addresses {
-		ba := &bchain.AddressDescriptor(addrDesc)
+		ba := bchain.AddressDescriptor(addrDesc)
 		key := d.chainParser.PackAddressKey(ba, height)
 		val := d.chainParser.PackTxIndexes(txi)
 		wb.PutCF(d.cfh[cfAddresses], key, val)
