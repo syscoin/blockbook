@@ -179,7 +179,7 @@ func (p *EthereumParser) GetAddrDescFromAddress(address string) (*bchain.Address
 	if err != nil {
 		return decodedBytes, err
 	}
-	decodedString := bchain.AddressDescriptor(decodedString)
+	decodedString := bchain.AddressDescriptor(decodedBytes)
 	return &decodedString, nil
 }
 
@@ -223,7 +223,7 @@ func (p *EthereumParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescri
 }
 
 // GetScriptFromAddrDesc returns output script for given address descriptor
-func (p *EthereumParser) GetScriptFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]byte, error) {
+func (p *EthereumParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]byte, error) {
 	return addrDesc, nil
 }
 

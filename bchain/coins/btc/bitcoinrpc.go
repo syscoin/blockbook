@@ -735,7 +735,7 @@ func (b *BitcoinRPC) GetTransactionSpecific(tx *bchain.Tx) (json.RawMessage, err
 }
 
 // getRawTransaction returns json as returned by backend, with all coin specific data
-func (b *BitcoinRPC) getRawTransaction(txid string) (json.RawMessage, error) {
+func (b *BitcoinRPC) getRawTransaction(txid string) (*json.RawMessage, error) {
 	glog.V(1).Info("rpc: getrawtransaction ", txid)
 
 	res := ResGetRawTransaction{}
@@ -753,7 +753,7 @@ func (b *BitcoinRPC) getRawTransaction(txid string) (json.RawMessage, error) {
 		}
 		return nil, errors.Annotatef(res.Error, "txid %v", txid)
 	}
-	return res.Result, nil
+	return &res.Result, nil
 }
 
 // EstimateSmartFee returns fee estimation

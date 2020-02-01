@@ -520,7 +520,7 @@ type BlockChainParser interface {
 	GetAddrDescFromVout(output *Vout) (*AddressDescriptor, error)
 	GetAddrDescFromAddress(address string) (*AddressDescriptor, error)
 	GetAddressesFromAddrDesc(addrDesc *AddressDescriptor) ([]string, bool, error)
-	GetScriptFromAddrDesc(addrDesc *AddressDescriptor) ([]byte, error)
+	GetScriptFromAddrDesc(addrDesc AddressDescriptor) ([]byte, error)
 	IsAddrDescIndexable(addrDesc *AddressDescriptor) bool
 	// parsing/packing/unpacking specific to chain
 	PackedTxidLen() int
@@ -532,7 +532,7 @@ type BlockChainParser interface {
 	UnpackTx(buf []byte) (*Tx, uint32, error)
 	GetAddrDescForUnknownInput(tx *Tx, input int) *AddressDescriptor
 	PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
-	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail *AddressBalanceDetail) (*AddrBalance, error)
+	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
 	PackAddressKey(addrDesc *AddressDescriptor, height uint32) []byte
 	UnpackAddressKey(key []byte) ([]byte, uint32, error)
 	PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte
@@ -574,7 +574,7 @@ type BlockChainParser interface {
 	IsSyscoinMintTx(nVersion int32) bool
 	IsAssetTx(nVersion int32) bool
 	IsAssetAllocationTx(nVersion int32) bool
-	TryGetOPReturn(script []byte) []byte
+	TryGetOPReturn(script *[]byte) *[]byte
 }
 
 // Mempool defines common interface to mempool

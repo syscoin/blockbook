@@ -178,7 +178,7 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc *bchain.Addr
 	contract, found := cachedContracts[cds]
 	cachedContractsMux.Unlock()
 	if !found {
-		address := EIP55Address(contractDesc)
+		address := EIP55Address(*contractDesc)
 		data, err := b.ethCall(erc20NameSignature, address)
 		if err != nil {
 			return nil, err
@@ -217,8 +217,8 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc *bchain.Addr
 
 // EthereumTypeGetErc20ContractBalance returns balance of ERC20 contract for given address
 func (b *EthereumRPC) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc *bchain.AddressDescriptor) (*big.Int, error) {
-	addr := EIP55Address(addrDesc)
-	contract := EIP55Address(contractDesc)
+	addr := EIP55Address(*addrDesc)
+	contract := EIP55Address(*contractDesc)
 	req := erc20BalanceOf + "0000000000000000000000000000000000000000000000000000000000000000"[len(addr)-2:] + addr[2:]
 	data, err := b.ethCall(req, contract)
 	if err != nil {
