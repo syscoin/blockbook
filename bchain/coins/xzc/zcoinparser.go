@@ -99,8 +99,8 @@ func GetChainParams(chain string) *chaincfg.Params {
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
 func (p *ZcoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
 
-	if len(*addrDesc) > 0 {
-		switch (*addrDesc)[0] {
+	if len(addrDesc) > 0 {
+		switch (addrDesc)[0] {
 		case OpZeroCoinMint:
 			return []string{"Zeromint"}, false, nil
 		case OpZeroCoinSpend:

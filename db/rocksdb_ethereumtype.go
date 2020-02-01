@@ -104,7 +104,7 @@ func isZeroAddress(addrDesc bchain.AddressDescriptor) bool {
 
 func (d *RocksDB) addToAddressesAndContractsEthereumType(addrDesc bchain.AddressDescriptor, btxID []byte, index int32, contract bchain.AddressDescriptor, addresses bchain.AddressesMap, addressContracts map[string]*AddrContracts, addTxCount bool) error {
 	var err error
-	strAddrDesc := string(*addrDesc)
+	strAddrDesc := string(addrDesc)
 	ac, e := addressContracts[strAddrDesc]
 	if !e {
 		ac, err = d.GetAddrDescContracts(addrDesc)
@@ -346,10 +346,10 @@ func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, heigh
 	disconnectAddress := func(btxID []byte, addrDesc, contract bchain.AddressDescriptor) error {
 		var err error
 		// do not process empty address
-		if len(*addrDesc) == 0 {
+		if len(addrDesc) == 0 {
 			return nil
 		}
-		s := string(*addrDesc)
+		s := string(addrDesc)
 		txid := string(btxID)
 		// find if tx for this address was already encountered
 		mtx, ftx := addresses[s]

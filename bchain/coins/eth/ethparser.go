@@ -219,7 +219,7 @@ func EIP55AddressFromAddress(address string) string {
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
 func (p *EthereumParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
-	return []string{EIP55Address(*addrDesc)}, true, nil
+	return []string{EIP55Address(addrDesc)}, true, nil
 }
 
 // GetScriptFromAddrDesc returns output script for given address descriptor

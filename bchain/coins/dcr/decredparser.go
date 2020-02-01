@@ -225,7 +225,7 @@ func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressD
 func (p *DecredParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
 	var addrs []string
 	if addrDesc != nil {
-		addrs = append(addrs, string(*addrDesc))
+		addrs = append(addrs, string(addrDesc))
 	}
 	return addrs, true, nil
 }

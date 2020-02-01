@@ -409,7 +409,7 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
 	for _, vin := range t.Vin {
-		if bytes.Equal(*vin.AddrDesc, *addrDesc) && vin.ValueSat != nil {
+		if bytes.Equal(vin.AddrDesc, addrDesc) && vin.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vin.ValueSat))
 		}
 	}
@@ -916,7 +916,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			if err != nil {
 				return nil, err
 			}
-			if bytes.Equal(*addrDesc, *tattAddrFromDesc) {
+			if bytes.Equal(addrDesc, *tattAddrFromDesc) {
 				sentSat := &token.SentSat
 				(*big.Int)(sentSat).Add((*big.Int)(sentSat), (*big.Int)(tatt.Value))
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
@@ -926,7 +926,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					if err != nil {
 						return nil, err
 					}
-					if bytes.Equal(*addrDesc, *tattAddrToDesc) {
+					if bytes.Equal(addrDesc, *tattAddrToDesc) {
 						receivedSat := &token.ReceivedSat
 						(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), (*big.Int)(tattr.Value))
 					}
@@ -946,7 +946,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					if err != nil {
 						return nil, err
 					}
-					if bytes.Equal(*addrDesc, *txAddrDesc) {
+					if bytes.Equal(addrDesc, *txAddrDesc) {
 						(*big.Int)(bh.ReceivedSat).Add((*big.Int)(bh.ReceivedSat), &value)
 					}
 				}
@@ -959,7 +959,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				if err != nil {
 					return nil, err
 				}
-				if bytes.Equal(*addrDesc, *txAddrDesc) {
+				if bytes.Equal(addrDesc, *txAddrDesc) {
 					// add sent amount only for OK transactions, however fees always
 					if ethTxData.Status == 1 {
 						(*big.Int)(bh.SentSat).Add((*big.Int)(bh.SentSat), &value)

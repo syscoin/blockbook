@@ -43,7 +43,7 @@ func (m *BaseMempool) GetTransactions(address string) ([]*Outpoint, error) {
 func (m *BaseMempool) GetAddrDescTransactions(addrDesc AddressDescriptor) ([]*Outpoint, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	outpoints := m.addrDescToTx[string(*addrDesc)]
+	outpoints := m.addrDescToTx[string(addrDesc)]
 	rv := make([]*Outpoint, len(outpoints))
 	for i, j := len(outpoints)-1, 0; i >= 0; i-- {
 		rv[j] = outpoints[i]

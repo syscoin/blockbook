@@ -328,10 +328,10 @@ func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail A
 
 const packedHeightBytes = 4
 func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
-	buf := make([]byte, len(*addrDesc)+packedHeightBytes)
-	copy(buf, *addrDesc)
+	buf := make([]byte, len(addrDesc)+packedHeightBytes)
+	copy(buf, addrDesc)
 	// pack height as binary complement to achieve ordering from newest to oldest block
-	binary.BigEndian.PutUint32(buf[len(*addrDesc):], ^height)
+	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
 	return buf
 }
 

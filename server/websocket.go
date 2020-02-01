@@ -674,7 +674,7 @@ func (s *WebsocketServer) subscribeAddresses(c *websocketChannel, addrDesc []bch
 	s.addressSubscriptionsLock.Lock()
 	defer s.addressSubscriptionsLock.Unlock()
 	for i := range addrDesc {
-		ads := string(*addrDesc[i])
+		ads := string(addrDesc[i])
 		as, ok := s.addressSubscriptions[ads]
 		if !ok {
 			as = make(map[*websocketChannel]string)
@@ -758,7 +758,7 @@ func (s *WebsocketServer) OnNewBlock(hash string, height uint32) {
 func (s *WebsocketServer) OnNewTxAddr(tx *bchain.Tx, addrDesc bchain.AddressDescriptor) {
 	// check if there is any subscription but release the lock immediately, GetTransactionFromBchainTx may take some time
 	s.addressSubscriptionsLock.Lock()
-	as, ok := s.addressSubscriptions[string(*addrDesc)]
+	as, ok := s.addressSubscriptions[string(addrDesc)]
 	lenAs := len(as)
 	s.addressSubscriptionsLock.Unlock()
 	if ok && lenAs > 0 {
@@ -783,7 +783,7 @@ func (s *WebsocketServer) OnNewTxAddr(tx *bchain.Tx, addrDesc bchain.AddressDesc
 			// get the list of subscriptions again, this time keep the lock
 			s.addressSubscriptionsLock.Lock()
 			defer s.addressSubscriptionsLock.Unlock()
-			as, ok = s.addressSubscriptions[string(*addrDesc)]
+			as, ok = s.addressSubscriptions[string(addrDesc)]
 			if ok {
 				for c, id := range as {
 					if c.IsAlive() {

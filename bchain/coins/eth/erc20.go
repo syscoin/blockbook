@@ -217,7 +217,7 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc bchain.Addre
 
 // EthereumTypeGetErc20ContractBalance returns balance of ERC20 contract for given address
 func (b *EthereumRPC) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc bchain.AddressDescriptor) (*big.Int, error) {
-	addr := EIP55Address(*addrDesc)
+	addr := EIP55Address(addrDesc)
 	contract := EIP55Address(*contractDesc)
 	req := erc20BalanceOf + "0000000000000000000000000000000000000000000000000000000000000000"[len(addr)-2:] + addr[2:]
 	data, err := b.ethCall(req, contract)

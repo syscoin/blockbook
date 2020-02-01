@@ -508,20 +508,20 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 			tao := ta.Outputs[i]
 			tao.ValueSat = output.ValueSat
 			addrDesc, err := d.chainParser.GetAddrDescFromVout(&output)
-			if err != nil || len(*addrDesc) == 0 || len(*addrDesc) > maxAddrDescLen {
+			if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 				if err != nil {
 					// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 					if err != bchain.ErrAddressMissing {
 						glog.Warningf("rocksdb: addrDesc: %v - height %d, tx %v, output %v, error %v", err, block.Height, tx.Txid, output, err)
 					}
 				} else {
-					glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping addrDesc of length %d", block.Height, tx.Txid, i, len(*addrDesc))
+					glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping addrDesc of length %d", block.Height, tx.Txid, i, len(addrDesc))
 				}
 				continue
 			}
 			tao.AddrDesc = addrDesc
 			if d.chainParser.IsAddrDescIndexable(addrDesc) {
-				strAddrDesc := string(*addrDesc)
+				strAddrDesc := string(addrDesc)
 				balance, e := balances[strAddrDesc]
 				if !e {
 					balance, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
@@ -939,7 +939,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 	isSyscoinTx := d.chainParser.IsSyscoinTx(txa.Version)
 	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
-		s := string(*addrDesc)
+		s := string(addrDesc)
 		b, fb := balances[s]
 		if !fb {
 			b, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)

@@ -72,7 +72,7 @@ func (m *MempoolBitcoinType) getInputAddress(input Outpoint) *addrIndex {
 			return nil
 		}
 	}
-	return &addrIndex{string(*addrDesc), ^input.Vout}
+	return &addrIndex{string(addrDesc), ^input.Vout}
 
 }
 
@@ -90,8 +90,8 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, ch
 			glog.Error("error in addrDesc in ", txid, " ", output.N, ": ", err)
 			continue
 		}
-		if len(*addrDesc) > 0 {
-			io = append(io, &addrIndex{string(*addrDesc), int32(output.N)})
+		if len(addrDesc) > 0 {
+			io = append(io, &addrIndex{string(addrDesc), int32(output.N)})
 		}
 		if m.OnNewTxAddr != nil {
 			m.OnNewTxAddr(tx, addrDesc)

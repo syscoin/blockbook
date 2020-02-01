@@ -95,7 +95,7 @@ func (p *BitcoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDe
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
 func (p *BitcoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
-	return p.OutputScriptToAddressesFunc(*addrDesc)
+	return p.OutputScriptToAddressesFunc(addrDesc)
 }
 
 // GetScriptFromAddrDesc returns output script for given address descriptor
@@ -106,7 +106,7 @@ func (p *BitcoinParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor)
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // empty or OP_RETURN scripts are not indexed
 func (p *BitcoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor) bool {
-	if len(*addrDesc) == 0 || (*addrDesc)[0] == txscript.OP_RETURN {
+	if len(addrDesc) == 0 || (addrDesc)[0] == txscript.OP_RETURN {
 		return false
 	}
 	return true
