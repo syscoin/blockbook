@@ -177,7 +177,7 @@ func (p *EthereumParser) GetAddrDescFromAddress(address string) (*bchain.Address
 	}
 	decodedBytes, err := hex.DecodeString(address)
 	if err != nil {
-		return decodedBytes, err
+		return nil, err
 	}
 	decodedString := bchain.AddressDescriptor(decodedBytes)
 	return &decodedString, nil
