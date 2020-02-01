@@ -267,14 +267,14 @@ func (w *SyncWorker) ConnectBlocksParallel(lower, higher uint32) error {
 					// channel is closed and empty - work is done
 					break WriteBlockLoop
 				}
-				if b.Height != lastBlock+1 {
-					glog.Fatal("writeBlockWorker skipped block, expected block ", lastBlock+1, ", new block ", b.Height)
+				if b.BlockHeader.Height != lastBlock+1 {
+					glog.Fatal("writeBlockWorker skipped block, expected block ", lastBlock+1, ", new block ", b.BlockHeader.Height)
 				}
-				err := bc.ConnectBlock(b, b.Height+keep > higher)
+				err := bc.ConnectBlock(b, b.BlockHeader.Height+keep > higher)
 				if err != nil {
-					glog.Fatal("writeBlockWorker ", b.Height, " ", b.Hash, " error ", err)
+					glog.Fatal("writeBlockWorker ", b.BlockHeader.Height, " ", b.Hash, " error ", err)
 				}
-				lastBlock = b.Height
+				lastBlock = b.BlockHeader.Height
 			case <-terminating:
 				break WriteBlockLoop
 			}
