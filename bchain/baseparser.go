@@ -30,7 +30,7 @@ func (p *BaseParser) ParseTx(b []byte) (*Tx, error) {
 }
 
 // GetAddrDescForUnknownInput returns nil AddressDescriptor
-func (p *BaseParser) GetAddrDescForUnknownInput(tx *Tx, input int) *AddressDescriptor {
+func (p *BaseParser) GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor {
 	var iTxid string
 	if len(tx.Vin) > input {
 		iTxid = tx.Vin[input].Txid
@@ -277,7 +277,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // by default all AddressDescriptors are indexable
-func (p *BaseParser) IsAddrDescIndexable(addrDesc *AddressDescriptor) bool {
+func (p *BaseParser) IsAddrDescIndexable(addrDesc AddressDescriptor) bool {
 	return true
 }
 
@@ -287,12 +287,12 @@ func (p *BaseParser) DerivationBasePath(xpub string) (string, error) {
 }
 
 // DeriveAddressDescriptors is unsupported
-func (p *BaseParser) DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]*AddressDescriptor, error) {
+func (p *BaseParser) DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]AddressDescriptor, error) {
 	return nil, errors.New("Not supported")
 }
 
 // DeriveAddressDescriptorsFromTo is unsupported
-func (p *BaseParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]*AddressDescriptor, error) {
+func (p *BaseParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]AddressDescriptor, error) {
 	return nil, errors.New("Not supported")
 }
 
@@ -327,7 +327,7 @@ func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail A
 }
 
 const packedHeightBytes = 4
-func (p *BaseParser) PackAddressKey(addrDesc *AddressDescriptor, height uint32) []byte {
+func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
 	buf := make([]byte, len(*addrDesc)+packedHeightBytes)
 	copy(buf, *addrDesc)
 	// pack height as binary complement to achieve ordering from newest to oldest block

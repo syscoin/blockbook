@@ -44,7 +44,7 @@ func NewWorker(db *db.RocksDB, chain bchain.BlockChain, mempool bchain.Mempool, 
 	return w, nil
 }
 
-func (w *Worker) getAddressesFromVout(vout *bchain.Vout) (*bchain.AddressDescriptor, []string, bool, error) {
+func (w *Worker) getAddressesFromVout(vout *bchain.Vout) (bchain.AddressDescriptor, []string, bool, error) {
 	addrDesc, err := w.chainParser.GetAddrDescFromVout(vout)
 	if err != nil {
 		return nil, nil, false, err
@@ -336,7 +336,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 	return r, nil
 }
 
-func (w *Worker) getAddressTxids(addrDesc *bchain.AddressDescriptor, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
+func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
 	var callback db.GetTransactionsCallback
@@ -396,17 +396,17 @@ func (w *Worker) getAddressTxids(addrDesc *bchain.AddressDescriptor, mempool boo
 	return txids, nil
 }
 
-func (t *Tx) getAddrVoutValue(addrDesc *bchain.AddressDescriptor) *big.Int {
+func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
 	for _, vout := range t.Vout {
-		if bytes.Equal(*vout.AddrDesc, *addrDesc) && vout.ValueSat != nil {
+		if bytes.Equal(vout.AddrDesc, addrDesc) && vout.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vout.ValueSat))
 		}
 	}
 	return &val
 }
 
-func (t *Tx) getAddrVinValue(addrDesc *bchain.AddressDescriptor) *big.Int {
+func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
 	for _, vin := range t.Vin {
 		if bytes.Equal(*vin.AddrDesc, *addrDesc) && vin.ValueSat != nil {
@@ -502,7 +502,7 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-func (w *Worker) getEthereumTypeAddressBalances(addrDesc *bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []*bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
+func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []*bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
 	var (
 		ba             *bchain.AddrBalance
 		tokens         []*bchain.Token
@@ -531,7 +531,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc *bchain.AddressDescript
 		if err != nil {
 			return nil, nil, nil, 0, 0, 0, errors.Annotatef(err, "EthereumTypeGetNonce %v", addrDesc)
 		}
-		var filterDesc *bchain.AddressDescriptor
+		var filterDesc bchain.AddressDescriptor
 		if filter.Contract != "" {
 			filterDesc, err = w.chainParser.GetAddrDescFromAddress(filter.Contract)
 			if err != nil {
@@ -652,7 +652,7 @@ func (w *Worker) txFromTxid(txid string, bestheight uint32, option AccountDetail
 	return tx, nil
 }
 
-func (w *Worker) getAddrDescAndNormalizeAddress(address string) (*bchain.AddressDescriptor, string, error) {
+func (w *Worker) getAddrDescAndNormalizeAddress(address string) (bchain.AddressDescriptor, string, error) {
 	addrDesc, err := w.chainParser.GetAddrDescFromAddress(address)
 	if err != nil {
 		return nil, "", NewAPIError(fmt.Sprintf("Invalid address, %v", err), true)
@@ -842,7 +842,7 @@ func (w *Worker) balanceHistoryHeightsFromTo(fromTime, toTime time.Time) (uint32
 	return fromUnix, fromHeight, toUnix, toHeight
 }
 
-func (w *Worker) balanceHistoryForTxid(addrDesc *bchain.AddressDescriptor, txid string, fromUnix, toUnix uint32) (*BalanceHistory, error) {
+func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid string, fromUnix, toUnix uint32) (*BalanceHistory, error) {
 	var time uint32
 	var err error
 	var ta *bchain.TxAddresses
@@ -911,7 +911,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc *bchain.AddressDescriptor, txid 
 				token = &TokenBalanceHistory{}
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
-			var tattAddrFromDesc, tattAddrToDesc *bchain.AddressDescriptor
+			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
 			tattAddrFromDesc, err = w.chainParser.GetAddrDescFromAddress(tatt.From)
 			if err != nil {
 				return nil, err

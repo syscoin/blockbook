@@ -186,18 +186,18 @@ func (p *DecredParser) ParseTxFromJson(jsonTx *json.RawMessage) (*bchain.Tx, err
 }
 
 // GetAddrDescForUnknownInput returns nil AddressDescriptor.
-func (p *DecredParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) *bchain.AddressDescriptor {
+func (p *DecredParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bchain.AddressDescriptor {
 	return nil
 }
 
 // GetAddrDescFromAddress returns internal address representation of a given address.
-func (p *DecredParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
+func (p *DecredParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
 	addressByte := []byte(address)
 	return &bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddrDescFromVout returns internal address representation of a given transaction output.
-func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.AddressDescriptor, error) {
+func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
 	script, err := hex.DecodeString(output.ScriptPubKey.Hex)
 	if err != nil {
 		return nil, err
@@ -222,7 +222,7 @@ func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.Address
 }
 
 // GetAddressesFromAddrDesc returns addresses obtained from the internal address representation
-func (p *DecredParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
+func (p *DecredParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
 	var addrs []string
 	if addrDesc != nil {
 		addrs = append(addrs, string(*addrDesc))
@@ -240,7 +240,7 @@ func (p *DecredParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 	return p.baseParser.UnpackTx(buf)
 }
 
-func (p *DecredParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (*bchain.AddressDescriptor, error) {
+func (p *DecredParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (bchain.AddressDescriptor, error) {
 	var addr, err = extKey.Address(p.netConfig)
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func (p *DecredParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (*bcha
 // DeriveAddressDescriptors derives address descriptors from given xpub for
 // listed indexes
 func (p *DecredParser) DeriveAddressDescriptors(xpub string, change uint32,
-	indexes []uint32) ([]*bchain.AddressDescriptor, error) {
+	indexes []uint32) ([]bchain.AddressDescriptor, error) {
 	extKey, err := hdkeychain.NewKeyFromString(xpub)
 	if err != nil {
 		return nil, err
@@ -262,7 +262,7 @@ func (p *DecredParser) DeriveAddressDescriptors(xpub string, change uint32,
 		return nil, err
 	}
 
-	ad := make([]*bchain.AddressDescriptor, len(indexes))
+	ad := make([]bchain.AddressDescriptor, len(indexes))
 	for i, index := range indexes {
 		indexExtKey, err := changeExtKey.Child(index)
 		if err != nil {
@@ -279,7 +279,7 @@ func (p *DecredParser) DeriveAddressDescriptors(xpub string, change uint32,
 // DeriveAddressDescriptorsFromTo derives address descriptors from given xpub for
 // addresses in index range
 func (p *DecredParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32,
-	fromIndex uint32, toIndex uint32) ([]*bchain.AddressDescriptor, error) {
+	fromIndex uint32, toIndex uint32) ([]bchain.AddressDescriptor, error) {
 	if toIndex <= fromIndex {
 		return nil, errors.New("toIndex<=fromIndex")
 	}
@@ -292,7 +292,7 @@ func (p *DecredParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32
 		return nil, err
 	}
 
-	ad := make([]*bchain.AddressDescriptor, toIndex-fromIndex)
+	ad := make([]bchain.AddressDescriptor, toIndex-fromIndex)
 	for index := fromIndex; index < toIndex; index++ {
 		indexExtKey, err := changeExtKey.Child(index)
 		if err != nil {

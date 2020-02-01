@@ -68,7 +68,7 @@ func GetChainParams(chain string) *chaincfg.Params {
 }
 
 // GetAddrDescFromVout returns internal address representation (descriptor) of given transaction output
-func (p *BitcoinParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.AddressDescriptor, error) {
+func (p *BitcoinParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
 	ad, err := hex.DecodeString(output.ScriptPubKey.Hex)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (p *BitcoinParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.Addres
 }
 
 // GetAddrDescFromAddress returns internal address representation (descriptor) of given address
-func (p *BitcoinParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
+func (p *BitcoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
 	addrDescScript, res := p.addressToOutputScript(address)
 	if res != nil {
 		return nil, res
@@ -94,7 +94,7 @@ func (p *BitcoinParser) GetAddrDescFromAddress(address string) (*bchain.AddressD
 }
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
-func (p *BitcoinParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
+func (p *BitcoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
 	return p.OutputScriptToAddressesFunc(*addrDesc)
 }
 
@@ -105,7 +105,7 @@ func (p *BitcoinParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor)
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
 // empty or OP_RETURN scripts are not indexed
-func (p *BitcoinParser) IsAddrDescIndexable(addrDesc *bchain.AddressDescriptor) bool {
+func (p *BitcoinParser) IsAddrDescIndexable(addrDesc bchain.AddressDescriptor) bool {
 	if len(*addrDesc) == 0 || (*addrDesc)[0] == txscript.OP_RETURN {
 		return false
 	}
@@ -343,7 +343,7 @@ func (p *BitcoinParser) MinimumCoinbaseConfirmations() int {
 	return p.minimumCoinbaseConfirmations
 }
 
-func (p *BitcoinParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (*bchain.AddressDescriptor, error) {
+func (p *BitcoinParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (bchain.AddressDescriptor, error) {
 	var a btcutil.Address
 	var err error
 	if extKey.Version() == p.XPubMagicSegwitP2sh {
@@ -373,7 +373,7 @@ func (p *BitcoinParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (*bch
 }
 
 // DeriveAddressDescriptors derives address descriptors from given xpub for listed indexes
-func (p *BitcoinParser) DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]*bchain.AddressDescriptor, error) {
+func (p *BitcoinParser) DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]bchain.AddressDescriptor, error) {
 	extKey, err := hdkeychain.NewKeyFromString(xpub, p.Params.Base58CksumHasher)
 	if err != nil {
 		return nil, err
@@ -382,7 +382,7 @@ func (p *BitcoinParser) DeriveAddressDescriptors(xpub string, change uint32, ind
 	if err != nil {
 		return nil, err
 	}
-	ad := make([]*bchain.AddressDescriptor, len(indexes))
+	ad := make([]bchain.AddressDescriptor, len(indexes))
 	for i, index := range indexes {
 		indexExtKey, err := changeExtKey.Child(index)
 		if err != nil {
@@ -397,7 +397,7 @@ func (p *BitcoinParser) DeriveAddressDescriptors(xpub string, change uint32, ind
 }
 
 // DeriveAddressDescriptorsFromTo derives address descriptors from given xpub for addresses in index range
-func (p *BitcoinParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]*bchain.AddressDescriptor, error) {
+func (p *BitcoinParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]bchain.AddressDescriptor, error) {
 	if toIndex <= fromIndex {
 		return nil, errors.New("toIndex<=fromIndex")
 	}
@@ -409,7 +409,7 @@ func (p *BitcoinParser) DeriveAddressDescriptorsFromTo(xpub string, change uint3
 	if err != nil {
 		return nil, err
 	}
-	ad := make([]*bchain.AddressDescriptor, toIndex-fromIndex)
+	ad := make([]bchain.AddressDescriptor, toIndex-fromIndex)
 	for index := fromIndex; index < toIndex; index++ {
 		indexExtKey, err := changeExtKey.Child(index)
 		if err != nil {

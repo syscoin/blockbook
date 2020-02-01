@@ -220,7 +220,7 @@ func (s *PublicServer) OnNewFiatRatesTicker(ticker *db.CurrencyRatesTicker) {
 }
 
 // OnNewTxAddr notifies users subscribed to bitcoind/addresstxid about new block
-func (s *PublicServer) OnNewTxAddr(tx *bchain.Tx, desc *bchain.AddressDescriptor) {
+func (s *PublicServer) OnNewTxAddr(tx *bchain.Tx, desc bchain.AddressDescriptor) {
 	s.socketio.OnNewTxAddr(tx.Txid, desc)
 	s.websocket.OnNewTxAddr(tx, desc)
 }

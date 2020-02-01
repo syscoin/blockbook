@@ -649,7 +649,7 @@ func (s *WebsocketServer) unsubscribeNewBlock(c *websocketChannel) (res interfac
 	return &subscriptionResponse{false}, nil
 }
 
-func (s *WebsocketServer) unmarshalAddresses(params []byte) ([]*bchain.AddressDescriptor, error) {
+func (s *WebsocketServer) unmarshalAddresses(params []byte) ([]bchain.AddressDescriptor, error) {
 	r := struct {
 		Addresses []string `json:"addresses"`
 	}{}
@@ -657,7 +657,7 @@ func (s *WebsocketServer) unmarshalAddresses(params []byte) ([]*bchain.AddressDe
 	if err != nil {
 		return nil, err
 	}
-	rv := make([]*bchain.AddressDescriptor, len(r.Addresses))
+	rv := make([]bchain.AddressDescriptor, len(r.Addresses))
 	for i, a := range r.Addresses {
 		ad, err := s.chainParser.GetAddrDescFromAddress(a)
 		if err != nil {
@@ -668,7 +668,7 @@ func (s *WebsocketServer) unmarshalAddresses(params []byte) ([]*bchain.AddressDe
 	return rv, nil
 }
 
-func (s *WebsocketServer) subscribeAddresses(c *websocketChannel, addrDesc []*bchain.AddressDescriptor, req *websocketReq) (res interface{}, err error) {
+func (s *WebsocketServer) subscribeAddresses(c *websocketChannel, addrDesc []bchain.AddressDescriptor, req *websocketReq) (res interface{}, err error) {
 	// unsubscribe all previous subscriptions
 	s.unsubscribeAddresses(c)
 	s.addressSubscriptionsLock.Lock()
@@ -755,7 +755,7 @@ func (s *WebsocketServer) OnNewBlock(hash string, height uint32) {
 }
 
 // OnNewTxAddr is a callback that broadcasts info about a tx affecting subscribed address
-func (s *WebsocketServer) OnNewTxAddr(tx *bchain.Tx, addrDesc *bchain.AddressDescriptor) {
+func (s *WebsocketServer) OnNewTxAddr(tx *bchain.Tx, addrDesc bchain.AddressDescriptor) {
 	// check if there is any subscription but release the lock immediately, GetTransactionFromBchainTx may take some time
 	s.addressSubscriptionsLock.Lock()
 	as, ok := s.addressSubscriptions[string(*addrDesc)]

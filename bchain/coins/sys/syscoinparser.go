@@ -180,12 +180,12 @@ func (p *SyscoinParser) outputScriptToAddresses(script []byte) ([]string, bool, 
 }
 
 // GetAddrDescFromAddress returns internal address representation (descriptor) of given address
-func (p *SyscoinParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
+func (p *SyscoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
 	return p.addressToOutputScript(address)
 }
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
-func (p *SyscoinParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
+func (p *SyscoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
 	return p.OutputScriptToAddressesFunc(addrDesc)
 }
 // TryGetOPReturn tries to process OP_RETURN script and return data

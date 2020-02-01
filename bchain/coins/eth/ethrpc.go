@@ -783,14 +783,14 @@ func (b *EthereumRPC) SendRawTransaction(hex string) (string, error) {
 }
 
 // EthereumTypeGetBalance returns current balance of an address
-func (b *EthereumRPC) EthereumTypeGetBalance(addrDesc *bchain.AddressDescriptor) (*big.Int, error) {
+func (b *EthereumRPC) EthereumTypeGetBalance(addrDesc bchain.AddressDescriptor) (*big.Int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 	defer cancel()
 	return b.client.BalanceAt(ctx, ethcommon.BytesToAddress(*addrDesc), nil)
 }
 
 // EthereumTypeGetNonce returns current balance of an address
-func (b *EthereumRPC) EthereumTypeGetNonce(addrDesc *bchain.AddressDescriptor) (uint64, error) {
+func (b *EthereumRPC) EthereumTypeGetNonce(addrDesc bchain.AddressDescriptor) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 	defer cancel()
 	return b.client.NonceAt(ctx, ethcommon.BytesToAddress(*addrDesc), nil)

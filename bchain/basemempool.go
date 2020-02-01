@@ -40,7 +40,7 @@ func (m *BaseMempool) GetTransactions(address string) ([]*Outpoint, error) {
 }
 
 // GetAddrDescTransactions returns slice of mempool transactions for given address descriptor, in reverse order
-func (m *BaseMempool) GetAddrDescTransactions(addrDesc *AddressDescriptor) ([]*Outpoint, error) {
+func (m *BaseMempool) GetAddrDescTransactions(addrDesc AddressDescriptor) ([]*Outpoint, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	outpoints := m.addrDescToTx[string(*addrDesc)]

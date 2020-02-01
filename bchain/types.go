@@ -298,10 +298,10 @@ type MempoolTxidEntries []*MempoolTxidEntry
 type OnNewBlockFunc func(hash string, height uint32)
 
 // OnNewTxAddrFunc is used to send notification about a new transaction/address
-type OnNewTxAddrFunc func(tx *Tx, desc *AddressDescriptor)
+type OnNewTxAddrFunc func(tx *Tx, desc AddressDescriptor)
 
 // AddrDescForOutpointFunc defines function that returns address descriptorfor given outpoint or nil if outpoint not found
-type AddrDescForOutpointFunc func(outpoint Outpoint) *AddressDescriptor
+type AddrDescForOutpointFunc func(outpoint Outpoint) AddressDescriptor
 
 // Addresses index
 type TxIndexes struct {
@@ -316,7 +316,7 @@ type AddressesMap map[string][]*TxIndexes
 
 // TxInput holds input data of the transaction in TxAddresses
 type TxInput struct {
-	AddrDesc *AddressDescriptor
+	AddrDesc AddressDescriptor
 	ValueSat big.Int
 }
 
@@ -331,7 +331,7 @@ type DbBlockInfo struct {
 
 // TxOutput holds output data of the transaction in TxAddresses
 type TxOutput struct {
-	AddrDesc *AddressDescriptor
+	AddrDesc AddressDescriptor
 	Spent    bool
 	ValueSat big.Int
 }
@@ -490,11 +490,11 @@ type BlockChain interface {
 	// parser
 	GetChainParser() BlockChainParser
 	// EthereumType specific
-	EthereumTypeGetBalance(addrDesc *AddressDescriptor) (*big.Int, error)
-	EthereumTypeGetNonce(addrDesc *AddressDescriptor) (uint64, error)
+	EthereumTypeGetBalance(addrDesc AddressDescriptor) (*big.Int, error)
+	EthereumTypeGetNonce(addrDesc AddressDescriptor) (uint64, error)
 	EthereumTypeEstimateGas(params map[string]interface{}) (uint64, error)
-	EthereumTypeGetErc20ContractInfo(contractDesc *AddressDescriptor) (*Erc20Contract, error)
-	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc *AddressDescriptor) (*big.Int, error)
+	EthereumTypeGetErc20ContractInfo(contractDesc AddressDescriptor) (*Erc20Contract, error)
+	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error)
 }
 
 // BlockChainParser defines common interface to parsing and conversions of block chain data
@@ -517,11 +517,11 @@ type BlockChainParser interface {
 	// but for example in syscoin this is going to be 8000 for max opreturn output script for syscoin coloured tx
 	GetMaxAddrLength() int
 	// address descriptor conversions
-	GetAddrDescFromVout(output *Vout) (*AddressDescriptor, error)
-	GetAddrDescFromAddress(address string) (*AddressDescriptor, error)
-	GetAddressesFromAddrDesc(addrDesc *AddressDescriptor) ([]string, bool, error)
+	GetAddrDescFromVout(output *Vout) (AddressDescriptor, error)
+	GetAddrDescFromAddress(address string) (AddressDescriptor, error)
+	GetAddressesFromAddrDesc(addrDesc AddressDescriptor) ([]string, bool, error)
 	GetScriptFromAddrDesc(addrDesc AddressDescriptor) ([]byte, error)
-	IsAddrDescIndexable(addrDesc *AddressDescriptor) bool
+	IsAddrDescIndexable(addrDesc AddressDescriptor) bool
 	// parsing/packing/unpacking specific to chain
 	PackedTxidLen() int
 	PackTxid(txid string) ([]byte, error)
@@ -530,10 +530,10 @@ type BlockChainParser interface {
 	ParseTxFromJson(*json.RawMessage) (*Tx, error)
 	PackTx(tx *Tx, height uint32, blockTime int64) ([]byte, error)
 	UnpackTx(buf []byte) (*Tx, uint32, error)
-	GetAddrDescForUnknownInput(tx *Tx, input int) *AddressDescriptor
+	GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor
 	PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
 	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
-	PackAddressKey(addrDesc *AddressDescriptor, height uint32) []byte
+	PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte
 	UnpackAddressKey(key []byte) ([]byte, uint32, error)
 	PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte
 	AppendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte
@@ -565,8 +565,8 @@ type BlockChainParser interface {
 	ParseBlock(b []byte) (*Block, error)
 	// xpub
 	DerivationBasePath(xpub string) (string, error)
-	DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]*AddressDescriptor, error)
-	DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]*AddressDescriptor, error)
+	DeriveAddressDescriptors(xpub string, change uint32, indexes []uint32) ([]AddressDescriptor, error)
+	DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]AddressDescriptor, error)
 	// EthereumType specific
 	EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 	// SyscoinType specific
@@ -581,7 +581,7 @@ type BlockChainParser interface {
 type Mempool interface {
 	Resync() (int, error)
 	GetTransactions(address string) ([]*Outpoint, error)
-	GetAddrDescTransactions(addrDesc *AddressDescriptor) ([]*Outpoint, error)
+	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]*Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
 	GetTransactionTime(txid string) uint32
 }

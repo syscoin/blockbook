@@ -99,20 +99,20 @@ func (p *NulsParser) PackedTxidLen() int {
 }
 
 // GetAddrDescFromAddress returns internal address representation (descriptor) of given address
-func (p *NulsParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
+func (p *NulsParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
 	addressByte := base58.Decode(address)
 	return &bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddrDescFromVout returns internal address representation (descriptor) of given transaction output
-func (p *NulsParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.AddressDescriptor, error) {
+func (p *NulsParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
 	addressStr := output.ScriptPubKey.Hex
 	addressByte := base58.Decode(addressStr)
 	return &bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
-func (p *NulsParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
+func (p *NulsParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
 	var addrs []string
 
 	if addrDesc != nil {
@@ -161,7 +161,7 @@ func (p *NulsParser) ParseTx(b []byte) (*bchain.Tx, error) {
 }
 
 // DeriveAddressDescriptorsFromTo derives address descriptors from given xpub for addresses in index range
-func (p *NulsParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]*bchain.AddressDescriptor, error) {
+func (p *NulsParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, fromIndex uint32, toIndex uint32) ([]bchain.AddressDescriptor, error) {
 	if toIndex <= fromIndex {
 		return nil, errors.New("toIndex<=fromIndex")
 	}
@@ -173,7 +173,7 @@ func (p *NulsParser) DeriveAddressDescriptorsFromTo(xpub string, change uint32, 
 	if err != nil {
 		return nil, err
 	}
-	ad := make([]*bchain.AddressDescriptor, toIndex-fromIndex)
+	ad := make([]bchain.AddressDescriptor, toIndex-fromIndex)
 	for index := fromIndex; index < toIndex; index++ {
 		indexExtKey, err := changeExtKey.Child(index)
 		if err != nil {

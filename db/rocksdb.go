@@ -358,7 +358,7 @@ func (d *RocksDB) GetTransactions(address string, lower uint32, higher uint32, f
 
 // GetAddrDescTransactions finds all input/output transactions for address descriptor
 // Transaction are passed to callback function in the order from newest block to the oldest
-func (d *RocksDB) GetAddrDescTransactions(addrDesc *bchain.AddressDescriptor, lower uint32, higher uint32, fn GetTransactionsCallback) (err error) {
+func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, lower uint32, higher uint32, fn GetTransactionsCallback) (err error) {
 	txidUnpackedLen := d.chainParser.PackedTxidLen()
 	startKey := d.chainParser.PackAddressKey(addrDesc, higher)
 	stopKey := d.chainParser.PackAddressKey(addrDesc, lower)
@@ -470,7 +470,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	return nil
 }
 
-func (d *RocksDB) resetValueSatToZero(valueSat *big.Int, addrDesc *bchain.AddressDescriptor, logText string) {
+func (d *RocksDB) resetValueSatToZero(valueSat *big.Int, addrDesc bchain.AddressDescriptor, logText string) {
 	ad, _, err := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
 	if err != nil {
 		glog.Warningf("rocksdb: unparsable address hex '%v' reached negative %s %v, resetting to 0. Parser error %v", addrDesc, logText, valueSat.String(), err)
@@ -789,7 +789,7 @@ func (d *RocksDB) getBlockTxs(height uint32) ([]*bchain.BlockTxs, error) {
 }
 
 // GetAddrDescBalance returns AddrBalance for given addrDesc
-func (d *RocksDB) GetAddrDescBalance(addrDesc *bchain.AddressDescriptor, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
+func (d *RocksDB) GetAddrDescBalance(addrDesc bchain.AddressDescriptor, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAddressBalance], addrDesc)
 	if err != nil {
 		return nil, err
@@ -836,7 +836,7 @@ func (d *RocksDB) GetTxAddresses(txid string) (*bchain.TxAddresses, error) {
 }
 
 // AddrDescForOutpoint defines function that returns address descriptorfor given outpoint or nil if outpoint not found
-func (d *RocksDB) AddrDescForOutpoint(outpoint bchain.Outpoint) *bchain.AddressDescriptor {
+func (d *RocksDB) AddrDescForOutpoint(outpoint bchain.Outpoint) bchain.AddressDescriptor {
 	ta, err := d.GetTxAddresses(outpoint.Txid)
 	if err != nil || ta == nil {
 		return nil
@@ -937,7 +937,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 	var balance *bchain.AddrBalance
 	addresses := make(map[string]struct{})
 	isSyscoinTx := d.chainParser.IsSyscoinTx(txa.Version)
-	getAddressBalance := func(addrDesc *bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
+	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
 		s := string(*addrDesc)
 		b, fb := balances[s]

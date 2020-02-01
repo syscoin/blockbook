@@ -284,12 +284,12 @@ func (c *blockChainWithMetrics) GetChainParser() bchain.BlockChainParser {
 	return c.b.GetChainParser()
 }
 
-func (c *blockChainWithMetrics) EthereumTypeGetBalance(addrDesc *bchain.AddressDescriptor) (v *big.Int, err error) {
+func (c *blockChainWithMetrics) EthereumTypeGetBalance(addrDesc bchain.AddressDescriptor) (v *big.Int, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("EthereumTypeGetBalance", s, err) }(time.Now())
 	return c.b.EthereumTypeGetBalance(addrDesc)
 }
 
-func (c *blockChainWithMetrics) EthereumTypeGetNonce(addrDesc *bchain.AddressDescriptor) (v uint64, err error) {
+func (c *blockChainWithMetrics) EthereumTypeGetNonce(addrDesc bchain.AddressDescriptor) (v uint64, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("EthereumTypeGetNonce", s, err) }(time.Now())
 	return c.b.EthereumTypeGetNonce(addrDesc)
 }
@@ -299,12 +299,12 @@ func (c *blockChainWithMetrics) EthereumTypeEstimateGas(params map[string]interf
 	return c.b.EthereumTypeEstimateGas(params)
 }
 
-func (c *blockChainWithMetrics) EthereumTypeGetErc20ContractInfo(contractDesc *bchain.AddressDescriptor) (v *bchain.Erc20Contract, err error) {
+func (c *blockChainWithMetrics) EthereumTypeGetErc20ContractInfo(contractDesc bchain.AddressDescriptor) (v *bchain.Erc20Contract, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("EthereumTypeGetErc20ContractInfo", s, err) }(time.Now())
 	return c.b.EthereumTypeGetErc20ContractInfo(contractDesc)
 }
 
-func (c *blockChainWithMetrics) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc *bchain.AddressDescriptor) (v *big.Int, err error) {
+func (c *blockChainWithMetrics) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc bchain.AddressDescriptor) (v *big.Int, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("EthereumTypeGetErc20ContractInfo", s, err) }(time.Now())
 	return c.b.EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc)
 }
@@ -336,7 +336,7 @@ func (c *mempoolWithMetrics) GetTransactions(address string) (v []*bchain.Outpoi
 	return c.mempool.GetTransactions(address)
 }
 
-func (c *mempoolWithMetrics) GetAddrDescTransactions(addrDesc *bchain.AddressDescriptor) (v []*bchain.Outpoint, err error) {
+func (c *mempoolWithMetrics) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor) (v []*bchain.Outpoint, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetMempoolTransactionsForAddrDesc", s, err) }(time.Now())
 	return c.mempool.GetAddrDescTransactions(addrDesc)
 }

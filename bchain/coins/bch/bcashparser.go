@@ -105,8 +105,13 @@ func GetChainParams(chain string) *chaincfg.Params {
 }
 
 // GetAddrDescFromAddress returns internal address representation of given address
-func (p *BCashParser) GetAddrDescFromAddress(address string) (*bchain.AddressDescriptor, error) {
-	return p.addressToOutputScript(address)
+func (p *BCashParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
+	addrDescScript, res := p.addressToOutputScript(address)
+	if res != nil {
+		return nil, res
+	}
+	addrDesc := bchain.AddressDescriptor(addrDescScript)
+	return &addrDesc, nil
 }
 
 // addressToOutputScript converts bitcoin address to ScriptPubKey

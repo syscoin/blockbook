@@ -748,7 +748,7 @@ func (s *SocketIoServer) onSubscribe(c *gosocketio.Channel, req []byte) interfac
 			return nil
 		}
 		// normalize the addresses to AddressDescriptor
-		descs := make([]*bchain.AddressDescriptor, len(addrs))
+		descs := make([]bchain.AddressDescriptor, len(addrs))
 		for i, a := range addrs {
 			d, err := s.chainParser.GetAddrDescFromAddress(a)
 			if err != nil {
@@ -779,7 +779,7 @@ func (s *SocketIoServer) OnNewBlockHash(hash string) {
 }
 
 // OnNewTxAddr notifies users subscribed to bitcoind/addresstxid about new block
-func (s *SocketIoServer) OnNewTxAddr(txid string, desc *bchain.AddressDescriptor) {
+func (s *SocketIoServer) OnNewTxAddr(txid string, desc bchain.AddressDescriptor) {
 	addr, searchable, err := s.chainParser.GetAddressesFromAddrDesc(desc)
 	if err != nil {
 		glog.Error("GetAddressesFromAddrDesc error ", err, " for descriptor ", desc)

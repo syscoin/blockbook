@@ -66,7 +66,7 @@ type Vin struct {
 	Vout      uint32                   `json:"vout,omitempty"`
 	Sequence  int64                    `json:"sequence,omitempty"`
 	N         int                      `json:"n"`
-	AddrDesc  *bchain.AddressDescriptor `json:"-"`
+	AddrDesc  bchain.AddressDescriptor `json:"-"`
 	Addresses []string                 `json:"addresses,omitempty"`
 	IsAddress bool                     `json:"isAddress"`
 	ValueSat  *bchain.Amount                  `json:"value,omitempty"`
@@ -85,7 +85,7 @@ type Vout struct {
 	SpentHeight int                      `json:"spentHeight,omitempty"`
 	Hex         string                   `json:"hex,omitempty"`
 	Asm         string                   `json:"asm,omitempty"`
-	AddrDesc    *bchain.AddressDescriptor `json:"-"`
+	AddrDesc    bchain.AddressDescriptor `json:"-"`
 	Addresses   []string                 `json:"addresses"`
 	IsAddress   bool                     `json:"isAddress"`
 	Type        string                   `json:"type,omitempty"`

@@ -47,7 +47,7 @@ func (a xpubTxids) Less(i, j int) bool {
 }
 
 type xpubAddress struct {
-	addrDesc  *bchain.AddressDescriptor
+	addrDesc  bchain.AddressDescriptor
 	balance   *bchain.AddrBalance
 	txs       uint32
 	maxHeight uint32
@@ -68,7 +68,7 @@ type xpubData struct {
 	changeAddresses []xpubAddress
 }
 
-func (w *Worker) xpubGetAddressTxids(addrDesc *bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, maxResults int) ([]*xpubTxid, bool, error) {
+func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, maxResults int) ([]*xpubTxid, bool, error) {
 	var err error
 	complete := true
 	txs := make([]*xpubTxid, 0, 4)

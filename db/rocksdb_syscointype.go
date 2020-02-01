@@ -203,7 +203,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData *[]byte, balances map[
 	if err != nil {
 		return err
 	}
-	getAddressBalance := func(addrDesc *bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
+	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
 		s := string(*addrDesc)
 		b, fb := balances[s]
@@ -278,7 +278,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData *[]byte, balances map[
 	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
-func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc *bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
+func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
 	if totalAssetSentValue == nil {
 		return errors.New("totalAssetSentValue was nil cannot connect allocation input")
 	}
@@ -326,7 +326,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData *[]byte, balances map[string]*bc
 	if err != nil {
 		return err
 	}
-	getAddressBalance := func(addrDesc *bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
+	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
 		s := string(*addrDesc)
 		b, fb := balances[s]
@@ -400,7 +400,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData *[]byte, balances map[string]*bc
 	return nil
 
 }
-func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc *bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
+func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
@@ -505,7 +505,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData *[]byte, balances map[string
 	if err != nil {
 		return err
 	}
-	getAddressBalance := func(addrDesc *bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
+	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
 		s := string(*addrDesc)
 		b, fb := balances[s]
@@ -577,7 +577,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData *[]byte, balances map[string
 	
 	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
-func (d *RocksDB) ConnectSyscoinOutputs(addrDesc *bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
+func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -596,7 +596,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc *bchain.AddressDescriptor, bala
 	return nil
 }
 
-func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc *bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
+func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err

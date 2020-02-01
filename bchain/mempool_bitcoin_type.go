@@ -52,7 +52,7 @@ func NewMempoolBitcoinType(chain BlockChain, workers int, subworkers int) *Mempo
 }
 
 func (m *MempoolBitcoinType) getInputAddress(input Outpoint) *addrIndex {
-	var addrDesc *AddressDescriptor
+	var addrDesc AddressDescriptor
 	if m.AddrDescForOutpoint != nil {
 		addrDesc = m.AddrDescForOutpoint(input)
 	}

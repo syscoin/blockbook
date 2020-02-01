@@ -167,7 +167,7 @@ func (p *MonetaryUnitParser) outputScriptToAddresses(script []byte) ([]string, b
 	return rv, s, nil
 }
 
-func (p *MonetaryUnitParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) *bchain.AddressDescriptor {
+func (p *MonetaryUnitParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bchain.AddressDescriptor {
 	if len(tx.Vin) > input {
 		scriptHex := tx.Vin[input].ScriptSig.Hex
 

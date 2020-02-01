@@ -244,7 +244,7 @@ func (p *PivXParser) outputScriptToAddresses(script []byte) ([]string, bool, err
 	return rv, s, nil
 }
 
-func (p *PivXParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) *bchain.AddressDescriptor {
+func (p *PivXParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bchain.AddressDescriptor {
 	if len(tx.Vin) > input {
 		scriptHex := tx.Vin[input].ScriptSig.Hex
 

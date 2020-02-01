@@ -214,7 +214,7 @@ func (p *DivicoinParser) outputScriptToAddresses(script []byte) ([]string, bool,
 }
 
 // GetAddrDescForUnknownInput = ???
-func (p *DivicoinParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) *bchain.AddressDescriptor {
+func (p *DivicoinParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bchain.AddressDescriptor {
 	if len(tx.Vin) > input {
 		scriptHex := tx.Vin[input].ScriptSig.Hex
 
