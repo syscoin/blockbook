@@ -75,7 +75,8 @@ func (p *BitcoinParser) GetAddrDescFromVout(output *bchain.Vout) (*bchain.Addres
 	}
 	// convert possible P2PK script to P2PKH
 	// so that all transactions by given public key are indexed together
-	return &txscript.ConvertP2PKtoP2PKH(p.Params.Base58CksumHasher, ad)
+	addrDesc, res := txscript.ConvertP2PKtoP2PKH(p.Params.Base58CksumHasher, ad)
+	return &addrDesc, res
 }
 
 // GetAddrDescFromAddress returns internal address representation (descriptor) of given address
@@ -85,12 +86,12 @@ func (p *BitcoinParser) GetAddrDescFromAddress(address string) (*bchain.AddressD
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
 func (p *BitcoinParser) GetAddressesFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]string, bool, error) {
-	return p.OutputScriptToAddressesFunc(addrDesc)
+	return p.OutputScriptToAddressesFunc(*addrDesc)
 }
 
 // GetScriptFromAddrDesc returns output script for given address descriptor
 func (p *BitcoinParser) GetScriptFromAddrDesc(addrDesc *bchain.AddressDescriptor) ([]byte, error) {
-	return addrDesc, nil
+	return *addrDesc, nil
 }
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
@@ -354,7 +355,8 @@ func (p *BitcoinParser) addrDescFromExtKey(extKey *hdkeychain.ExtendedKey) (*bch
 	if err != nil {
 		return nil, err
 	}
-	return &txscript.PayToAddrScript(a)
+	addrDesc, res != txscript.PayToAddrScript(a)
+	return &addrDesc, res
 }
 
 // DeriveAddressDescriptors derives address descriptors from given xpub for listed indexes
@@ -503,7 +505,7 @@ func (p *BitcoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	l = p.BaseParser.PackVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
-		buf = p.AppendTxInput(&ta.Inputs[i], buf, varBuf)
+		buf = p.AppendTxInput(ta.Inputs[i], buf, varBuf)
 	}
 	l = p.BaseParser.PackVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -533,7 +535,7 @@ func (p *BitcoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 }
 
 func (p *BitcoinParser) AppendTxInput(txi *bchain.TxInput, buf []byte, varBuf []byte) []byte {
-	la := len(txi.AddrDesc)
+	la := len(*txi.AddrDesc)
 	l := p.BaseParser.PackVaruint(uint(la), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, txi.AddrDesc...)
@@ -543,7 +545,7 @@ func (p *BitcoinParser) AppendTxInput(txi *bchain.TxInput, buf []byte, varBuf []
 }
 
 func (p *BitcoinParser) AppendTxOutput(txo *bchain.TxOutput, buf []byte, varBuf []byte) []byte {
-	la := len(txo.AddrDesc)
+	la := len(*txo.AddrDesc)
 	if txo.Spent {
 		la = ^la
 	}

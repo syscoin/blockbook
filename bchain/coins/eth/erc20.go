@@ -173,7 +173,7 @@ func parseErc20StringProperty(contractDesc *bchain.AddressDescriptor, data strin
 
 // EthereumTypeGetErc20ContractInfo returns information about ERC20 contract
 func (b *EthereumRPC) EthereumTypeGetErc20ContractInfo(contractDesc *bchain.AddressDescriptor) (*bchain.Erc20Contract, error) {
-	cds := string(contractDesc)
+	cds := string(*contractDesc)
 	cachedContractsMux.Lock()
 	contract, found := cachedContracts[cds]
 	cachedContractsMux.Unlock()
