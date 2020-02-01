@@ -916,7 +916,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			if err != nil {
 				return nil, err
 			}
-			if bytes.Equal(addrDesc, *tattAddrFromDesc) {
+			if bytes.Equal(addrDesc, tattAddrFromDesc) {
 				sentSat := &token.SentSat
 				(*big.Int)(sentSat).Add((*big.Int)(sentSat), (*big.Int)(tatt.Value))
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
@@ -926,7 +926,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					if err != nil {
 						return nil, err
 					}
-					if bytes.Equal(addrDesc, *tattAddrToDesc) {
+					if bytes.Equal(addrDesc, tattAddrToDesc) {
 						receivedSat := &token.ReceivedSat
 						(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), (*big.Int)(tattr.Value))
 					}
