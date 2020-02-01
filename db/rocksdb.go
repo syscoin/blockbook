@@ -421,7 +421,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	defer wb.Destroy()
 
 	if glog.V(2) {
-		glog.Infof("rocksdb: insert %d %s", block.Height, block.Hash)
+		glog.Infof("rocksdb: insert %d %s", block.BlockHeader.Height, block.BlockHeader.Hash)
 	}
 
 	chainType := d.chainParser.GetChainType()
@@ -460,7 +460,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	} else {
 		return errors.New("Unknown chain type")
 	}
-	if err := d.storeAddresses(wb, block.Height, addresses); err != nil {
+	if err := d.storeAddresses(wb, block.BlockHeader.Height, addresses); err != nil {
 		return err
 	}
 	if err := d.db.Write(d.wo, wb); err != nil {
@@ -498,7 +498,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 			return err
 		}
 		blockTxIDs[txi] = btxID
-		ta := bchain.TxAddresses{Version: tx.Version, Height: block.Height}
+		ta := bchain.TxAddresses{Version: tx.Version, Height: block.BlockHeader.Height}
 		ta.Outputs = make([]*bchain.TxOutput, len(tx.Vout))
 		txAddressesMap[string(btxID)] = &ta
 		blockTxAddresses[txi] = &ta
@@ -512,10 +512,10 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				if err != nil {
 					// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 					if err != bchain.ErrAddressMissing {
-						glog.Warningf("rocksdb: addrDesc: %v - height %d, tx %v, output %v, error %v", err, block.Height, tx.Txid, output, err)
+						glog.Warningf("rocksdb: addrDesc: %v - height %d, tx %v, output %v, error %v", err, block.BlockHeader.Height, tx.Txid, output, err)
 					}
 				} else {
-					glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping addrDesc of length %d", block.Height, tx.Txid, i, len(addrDesc))
+					glog.V(1).Infof("rocksdb: height %d, tx %v, vout %v, skipping addrDesc of length %d", block.BlockHeader.Height, tx.Txid, i, len(addrDesc))
 				}
 				continue
 			}
@@ -540,7 +540,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				balance.AddUtxo(&bchain.Utxo{
 					BtxID:    btxID,
 					Vout:     int32(i),
-					Height:   block.Height,
+					Height:   block.BlockHeader.Height,
 					ValueSat: output.ValueSat,
 				})
 				counted := addToAddressesMap(addresses, strAddrDesc, btxID, int32(i))
@@ -551,7 +551,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 			} else if isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
 				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxID, int32(i), &ta)
 				if err != nil {
-					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
+					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.BlockHeader.Height, tx.Txid, output, err)
 				}
 			}
 		}
@@ -591,12 +591,12 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				d.cbs.txAddressesHit++
 			}
 			if len(ita.Outputs) <= int(input.Vout) {
-				glog.Warningf("rocksdb: height %d, tx %v, input tx %v vout %v is out of bounds of stored tx", block.Height, tx.Txid, input.Txid, input.Vout)
+				glog.Warningf("rocksdb: height %d, tx %v, input tx %v vout %v is out of bounds of stored tx", block.BlockHeader.Height, tx.Txid, input.Txid, input.Vout)
 				continue
 			}
 			spentOutput := ita.Outputs[int(input.Vout)]
 			if spentOutput.Spent {
-				glog.Warningf("rocksdb: height %d, tx %v, input tx %v vout %v is double spend", block.Height, tx.Txid, input.Txid, input.Vout)
+				glog.Warningf("rocksdb: height %d, tx %v, input tx %v vout %v is double spend", block.BlockHeader.Height, tx.Txid, input.Txid, input.Vout)
 			}
 			tai.AddrDesc = spentOutput.AddrDesc
 			tai.ValueSat = spentOutput.ValueSat
@@ -604,7 +604,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 			spentOutput.Spent = true
 			if len(spentOutput.AddrDesc) == 0 {
 				if !logged {
-					glog.V(1).Infof("rocksdb: height %d, tx %v, input tx %v vout %v skipping empty address", block.Height, tx.Txid, input.Txid, input.Vout)
+					glog.V(1).Infof("rocksdb: height %d, tx %v, input tx %v vout %v skipping empty address", block.BlockHeader.Height, tx.Txid, input.Txid, input.Vout)
 					logged = true
 				}
 				continue
@@ -704,8 +704,8 @@ func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*bchain
 func (d *RocksDB) cleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchain.Block) error {
 	keep := d.chainParser.KeepBlockAddresses()
 	// cleanup old block address
-	if block.Height > uint32(keep) {
-		for rh := block.Height - uint32(keep); rh > 0; rh-- {
+	if block.BlockHeader.Height > uint32(keep) {
+		for rh := block.BlockHeader.Height - uint32(keep); rh > 0; rh-- {
 			key := d.chainParser.PackUint(rh)
 			val, err := d.db.GetCF(d.ro, d.cfh[cfBlockTxs], key)
 			if err != nil {
@@ -753,7 +753,7 @@ func (d *RocksDB) storeAndCleanupBlockTxs(wb *gorocksdb.WriteBatch, block *bchai
 		buf = append(buf, varBuf[:l]...)
 		buf = append(buf, d.chainParser.PackOutpoints(o)...)
 	}
-	key := d.chainParser.PackUint(block.Height)
+	key := d.chainParser.PackUint(block.BlockHeader.Height)
 	wb.PutCF(d.cfh[cfBlockTxs], key, buf)
 	return d.cleanupBlockTxs(wb, block)
 }
@@ -903,7 +903,7 @@ func (d *RocksDB) GetBlockInfo(height uint32) (*bchain.DbBlockInfo, error) {
 }
 
 func (d *RocksDB) writeHeightFromBlock(wb *gorocksdb.WriteBatch, block *bchain.Block, op int) error {
-	return d.writeHeight(wb, block.Height, &bchain.DbBlockInfo{
+	return d.writeHeight(wb, block.BlockHeader.Height, &bchain.DbBlockInfo{
 		Hash:   block.BlockHeader.Hash,
 		Time:   block.BlockHeader.Time,
 		Txs:    uint32(len(block.Txs)),
