@@ -91,7 +91,7 @@ func (p *LiquidParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bcha
 		}
 	}
 	glog.Info("tx ", tx.Txid, ", encountered Bitcoin tx ", iTxid)
-	return &s
+	return s
 }
 
 // outputScriptToAddresses converts ScriptPubKey to bitcoin addresses

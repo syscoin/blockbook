@@ -621,7 +621,7 @@ func (d *DecredRPC) GetBlockInfo(hash string) (*bchain.BlockInfo, error) {
 		return nil, err
 	}
 
-	header := &bchain.BlockHeader{
+	header := bchain.BlockHeader{
 		Hash:          block.Result.Hash,
 		Prev:          block.Result.PreviousHash,
 		Next:          block.Result.NextHash,
@@ -651,7 +651,7 @@ func (d *DecredRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 		return nil, err
 	}
 
-	tx, err := d.Parser.ParseTxFromJson(r)
+	tx, err := d.Parser.ParseTxFromJson(&r)
 	if err != nil {
 		return nil, errors.Annotatef(err, "txid %v", txid)
 	}

@@ -108,7 +108,7 @@ func (b *MonetaryUnitRPC) GetBlock(hash string, height uint32) (*bchain.Block, e
 		txs = append(txs, tx)
 	}
 	block := &bchain.Block{
-		BlockHeader: res.Result.BlockHeader,
+		BlockHeader: &res.Result.BlockHeader,
 		Txs:         txs,
 	}
 	return block, nil

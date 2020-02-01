@@ -225,5 +225,5 @@ func (p *DivicoinParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bc
 	}
 
 	s := make([]byte, 10)
-	return &s
+	return s
 }

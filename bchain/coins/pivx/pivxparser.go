@@ -255,7 +255,7 @@ func (p *PivXParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int) bchain
 	}
 
 	s := make([]byte, 10)
-	return &s
+	return s
 }
 
 // Checks if script is OP_ZEROCOINMINT

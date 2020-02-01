@@ -189,11 +189,11 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
 		bi: bchain.DbBlockInfo{
-			Hash:   block.Hash,
-			Time:   block.Time,
+			Hash:   block.BlockHeader.Hash,
+			Time:   block.BlockHeader.Time,
 			Txs:    uint32(len(block.Txs)),
-			Size:   uint32(block.Size),
-			Height: block.Height,
+			Size:   uint32(block.BlockHeader.Size),
+			Height: block.BlockHeader.Height,
 		},
 		addresses: addresses,
 	})
@@ -289,11 +289,11 @@ func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTx
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
 		bi: bchain.DbBlockInfo{
-			Hash:   block.Hash,
-			Time:   block.Time,
+			Hash:   block.BlockHeader.Hash,
+			Time:   block.BlockHeader.Time,
 			Txs:    uint32(len(block.Txs)),
-			Size:   uint32(block.Size),
-			Height: block.Height,
+			Size:   uint32(block.BlockHeader.Size),
+			Height: block.BlockHeader.Height,
 		},
 		addresses: addresses,
 	})
@@ -331,7 +331,7 @@ func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTx
 
 // ConnectBlock connects block in bulk mode
 func (b *BulkConnect) ConnectBlock(block *bchain.Block, storeBlockTxs bool) error {
-	b.height = block.Height
+	b.height = block.BlockHeader.Height
 	if b.chainType == bchain.ChainBitcoinType {
 		return b.connectBlockBitcoinType(block, storeBlockTxs)
 	} else if b.chainType == bchain.ChainEthereumType {

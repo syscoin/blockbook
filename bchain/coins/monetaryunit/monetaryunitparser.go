@@ -178,5 +178,5 @@ func (p *MonetaryUnitParser) GetAddrDescForUnknownInput(tx *bchain.Tx, input int
 	}
 
 	s := make([]byte, 10)
-	return &s
+	return s
 }

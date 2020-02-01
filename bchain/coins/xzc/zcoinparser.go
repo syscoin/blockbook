@@ -190,7 +190,7 @@ func (p *ZcoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 
 		btx := p.TxFromMsgTx(&tx, false)
 
-		p.parseZcoinTx(&btx)
+		p.parseZcoinTx(btx)
 
 		txs[i] = btx
 	}

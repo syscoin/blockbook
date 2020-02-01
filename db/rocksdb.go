@@ -907,7 +907,7 @@ func (d *RocksDB) writeHeightFromBlock(wb *gorocksdb.WriteBatch, block *bchain.B
 		Hash:   block.Hash,
 		Time:   block.Time,
 		Txs:    uint32(len(block.Txs)),
-		Size:   uint32(block.Size),
+		Size:   uint32(block.BlockHeader.Size),
 		Height: block.Height,
 	}, op)
 }

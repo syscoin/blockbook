@@ -91,7 +91,7 @@ func (zc *ZcoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) 
 		return nil, errors.Annotatef(err, "hash %v", hash)
 	}
 
-	block.BlockHeader = *header
+	block.BlockHeader = header
 
 	return block, nil
 }

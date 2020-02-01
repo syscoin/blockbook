@@ -108,7 +108,7 @@ func (p *NulsParser) GetAddrDescFromAddress(address string) (bchain.AddressDescr
 func (p *NulsParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
 	addressStr := output.ScriptPubKey.Hex
 	addressByte := base58.Decode(addressStr)
-	return &bchain.AddressDescriptor(addressByte), nil
+	return bchain.AddressDescriptor(addressByte), nil
 }
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
@@ -157,7 +157,7 @@ func (p *NulsParser) ParseTx(b []byte) (*bchain.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tx, err
+	return &tx, err
 }
 
 // DeriveAddressDescriptorsFromTo derives address descriptors from given xpub for addresses in index range

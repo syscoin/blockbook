@@ -256,7 +256,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			if detail == bchain.AddressBalanceDetailUTXO {
 				ab.Utxos = append(ab.Utxos, u)
 			} else {
-				ab.AddUtxo(&u)
+				ab.AddUtxo(u)
 			}
 		}
 	}
