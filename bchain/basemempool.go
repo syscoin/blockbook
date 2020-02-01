@@ -24,8 +24,8 @@ type txidio struct {
 type BaseMempool struct {
 	chain        BlockChain
 	mux          sync.Mutex
-	txEntries    map[string]txEntry
-	addrDescToTx map[string][]Outpoint
+	txEntries    map[string]*txEntry
+	addrDescToTx map[string][]*Outpoint
 	OnNewTxAddr  OnNewTxAddrFunc
 }
 
@@ -40,11 +40,11 @@ func (m *BaseMempool) GetTransactions(address string) ([]*Outpoint, error) {
 }
 
 // GetAddrDescTransactions returns slice of mempool transactions for given address descriptor, in reverse order
-func (m *BaseMempool) GetAddrDescTransactions(addrDesc *AddressDescriptor) ([]Outpoint, error) {
+func (m *BaseMempool) GetAddrDescTransactions(addrDesc *AddressDescriptor) ([]*Outpoint, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	outpoints := m.addrDescToTx[string(*addrDesc)]
-	rv := make([]Outpoint, len(outpoints))
+	rv := make([]*Outpoint, len(outpoints))
 	for i, j := len(outpoints)-1, 0; i >= 0; i-- {
 		rv[j] = outpoints[i]
 		j++
@@ -71,7 +71,7 @@ func (m *BaseMempool) removeEntryFromMempool(txid string, entry txEntry) {
 	for _, si := range entry.addrIndexes {
 		outpoints, found := m.addrDescToTx[si.addrDesc]
 		if found {
-			newOutpoints := make([]Outpoint, 0, len(outpoints)-1)
+			newOutpoints := make([]*Outpoint, 0, len(outpoints)-1)
 			for _, o := range outpoints {
 				if o.Txid != txid {
 					newOutpoints = append(newOutpoints, o)

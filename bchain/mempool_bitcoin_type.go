@@ -20,8 +20,8 @@ func NewMempoolBitcoinType(chain BlockChain, workers int, subworkers int) *Mempo
 	m := &MempoolBitcoinType{
 		BaseMempool: BaseMempool{
 			chain:        chain,
-			txEntries:    make(map[string]txEntry),
-			addrDescToTx: make(map[string][]Outpoint),
+			txEntries:    make(map[string]*txEntry),
+			addrDescToTx: make(map[string][]*Outpoint),
 		},
 		chanTxid:      make(chan string, 1),
 		chanAddrIndex: make(chan txidio, 1),
@@ -66,7 +66,7 @@ func (m *MempoolBitcoinType) getInputAddress(input Outpoint) *addrIndex {
 			glog.Error("Vout len in transaction ", input.Txid, " ", len(itx.Vout), " input.Vout=", input.Vout)
 			return nil
 		}
-		addrDesc, err = m.chain.GetChainParser().GetAddrDescFromVout(&itx.Vout[input.Vout])
+		addrDesc, err = m.chain.GetChainParser().GetAddrDescFromVout(itx.Vout[input.Vout])
 		if err != nil {
 			glog.Error("error in addrDesc in ", input.Txid, " ", input.Vout, ": ", err)
 			return nil
@@ -85,7 +85,7 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, ch
 	glog.V(2).Info("mempool: gettxaddrs ", txid, ", ", len(tx.Vin), " inputs")
 	io := make([]*addrIndex, 0, len(tx.Vout)+len(tx.Vin))
 	for _, output := range tx.Vout {
-		addrDesc, err := m.chain.GetChainParser().GetAddrDescFromVout(&output)
+		addrDesc, err := m.chain.GetChainParser().GetAddrDescFromVout(output)
 		if err != nil {
 			glog.Error("error in addrDesc in ", txid, " ", output.N, ": ", err)
 			continue
@@ -109,7 +109,7 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, ch
 			// store as many processed results as possible
 			case ai := <-chanResult:
 				if ai != nil {
-					io = append(io, *ai)
+					io = append(io, ai)
 				}
 				dispatched--
 			// send input to be processed
@@ -122,7 +122,7 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, ch
 	for i := 0; i < dispatched; i++ {
 		ai := <-chanResult
 		if ai != nil {
-			io = append(io, *ai)
+			io = append(io, ai)
 		}
 	}
 	return io, true

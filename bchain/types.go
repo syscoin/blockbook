@@ -298,10 +298,10 @@ type MempoolTxidEntries []*MempoolTxidEntry
 type OnNewBlockFunc func(hash string, height uint32)
 
 // OnNewTxAddrFunc is used to send notification about a new transaction/address
-type OnNewTxAddrFunc func(tx *Tx, desc AddressDescriptor)
+type OnNewTxAddrFunc func(tx *Tx, desc *AddressDescriptor)
 
 // AddrDescForOutpointFunc defines function that returns address descriptorfor given outpoint or nil if outpoint not found
-type AddrDescForOutpointFunc func(outpoint Outpoint) AddressDescriptor
+type AddrDescForOutpointFunc func(outpoint Outpoint) *AddressDescriptor
 
 // Addresses index
 type TxIndexes struct {

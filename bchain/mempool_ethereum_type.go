@@ -22,8 +22,8 @@ func NewMempoolEthereumType(chain BlockChain, mempoolTxTimeoutHours int, queryBa
 	return &MempoolEthereumType{
 		BaseMempool: BaseMempool{
 			chain:        chain,
-			txEntries:    make(map[string]txEntry),
-			addrDescToTx: make(map[string][]Outpoint),
+			txEntries:    make(map[string]*txEntry),
+			addrDescToTx: make(map[string][]*Outpoint),
 		},
 		mempoolTimeoutTime:   mempoolTimeoutTime,
 		queryBackendOnResync: queryBackendOnResync,
@@ -54,7 +54,7 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 	parser := m.chain.GetChainParser()
 	addrIndexes := make([]*addrIndex, 0, len(tx.Vout)+len(tx.Vin))
 	for _, output := range tx.Vout {
-		addrDesc, err := parser.GetAddrDescFromVout(&output)
+		addrDesc, err := parser.GetAddrDescFromVout(output)
 		if err != nil {
 			if err != ErrAddressMissing {
 				glog.Error("error in output addrDesc in ", txid, " ", output.N, ": ", err)
