@@ -205,7 +205,7 @@ type Utxo struct {
 }
 
 // Utxos is array of Utxo
-type Utxos []Utxo
+type Utxos []*Utxo
 
 func (a Utxos) Len() int      { return len(a) }
 func (a Utxos) Swap(i, j int) { a[i], a[j] = a[j], a[i] }

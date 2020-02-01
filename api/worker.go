@@ -1086,7 +1086,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 								if len(bchainTx.Vin) == 1 && len(bchainTx.Vin[0].Coinbase) > 0 {
 									coinbase = true
 								}
-								utxos = append(utxos, Utxo{
+								utxos = append(utxos, &Utxo{
 									Txid:      bchainTx.Txid,
 									Vout:      int32(i),
 									AmountSat: (*bchain.Amount)(&vout.ValueSat),
@@ -1135,16 +1135,16 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 						if err != nil {
 							return nil, err
 						}
-						if len(ta.Inputs) == 1 && len(ta.Inputs[0].AddrDesc) == 0 && IsZeroBigInt(&ta.Inputs[0].ValueSat) {
+						if len(ta.Inputs) == 1 && len(ta.Inputs[0].AddrDesc) == 0 && IsZeroBigInt(ta.Inputs[0].ValueSat) {
 							coinbase = true
 						}
 					}
 					_, e = inMempool[txid]
 					if !e {
-						utxos = append(utxos, Utxo{
+						utxos = append(utxos, &Utxo{
 							Txid:          txid,
 							Vout:          utxo.Vout,
-							AmountSat:     (*bchain.Amount)(&utxo.ValueSat),
+							AmountSat:     (*bchain.Amount)(utxo.ValueSat),
 							Height:        int(utxo.Height),
 							Confirmations: confirmations,
 							Coinbase:      coinbase,

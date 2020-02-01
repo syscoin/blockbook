@@ -247,7 +247,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			l += ll
 			valueSat, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
-			u := bchain.Utxo{
+			u := &bchain.Utxo{
 				BtxID:    btxID,
 				Vout:     int32(vout),
 				Height:   uint32(height),
@@ -361,7 +361,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	l = p.BaseParser.PackVaruint(uint(len(ta.Inputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
-		buf = p.BitcoinParser.AppendTxInput(&ta.Inputs[i], buf, varBuf)
+		buf = p.BitcoinParser.AppendTxInput(ta.Inputs[i], buf, varBuf)
 	}
 	l = p.BaseParser.PackVaruint(uint(len(ta.Outputs)), varBuf)
 	buf = append(buf, varBuf[:l]...)

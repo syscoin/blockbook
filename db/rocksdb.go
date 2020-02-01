@@ -989,7 +989,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 						d.resetValueSatToZero(&balance.SentSat, t.AddrDesc, "sent amount")
 					}
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
-					balance.Utxos = append(balance.Utxos, bchain.Utxo{
+					balance.Utxos = append(balance.Utxos, &bchain.Utxo{
 						BtxID:    input.BtxID,
 						Vout:     input.Index,
 						Height:   inputHeight,
