@@ -272,7 +272,7 @@ func (w *SyncWorker) ConnectBlocksParallel(lower, higher uint32) error {
 				}
 				err := bc.ConnectBlock(b, b.BlockHeader.Height+keep > higher)
 				if err != nil {
-					glog.Fatal("writeBlockWorker ", b.BlockHeader.Height, " ", b.Hash, " error ", err)
+					glog.Fatal("writeBlockWorker ", b.BlockHeader.Height, " ", b.BlockHeader.Hash, " error ", err)
 				}
 				lastBlock = b.BlockHeader.Height
 			case <-terminating:
@@ -394,7 +394,7 @@ func (w *SyncWorker) getBlockChain(out chan blockResult, done chan struct{}) {
 			out <- blockResult{err: err}
 			return
 		}
-		hash = block.Next
+		hash = block.BlockHeader.Next
 		height++
 		out <- blockResult{block: block}
 	}
