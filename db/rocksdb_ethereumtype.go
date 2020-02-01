@@ -407,7 +407,7 @@ func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, heigh
 			return err
 		}
 		// if from==to, tx is counted only once and does not have to be disconnected again
-		if !*blockTx.from, *blockTx.to) {
+		if !bytes.Equal(*blockTx.from, *blockTx.to) {
 			if err := disconnectAddress(blockTx.btxID, blockTx.to, nil); err != nil {
 				return err
 			}
