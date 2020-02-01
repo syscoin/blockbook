@@ -183,9 +183,9 @@ func (p *DivicoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain
 }
 
 // ParseTxFromJSON parses JSON message containing transaction and returns Tx struct
-func (p *DivicoinParser) ParseTxFromJSON(msg json.RawMessage) (*bchain.Tx, error) {
+func (p *DivicoinParser) ParseTxFromJSON(msg *json.RawMessage) (*bchain.Tx, error) {
 	var tx bchain.Tx
-	err := json.Unmarshal(msg, &tx)
+	err := json.Unmarshal(*msg, &tx)
 	if err != nil {
 		return nil, err
 	}

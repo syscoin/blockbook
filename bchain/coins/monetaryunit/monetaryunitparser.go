@@ -136,9 +136,9 @@ func (p *MonetaryUnitParser) ParseTx(b []byte) (*bchain.Tx, error) {
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *MonetaryUnitParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
+func (p *MonetaryUnitParser) ParseTxFromJson(msg *json.RawMessage) (*bchain.Tx, error) {
 	var tx bchain.Tx
-	err := json.Unmarshal(msg, &tx)
+	err := json.Unmarshal(*msg, &tx)
 	if err != nil {
 		return nil, err
 	}

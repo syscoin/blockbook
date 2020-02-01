@@ -105,9 +105,9 @@ func (p *BaseParser) AmountDecimals() int {
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *BaseParser) ParseTxFromJson(msg json.RawMessage) (*Tx, error) {
+func (p *BaseParser) ParseTxFromJson(msg *json.RawMessage) (*Tx, error) {
 	var tx Tx
-	err := json.Unmarshal(msg, &tx)
+	err := json.Unmarshal(*msg, &tx)
 	if err != nil {
 		return nil, err
 	}
@@ -449,8 +449,8 @@ func (p *BaseParser) PackTxIndexes(txi []*TxIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	// store the txs in reverse order for ordering from newest to oldest
-	for j := len(*txi) - 1; j >= 0; j-- {
-		t := (*txi)[j]
+	for j := len(txi) - 1; j >= 0; j-- {
+		t := txi[j]
 		buf = append(buf, []byte(t.BtxID)...)
 		for i, index := range t.Indexes {
 			index <<= 1

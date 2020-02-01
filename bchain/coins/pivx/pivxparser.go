@@ -207,9 +207,9 @@ func (p *PivXParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain.Tx 
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *PivXParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
+func (p *PivXParser) ParseTxFromJson(msg *json.RawMessage) (*bchain.Tx, error) {
 	var tx bchain.Tx
-	err := json.Unmarshal(msg, &tx)
+	err := json.Unmarshal(*msg, &tx)
 	if err != nil {
 		return nil, err
 	}

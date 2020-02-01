@@ -517,8 +517,8 @@ type BlockChainParser interface {
 	// but for example in syscoin this is going to be 8000 for max opreturn output script for syscoin coloured tx
 	GetMaxAddrLength() int
 	// address descriptor conversions
-	GetAddrDescFromVout(output *Vout) (AddressDescriptor, error)
-	GetAddrDescFromAddress(address string) (AddressDescriptor, error)
+	GetAddrDescFromVout(output *Vout) (*AddressDescriptor, error)
+	GetAddrDescFromAddress(address string) (*AddressDescriptor, error)
 	GetAddressesFromAddrDesc(addrDesc *AddressDescriptor) ([]string, bool, error)
 	GetScriptFromAddrDesc(addrDesc *AddressDescriptor) ([]byte, error)
 	IsAddrDescIndexable(addrDesc *AddressDescriptor) bool
@@ -527,12 +527,12 @@ type BlockChainParser interface {
 	PackTxid(txid string) ([]byte, error)
 	UnpackTxid(buf []byte) (string, error)
 	ParseTx(b []byte) (*Tx, error)
-	ParseTxFromJson(json.RawMessage) (*Tx, error)
+	ParseTxFromJson(*json.RawMessage) (*Tx, error)
 	PackTx(tx *Tx, height uint32, blockTime int64) ([]byte, error)
 	UnpackTx(buf []byte) (*Tx, uint32, error)
-	GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor
+	GetAddrDescForUnknownInput(tx *Tx, input int) *AddressDescriptor
 	PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
-	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
+	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail *AddressBalanceDetail) (*AddrBalance, error)
 	PackAddressKey(addrDesc *AddressDescriptor, height uint32) []byte
 	UnpackAddressKey(key []byte) ([]byte, uint32, error)
 	PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte

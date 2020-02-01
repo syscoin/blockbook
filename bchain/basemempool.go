@@ -30,7 +30,7 @@ type BaseMempool struct {
 }
 
 // GetTransactions returns slice of mempool transactions for given address
-func (m *BaseMempool) GetTransactions(address string) ([]Outpoint, error) {
+func (m *BaseMempool) GetTransactions(address string) ([]*Outpoint, error) {
 	parser := m.chain.GetChainParser()
 	addrDesc, err := parser.GetAddrDescFromAddress(address)
 	if err != nil {
