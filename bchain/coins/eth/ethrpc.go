@@ -547,17 +547,17 @@ func (b *EthereumRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	btxs := make([]*bchain.Tx, len(body.Transactions))
 	for i := range body.Transactions {
 		tx := body.Transactions[i]
-		btx, err := b.Parser.ethTxToTx(tx, &rpcReceipt{Logs: logs[tx.Hash]}, bbh.Time, uint32(bbh.Confirmations))
+		btx, err := b.Parser.ethTxToTx(&tx, &rpcReceipt{Logs: logs[tx.Hash]}, bbh.Time, uint32(bbh.Confirmations))
 		if err != nil {
 			return nil, errors.Annotatef(err, "hash %v, height %v, txid %v", hash, height, tx.Hash)
 		}
-		btxs[i] = *btx
+		btxs[i] = btx
 		if b.mempoolInitialized {
 			b.Mempool.RemoveTransactionFromMempool(tx.Hash)
 		}
 	}
 	bbk := &bchain.Block{
-		BlockHeader: *bbh,
+		BlockHeader: bbh,
 		Txs:         btxs,
 	}
 	return bbk, nil

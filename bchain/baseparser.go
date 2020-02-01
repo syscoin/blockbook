@@ -30,7 +30,7 @@ func (p *BaseParser) ParseTx(b []byte) (*Tx, error) {
 }
 
 // GetAddrDescForUnknownInput returns nil AddressDescriptor
-func (p *BaseParser) GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor {
+func (p *BaseParser) GetAddrDescForUnknownInput(tx *Tx, input int) *AddressDescriptor {
 	var iTxid string
 	if len(tx.Vin) > input {
 		iTxid = tx.Vin[input].Txid
