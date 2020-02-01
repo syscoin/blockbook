@@ -43,7 +43,7 @@ func appendAddress(io []*addrIndex, i int32, a string, parser BlockChainParser) 
 	return io
 }
 
-func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry, bool) {
+func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (*txEntry, bool) {
 	tx, err := m.chain.GetTransactionForMempool(txid)
 	if err != nil {
 		if err != ErrTxNotFound {
@@ -83,12 +83,12 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 		sent := make(map[string]struct{})
 		for _, si := range addrIndexes {
 			if _, found := sent[si.addrDesc]; !found {
-				m.OnNewTxAddr(tx, &bchain.AddressDescriptor(si.addrDesc))
+				m.OnNewTxAddr(tx, &(AddressDescriptor(si.addrDesc)))
 				sent[si.addrDesc] = struct{}{}
 			}
 		}
 	}
-	return txEntry{addrIndexes: addrIndexes, time: txTime}, true
+	return &txEntry{addrIndexes: addrIndexes, time: txTime}, true
 }
 
 // Resync ethereum type removes timed out transactions and returns number of transactions in mempool.
