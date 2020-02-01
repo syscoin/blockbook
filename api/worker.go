@@ -326,8 +326,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Version:          bchainTx.Version,
 		Hex:              bchainTx.Hex,
 		Rbf:              rbf,
-		Vin:              &vins,
-		Vout:             &vouts,
+		Vin:              vins,
+		Vout:             vouts,
 		CoinSpecificData: &bchainTx.CoinSpecificData,
 		CoinSpecificJSON: &sj,
 		TokenTransfers:   tokens,
@@ -474,8 +474,8 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		Txid:          txid,
 		ValueInSat:    (*bchain.Amount)(&valInSat),
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
-		Vin:           &vins,
-		Vout:          &vouts,
+		Vin:           vins,
+		Vout:          vouts,
 		TokenTransfers:  ta.TokenTransfers,
 	}
 	return r
@@ -979,7 +979,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 
 func (w *Worker) setFiatRateToBalanceHistories(histories BalanceHistories, fiat string) error {
 	for i := range histories {
-		bh := &histories[i]
+		bh := histories[i]
 		t := time.Unix(int64(bh.Time), 0)
 		ticker, err := w.db.FiatRatesFindTicker(&t)
 		if err != nil {
@@ -1017,7 +1017,7 @@ func (w *Worker) GetBalanceHistory(address string, fromTime, toTime time.Time, f
 			return nil, err
 		}
 		if bh != nil {
-			bhs = append(bhs, *bh)
+			bhs = append(bhs, bh)
 		}
 	}
 	bha := bhs.SortAndAggregate(groupBy)
@@ -1135,7 +1135,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 						if err != nil {
 							return nil, err
 						}
-						if len(ta.Inputs) == 1 && len(ta.Inputs[0].AddrDesc) == 0 && IsZeroBigInt(ta.Inputs[0].ValueSat) {
+						if len(ta.Inputs) == 1 && len(ta.Inputs[0].AddrDesc) == 0 && IsZeroBigInt(&ta.Inputs[0].ValueSat) {
 							coinbase = true
 						}
 					}
@@ -1144,7 +1144,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 						utxos = append(utxos, &Utxo{
 							Txid:          txid,
 							Vout:          utxo.Vout,
-							AmountSat:     (*bchain.Amount)(utxo.ValueSat),
+							AmountSat:     (*bchain.Amount)(&utxo.ValueSat),
 							Height:        int(utxo.Height),
 							Confirmations: confirmations,
 							Coinbase:      coinbase,
@@ -1203,7 +1203,7 @@ func (w *Worker) GetBlocks(page int, blocksOnPage int) (*Blocks, error) {
 			r.Blocks = r.Blocks[:i]
 			break
 		}
-		r.Blocks[i-from] = *bi
+		r.Blocks[i-from] = bi
 	}
 	glog.Info("GetBlocks page ", page, " finished in ", time.Since(start))
 	return r, nil
