@@ -191,10 +191,10 @@ func (w *SyncWorker) connectBlocks(onNewBlock bchain.OnNewBlockFunc, initialSync
 			return err
 		}
 		if onNewBlock != nil {
-			onNewBlock(res.block.Hash, res.block.Height)
+			onNewBlock(res.block.BlockHeader.Hash, res.block.BlockHeader.Height)
 		}
-		if res.block.Height > 0 && res.block.Height%1000 == 0 {
-			glog.Info("connected block ", res.block.Height, " ", res.block.Hash)
+		if res.block.BlockHeader.Height > 0 && res.block.BlockHeader.Height%1000 == 0 {
+			glog.Info("connected block ", res.block.BlockHeader.Height, " ", res.block.BlockHeader.Hash)
 		}
 
 		return nil
@@ -205,7 +205,7 @@ func (w *SyncWorker) connectBlocks(onNewBlock bchain.OnNewBlockFunc, initialSync
 		for {
 			select {
 			case <-w.chanOsSignal:
-				glog.Info("connectBlocks interrupted at height ", lastRes.block.Height)
+				glog.Info("connectBlocks interrupted at height ", lastRes.block.BlockHeader.Height)
 				return ErrOperationInterrupted
 			case res := <-bch:
 				if res == empty {
@@ -228,7 +228,7 @@ func (w *SyncWorker) connectBlocks(onNewBlock bchain.OnNewBlockFunc, initialSync
 	}
 
 	if lastRes.block != nil {
-		glog.Infof("resync: synced at %d %s", lastRes.block.Height, lastRes.block.Hash)
+		glog.Infof("resync: synced at %d %s", lastRes.block.BlockHeader.Height, lastRes.block.BlockHeader.Hash)
 	}
 
 	return nil
