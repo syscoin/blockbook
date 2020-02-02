@@ -926,7 +926,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			bh.Tokens[0] = &TokenBalanceHistory{
 				AssetGuid: assetGuid, 
 				SentSat: (*bchain.Amount)(sentSat),
-				ReceivedSat: (*bchain.Amount)(receivedSat)
+				ReceivedSat: (*bchain.Amount)(receivedSat),
 			}
 		}	
 	} else if w.chainType == bchain.ChainEthereumType {
