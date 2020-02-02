@@ -398,7 +398,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 
 func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
-	for _, vout := range *t.Vout {
+	for _, vout := range t.Vout {
 		if bytes.Equal(vout.AddrDesc, addrDesc) && vout.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vout.ValueSat))
 		}
@@ -408,7 +408,7 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 
 func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
-	for _, vin := range *t.Vin {
+	for _, vin := range t.Vin {
 		if bytes.Equal(vin.AddrDesc, addrDesc) && vin.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vin.ValueSat))
 		}
@@ -474,9 +474,9 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		Txid:          txid,
 		ValueInSat:    (*bchain.Amount)(&valInSat),
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
-		Vin:           &vins,
-		Vout:          &vouts,
-		TokenTransfers:  &ta.TokenTransfers,
+		Vin:           vins,
+		Vout:          vouts,
+		TokenTransfers:  ta.TokenTransfers,
 	}
 	return r
 }
