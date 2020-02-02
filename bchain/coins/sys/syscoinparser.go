@@ -5,7 +5,6 @@ import (
 	"blockbook/bchain/coins/btc"
 	"blockbook/bchain/coins/utils"
 	"bytes"
-	"math/big"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
