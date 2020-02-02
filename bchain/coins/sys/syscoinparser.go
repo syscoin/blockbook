@@ -304,6 +304,7 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	l = p.BaseParser.PackVaruint(uint(len(tt.From)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, []byte(tt.From)...)
+	glog.Warningf("AppendTokenTransfer from %v", tt.From)
 	l = p.BaseParser.PackVaruint(uint(len(tt.To)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, []byte(tt.To)...)
@@ -329,6 +330,7 @@ func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
 	tt.From = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	glog.Warningf("UnpackTokenTransfer from %v", tt.From)
 	ll += int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
