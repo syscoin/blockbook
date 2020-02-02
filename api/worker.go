@@ -251,7 +251,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		if len(ta.TokenTransfers) > 0 {
+		if ta != nil && len(ta.TokenTransfers) > 0 {
 			tokens = &ta.TokenTransfers
 		}
 	} else if w.chainType == bchain.ChainEthereumType {
