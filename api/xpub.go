@@ -245,7 +245,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				TotalSentSat:     (*bchain.Amount)(totalSent),
 				Transfers:        transfers,
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-			})
+			}
 			i++
 			for k, v := range ad.balance.AssetBalances {
 				balanceAssetSat := &v.BalanceAssetSat
@@ -262,7 +262,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					TotalSentSat:     (*bchain.Amount)(sentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  strconv.FormatUint(uint64(k), 10),
-				})
+				}
 				i++
 			}
 		}

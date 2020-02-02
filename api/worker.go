@@ -280,7 +280,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				Value:    (*bchain.Amount)(&e.Tokens),
 				Name:     erc20c.Name,
 				Symbol:   erc20c.Symbol,
-			})
+			}
 		}
 		ethTxData := eth.GetEthereumTxData(bchainTx)
 		// mempool txs do not have fees yet
@@ -800,7 +800,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				TotalReceivedSat: (*bchain.Amount)(totalReceived),
 				TotalSentSat:     (*bchain.Amount)(sentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
-			})
+			}
 			i++
 		}
 	}
