@@ -87,17 +87,17 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		if balanceTransfer.AssetBalances == nil{
 			balanceTransfer.AssetBalances = map[uint32]bchain.AssetBalance{}
 		}
-		assetTransferBalance := &balanceTransfer.AssetBalances[assetGuid]
-		balances := &balance.AssetBalances[assetGuid]
+		assetTransferBalance := balanceTransfer.AssetBalances[assetGuid]
+		balances := balance.AssetBalances[assetGuid]
 		assetTransferBalance.BalanceAssetSat = balances.BalanceAssetSat
 		balances.BalanceAssetSat.Set(big.NewInt(0))
 	} else {
 		if balance.AssetBalances == nil{
 			balance.AssetBalances = map[uint32]bchain.AssetBalance{}
 		}
-		assetBalance := &balance.AssetBalances[assetGuid]
+		assetBalance := balance.AssetBalances[assetGuid]
 		valueSat := big.NewInt(asset.Balance)
-		assetBalance.BalanceAssetSat.Add(assetBalance.BalanceAssetSat, valueSat)
+		assetBalance.BalanceAssetSat.Add(&assetBalance.BalanceAssetSat, valueSat)
 	}
 	return nil
 }
