@@ -485,7 +485,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		TokenTransfers:  ta.TokenTransfers,
 	}
 	if len(ta.TokenTransfers) < 0 {
-		glog.Errorf("txFromTxAddress %v", r.TokenTransfers[0].From)
+		glog.Errorf("txFromTxAddress1 %v", r.TokenTransfers[0].From)
 	}
 	return r
 }
