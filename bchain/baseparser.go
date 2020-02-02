@@ -105,15 +105,15 @@ func (p *BaseParser) AmountDecimals() int {
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *BaseParser) ParseTxFromJson(msg *json.RawMessage) (*Tx, error) {
+func (p *BaseParser) ParseTxFromJson(msg json.RawMessage) (*Tx, error) {
 	var tx Tx
-	err := json.Unmarshal(*msg, &tx)
+	err := json.Unmarshal(msg, &tx)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range tx.Vout {
-		vout := tx.Vout[i]
+		vout := &tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {
@@ -232,13 +232,13 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	vin := make([]*Vin, len(pt.Vin))
+	vin := make([]Vin, len(pt.Vin))
 	for i, pti := range pt.Vin {
 		itxid, err := p.UnpackTxid(pti.Txid)
 		if err != nil {
 			return nil, 0, err
 		}
-		vin[i] = &Vin{
+		vin[i] = Vin{
 			Addresses: pti.Addresses,
 			Coinbase:  pti.Coinbase,
 			ScriptSig: ScriptSig{
@@ -249,11 +249,11 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 			Vout:     pti.Vout,
 		}
 	}
-	vout := make([]*Vout, len(pt.Vout))
+	vout := make([]Vout, len(pt.Vout))
 	for i, pto := range pt.Vout {
 		var vs big.Int
 		vs.SetBytes(pto.ValueSat)
-		vout[i] = &Vout{
+		vout[i] = Vout{
 			N: pto.N,
 			ScriptPubKey: ScriptPubKey{
 				Addresses: pto.Addresses,
@@ -262,7 +262,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 			ValueSat: vs,
 		}
 	}
-	tx := &Tx{
+	tx := Tx{
 		Blocktime: int64(pt.Blocktime),
 		Hex:       hex.EncodeToString(pt.Hex),
 		LockTime:  pt.Locktime,
@@ -272,7 +272,7 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 		Vout:      vout,
 		Version:   pt.Version,
 	}
-	return tx, pt.Height, nil
+	return &tx, pt.Height, nil
 }
 
 // IsAddrDescIndexable returns true if AddressDescriptor should be added to index
@@ -313,7 +313,7 @@ func (p *BaseParser) IsAssetTx(nVersion int32) bool {
 func (p *BaseParser) IsAssetAllocationTx(nVersion int32) bool {
 	return false
 }
-func (p *BaseParser) TryGetOPReturn(script *[]byte) *[]byte {
+func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 func (p *BaseParser) GetMaxAddrLength() int {
@@ -445,12 +445,12 @@ func (p *BaseParser) UnpackBigint(buf []byte) (big.Int, int) {
 	return r, l
 }
 
-func (p *BaseParser) PackTxIndexes(txi []*TxIndexes) []byte {
+func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	// store the txs in reverse order for ordering from newest to oldest
 	for j := len(txi) - 1; j >= 0; j-- {
-		t := txi[j]
+		t := &txi[j]
 		buf = append(buf, []byte(t.BtxID)...)
 		for i, index := range t.Indexes {
 			index <<= 1
@@ -488,11 +488,11 @@ func (p *BaseParser) UnpackTxOutput(to *TxOutput, buf []byte) int {
 	return 0
 }
 
-func (p *BaseParser) PackOutpoints(outpoints []*DbOutpoint) []byte {
+func (p *BaseParser) PackOutpoints(outpoints []DbOutpoint) []byte {
 	return nil
 }
 
-func (p *BaseParser) UnpackNOutpoints(buf []byte) ([]*DbOutpoint, int, error) {
+func (p *BaseParser) UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error) {
 	return nil, 0, errors.New("Not supported")
 }
 

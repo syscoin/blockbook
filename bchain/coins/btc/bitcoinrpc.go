@@ -557,7 +557,7 @@ func (b *BitcoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error)
 	if err != nil {
 		return nil, errors.Annotatef(err, "hash %v", hash)
 	}
-	block.BlockHeader = header
+	block.BlockHeader = *header
 	return block, nil
 }
 
@@ -642,9 +642,9 @@ func (b *BitcoinRPC) GetBlockFull(hash string) (*bchain.Block, error) {
 	}
 
 	for i := range res.Result.Txs {
-		tx := res.Result.Txs[i]
+		tx := &res.Result.Txs[i]
 		for j := range tx.Vout {
-			vout := tx.Vout[j]
+			vout := &tx.Vout[j]
 			// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 			vout.ValueSat, err = b.Parser.AmountToBigInt(vout.JsonValue)
 			if err != nil {
@@ -718,8 +718,8 @@ func (b *BitcoinRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	tx, err := b.Parser.ParseTxFromJson(&r)
-	tx.CoinSpecificData = &r
+	tx, err := b.Parser.ParseTxFromJson(r)
+	tx.CoinSpecificData = r
 	if err != nil {
 		return nil, errors.Annotatef(err, "txid %v", txid)
 	}

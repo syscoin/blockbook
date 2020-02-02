@@ -108,13 +108,13 @@ func (p *PivXParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, errors.Annotatef(err, "DecodeTransactions")
 	}
 
-	txs := make([]*bchain.Tx, len(w.Transactions))
+	txs := make([]bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: &bchain.BlockHeader{
+		BlockHeader: bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -141,17 +141,17 @@ func (p *PivXParser) ParseTx(b []byte) (*bchain.Tx, error) {
 	}
 	tx := p.TxFromMsgTx(&t, true)
 	tx.Hex = hex.EncodeToString(b)
-	return tx, nil
+	return &tx, nil
 }
 
 // TxFromMsgTx parses tx and adds handling for OP_ZEROCOINSPEND inputs
-func (p *PivXParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain.Tx {
-	vin := make([]*bchain.Vin, len(t.TxIn))
+func (p *PivXParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
+	vin := make([]bchain.Vin, len(t.TxIn))
 	for i, in := range t.TxIn {
 
 		// extra check to not confuse Tx with single OP_ZEROCOINSPEND input as a coinbase Tx
 		if !isZeroCoinSpendScript(in.SignatureScript) && blockchain.IsCoinBaseTx(t) {
-			vin[i] = &bchain.Vin{
+			vin[i] = bchain.Vin{
 				Coinbase: hex.EncodeToString(in.SignatureScript),
 				Sequence: in.Sequence,
 			}
@@ -165,14 +165,14 @@ func (p *PivXParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain.Tx 
 
 		txid := in.PreviousOutPoint.Hash.String()
 
-		vin[i] = &bchain.Vin{
+		vin[i] = bchain.Vin{
 			Txid:      txid,
 			Vout:      in.PreviousOutPoint.Index,
 			Sequence:  in.Sequence,
 			ScriptSig: s,
 		}
 	}
-	vout := make([]*bchain.Vout, len(t.TxOut))
+	vout := make([]bchain.Vout, len(t.TxOut))
 	for i, out := range t.TxOut {
 		addrs := []string{}
 		if parseAddresses {
@@ -186,13 +186,13 @@ func (p *PivXParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain.Tx 
 		}
 		var vs big.Int
 		vs.SetInt64(out.Value)
-		vout[i] = &bchain.Vout{
+		vout[i] = bchain.Vout{
 			ValueSat:     vs,
 			N:            uint32(i),
 			ScriptPubKey: s,
 		}
 	}
-	tx := &bchain.Tx{
+	tx := bchain.Tx{
 		Txid:     t.TxHash().String(),
 		Version:  t.Version,
 		LockTime: t.LockTime,
@@ -207,15 +207,15 @@ func (p *PivXParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain.Tx 
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *PivXParser) ParseTxFromJson(msg *json.RawMessage) (*bchain.Tx, error) {
+func (p *PivXParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
 	var tx bchain.Tx
-	err := json.Unmarshal(*msg, &tx)
+	err := json.Unmarshal(msg, &tx)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range tx.Vout {
-		vout := tx.Vout[i]
+		vout := &tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {

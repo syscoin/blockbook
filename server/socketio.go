@@ -273,12 +273,12 @@ type resTx struct {
 	Hash           string `json:"hash"`
 	Locktime       int    `json:"locktime,omitempty"`
 	// Size           int         `json:"size,omitempty"`
-	Inputs         []*txInputs  `json:"inputs"`
+	Inputs         []txInputs  `json:"inputs"`
 	InputSatoshis  int64       `json:"inputSatoshis,omitempty"`
-	Outputs        []*txOutputs `json:"outputs"`
+	Outputs        []txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`
-	TokenTransfers []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers *[]bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	TokenOutputSatoshis  map[uint32]int64    `json:"tokenOutputSatoshis,omitempty"`
 }
 
@@ -300,12 +300,12 @@ type resultGetAddressHistory struct {
 
 func txToResTx(tx *api.Tx) resTx {
 	var resultTx resTx 
-	inputs := make([]*txInputs, len(tx.Vin))
-	for i := range tx.Vin {
-		vin := tx.Vin[i]
+	inputs := make([]txInputs, len(*tx.Vin))
+	for i := range *tx.Vin {
+		vin := &(*tx.Vin)[i]
 		txid := vin.Txid
 		script := vin.Hex
-		input := &txInputs{
+		input := txInputs{
 			Txid:        &txid,
 			Script:      &script,
 			Sequence:    int64(vin.Sequence),
@@ -318,11 +318,11 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		inputs[i] = input
 	}
-	outputs := make([]*txOutputs, len(tx.Vout))
-	for i := range tx.Vout {
-		vout := tx.Vout[i]
+	outputs := make([]txOutputs, len(*tx.Vout))
+	for i := range *tx.Vout {
+		vout := &(*tx.Vout)[i]
 		script := vout.Hex
-		output := &txOutputs{
+		output := txOutputs{
 			Satoshis: vout.ValueSat.AsInt64(),
 			Script:   &script,
 		}
@@ -332,9 +332,9 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		outputs[i] = output
 	}
-	if len(tx.TokenTransfers) > 0 {
+	if len(*tx.TokenTransfers) > 0 {
 		mapTokens := map[uint32]*big.Int{}
-		for _, tokenTransfer := range tx.TokenTransfers {
+		for _, tokenTransfer := range *tx.TokenTransfers {
 			assetGuid, err := strconv.Atoi(tokenTransfer.Token)
 			if err != nil {
 				return resultTx
@@ -416,8 +416,8 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 		}
 		ads := make(map[string]*addressHistoryIndexes)
 		var totalSat big.Int
-		for i := range tx.Vin {
-			vin := tx.Vin[i]
+		for i := range *tx.Vin {
+			vin := &(*tx.Vin)[i]
 			a := addressInSlice(vin.Addresses, addr)
 			if a != "" {
 				hi := ads[a]
@@ -431,8 +431,8 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 			}
 		}
-		for i := range tx.Vout {
-			vout := tx.Vout[i]
+		for i := range *tx.Vout {
+			vout := &(*tx.Vout)[i]
 			a := addressInSlice(vout.Addresses, addr)
 			if a != "" {
 				hi := ads[a]
@@ -446,10 +446,10 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 			}
 		}
-		if len(tx.TokenTransfers) > 0 {
+		if len(*tx.TokenTransfers) > 0{
 			mapTokensIn := map[uint32]*big.Int{}
 			mapTokensOut := map[uint32]*big.Int{}
-			for _, tokenTransfer := range tx.TokenTransfers {
+			for _, tokenTransfer := range *tx.TokenTransfers {
 				assetGuid, err := strconv.Atoi(tokenTransfer.Token)
 				if err != nil {
 					return res, err

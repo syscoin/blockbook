@@ -82,16 +82,16 @@ func (b *LiquidRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) 
 		return nil, errors.Annotatef(res.Error, "hash %v", hash)
 	}
 
-	txs := make([]*bchain.Tx, 0, len(res.Result.Txids))
+	txs := make([]bchain.Tx, 0, len(res.Result.Txids))
 	for _, txid := range res.Result.Txids {
 		tx, err := b.GetTransaction(txid)
 		if err != nil {
 			return nil, err
 		}
-		txs = append(txs, tx)
+		txs = append(txs, *tx)
 	}
 	block := &bchain.Block{
-		BlockHeader: &res.Result.BlockHeader,
+		BlockHeader: res.Result.BlockHeader,
 		Txs:         txs,
 	}
 	return block, nil

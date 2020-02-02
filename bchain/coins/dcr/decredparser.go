@@ -111,13 +111,13 @@ func (p *DecredParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, err
 	}
 
-	txs := make([]*bchain.Tx, len(w.Transactions))
+	txs := make([]bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: &bchain.BlockHeader{
+		BlockHeader: bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -126,20 +126,20 @@ func (p *DecredParser) ParseBlock(b []byte) (*bchain.Block, error) {
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *DecredParser) ParseTxFromJson(jsonTx *json.RawMessage) (*bchain.Tx, error) {
+func (p *DecredParser) ParseTxFromJson(jsonTx json.RawMessage) (*bchain.Tx, error) {
 	var getTxResult GetTransactionResult
-	if err := json.Unmarshal([]byte(*jsonTx), &getTxResult.Result); err != nil {
+	if err := json.Unmarshal([]byte(jsonTx), &getTxResult.Result); err != nil {
 		return nil, err
 	}
 
-	vins := make([]*bchain.Vin, len(getTxResult.Result.Vin))
+	vins := make([]bchain.Vin, len(getTxResult.Result.Vin))
 	for index, input := range getTxResult.Result.Vin {
 		hexData := bchain.ScriptSig{}
 		if input.ScriptSig != nil {
 			hexData.Hex = input.ScriptSig.Hex
 		}
 
-		vins[index] = &bchain.Vin{
+		vins[index] = bchain.Vin{
 			Coinbase:  input.Coinbase,
 			Txid:      input.Txid,
 			Vout:      input.Vout,
@@ -149,7 +149,7 @@ func (p *DecredParser) ParseTxFromJson(jsonTx *json.RawMessage) (*bchain.Tx, err
 		}
 	}
 
-	vouts := make([]*bchain.Vout, len(getTxResult.Result.Vout))
+	vouts := make([]bchain.Vout, len(getTxResult.Result.Vout))
 	for index, output := range getTxResult.Result.Vout {
 		addr := output.ScriptPubKey.Addresses
 		// If nulldata type found make asm field the address data.
@@ -157,7 +157,7 @@ func (p *DecredParser) ParseTxFromJson(jsonTx *json.RawMessage) (*bchain.Tx, err
 			addr = []string{output.ScriptPubKey.Asm}
 		}
 
-		vouts[index] = &bchain.Vout{
+		vouts[index] = bchain.Vout{
 			ValueSat: *big.NewInt(int64(math.Round(output.Value * 1e8))),
 			N:        output.N,
 			ScriptPubKey: bchain.ScriptPubKey{

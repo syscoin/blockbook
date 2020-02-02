@@ -75,12 +75,12 @@ func init() {
 		Blocktime: 1534858022,
 		Time:      1534858022,
 		Txid:      "0xcd647151552b5132b2aef7c9be00dc6f73afc5901dde157aab131335baaa853b",
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Addresses: []string{"0x3E3a3D69dc66bA10737F531ed088954a9EC89d97"},
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(1999622000000000000),
 				ScriptPubKey: bchain.ScriptPubKey{
@@ -113,12 +113,12 @@ func init() {
 		Blocktime: 1534858022,
 		Time:      1534858022,
 		Txid:      "0xa9cd088aba2131000da6f38a33c20169baee476218deea6b78720700b895b101",
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Addresses: []string{"0x20cD153de35D469BA46127A0C8F18626b59a256A"},
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(0),
 				ScriptPubKey: bchain.ScriptPubKey{

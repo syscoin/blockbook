@@ -67,7 +67,7 @@ func init() {
 		Time:      1533980594,
 		Txid:      "9d9e759dd970d86df9e105a7d4f671543bc16a03b6c5d2b48895f2a00aa7dd23",
 		LockTime:  0,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "47304402205b7d9c9aae790b69017651e10134735928df3b4a4a2feacc9568eb4fa133ed5902203f21a399385ce29dd79831ea34aa535612aa4314c5bd0b002bbbc9bcd2de1436012102b8d462740c99032a00083ac7028879acec244849e54ad0a04ea87f632f54b1d2",
@@ -77,7 +77,7 @@ func init() {
 				Sequence: 4294967294,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(18188266638),
 				N:        0,
@@ -104,7 +104,7 @@ func init() {
 		Time:      1481277009,
 		Txid:      "3d721fdce2855e2b4a54b74a26edd58a7262e1f195b5acaaae7832be6e0b3d32",
 		LockTime:  0,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: rawSpendHex,
@@ -114,7 +114,7 @@ func init() {
 				Sequence: 2,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(5000000000),
 				N:        0,
@@ -134,7 +134,7 @@ func init() {
 		Time:      1547091829,
 		Txid:      "96ae951083651f141d1fb2719c76d47e5a3ad421b81905f679c0edb60f2de0ff",
 		LockTime:  126200,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "483045022100bdc6b51c114617e29e28390dc9b3ad95b833ca3d1f0429ba667c58a667f9124702204ca2ed362dd9ef723ddbdcf4185b47c28b127a36f46bc4717662be863309b3e601210387e7ff08b953e3736955408fc6ebcd8aa84a04cc4b45758ea29cc2cfe1820535",
@@ -144,7 +144,7 @@ func init() {
 				Sequence: 4294967294,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(42000000000),
 				N:        0,
@@ -174,13 +174,13 @@ func init() {
 		Time:      1533977563,
 		Txid:      "914ccbdb72f593e5def15978cf5891e1384a1b85e89374fc1c440c074c6dd286",
 		LockTime:  0,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Coinbase: "03a1860104dba36e5b082a00077c00000000052f6d70682f",
 				Sequence: 0,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(2800200000),
 				N:        0,
@@ -587,7 +587,7 @@ func TestParseBlock(t *testing.T) {
 				parser:   NewZcoinParser(GetChainParams("main"), &btc.Configuration{}),
 			},
 			want: &bchain.Block{
-				BlockHeader: &bchain.BlockHeader{
+				BlockHeader: bchain.BlockHeader{
 					Size: 200286,
 					Time: 1547120622,
 				},
@@ -602,7 +602,7 @@ func TestParseBlock(t *testing.T) {
 				parser:   NewZcoinParser(GetChainParams("main"), &btc.Configuration{}),
 			},
 			want: &bchain.Block{
-				BlockHeader: &bchain.BlockHeader{
+				BlockHeader: bchain.BlockHeader{
 					Size: 25298,
 					Time: 1482107572,
 				},

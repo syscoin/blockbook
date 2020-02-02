@@ -191,10 +191,10 @@ func (w *SyncWorker) connectBlocks(onNewBlock bchain.OnNewBlockFunc, initialSync
 			return err
 		}
 		if onNewBlock != nil {
-			onNewBlock(res.block.BlockHeader.Hash, res.block.BlockHeader.Height)
+			onNewBlock(res.block.Hash, res.block.Height)
 		}
-		if res.block.BlockHeader.Height > 0 && res.block.BlockHeader.Height%1000 == 0 {
-			glog.Info("connected block ", res.block.BlockHeader.Height, " ", res.block.BlockHeader.Hash)
+		if res.block.Height > 0 && res.block.Height%1000 == 0 {
+			glog.Info("connected block ", res.block.Height, " ", res.block.Hash)
 		}
 
 		return nil
@@ -205,7 +205,7 @@ func (w *SyncWorker) connectBlocks(onNewBlock bchain.OnNewBlockFunc, initialSync
 		for {
 			select {
 			case <-w.chanOsSignal:
-				glog.Info("connectBlocks interrupted at height ", lastRes.block.BlockHeader.Height)
+				glog.Info("connectBlocks interrupted at height ", lastRes.block.Height)
 				return ErrOperationInterrupted
 			case res := <-bch:
 				if res == empty {
@@ -228,7 +228,7 @@ func (w *SyncWorker) connectBlocks(onNewBlock bchain.OnNewBlockFunc, initialSync
 	}
 
 	if lastRes.block != nil {
-		glog.Infof("resync: synced at %d %s", lastRes.block.BlockHeader.Height, lastRes.block.BlockHeader.Hash)
+		glog.Infof("resync: synced at %d %s", lastRes.block.Height, lastRes.block.Hash)
 	}
 
 	return nil
@@ -267,14 +267,14 @@ func (w *SyncWorker) ConnectBlocksParallel(lower, higher uint32) error {
 					// channel is closed and empty - work is done
 					break WriteBlockLoop
 				}
-				if b.BlockHeader.Height != lastBlock+1 {
-					glog.Fatal("writeBlockWorker skipped block, expected block ", lastBlock+1, ", new block ", b.BlockHeader.Height)
+				if b.Height != lastBlock+1 {
+					glog.Fatal("writeBlockWorker skipped block, expected block ", lastBlock+1, ", new block ", b.Height)
 				}
-				err := bc.ConnectBlock(b, b.BlockHeader.Height+keep > higher)
+				err := bc.ConnectBlock(b, b.Height+keep > higher)
 				if err != nil {
-					glog.Fatal("writeBlockWorker ", b.BlockHeader.Height, " ", b.BlockHeader.Hash, " error ", err)
+					glog.Fatal("writeBlockWorker ", b.Height, " ", b.Hash, " error ", err)
 				}
-				lastBlock = b.BlockHeader.Height
+				lastBlock = b.Height
 			case <-terminating:
 				break WriteBlockLoop
 			}
@@ -394,7 +394,7 @@ func (w *SyncWorker) getBlockChain(out chan blockResult, done chan struct{}) {
 			out <- blockResult{err: err}
 			return
 		}
-		hash = block.BlockHeader.Next
+		hash = block.Next
 		height++
 		out <- blockResult{block: block}
 	}

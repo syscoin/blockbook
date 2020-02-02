@@ -105,7 +105,7 @@ func loadTestData(coin string, parser bchain.BlockChainParser) (*TestData, error
 		for _, tx := range b.TxDetails {
 			// convert amounts in test json to bit.Int and clear the temporary JsonValue
 			for i := range tx.Vout {
-				vout := tx.Vout[i]
+				vout := &tx.Vout[i]
 				vout.ValueSat, err = parser.AmountToBigInt(vout.JsonValue)
 				if err != nil {
 					return nil, err
@@ -126,7 +126,7 @@ func loadTestData(coin string, parser bchain.BlockChainParser) (*TestData, error
 
 func setTxAddresses(parser bchain.BlockChainParser, tx *bchain.Tx) error {
 	for i := range tx.Vout {
-		ad, err := parser.GetAddrDescFromVout(tx.Vout[i])
+		ad, err := parser.GetAddrDescFromVout(&tx.Vout[i])
 		if err != nil {
 			return err
 		}

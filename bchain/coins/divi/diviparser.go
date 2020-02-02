@@ -94,13 +94,13 @@ func (p *DivicoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, errors.Annotatef(err, "DecodeTransactions")
 	}
 
-	txs := make([]*bchain.Tx, len(w.Transactions))
+	txs := make([]bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: &bchain.BlockHeader{
+		BlockHeader: bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -127,12 +127,12 @@ func (p *DivicoinParser) ParseTx(b []byte) (*bchain.Tx, error) {
 	}
 	tx := p.TxFromMsgTx(&t, true)
 	tx.Hex = hex.EncodeToString(b)
-	return tx, nil
+	return &tx, nil
 }
 
 // TxFromMsgTx parses tx and adds handling for OP_ZEROCOINSPEND inputs
-func (p *DivicoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain.Tx {
-	vin := make([]*bchain.Vin, len(t.TxIn))
+func (p *DivicoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
+	vin := make([]bchain.Vin, len(t.TxIn))
 	for i, in := range t.TxIn {
 		s := bchain.ScriptSig{
 			Hex: hex.EncodeToString(in.SignatureScript),
@@ -141,14 +141,14 @@ func (p *DivicoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain
 
 		txid := in.PreviousOutPoint.Hash.String()
 
-		vin[i] = &bchain.Vin{
+		vin[i] = bchain.Vin{
 			Txid:      txid,
 			Vout:      in.PreviousOutPoint.Index,
 			Sequence:  in.Sequence,
 			ScriptSig: s,
 		}
 	}
-	vout := make([]*bchain.Vout, len(t.TxOut))
+	vout := make([]bchain.Vout, len(t.TxOut))
 	for i, out := range t.TxOut {
 		addrs := []string{}
 		if parseAddresses {
@@ -162,13 +162,13 @@ func (p *DivicoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain
 		}
 		var vs big.Int
 		vs.SetInt64(out.Value)
-		vout[i] = &bchain.Vout{
+		vout[i] = bchain.Vout{
 			ValueSat:     vs,
 			N:            uint32(i),
 			ScriptPubKey: s,
 		}
 	}
-	tx := &bchain.Tx{
+	tx := bchain.Tx{
 		Txid:     t.TxHash().String(),
 		Version:  t.Version,
 		LockTime: t.LockTime,
@@ -183,15 +183,15 @@ func (p *DivicoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) *bchain
 }
 
 // ParseTxFromJSON parses JSON message containing transaction and returns Tx struct
-func (p *DivicoinParser) ParseTxFromJSON(msg *json.RawMessage) (*bchain.Tx, error) {
+func (p *DivicoinParser) ParseTxFromJSON(msg json.RawMessage) (*bchain.Tx, error) {
 	var tx bchain.Tx
-	err := json.Unmarshal(*msg, &tx)
+	err := json.Unmarshal(msg, &tx)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range tx.Vout {
-		vout := tx.Vout[i]
+		vout := &tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {

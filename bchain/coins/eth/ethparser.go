@@ -130,7 +130,7 @@ func (p *EthereumParser) ethTxToTx(tx *rpcTransaction, receipt *rpcReceipt, bloc
 		// LockTime
 		Time: blocktime,
 		Txid: txid,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Addresses: fa,
 				// Coinbase
@@ -140,7 +140,7 @@ func (p *EthereumParser) ethTxToTx(tx *rpcTransaction, receipt *rpcReceipt, bloc
 				// Vout
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				N:        0, // there is always up to one To address
 				ValueSat: *vs,

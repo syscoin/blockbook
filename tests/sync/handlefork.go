@@ -194,8 +194,8 @@ func makeFakeChain(chain bchain.BlockChain, blks []BlockID, upper uint32) (*fake
 	}, nil
 }
 
-func getTxs(h *TestHandler, d *db.RocksDB, rng Range, blks []BlockID) ([]*bchain.Tx, error) {
-	res := make([]*bchain.Tx, 0, (rng.Upper-rng.Lower+1)*2000)
+func getTxs(h *TestHandler, d *db.RocksDB, rng Range, blks []BlockID) ([]bchain.Tx, error) {
+	res := make([]bchain.Tx, 0, (rng.Upper-rng.Lower+1)*2000)
 
 	for _, b := range blks {
 		bi, err := d.GetBlockInfo(b.Height)
@@ -216,14 +216,14 @@ func getTxs(h *TestHandler, d *db.RocksDB, rng Range, blks []BlockID) ([]*bchain
 	return res, nil
 }
 
-func getBlockTxs(chain bchain.BlockChain, hash string) ([]*bchain.Tx, error) {
+func getBlockTxs(chain bchain.BlockChain, hash string) ([]bchain.Tx, error) {
 	b, err := chain.GetBlock(hash, 0)
 	if err != nil {
 		return nil, fmt.Errorf("GetBlock: %s", err)
 	}
 	parser := chain.GetChainParser()
 	for i := range b.Txs {
-		err := setTxAddresses(parser, b.Txs[i])
+		err := setTxAddresses(parser, &b.Txs[i])
 		if err != nil {
 			return nil, fmt.Errorf("setTxAddresses [%s]: %s", b.Txs[i].Txid, err)
 		}
@@ -231,7 +231,7 @@ func getBlockTxs(chain bchain.BlockChain, hash string) ([]*bchain.Tx, error) {
 	return b.Txs, nil
 }
 
-func getAddr2TxsMap(txs []*bchain.Tx) map[string][]string {
+func getAddr2TxsMap(txs []bchain.Tx) map[string][]string {
 	addr2txs := make(map[string][]string)
 	for i := range txs {
 		for j := range txs[i].Vout {

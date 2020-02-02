@@ -20,8 +20,8 @@ func NewMempoolBitcoinType(chain BlockChain, workers int, subworkers int) *Mempo
 	m := &MempoolBitcoinType{
 		BaseMempool: BaseMempool{
 			chain:        chain,
-			txEntries:    make(map[string]*txEntry),
-			addrDescToTx: make(map[string][]*Outpoint),
+			txEntries:    make(map[string]txEntry),
+			addrDescToTx: make(map[string][]Outpoint),
 		},
 		chanTxid:      make(chan string, 1),
 		chanAddrIndex: make(chan txidio, 1),
@@ -41,7 +41,7 @@ func NewMempoolBitcoinType(chain BlockChain, workers int, subworkers int) *Mempo
 			for txid := range m.chanTxid {
 				io, ok := m.getTxAddrs(txid, chanInput, chanResult)
 				if !ok {
-					io = []*addrIndex{}
+					io = []addrIndex{}
 				}
 				m.chanAddrIndex <- txidio{txid, io}
 			}
@@ -66,7 +66,7 @@ func (m *MempoolBitcoinType) getInputAddress(input Outpoint) *addrIndex {
 			glog.Error("Vout len in transaction ", input.Txid, " ", len(itx.Vout), " input.Vout=", input.Vout)
 			return nil
 		}
-		addrDesc, err = m.chain.GetChainParser().GetAddrDescFromVout(itx.Vout[input.Vout])
+		addrDesc, err = m.chain.GetChainParser().GetAddrDescFromVout(&itx.Vout[input.Vout])
 		if err != nil {
 			glog.Error("error in addrDesc in ", input.Txid, " ", input.Vout, ": ", err)
 			return nil
@@ -76,22 +76,22 @@ func (m *MempoolBitcoinType) getInputAddress(input Outpoint) *addrIndex {
 
 }
 
-func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, chanResult chan *addrIndex) ([]*addrIndex, bool) {
+func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, chanResult chan *addrIndex) ([]addrIndex, bool) {
 	tx, err := m.chain.GetTransactionForMempool(txid)
 	if err != nil {
 		glog.Error("cannot get transaction ", txid, ": ", err)
 		return nil, false
 	}
 	glog.V(2).Info("mempool: gettxaddrs ", txid, ", ", len(tx.Vin), " inputs")
-	io := make([]*addrIndex, 0, len(tx.Vout)+len(tx.Vin))
+	io := make([]addrIndex, 0, len(tx.Vout)+len(tx.Vin))
 	for _, output := range tx.Vout {
-		addrDesc, err := m.chain.GetChainParser().GetAddrDescFromVout(output)
+		addrDesc, err := m.chain.GetChainParser().GetAddrDescFromVout(&output)
 		if err != nil {
 			glog.Error("error in addrDesc in ", txid, " ", output.N, ": ", err)
 			continue
 		}
 		if len(addrDesc) > 0 {
-			io = append(io, &addrIndex{string(addrDesc), int32(output.N)})
+			io = append(io, addrIndex{string(addrDesc), int32(output.N)})
 		}
 		if m.OnNewTxAddr != nil {
 			m.OnNewTxAddr(tx, addrDesc)
@@ -109,7 +109,7 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, ch
 			// store as many processed results as possible
 			case ai := <-chanResult:
 				if ai != nil {
-					io = append(io, ai)
+					io = append(io, *ai)
 				}
 				dispatched--
 			// send input to be processed
@@ -122,7 +122,7 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan Outpoint, ch
 	for i := 0; i < dispatched; i++ {
 		ai := <-chanResult
 		if ai != nil {
-			io = append(io, ai)
+			io = append(io, *ai)
 		}
 	}
 	return io, true
@@ -139,12 +139,12 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 		return 0, err
 	}
 	glog.V(2).Info("mempool: resync ", len(txs), " txs")
-	onNewEntry := func(txid string, entry *txEntry) {
+	onNewEntry := func(txid string, entry txEntry) {
 		if len(entry.addrIndexes) > 0 {
 			m.mux.Lock()
 			m.txEntries[txid] = entry
 			for _, si := range entry.addrIndexes {
-				m.addrDescToTx[si.addrDesc] = append(m.addrDescToTx[si.addrDesc], &Outpoint{txid, si.n})
+				m.addrDescToTx[si.addrDesc] = append(m.addrDescToTx[si.addrDesc], Outpoint{txid, si.n})
 			}
 			m.mux.Unlock()
 		}
@@ -162,7 +162,7 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 				select {
 				// store as many processed transactions as possible
 				case tio := <-m.chanAddrIndex:
-					onNewEntry(tio.txid, &txEntry{tio.io, txTime})
+					onNewEntry(tio.txid, txEntry{tio.io, txTime})
 					dispatched--
 				// send transaction to be processed
 				case m.chanTxid <- txid:
@@ -174,7 +174,7 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 	}
 	for i := 0; i < dispatched; i++ {
 		tio := <-m.chanAddrIndex
-		onNewEntry(tio.txid, &txEntry{tio.io, txTime})
+		onNewEntry(tio.txid, txEntry{tio.io, txTime})
 	}
 
 	for txid, entry := range m.txEntries {

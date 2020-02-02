@@ -331,12 +331,12 @@ func (c *mempoolWithMetrics) Resync() (count int, err error) {
 	return count, err
 }
 
-func (c *mempoolWithMetrics) GetTransactions(address string) (v []*bchain.Outpoint, err error) {
+func (c *mempoolWithMetrics) GetTransactions(address string) (v []bchain.Outpoint, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetMempoolTransactions", s, err) }(time.Now())
 	return c.mempool.GetTransactions(address)
 }
 
-func (c *mempoolWithMetrics) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor) (v []*bchain.Outpoint, err error) {
+func (c *mempoolWithMetrics) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor) (v []bchain.Outpoint, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetMempoolTransactionsForAddrDesc", s, err) }(time.Now())
 	return c.mempool.GetAddrDescTransactions(addrDesc)
 }

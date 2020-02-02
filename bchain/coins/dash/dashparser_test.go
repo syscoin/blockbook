@@ -129,7 +129,7 @@ var (
 		Time:          1551246710,
 		Txid:          "ed732a404cdfd4e0475a7a016200b7eef191f2c9de0ffdef8a20091c0499299c",
 		Version:       1,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Txid: "bd9654c61a12a23452a9343b84b5aee3353d4a5e1e417da7db7b741ad16452f8",
 				Vout: 0,
@@ -139,7 +139,7 @@ var (
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				N: 0,
 				ScriptPubKey: bchain.ScriptPubKey{
@@ -168,13 +168,13 @@ var (
 		Time:          1551246710,
 		Txid:          "71d6975e3b79b52baf26c3269896a34f3bedfb04561c692ffa31f64dada1f9c4",
 		Version:       3,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Coinbase: "0340b00f1291af3c09542bc8349901000000002f4e614e",
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				N: 0,
 				ScriptPubKey: bchain.ScriptPubKey{

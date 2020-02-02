@@ -27,7 +27,7 @@ func init() {
 		Txid:      "00206bb124108a5fd98e828b181ff01b927c0c6b477d4512bfef84cf52f0fc2a6a1a",
 		LockTime:  0,
 		Version:   1,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Txid:     "00205457ab0703b1d10462d4347048c0bb3564e40f57ae1f6251695943de1ac810a0",
 				Vout:     0,
@@ -37,7 +37,7 @@ func init() {
 				},
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat:  *big.NewInt(399999000000),
 				N:         0,
@@ -59,7 +59,7 @@ func init() {
 		Txid:      "002078a98f381c714a068d605e4be1ee21954857611e098abbcc3f50c5680f8ad2e5",
 		LockTime:  0,
 		Version:   1,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				Txid:     "00207a40dc4b6ac407d49a3c33aa754bb4f05e45e57c24811b147e7bf3caf063a823",
 				Vout:     1,
@@ -69,7 +69,7 @@ func init() {
 				},
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat:  *big.NewInt(400000000000),
 				N:         0,

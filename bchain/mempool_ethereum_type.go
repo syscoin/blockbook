@@ -22,8 +22,8 @@ func NewMempoolEthereumType(chain BlockChain, mempoolTxTimeoutHours int, queryBa
 	return &MempoolEthereumType{
 		BaseMempool: BaseMempool{
 			chain:        chain,
-			txEntries:    make(map[string]*txEntry),
-			addrDescToTx: make(map[string][]*Outpoint),
+			txEntries:    make(map[string]txEntry),
+			addrDescToTx: make(map[string][]Outpoint),
 		},
 		mempoolTimeoutTime:   mempoolTimeoutTime,
 		queryBackendOnResync: queryBackendOnResync,
@@ -31,30 +31,30 @@ func NewMempoolEthereumType(chain BlockChain, mempoolTxTimeoutHours int, queryBa
 	}
 }
 
-func appendAddress(io []*addrIndex, i int32, a string, parser BlockChainParser) []*addrIndex {
+func appendAddress(io []addrIndex, i int32, a string, parser BlockChainParser) []addrIndex {
 	if len(a) > 0 {
 		addrDesc, err := parser.GetAddrDescFromAddress(a)
 		if err != nil {
 			glog.Error("error in input addrDesc in ", a, ": ", err)
 			return io
 		}
-		io = append(io, &addrIndex{string(addrDesc), i})
+		io = append(io, addrIndex{string(addrDesc), i})
 	}
 	return io
 }
 
-func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (*txEntry, bool) {
+func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry, bool) {
 	tx, err := m.chain.GetTransactionForMempool(txid)
 	if err != nil {
 		if err != ErrTxNotFound {
 			glog.Warning("cannot get transaction ", txid, ": ", err)
 		}
-		return &txEntry{}, false
+		return txEntry{}, false
 	}
 	parser := m.chain.GetChainParser()
-	addrIndexes := make([]*addrIndex, 0, len(tx.Vout)+len(tx.Vin))
+	addrIndexes := make([]addrIndex, 0, len(tx.Vout)+len(tx.Vin))
 	for _, output := range tx.Vout {
-		addrDesc, err := parser.GetAddrDescFromVout(output)
+		addrDesc, err := parser.GetAddrDescFromVout(&output)
 		if err != nil {
 			if err != ErrAddressMissing {
 				glog.Error("error in output addrDesc in ", txid, " ", output.N, ": ", err)
@@ -62,7 +62,7 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (*txEntr
 			continue
 		}
 		if len(addrDesc) > 0 {
-			addrIndexes = append(addrIndexes, &addrIndex{string(addrDesc), int32(output.N)})
+			addrIndexes = append(addrIndexes, addrIndex{string(addrDesc), int32(output.N)})
 		}
 	}
 	for _, input := range tx.Vin {
@@ -83,13 +83,12 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (*txEntr
 		sent := make(map[string]struct{})
 		for _, si := range addrIndexes {
 			if _, found := sent[si.addrDesc]; !found {
-				addrDesc := AddressDescriptor(si.addrDesc)
-				m.OnNewTxAddr(tx, addrDesc)
+				m.OnNewTxAddr(tx, AddressDescriptor(si.addrDesc))
 				sent[si.addrDesc] = struct{}{}
 			}
 		}
 	}
-	return &txEntry{addrIndexes: addrIndexes, time: txTime}, true
+	return txEntry{addrIndexes: addrIndexes, time: txTime}, true
 }
 
 // Resync ethereum type removes timed out transactions and returns number of transactions in mempool.
@@ -140,7 +139,7 @@ func (m *MempoolEthereumType) AddTransactionToMempool(txid string) {
 		m.mux.Lock()
 		m.txEntries[txid] = entry
 		for _, si := range entry.addrIndexes {
-			m.addrDescToTx[si.addrDesc] = append(m.addrDescToTx[si.addrDesc], &Outpoint{txid, si.n})
+			m.addrDescToTx[si.addrDesc] = append(m.addrDescToTx[si.addrDesc], Outpoint{txid, si.n})
 		}
 		m.mux.Unlock()
 	}

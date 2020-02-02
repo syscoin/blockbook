@@ -99,13 +99,13 @@ func (p *MonetaryUnitParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, errors.Annotatef(err, "DecodeTransactions")
 	}
 
-	txs := make([]*bchain.Tx, len(w.Transactions))
+	txs := make([]bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
 		txs[ti] = p.TxFromMsgTx(t, false)
 	}
 
 	return &bchain.Block{
-		BlockHeader: &bchain.BlockHeader{
+		BlockHeader: bchain.BlockHeader{
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -132,19 +132,19 @@ func (p *MonetaryUnitParser) ParseTx(b []byte) (*bchain.Tx, error) {
 	}
 	tx := p.TxFromMsgTx(&t, true)
 	tx.Hex = hex.EncodeToString(b)
-	return tx, nil
+	return &tx, nil
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *MonetaryUnitParser) ParseTxFromJson(msg *json.RawMessage) (*bchain.Tx, error) {
+func (p *MonetaryUnitParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
 	var tx bchain.Tx
-	err := json.Unmarshal(*msg, &tx)
+	err := json.Unmarshal(msg, &tx)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range tx.Vout {
-		vout := tx.Vout[i]
+		vout := &tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {

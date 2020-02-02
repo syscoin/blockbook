@@ -83,8 +83,8 @@ type Tx struct {
 	Txid        string `json:"txid"`
 	Version     int32  `json:"version"`
 	LockTime    uint32 `json:"locktime"`
-	Vin         []*Vin  `json:"vin"`
-	Vout        []*Vout `json:"vout"`
+	Vin         []Vin  `json:"vin"`
+	Vout        []Vout `json:"vout"`
 	BlockHeight uint32 `json:"blockHeight,omitempty"`
 	// BlockHash     string `json:"blockhash,omitempty"`
 	Confirmations    uint32      `json:"confirmations,omitempty"`
@@ -95,8 +95,8 @@ type Tx struct {
 
 // Block is block header and list of transactions
 type Block struct {
-	BlockHeader *BlockHeader
-	Txs []*Tx `json:"tx"`
+	BlockHeader
+	Txs []Tx `json:"tx"`
 }
 
 // BlockHeader contains limited data (as needed for indexing) from backend block header
@@ -213,7 +213,7 @@ type AddrBalance struct {
 	Txs        uint32
 	SentSat    big.Int
 	BalanceSat big.Int
-	Utxos      []*Utxo
+	Utxos      []Utxo
 	utxosMap   map[string]int
 	AssetBalances map[uint32]*AssetBalance
 }
@@ -236,7 +236,7 @@ func ReceivedSatFromBalances(balance *big.Int, sent *big.Int) *big.Int {
 
 // AddUtxo
 func (ab *AddrBalance) AddUtxo(u *Utxo) {
-	ab.Utxos = append(ab.Utxos, u)
+	ab.Utxos = append(ab.Utxos, *u)
 	l := len(ab.Utxos)
 	if l >= 16 {
 		if len(ab.utxosMap) == 0 {
@@ -262,7 +262,7 @@ func (ab *AddrBalance) AddUtxo(u *Utxo) {
 func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 	if len(ab.utxosMap) == 0 {
 		for i := range ab.Utxos {
-			utxo := ab.Utxos[i]
+			utxo := &ab.Utxos[i]
 			if utxo.Vout == vout && *(*int)(unsafe.Pointer(&utxo.BtxID[0])) == *(*int)(unsafe.Pointer(&btxID[0])) && bytes.Equal(utxo.BtxID, btxID) {
 				// mark utxo as spent by setting vout=-1
 				utxo.Vout = -1
@@ -273,7 +273,7 @@ func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 		if i, e := ab.utxosMap[string(btxID)]; e {
 			l := len(ab.Utxos)
 			for ; i < l; i++ {
-				utxo := ab.Utxos[i]
+				utxo := &ab.Utxos[i]
 				if utxo.Vout == vout {
 					if bytes.Equal(utxo.BtxID, btxID) {
 						// mark utxo as spent by setting vout=-1
@@ -292,7 +292,7 @@ func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 type AddressBalanceDetail int
 
 // MempoolTxidEntries is array of MempoolTxidEntry
-type MempoolTxidEntries []*MempoolTxidEntry
+type MempoolTxidEntries []MempoolTxidEntry
 
 // OnNewBlockFunc is used to send notification about a new block
 type OnNewBlockFunc func(hash string, height uint32)
@@ -312,7 +312,7 @@ type TxIndexes struct {
 // AddressesMap is a map of addresses in a block
 // each address contains a slice of transactions with indexes where the address appears
 // slice is used instead of map so that order is defined and also search in case of few items
-type AddressesMap map[string][]*TxIndexes
+type AddressesMap map[string][]TxIndexes
 
 // TxInput holds input data of the transaction in TxAddresses
 type TxInput struct {
@@ -431,9 +431,9 @@ type TokenTransfer struct {
 type TxAddresses struct {
 	Version int32
 	Height  uint32
-	Inputs  []*TxInput
-	Outputs []*TxOutput
-	TokenTransfers []*TokenTransfer
+	Inputs  []TxInput
+	Outputs []TxOutput
+	TokenTransfers []TokenTransfer
 }
 
 type DbOutpoint struct {
@@ -443,7 +443,7 @@ type DbOutpoint struct {
 
 type BlockTxs struct {
 	BtxID  []byte
-	Inputs []*DbOutpoint
+	Inputs []DbOutpoint
 }
 
 const (
@@ -527,7 +527,7 @@ type BlockChainParser interface {
 	PackTxid(txid string) ([]byte, error)
 	UnpackTxid(buf []byte) (string, error)
 	ParseTx(b []byte) (*Tx, error)
-	ParseTxFromJson(*json.RawMessage) (*Tx, error)
+	ParseTxFromJson(json.RawMessage) (*Tx, error)
 	PackTx(tx *Tx, height uint32, blockTime int64) ([]byte, error)
 	UnpackTx(buf []byte) (*Tx, uint32, error)
 	GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor
@@ -541,9 +541,9 @@ type BlockChainParser interface {
 	UnpackTxAddresses(buf []byte) (*TxAddresses, error)
 	UnpackTxInput(ti *TxInput, buf []byte) int
 	UnpackTxOutput(to *TxOutput, buf []byte) int
-	PackTxIndexes(txi []*TxIndexes) []byte
-	PackOutpoints(outpoints []*DbOutpoint) []byte
-	UnpackNOutpoints(buf []byte) ([]*DbOutpoint, int, error)
+	PackTxIndexes(txi []TxIndexes) []byte
+	PackOutpoints(outpoints []DbOutpoint) []byte
+	UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error)
 	PackBlockInfo(block *DbBlockInfo) ([]byte, error)
 	UnpackBlockInfo(buf []byte) (*DbBlockInfo, error)
 	// packing/unpacking generic to all chain (expect this to be in baseparser)
@@ -574,14 +574,14 @@ type BlockChainParser interface {
 	IsSyscoinMintTx(nVersion int32) bool
 	IsAssetTx(nVersion int32) bool
 	IsAssetAllocationTx(nVersion int32) bool
-	TryGetOPReturn(script *[]byte) *[]byte
+	TryGetOPReturn(script []byte) []byte
 }
 
 // Mempool defines common interface to mempool
 type Mempool interface {
 	Resync() (int, error)
-	GetTransactions(address string) ([]*Outpoint, error)
-	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]*Outpoint, error)
+	GetTransactions(address string) ([]Outpoint, error)
+	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
 	GetTransactionTime(txid string) uint32
 }

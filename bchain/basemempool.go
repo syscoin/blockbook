@@ -11,26 +11,26 @@ type addrIndex struct {
 }
 
 type txEntry struct {
-	addrIndexes []*addrIndex
+	addrIndexes []addrIndex
 	time        uint32
 }
 
 type txidio struct {
 	txid string
-	io   []*addrIndex
+	io   []addrIndex
 }
 
 // BaseMempool is mempool base handle
 type BaseMempool struct {
 	chain        BlockChain
 	mux          sync.Mutex
-	txEntries    map[string]*txEntry
-	addrDescToTx map[string][]*Outpoint
+	txEntries    map[string]txEntry
+	addrDescToTx map[string][]Outpoint
 	OnNewTxAddr  OnNewTxAddrFunc
 }
 
 // GetTransactions returns slice of mempool transactions for given address
-func (m *BaseMempool) GetTransactions(address string) ([]*Outpoint, error) {
+func (m *BaseMempool) GetTransactions(address string) ([]Outpoint, error) {
 	parser := m.chain.GetChainParser()
 	addrDesc, err := parser.GetAddrDescFromAddress(address)
 	if err != nil {
@@ -40,11 +40,11 @@ func (m *BaseMempool) GetTransactions(address string) ([]*Outpoint, error) {
 }
 
 // GetAddrDescTransactions returns slice of mempool transactions for given address descriptor, in reverse order
-func (m *BaseMempool) GetAddrDescTransactions(addrDesc AddressDescriptor) ([]*Outpoint, error) {
+func (m *BaseMempool) GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	outpoints := m.addrDescToTx[string(addrDesc)]
-	rv := make([]*Outpoint, len(outpoints))
+	rv := make([]Outpoint, len(outpoints))
 	for i, j := len(outpoints)-1, 0; i >= 0; i-- {
 		rv[j] = outpoints[i]
 		j++
@@ -66,12 +66,12 @@ func (a MempoolTxidEntries) Less(i, j int) bool {
 }
 
 // removeEntryFromMempool removes entry from mempool structs. The caller is responsible for locking!
-func (m *BaseMempool) removeEntryFromMempool(txid string, entry *txEntry) {
+func (m *BaseMempool) removeEntryFromMempool(txid string, entry txEntry) {
 	delete(m.txEntries, txid)
 	for _, si := range entry.addrIndexes {
 		outpoints, found := m.addrDescToTx[si.addrDesc]
 		if found {
-			newOutpoints := make([]*Outpoint, 0, len(outpoints)-1)
+			newOutpoints := make([]Outpoint, 0, len(outpoints)-1)
 			for _, o := range outpoints {
 				if o.Txid != txid {
 					newOutpoints = append(newOutpoints, o)
@@ -92,7 +92,7 @@ func (m *BaseMempool) GetAllEntries() MempoolTxidEntries {
 	m.mux.Lock()
 	entries := make(MempoolTxidEntries, len(m.txEntries))
 	for txid, entry := range m.txEntries {
-		entries[i] = &MempoolTxidEntry{
+		entries[i] = MempoolTxidEntry{
 			Txid: txid,
 			Time: entry.time,
 		}

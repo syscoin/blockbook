@@ -106,8 +106,8 @@ type Tx struct {
 	Txid             string            `json:"txid"`
 	Version          int32             `json:"version,omitempty"`
 	Locktime         uint32            `json:"lockTime,omitempty"`
-	Vin              []*Vin             `json:"vin"`
-	Vout             []*Vout            `json:"vout"`
+	Vin              *[]Vin             `json:"vin"`
+	Vout             *[]Vout            `json:"vout"`
 	Blockhash        string            `json:"blockHash,omitempty"`
 	Blockheight      int               `json:"blockHeight"`
 	Confirmations    uint32            `json:"confirmations"`
@@ -120,7 +120,7 @@ type Tx struct {
 	Rbf              bool              `json:"rbf,omitempty"`
 	CoinSpecificData *interface{}       `json:"-"`
 	CoinSpecificJSON *json.RawMessage   `json:"-"`
-	TokenTransfers   []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers   *[]bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 
@@ -205,7 +205,7 @@ type Utxo struct {
 }
 
 // Utxos is array of Utxo
-type Utxos []*Utxo
+type Utxos []Utxo
 
 func (a Utxos) Len() int      { return len(a) }
 func (a Utxos) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -240,7 +240,7 @@ type BalanceHistory struct {
 }
 
 // BalanceHistories is array of BalanceHistory
-type BalanceHistories []*BalanceHistory
+type BalanceHistories []BalanceHistory
 
 func (a BalanceHistories) Len() int      { return len(a) }
 func (a BalanceHistories) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -257,13 +257,13 @@ func (a BalanceHistories) Less(i, j int) bool {
 func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories {
 	bhs := make(BalanceHistories, 0)
 	if len(a) > 0 {
-		bha := &BalanceHistory{
+		bha := BalanceHistory{
 			SentSat:     &bchain.Amount{},
 			ReceivedSat: &bchain.Amount{},
 		}
 		sort.Sort(a)
 		for i := range a {
-			bh := a[i]
+			bh := &a[i]
 			time := bh.Time - bh.Time%groupByTime
 			if bha.Time != time {
 				if bha.Time != 0 {
@@ -271,7 +271,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 					bha.Txid = ""
 					bhs = append(bhs, bha)
 				}
-				bha = &BalanceHistory{
+				bha = BalanceHistory{
 					Time:        time,
 					SentSat:     &bchain.Amount{},
 					ReceivedSat: &bchain.Amount{},
@@ -312,7 +312,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 // Blocks is list of blocks with paging information
 type Blocks struct {
 	Paging
-	Blocks []*bchain.DbBlockInfo `json:"blocks"`
+	Blocks []bchain.DbBlockInfo `json:"blocks"`
 }
 
 // BlockInfo contains extended block header data and a list of block txids
@@ -393,6 +393,6 @@ type MempoolTxid struct {
 // MempoolTxids contains a list of mempool txids with paging information
 type MempoolTxids struct {
 	Paging
-	Mempool     []*MempoolTxid `json:"mempool"`
+	Mempool     []MempoolTxid `json:"mempool"`
 	MempoolSize int           `json:"mempoolSize"`
 }

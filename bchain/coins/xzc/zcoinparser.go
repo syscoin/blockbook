@@ -100,7 +100,7 @@ func GetChainParams(chain string) *chaincfg.Params {
 func (p *ZcoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
 
 	if len(addrDesc) > 0 {
-		switch (addrDesc)[0] {
+		switch addrDesc[0] {
 		case OpZeroCoinMint:
 			return []string{"Zeromint"}, false, nil
 		case OpZeroCoinSpend:
@@ -178,7 +178,7 @@ func (p *ZcoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, err
 	}
 
-	txs := make([]*bchain.Tx, ntx)
+	txs := make([]bchain.Tx, ntx)
 
 	for i := uint64(0); i < ntx; i++ {
 		tx := wire.MsgTx{}
@@ -190,13 +190,13 @@ func (p *ZcoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 
 		btx := p.TxFromMsgTx(&tx, false)
 
-		p.parseZcoinTx(btx)
+		p.parseZcoinTx(&btx)
 
 		txs[i] = btx
 	}
 
 	return &bchain.Block{
-		BlockHeader: &bchain.BlockHeader{
+		BlockHeader: bchain.BlockHeader{
 			Size: len(b),
 			Time: header.Timestamp.Unix(),
 		},
@@ -205,15 +205,15 @@ func (p *ZcoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *ZcoinParser) ParseTxFromJson(msg *json.RawMessage) (*bchain.Tx, error) {
+func (p *ZcoinParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
 	var tx bchain.Tx
-	err := json.Unmarshal(*msg, &tx)
+	err := json.Unmarshal(msg, &tx)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range tx.Vout {
-		vout := tx.Vout[i]
+		vout := &tx.Vout[i]
 		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
 		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
 		if err != nil {
@@ -229,7 +229,7 @@ func (p *ZcoinParser) ParseTxFromJson(msg *json.RawMessage) (*bchain.Tx, error) 
 
 func (p *ZcoinParser) parseZcoinTx(tx *bchain.Tx) error {
 	for i := range tx.Vin {
-		vin := tx.Vin[i]
+		vin := &tx.Vin[i]
 
 		// FIXME: right now we treat zerocoin spend vin as coinbase
 		// change this after blockbook support special type of vin

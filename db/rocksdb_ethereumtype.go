@@ -167,7 +167,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 		if err != nil {
 			return nil, err
 		}
-		blockTx := blockTxs[txi]
+		blockTx := &blockTxs[txi]
 		blockTx.btxID = btxID
 		var from, to bchain.AddressDescriptor
 		// there is only one output address in EthereumType transaction, store it in format txid 0
@@ -176,7 +176,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 			if err != nil {
 				// do not log ErrAddressMissing, transactions can be without to address (for example eth contracts)
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: addrDesc: %v - height %d, tx %v, output", err, block.BlockHeader.Height, tx.Txid)
+					glog.Warningf("rocksdb: addrDesc: %v - height %d, tx %v, output", err, block.Height, tx.Txid)
 				}
 				continue
 			}
@@ -190,7 +190,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 			from, err = d.chainParser.GetAddrDescFromAddress(tx.Vin[0].Addresses[0])
 			if err != nil {
 				if err != bchain.ErrAddressMissing {
-					glog.Warningf("rocksdb: addrDesc: %v - height %d, tx %v, input", err, block.BlockHeader.Height, tx.Txid)
+					glog.Warningf("rocksdb: addrDesc: %v - height %d, tx %v, input", err, block.Height, tx.Txid)
 				}
 				continue
 			}
@@ -200,9 +200,9 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 			blockTx.from = from
 		}
 		// store erc20 transfers
-		erc20, err := d.chainParser.EthereumTypeGetErc20FromTx(tx)
+		erc20, err := d.chainParser.EthereumTypeGetErc20FromTx(&tx)
 		if err != nil {
-			glog.Warningf("rocksdb: GetErc20FromTx %v - height %d, tx %v", err, block.BlockHeader.Height, tx.Txid)
+			glog.Warningf("rocksdb: GetErc20FromTx %v - height %d, tx %v", err, block.Height, tx.Txid)
 		}
 		blockTx.contracts = make([]ethBlockTxContract, len(erc20)*2)
 		j := 0
@@ -216,7 +216,7 @@ func (d *RocksDB) processAddressesEthereumType(block *bchain.Block, addresses bc
 				}
 			}
 			if err != nil {
-				glog.Warningf("rocksdb: GetErc20FromTx %v - height %d, tx %v, transfer %v", err, block.BlockHeader.Height, tx.Txid, t)
+				glog.Warningf("rocksdb: GetErc20FromTx %v - height %d, tx %v, transfer %v", err, block.Height, tx.Txid, t)
 				continue
 			}
 			if err = d.addToAddressesAndContractsEthereumType(to, btxID, int32(i), contract, addresses, addressContracts, true); err != nil {
@@ -256,19 +256,19 @@ func (d *RocksDB) storeAndCleanupBlockTxsEthereumType(wb *gorocksdb.WriteBatch, 
 		}
 	}
 	for i := range blockTxs {
-		blockTx := blockTxs[i]
+		blockTx := &blockTxs[i]
 		buf = append(buf, blockTx.btxID...)
 		appendAddress(blockTx.from)
 		appendAddress(blockTx.to)
 		l := d.chainParser.PackVaruint(uint(len(blockTx.contracts)), varBuf)
 		buf = append(buf, varBuf[:l]...)
 		for j := range blockTx.contracts {
-			c := blockTx.contracts[j]
+			c := &blockTx.contracts[j]
 			appendAddress(c.addr)
 			appendAddress(c.contract)
 		}
 	}
-	key := d.chainParser.PackUint(block.BlockHeader.Height)
+	key := d.chainParser.PackUint(block.Height)
 	wb.PutCF(d.cfh[cfBlockTxs], key, buf)
 	return d.cleanupBlockTxs(wb, block)
 }
@@ -402,7 +402,7 @@ func (d *RocksDB) disconnectBlockTxsEthereumType(wb *gorocksdb.WriteBatch, heigh
 		return nil
 	}
 	for i := range blockTxs {
-		blockTx := blockTxs[i]
+		blockTx := &blockTxs[i]
 		if err := disconnectAddress(blockTx.btxID, blockTx.from, nil); err != nil {
 			return err
 		}

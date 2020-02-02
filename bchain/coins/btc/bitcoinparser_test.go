@@ -272,7 +272,7 @@ func init() {
 		Txid:      "056e3d82e5ffd0e915fb9b62797d76263508c34fe3e5dbed30dd3e943930f204",
 		LockTime:  512115,
 		Version:   1,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "4730440220037f4ed5427cde81d55b9b6a2fd08c8a25090c2c2fff3a75c1a57625ca8a7118022076c702fe55969fa08137f71afd4851c48e31082dd3c40c919c92cdbc826758d30121029f6da5623c9f9b68a9baf9c1bc7511df88fa34c6c2f71f7c62f2f03ff48dca80",
@@ -282,7 +282,7 @@ func init() {
 				Sequence: 4294967294,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(38812),
 				N:        0,
@@ -302,7 +302,7 @@ func init() {
 		Txid:      "474e6795760ebe81cb4023dc227e5a0efe340e1771c89a0035276361ed733de7",
 		LockTime:  0,
 		Version:   1,
-		Vin: []*bchain.Vin{
+		Vin: []bchain.Vin{
 			{
 				ScriptSig: bchain.ScriptSig{
 					Hex: "160014550da1f5d25a9dae2eafd6902b4194c4c6500af6",
@@ -312,7 +312,7 @@ func init() {
 				Sequence: 4294967295,
 			},
 		},
-		Vout: []*bchain.Vout{
+		Vout: []bchain.Vout{
 			{
 				ValueSat: *big.NewInt(10000000),
 				N:        0,
@@ -491,8 +491,8 @@ func TestDeriveAddressDescriptors(t *testing.T) {
 				t.Errorf("DeriveAddressDescriptorsFromTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			gotAddresses := make([]string, len(*got))
-			for i, ad := range *got {
+			gotAddresses := make([]string, len(got))
+			for i, ad := range got {
 				aa, _, err := tt.args.parser.GetAddressesFromAddrDesc(ad)
 				if err != nil || len(aa) != 1 {
 					t.Errorf("DeriveAddressDescriptorsFromTo() got incorrect address descriptor %v, error %v", ad, err)
@@ -575,8 +575,8 @@ func TestDeriveAddressDescriptorsFromTo(t *testing.T) {
 				t.Errorf("DeriveAddressDescriptorsFromTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			gotAddresses := make([]string, len(*got))
-			for i, ad := range *got {
+			gotAddresses := make([]string, len(got))
+			for i, ad := range got {
 				aa, _, err := tt.args.parser.GetAddressesFromAddrDesc(ad)
 				if err != nil || len(aa) != 1 {
 					t.Errorf("DeriveAddressDescriptorsFromTo() got incorrect address descriptor %v, error %v", ad, err)

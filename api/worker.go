@@ -97,15 +97,15 @@ func (w *Worker) GetSpendingTxid(txid string, n int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if n >= len(tx.Vout) || n < 0 {
-		return "", NewAPIError(fmt.Sprintf("Passed incorrect vout index %v for tx %v, len vout %v", n, tx.Txid, len(tx.Vout)), false)
+	if n >= len(*tx.Vout) || n < 0 {
+		return "", NewAPIError(fmt.Sprintf("Passed incorrect vout index %v for tx %v, len vout %v", n, tx.Txid, len(*tx.Vout)), false)
 	}
-	err = w.setSpendingTxToVout(tx.Vout[n], tx.Txid, uint32(tx.Blockheight))
+	err = w.setSpendingTxToVout(&(*tx.Vout)[n], tx.Txid, uint32(tx.Blockheight))
 	if err != nil {
 		return "", err
 	}
 	glog.Info("GetSpendingTxid ", txid, " ", n, " finished in ", time.Since(start))
-	return tx.Vout[n].SpentTxID, nil
+	return (*tx.Vout)[n].SpentTxID, nil
 }
 
 // GetTransaction reads transaction data from txid
@@ -124,7 +124,7 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
 	var err error
 	var ta *bchain.TxAddresses
-	var tokens []*bchain.TokenTransfer
+	var tokens *[]bchain.TokenTransfer
 	var ethSpecific *EthereumSpecific
 	var blockhash string
 	if bchainTx.Confirmations > 0 {
@@ -141,11 +141,11 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 	}
 	var valInSat, valOutSat, feesSat big.Int
 	var pValInSat *big.Int
-	vins := make([]*Vin, len(bchainTx.Vin))
+	vins := make([]Vin, len(bchainTx.Vin))
 	rbf := false
 	for i := range bchainTx.Vin {
-		bchainVin := bchainTx.Vin[i]
-		vin := vins[i]
+		bchainVin := &bchainTx.Vin[i]
+		vin := &vins[i]
 		vin.Txid = bchainVin.Txid
 		vin.N = i
 		vin.Vout = bchainVin.Vout
@@ -188,7 +188,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 						}
 					}
 					if len(otx.Vout) > int(vin.Vout) {
-						vout := otx.Vout[vin.Vout]
+						vout := &otx.Vout[vin.Vout]
 						vin.ValueSat = (*bchain.Amount)(&vout.ValueSat)
 						vin.AddrDesc, vin.Addresses, vin.IsAddress, err = w.getAddressesFromVout(vout)
 						if err != nil {
@@ -197,7 +197,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 					}
 				} else {
 					if len(tas.Outputs) > int(vin.Vout) {
-						output := tas.Outputs[vin.Vout]
+						output := &tas.Outputs[vin.Vout]
 						vin.ValueSat = (*bchain.Amount)(&output.ValueSat)
 						vin.AddrDesc = output.AddrDesc
 						vin.Addresses, vin.IsAddress, err = output.Addresses(w.chainParser)
@@ -221,10 +221,10 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			}
 		}
 	}
-	vouts := make([]*Vout, len(bchainTx.Vout))
+	vouts := make([]Vout, len(bchainTx.Vout))
 	for i := range bchainTx.Vout {
-		bchainVout := bchainTx.Vout[i]
-		vout := vouts[i]
+		bchainVout := &bchainTx.Vout[i]
+		vout := &vouts[i]
 		vout.N = i
 		vout.ValueSat = (*bchain.Amount)(&bchainVout.ValueSat)
 		valOutSat.Add(&valOutSat, &bchainVout.ValueSat)
@@ -250,14 +250,14 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		tokens =  ta.TokenTransfers
+		tokens =  &ta.TokenTransfers
 	} else if w.chainType == bchain.ChainEthereumType {
 		ets, err := w.chainParser.EthereumTypeGetErc20FromTx(bchainTx)
 		if err != nil {
 			glog.Errorf("GetErc20FromTx error %v, %v", err, bchainTx)
 		}
-		var tokensEth []*bchain.TokenTransfer
-		tokensEth = make([]*bchain.TokenTransfer, len(ets))
+		var tokensEth []bchain.TokenTransfer
+		tokensEth = make([]bchain.TokenTransfer, len(ets))
 		for i := range ets {
 			e := &ets[i]
 			cd, err := w.chainParser.GetAddrDescFromAddress(e.Contract)
@@ -272,7 +272,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			if erc20c == nil {
 				erc20c = &bchain.Erc20Contract{Name: e.Contract}
 			}
-			tokensEth[i] = &bchain.TokenTransfer{
+			tokensEth[i] = bchain.TokenTransfer{
 				Type:     bchain.ERC20TokenType,
 				Token:    e.Contract,
 				From:     e.From,
@@ -298,7 +298,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			Nonce:    ethTxData.Nonce,
 			Status:   ethTxData.Status,
 		}
-		tokens = tokensEth
+		tokens = &tokensEth
 	}
 	// for now do not return size, we would have to compute vsize of segwit transactions
 	// size:=len(bchainTx.Hex) / 2
@@ -326,8 +326,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Version:          bchainTx.Version,
 		Hex:              bchainTx.Hex,
 		Rbf:              rbf,
-		Vin:              vins,
-		Vout:             vouts,
+		Vin:              &vins,
+		Vout:             &vouts,
 		CoinSpecificData: &bchainTx.CoinSpecificData,
 		CoinSpecificJSON: &sj,
 		TokenTransfers:   tokens,
@@ -398,7 +398,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 
 func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
-	for _, vout := range t.Vout {
+	for _, vout := range *t.Vout {
 		if bytes.Equal(vout.AddrDesc, addrDesc) && vout.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vout.ValueSat))
 		}
@@ -408,7 +408,7 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 
 func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
-	for _, vin := range t.Vin {
+	for _, vin := range *t.Vin {
 		if bytes.Equal(vin.AddrDesc, addrDesc) && vin.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vin.ValueSat))
 		}
@@ -435,10 +435,10 @@ func GetUniqueTxids(txids []string) []string {
 func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain.DbBlockInfo, bestheight uint32) *Tx {
 	var err error
 	var valInSat, valOutSat, feesSat big.Int
-	vins := make([]*Vin, len(ta.Inputs))
+	vins := make([]Vin, len(ta.Inputs))
 	for i := range ta.Inputs {
-		tai := ta.Inputs[i]
-		vin := vins[i]
+		tai := &ta.Inputs[i]
+		vin := &vins[i]
 		vin.N = i
 		vin.ValueSat = (*bchain.Amount)(&tai.ValueSat)
 		valInSat.Add(&valInSat, &tai.ValueSat)
@@ -447,10 +447,10 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			glog.Errorf("tai.Addresses error %v, tx %v, input %v, tai %+v", err, txid, i, tai)
 		}
 	}
-	vouts := make([]*Vout, len(ta.Outputs))
+	vouts := make([]Vout, len(ta.Outputs))
 	for i := range ta.Outputs {
-		tao := ta.Outputs[i]
-		vout := vouts[i]
+		tao := &ta.Outputs[i]
+		vout := &vouts[i]
 		vout.N = i
 		vout.ValueSat = (*bchain.Amount)(&tao.ValueSat)
 		valOutSat.Add(&valOutSat, &tao.ValueSat)
@@ -474,9 +474,9 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		Txid:          txid,
 		ValueInSat:    (*bchain.Amount)(&valInSat),
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
-		Vin:           vins,
-		Vout:          vouts,
-		TokenTransfers:  ta.TokenTransfers,
+		Vin:           &vins,
+		Vout:          &vouts,
+		TokenTransfers:  &ta.TokenTransfers,
 	}
 	return r
 }
@@ -883,13 +883,13 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 	}
 	if w.chainType == bchain.ChainBitcoinType {
 		for i := range ta.Inputs {
-			tai := ta.Inputs[i]
+			tai := &ta.Inputs[i]
 			if bytes.Equal(addrDesc, tai.AddrDesc) {
 				(*big.Int)(bh.SentSat).Add((*big.Int)(bh.SentSat), &tai.ValueSat)
 			}
 		}
 		for i := range ta.Outputs {
-			tao := ta.Outputs[i]
+			tao := &ta.Outputs[i]
 			if bytes.Equal(addrDesc, tao.AddrDesc) {
 				(*big.Int)(bh.ReceivedSat).Add((*big.Int)(bh.ReceivedSat), &tao.ValueSat)
 			}
@@ -899,7 +899,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			var ok bool
 			var err error
 			var assetGuid int
-			tatt := ta.TokenTransfers[0]
+			tatt := &ta.TokenTransfers[0]
 			if bh.Tokens == nil {
 				bh.Tokens = map[uint32]*TokenBalanceHistory{}
 			}
@@ -939,7 +939,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		// add received amount only for OK transactions
 		if ethTxData.Status == 1 {
 			if len(bchainTx.Vout) > 0 {
-				bchainVout := bchainTx.Vout[0]
+				bchainVout := &bchainTx.Vout[0]
 				value = bchainVout.ValueSat
 				if len(bchainVout.ScriptPubKey.Addresses) > 0 {
 					txAddrDesc, err := w.chainParser.GetAddrDescFromAddress(bchainVout.ScriptPubKey.Addresses[0])
@@ -953,7 +953,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			}
 		}
 		for i := range bchainTx.Vin {
-			bchainVin := bchainTx.Vin[i]
+			bchainVin := &bchainTx.Vin[i]
 			if len(bchainVin.Addresses) > 0 {
 				txAddrDesc, err := w.chainParser.GetAddrDescFromAddress(bchainVin.Addresses[0])
 				if err != nil {
@@ -979,7 +979,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 
 func (w *Worker) setFiatRateToBalanceHistories(histories BalanceHistories, fiat string) error {
 	for i := range histories {
-		bh := histories[i]
+		bh := &histories[i]
 		t := time.Unix(int64(bh.Time), 0)
 		ticker, err := w.db.FiatRatesFindTicker(&t)
 		if err != nil {
@@ -1017,7 +1017,7 @@ func (w *Worker) GetBalanceHistory(address string, fromTime, toTime time.Time, f
 			return nil, err
 		}
 		if bh != nil {
-			bhs = append(bhs, bh)
+			bhs = append(bhs, *bh)
 		}
 	}
 	bha := bhs.SortAndAggregate(groupBy)
@@ -1068,7 +1068,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 					mc[i] = bchainTx
 					// get outputs spent by the mempool tx
 					for i := range bchainTx.Vin {
-						vin := bchainTx.Vin[i]
+						vin := &bchainTx.Vin[i]
 						spentInMempool[vin.Txid+strconv.Itoa(int(vin.Vout))] = struct{}{}
 					}
 				}
@@ -1076,7 +1076,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 			for _, bchainTx := range mc {
 				if bchainTx != nil {
 					for i := range bchainTx.Vout {
-						vout := bchainTx.Vout[i]
+						vout := &bchainTx.Vout[i]
 						vad, err := w.chainParser.GetAddrDescFromVout(vout)
 						if err == nil && bytes.Equal(addrDesc, vad) {
 							// report only outpoints that are not spent in mempool
@@ -1086,7 +1086,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 								if len(bchainTx.Vin) == 1 && len(bchainTx.Vin[0].Coinbase) > 0 {
 									coinbase = true
 								}
-								utxos = append(utxos, &Utxo{
+								utxos = append(utxos, Utxo{
 									Txid:      bchainTx.Txid,
 									Vout:      int32(i),
 									AmountSat: (*bchain.Amount)(&vout.ValueSat),
@@ -1120,7 +1120,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 			checksum.Set(&ba.BalanceSat)
 			// go backwards to get the newest first
 			for i := len(ba.Utxos) - 1; i >= 0; i-- {
-				utxo := ba.Utxos[i]
+				utxo := &ba.Utxos[i]
 				txid, err := w.chainParser.UnpackTxid(utxo.BtxID)
 				if err != nil {
 					return nil, err
@@ -1141,7 +1141,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 					}
 					_, e = inMempool[txid]
 					if !e {
-						utxos = append(utxos, &Utxo{
+						utxos = append(utxos, Utxo{
 							Txid:          txid,
 							Vout:          utxo.Vout,
 							AmountSat:     (*bchain.Amount)(&utxo.ValueSat),
@@ -1193,7 +1193,7 @@ func (w *Worker) GetBlocks(page int, blocksOnPage int) (*Blocks, error) {
 	}
 	pg, from, to, page := computePaging(bestheight+1, page, blocksOnPage)
 	r := &Blocks{Paging: pg}
-	r.Blocks = make([]*bchain.DbBlockInfo, to-from)
+	r.Blocks = make([]bchain.DbBlockInfo, to-from)
 	for i := from; i < to; i++ {
 		bi, err := w.db.GetBlockInfo(uint32(bestheight - i))
 		if err != nil {
@@ -1203,7 +1203,7 @@ func (w *Worker) GetBlocks(page int, blocksOnPage int) (*Blocks, error) {
 			r.Blocks = r.Blocks[:i]
 			break
 		}
-		r.Blocks[i-from] = bi
+		r.Blocks[i-from] = *bi
 	}
 	glog.Info("GetBlocks page ", page, " finished in ", time.Since(start))
 	return r, nil
@@ -1666,10 +1666,10 @@ func (w *Worker) GetMempool(page int, itemsOnPage int) (*MempoolTxids, error) {
 		Paging:      pg,
 		MempoolSize: len(entries),
 	}
-	r.Mempool = make([]*MempoolTxid, to-from)
+	r.Mempool = make([]MempoolTxid, to-from)
 	for i := from; i < to; i++ {
-		entry := entries[i]
-		r.Mempool[i-from] = &MempoolTxid{
+		entry := &entries[i]
+		r.Mempool[i-from] = MempoolTxid{
 			Txid: entry.Txid,
 			Time: int64(entry.Time),
 		}

@@ -104,9 +104,9 @@ type BlockV1 struct {
 // TxToV1 converts Tx to TxV1
 func (w *Worker) TxToV1(tx *Tx) *TxV1 {
 	d := w.chainParser.AmountDecimals()
-	vinV1 := make([]VinV1, len(tx.Vin))
-	for i := range tx.Vin {
-		v := tx.Vin[i]
+	vinV1 := make([]VinV1, len(*tx.Vin))
+	for i := range *tx.Vin {
+		v := &(*tx.Vin)[i]
 		vinV1[i] = VinV1{
 			AddrDesc:  v.AddrDesc,
 			Addresses: v.Addresses,
@@ -123,9 +123,9 @@ func (w *Worker) TxToV1(tx *Tx) *TxV1 {
 			Vout:      v.Vout,
 		}
 	}
-	voutV1 := make([]VoutV1, len(tx.Vout))
-	for i := range tx.Vout {
-		v := tx.Vout[i]
+	voutV1 := make([]VoutV1, len(*tx.Vout))
+	for i := range *tx.Vout {
+		v := &(*tx.Vout)[i]
 		voutV1[i] = VoutV1{
 			N: v.N,
 			ScriptPubKey: ScriptPubKeyV1{
@@ -196,7 +196,7 @@ func (w *Worker) AddressUtxoToV1(au Utxos) []AddressUtxoV1 {
 	d := w.chainParser.AmountDecimals()
 	v1 := make([]AddressUtxoV1, len(au))
 	for i := range au {
-		utxo := au[i]
+		utxo := &au[i]
 		v1[i] = AddressUtxoV1{
 			AmountSat:     utxo.AmountSat.AsBigInt(),
 			Amount:        utxo.AmountSat.DecimalString(d),
