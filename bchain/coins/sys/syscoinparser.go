@@ -407,6 +407,7 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 		ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
 		for i := 0; i < int(tokenTransfers); i++ {
 			l += p.UnpackTokenTransfer(&ta.TokenTransfers[i], buf[l:])
+			glog.Warningf("UnpackTxAddresses token %v from %v", i, ta.TokenTransfers[i].From)
 		}
 	}
 	return &ta, nil
