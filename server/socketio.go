@@ -318,7 +318,7 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		inputs[i] = input
 	}
-	outputs := make([]&txOutputs, len(tx.Vout))
+	outputs := make([]*txOutputs, len(tx.Vout))
 	for i := range tx.Vout {
 		vout := tx.Vout[i]
 		script := vout.Hex
