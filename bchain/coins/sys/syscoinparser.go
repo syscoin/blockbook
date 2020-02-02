@@ -369,10 +369,13 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	for i := range ta.Outputs {
 		buf = p.BitcoinParser.AppendTxOutput(&ta.Outputs[i], buf, varBuf)
 	}
-	l = p.BaseParser.PackVaruint(uint(len(ta.TokenTransfers)), varBuf)
+	tokenTransfers := len(ta.TokenTransfers)
+	l = p.BaseParser.PackVaruint(uint(tokenTransfers), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	for i := range ta.TokenTransfers {
-		buf = p.AppendTokenTransfer(&ta.TokenTransfers[i], buf, varBuf)
+	if tokenTransfers > 0 {
+		for i := range ta.TokenTransfers {
+			buf = p.AppendTokenTransfer(&ta.TokenTransfers[i], buf, varBuf)
+		}
 	}
 	return buf
 }
@@ -399,9 +402,11 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	}
 	tokenTransfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
-	for i := uint(0); i < tokenTransfers; i++ {
-		l += p.UnpackTokenTransfer(&ta.TokenTransfers[i], buf[l:])
+	if tokenTransfers > 0 {
+		ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
+		for i := uint(0); i < tokenTransfers; i++ {
+			l += p.UnpackTokenTransfer(&ta.TokenTransfers[i], buf[l:])
+		}
 	}
 	return &ta, nil
 }
