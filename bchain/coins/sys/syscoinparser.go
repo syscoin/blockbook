@@ -9,6 +9,7 @@ import (
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/martinboehm/btcutil"
+	"github.com/golang/glog"
 )
 
 // magic numbers
