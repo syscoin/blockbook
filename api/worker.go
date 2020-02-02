@@ -132,6 +132,9 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			glog.Warning("GetTransactionFromBchainTx before tx addresses")
 			ta, err = w.db.GetTxAddresses(bchainTx.Txid)
 			glog.Warning("GetTransactionFromBchainTx after tx addresses")
+			if len(ta.TokenTransfers) > 0 {
+				glog.Warningf("GetTransactionFromBchainTx after tx address %v", ta.TokenTransfers[0].From)
+			}
 			if err != nil {
 				return nil, errors.Annotatef(err, "GetTxAddresses %v", bchainTx.Txid)
 			}
