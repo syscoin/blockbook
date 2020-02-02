@@ -250,7 +250,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		tokens =  ta.TokenTransfers
+		tokens = ta.TokenTransfers
 	} else if w.chainType == bchain.ChainEthereumType {
 		ets, err := w.chainParser.EthereumTypeGetErc20FromTx(bchainTx)
 		if err != nil {
@@ -896,23 +896,12 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			var err error
 			var assetGuid int
 			tatt := ta.TokenTransfers[0]
-			if bh.Tokens == nil {
-				bh.Tokens = map[uint32]*TokenBalanceHistory{}
-			}
+			bh.Tokens = make([]*TokenBalanceHistory{}, 1)
 			assetGuid, err = strconv.Atoi(tatt.Token)
+			sentSat := big.NewInt(0)
+			receivedSat := big.NewInt(0)
 			if err != nil {
 				return nil, err
-			}
-			token, ok := bh.Tokens[uint32(assetGuid)]
-			if !ok {
-				token = &TokenBalanceHistory{}
-				bh.Tokens[uint32(assetGuid)] = token
-			}
-			if token.SentSat == nil {
-				token.SentSat = &bchain.Amount{}
-			}
-			if token.ReceivedSat == nil {
-				token.ReceivedSat = &bchain.Amount{}
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
 			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
@@ -921,7 +910,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				return nil, err
 			}
 			if bytes.Equal(addrDesc, tattAddrFromDesc) {
-				(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tatt.Value))
+				sentSat.Add(sentSat, (*big.Int)(tatt.Value))
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
 			} else {
 				for _,tattr := range ta.TokenTransfers {
@@ -930,9 +919,14 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 						return nil, err
 					}
 					if bytes.Equal(addrDesc, tattAddrToDesc) {
-						(*big.Int)(token.ReceivedSat).Add((*big.Int)(token.ReceivedSat), (*big.Int)(tattr.Value))
+						receivedSat.Add(receivedSat, (*big.Int)(tattr.Value))
 					}
 				}
+			}
+			bh.Tokens[0] = &TokenBalanceHistory{
+				AssetGuid: assetGuid, 
+				SentSat: (*bchain.Amount)(sentSat),
+				ReceivedSat: (*bchain.Amount)(receivedSat)
 			}
 		}	
 	} else if w.chainType == bchain.ChainEthereumType {

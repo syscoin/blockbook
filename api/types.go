@@ -224,6 +224,7 @@ func (a Utxos) Less(i, j int) bool {
 
 // history of tokens mapped to uint32 asset guid's in BalanceHistory obj
 type TokenBalanceHistory struct {
+	AssetGuid   uint32 `json:"assetGuid,omitempty"`
 	ReceivedSat *bchain.Amount `json:"received,omitempty"`
 	SentSat     *bchain.Amount `json:"sent,omitempty"`	
 }
@@ -236,7 +237,7 @@ type BalanceHistory struct {
 	SentSat     *bchain.Amount `json:"sent"`
 	FiatRate    float64 `json:"fiatRate,omitempty"`
 	Txid        string  `json:"txid,omitempty"`
-	Tokens	    map[uint32]*TokenBalanceHistory `json:"tokens,omitempty"`	
+	Tokens	    []*TokenBalanceHistory `json:"tokens,omitempty"`	
 }
 
 // BalanceHistories is array of BalanceHistory
@@ -285,23 +286,21 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 			(*big.Int)(bha.ReceivedSat).Add((*big.Int)(bha.ReceivedSat), (*big.Int)(bh.ReceivedSat))
 
 			if len(bh.Tokens) > 0 {
-				if bha.Tokens == nil {
-					bha.Tokens = map[uint32]*TokenBalanceHistory{}
-				}
+				// fill up map of balances for each asset guid
+				tokens = map[uint32]*TokenBalanceHistory{}
+				bha.Tokens = []*TokenBalanceHistory{}
 				for key, token := range bh.Tokens {
-					bhaToken, ok := bha.Tokens[key];
+					bhaToken, ok := tokens[key];
 					if !ok {
-						bhaToken = &TokenBalanceHistory{}
-						bha.Tokens[key] = bhaToken
-					}
-					if bhaToken.SentSat == nil {
-						bhaToken.SentSat = &bchain.Amount{}
-					}
-					if bhaToken.ReceivedSat == nil {
-						bhaToken.ReceivedSat = &bchain.Amount{}
+						bhaToken = &TokenBalanceHistory{AssetGuid: key, SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
+						tokens[key] = bhaToken
 					}
 					(*big.Int)(bhaToken.SentSat).Add((*big.Int)(bhaToken.SentSat), (*big.Int)(token.SentSat))
 					(*big.Int)(bhaToken.ReceivedSat).Add((*big.Int)(bhaToken.ReceivedSat), (*big.Int)(token.ReceivedSat))
+				}
+				// then flatten to array of token balances from the map
+				for key, token := range bha.Tokens {
+					bha.Tokens = append(bha.Tokens, token)
 				}
 			}
 		}
