@@ -105,7 +105,7 @@ func (w *Worker) GetSpendingTxid(txid string, n int) (string, error) {
 		return "", err
 	}
 	glog.Info("GetSpendingTxid ", txid, " ", n, " finished in ", time.Since(start))
-	return (*tx.Vout)[n].SpentTxID, nil
+	return tx.Vout[n].SpentTxID, nil
 }
 
 // GetTransaction reads transaction data from txid
@@ -330,7 +330,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Vout:             &vouts,
 		CoinSpecificData: &bchainTx.CoinSpecificData,
 		CoinSpecificJSON: &sj,
-		TokenTransfers:   tokens,
+		TokenTransfers:   *tokens,
 		EthereumSpecific: ethSpecific,
 	}
 	return r, nil
