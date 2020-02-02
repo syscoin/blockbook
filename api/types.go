@@ -106,8 +106,8 @@ type Tx struct {
 	Txid             string            `json:"txid"`
 	Version          int32             `json:"version,omitempty"`
 	Locktime         uint32            `json:"lockTime,omitempty"`
-	Vin              *[]Vin             `json:"vin"`
-	Vout             *[]Vout            `json:"vout"`
+	Vin              []Vin             `json:"vin"`
+	Vout             []Vout            `json:"vout"`
 	Blockhash        string            `json:"blockHash,omitempty"`
 	Blockheight      int               `json:"blockHeight"`
 	Confirmations    uint32            `json:"confirmations"`
@@ -118,9 +118,9 @@ type Tx struct {
 	FeesSat          *bchain.Amount           `json:"fees,omitempty"`
 	Hex              string            `json:"hex,omitempty"`
 	Rbf              bool              `json:"rbf,omitempty"`
-	CoinSpecificData *interface{}       `json:"-"`
-	CoinSpecificJSON *json.RawMessage   `json:"-"`
-	TokenTransfers   *[]bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	CoinSpecificData interface{}       `json:"-"`
+	CoinSpecificJSON json.RawMessage   `json:"-"`
+	TokenTransfers   []bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 
@@ -184,7 +184,7 @@ type Address struct {
 	Txids                 []string              `json:"txids,omitempty"`
 	Nonce                 string                `json:"nonce,omitempty"`
 	UsedTokens            int                   `json:"usedTokens,omitempty"`
-	Tokens                []*bchain.Token        `json:"tokens,omitempty"`
+	Tokens                []bchain.Token        `json:"tokens,omitempty"`
 	Erc20Contract         *bchain.Erc20Contract `json:"erc20Contract,omitempty"`
 	// helpers for explorer
 	Filter        string              `json:"-"`
