@@ -87,8 +87,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		if balanceTransfer.AssetBalances == nil{
 			balanceTransfer.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
-		assetTransferBalance, ok := balanceTransfer.AssetBalances[assetGuid]
-		if !ok {
+		if assetTransferBalance, ok := balanceTransfer.AssetBalances[assetGuid]; !ok {
 			assetTransferBalance = &bchain.AssetBalance{}
 			balanceTransfer.AssetBalances[assetGuid] = assetTransferBalance
 		}
@@ -99,8 +98,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		if balance.AssetBalances == nil{
 			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
-		assetBalance, ok := balance.AssetBalances[assetGuid]
-		if !ok {
+		if assetBalance, ok := balance.AssetBalances[assetGuid]; !ok {
 			assetBalance = &bchain.AssetBalance{}
 			balance.AssetBalances[assetGuid] = assetBalance
 		}
@@ -134,7 +132,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		return errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
-	txAddresses.TokenTransfers = make([]bchain.TokenTransfer, len(assetAllocation.ListSendingAllocationAmounts))
+	txAddresses.TokenTransfers = make([]*bchain.TokenTransfer, len(assetAllocation.ListSendingAllocationAmounts))
 	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		receiverAddress := allocation.WitnessAddress.ToString("sys")
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverAddress)
@@ -174,8 +172,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		if balance.AssetBalances == nil {
 			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
-		assetBalance, ok := balance.AssetBalances[assetGuid]
-		if !ok {
+		if assetBalance, ok := balance.AssetBalances[assetGuid]; !ok {
 			assetBalance = &bchain.AssetBalance{}
 			balance.AssetBalances[assetGuid] = assetBalance
 		}
@@ -183,7 +180,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAssetSat := &assetBalance.BalanceAssetSat
 		balanceAssetSat.Add(balanceAssetSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
-		txAddresses.TokenTransfers = append(txAddresses.TokenTransfers, bchain.TokenTransfer {
+		txAddresses.TokenTransfers = append(txAddresses.TokenTransfers, &bchain.TokenTransfer {
 			Type:     bchain.SPTAllocatedTokenType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
@@ -302,8 +299,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	if balance.AssetBalances == nil {
 		balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 	}
-	assetBalance, ok := balance.AssetBalances[assetGuid]
-	if !ok {
+	if assetBalance, ok := balance.AssetBalances[assetGuid]; !ok {
 		assetBalance = &bchain.AssetBalance{}
 		balance.AssetBalances[assetGuid] = assetBalance
 	}
@@ -488,8 +484,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	if balance.AssetBalances == nil {
 		balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 	}
-	assetBalance, ok := balance.AssetBalances[assetGuid]
-	if !ok {
+	if assetBalance, ok := balance.AssetBalances[assetGuid]; !ok {
 		assetBalance = &bchain.AssetBalance{}
 		balance.AssetBalances[assetGuid] = assetBalance
 	}

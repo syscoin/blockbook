@@ -220,9 +220,9 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 	return lastUsed, addresses, nil
 }
 
-func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) []bchain.Token {
+func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) []*bchain.Token {
 	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
-	var tokens []bchain.Token
+	var tokens []*bchain.Token
 	var address string
 	if len(a) > 0 {
 		address = a[0]
@@ -231,13 +231,12 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 	if ad.balance != nil {
 		transfers := int(ad.balance.Txs)
 		
-		var i uint = 0
 		if option >= AccountDetailsTokenBalances {
-			tokens = make([]bchain.Token, 1 + len(ad.balance.AssetBalances))
+			tokens = make([]*bchain.Token, 1 + len(ad.balance.AssetBalances))
 			balance := &ad.balance.BalanceSat
 			totalSent := &ad.balance.SentSat
 			totalReceived := ad.balance.ReceivedSat()
-			tokens[i] = bchain.Token{
+			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.XPUBAddressTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
@@ -246,14 +245,13 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				TotalSentSat:     (*bchain.Amount)(totalSent),
 				Transfers:        transfers,
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-			}
-			i++
+			})
 			for k, v := range ad.balance.AssetBalances {
 				balanceAssetSat := &v.BalanceAssetSat
 				sentAssetSat := &v.SentAssetSat
 				totalReceived := bchain.ReceivedSatFromBalances(balanceAssetSat, sentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
-				tokens[i] = bchain.Token{
+				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTAllocatedTokenType,
 					Name:             address,
 					Decimals:         w.chainParser.AmountDecimals(),
@@ -263,8 +261,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					TotalSentSat:     (*bchain.Amount)(sentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  strconv.FormatUint(uint64(k), 10),
-				}
-				i++
+				})
 			}
 		}
 	}
@@ -529,10 +526,10 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		txCount = int(data.txCountEstimate)
 	}
 	usedTokens := 0
-	var tokens []bchain.Token
+	var tokens []*bchain.Token
 	var xpubAddresses map[string]struct{}
 	if option > AccountDetailsBasic {
-		tokens = make([]bchain.Token, 0, 4)
+		tokens = make([]*bchain.Token, 0, 4)
 		xpubAddresses = make(map[string]struct{})
 	}
 	for ci, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {

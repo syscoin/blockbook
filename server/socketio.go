@@ -278,7 +278,7 @@ type resTx struct {
 	Outputs        []txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`
-	TokenTransfers []bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	TokenOutputSatoshis  map[uint32]int64    `json:"tokenOutputSatoshis,omitempty"`
 }
 
@@ -339,9 +339,9 @@ func txToResTx(tx *api.Tx) resTx {
 			if err != nil {
 				return resultTx
 			}
-			token, ok := mapTokens[uint32(assetGuid)]
-			if !ok {
+			if token, ok := mapTokens[uint32(assetGuid)]; !ok {
 				token = big.NewInt(0)
+				mapTokens[uint32(assetGuid)] = token
 			}
 			token.Add(token, (*big.Int)(tokenTransfer.Value))
 		}
