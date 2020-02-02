@@ -9,7 +9,6 @@ import (
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/martinboehm/btcutil"
-	"github.com/golang/glog"
 )
 
 // magic numbers
@@ -305,7 +304,6 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	l = p.BaseParser.PackVaruint(uint(len(tt.From)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, []byte(tt.From)...)
-	glog.Warningf("AppendTokenTransfer from %v", tt.From)
 	l = p.BaseParser.PackVaruint(uint(len(tt.To)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, []byte(tt.To)...)
@@ -324,14 +322,12 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 
 func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte) int {
 	var Decimals uint
-	tt = &bchain.TokenTransfer{}
 	al, l := p.BaseParser.UnpackVaruint(buf)
 	tt.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := l+int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
 	tt.From = string(append([]byte(nil), buf[ll:ll+int(al)]...))
-	glog.Warningf("UnpackTokenTransfer from %v", tt.From)
 	ll += int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
@@ -405,9 +401,9 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	l += ll
 	if tokenTransfers > 0 {
 		ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
-		for i := 0; i < int(tokenTransfers); i++ {
-			l += p.UnpackTokenTransfer(&ta.TokenTransfers[i], buf[l:])
-			glog.Warningf("UnpackTxAddresses token %v from %v", i, ta.TokenTransfers[i].From)
+		for i := uint(0); i < tokenTransfers; i++ {
+			ta.TokenTransfers[i] = bchain.TokenTransfer{}
+			l += p.UnpackTokenTransfer(&(ta.TokenTransfers[i]), buf[l:])
 		}
 	}
 	return &ta, nil
