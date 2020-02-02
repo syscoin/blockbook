@@ -257,10 +257,15 @@ func (a BalanceHistories) Less(i, j int) bool {
 // SortAndAggregate sums BalanceHistories to groups defined by parameter groupByTime
 func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories {
 	bhs := make(BalanceHistories, 0)
+	var tokens map[uint32]*TokenBalanceHistory
 	if len(a) > 0 {
 		bha := BalanceHistory{
 			SentSat:     &bchain.Amount{},
 			ReceivedSat: &bchain.Amount{},
+		}
+		if len(bh.Tokens) > 0 {
+			bha.Tokens = []*TokenBalanceHistory{}
+			tokens = map[uint32]*TokenBalanceHistory{}
 		}
 		sort.Sort(a)
 		for i := range a {
@@ -287,8 +292,6 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 
 			if len(bh.Tokens) > 0 {
 				// fill up map of balances for each asset guid
-				tokens := map[uint32]*TokenBalanceHistory{}
-				bha.Tokens = []*TokenBalanceHistory{}
 				for _, token := range bh.Tokens {
 					bhaToken, ok := tokens[token.AssetGuid];
 					if !ok {
@@ -298,10 +301,12 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 					(*big.Int)(bhaToken.SentSat).Add((*big.Int)(bhaToken.SentSat), (*big.Int)(token.SentSat))
 					(*big.Int)(bhaToken.ReceivedSat).Add((*big.Int)(bhaToken.ReceivedSat), (*big.Int)(token.ReceivedSat))
 				}
-				// then flatten to array of token balances from the map
-				for _, token := range tokens {
-					bha.Tokens = append(bha.Tokens, token)
-				}
+			}
+		}
+		if len(bh.Tokens) > 0 {
+			// then flatten to array of token balances from the map
+			for _, token := range tokens {
+				bha.Tokens = append(bha.Tokens, token)
 			}
 		}
 		if bha.Txs > 0 {
