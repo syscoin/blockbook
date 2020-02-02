@@ -324,32 +324,34 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte) int {
 	var Decimals uint
 	var Value big.Int
-	tt = &bchain.TokenTransfer{}
+	tokenTransfer = bchain.TokenTransfer{}
 	al, l := p.BaseParser.UnpackVaruint(buf)
-	tt.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
-	ll := uint(l)+al
+	tokenTransfer.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
+	ll := l+int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += uint(l)
-	tt.From = string(append([]byte(nil), buf[l:l+int(al)]...))
+	ll += l
+	tokenTransfer.From = string(append([]byte(nil), buf[ll:ll+int(al)]...))
 	ll += al
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += uint(l)
-	tt.To = string(append([]byte(nil), buf[l:l+int(al)]...))
-	ll += al
+	ll += l
+	tokenTransfer.To = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	ll += int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += uint(l)
-	tt.Token = string(append([]byte(nil), buf[l:l+int(al)]...))
-	ll += al
+	ll += l
+	tokenTransfer.Token = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	ll += int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += uint(l)
-	tt.Symbol = string(append([]byte(nil), buf[l:l+int(al)]...))
-	ll += al
+	ll += l
+	tokenTransfer.Symbol = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	ll += int(al)
 	Decimals, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	tt.Decimals = int(Decimals)
-	ll += uint(l)
+	ll += l
+	tokenTransfer.Decimals = int(Decimals)
 	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
-	tt.Value = (*bchain.Amount)(&Value)
-	return int(ll)+l
+	ll += l
+	tokenTransfer.Value = (*bchain.Amount)(&Value)
+	tt = &tokenTransfer
+	return ll
 }
 
 func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
