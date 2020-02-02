@@ -895,7 +895,6 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			}
 		}
 		if len(ta.TokenTransfers) > 0 {
-			var ok bool
 			var err error
 			var assetGuid int
 			tatt := &ta.TokenTransfers[0]
