@@ -326,10 +326,10 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Version:          bchainTx.Version,
 		Hex:              bchainTx.Hex,
 		Rbf:              rbf,
-		Vin:              &vins,
-		Vout:             &vouts,
-		CoinSpecificData: &bchainTx.CoinSpecificData,
-		CoinSpecificJSON: &sj,
+		Vin:              vins,
+		Vout:             vouts,
+		CoinSpecificData: bchainTx.CoinSpecificData,
+		CoinSpecificJSON: sj,
 		TokenTransfers:   *tokens,
 		EthereumSpecific: ethSpecific,
 	}
@@ -504,7 +504,7 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 
 func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (bchain.AddrBalance, []bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
 	var (
-		ba             bchain.AddrBalance
+		ba             *bchain.AddrBalance
 		tokens         []bchain.Token
 		ci             *bchain.Erc20Contract
 		n              uint64
@@ -605,7 +605,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 	} else {
 		// addresses without any normal transactions can have internal transactions and therefore balance
 		if b != nil {
-			ba = bchain.AddrBalance{
+			ba = &bchain.AddrBalance{
 				BalanceSat: *b,
 			}
 		}
