@@ -215,7 +215,7 @@ type AddrBalance struct {
 	BalanceSat big.Int
 	Utxos      []Utxo
 	utxosMap   map[string]int
-	AssetBalances map[uint32]*AssetBalance
+	AssetBalances map[uint32]AssetBalance
 }
 
 
