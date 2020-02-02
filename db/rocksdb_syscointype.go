@@ -135,7 +135,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		return errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
 	txAddresses.TokenTransfers = make([]bchain.TokenTransfer, len(assetAllocation.ListSendingAllocationAmounts))
-	for i, allocation := range assetAllocation.ListSendingAllocationAmounts {
+	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		receiverAddress := allocation.WitnessAddress.ToString("sys")
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverAddress)
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
