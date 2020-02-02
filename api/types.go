@@ -225,7 +225,7 @@ func (a Utxos) Less(i, j int) bool {
 // history of tokens mapped to uint32 asset guid's in BalanceHistory obj
 type TokenBalanceHistory struct {
 	ReceivedSat *bchain.Amount `json:"received,omitempty"`
-	SentSat    	*bchain.Amount `json:"sent,omitempty"`	
+	SentSat     *bchain.Amount `json:"sent,omitempty"`	
 }
 
 // BalanceHistory contains info about one point in time of balance history
