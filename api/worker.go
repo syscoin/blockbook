@@ -277,7 +277,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				From:     e.From,
 				To:       e.To,
 				Decimals: erc20c.Decimals,
-				Value:    (*bchain.Amount)(&e.Tokens),
+				Value:    (bchain.Amount)(e.Tokens),
 				Name:     erc20c.Name,
 				Symbol:   erc20c.Symbol,
 			}
@@ -910,7 +910,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				return nil, err
 			}
 			if bytes.Equal(addrDesc, tattAddrFromDesc) {
-				sentSat.Add(sentSat, (*big.Int)(tatt.Value))
+				sentSat.Add(sentSat, (*big.Int)(&tatt.Value))
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
 			} else {
 				for _,tattr := range ta.TokenTransfers {
@@ -919,7 +919,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 						return nil, err
 					}
 					if bytes.Equal(addrDesc, tattAddrToDesc) {
-						receivedSat.Add(receivedSat, (*big.Int)(tattr.Value))
+						receivedSat.Add(receivedSat, (*big.Int)(&tattr.Value))
 					}
 				}
 			}
