@@ -322,7 +322,7 @@ func txToResTx(tx *api.Tx) resTx {
 	for i := range tx.Vout {
 		vout := tx.Vout[i]
 		script := vout.Hex
-		output := txOutputs{
+		output := &txOutputs{
 			Satoshis: vout.ValueSat.AsInt64(),
 			Script:   &script,
 		}
