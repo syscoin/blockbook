@@ -906,7 +906,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			if err != nil {
 				return nil, err
 			}
-			token := &bh.Tokens[uint32(assetGuid)]
+			token := bh.Tokens[uint32(assetGuid)]
 			if token.SentSat == nil {
 				token.SentSat = &bchain.Amount{}
 			}

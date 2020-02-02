@@ -601,11 +601,13 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 				return nil, err
 			}
 			if len(utxos) > 0 {
-				t := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
-				for j := range utxos {				
-					a := &utxos[j]
-					a.Address = t.Name
-					a.Path = t.Path
+				txs := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
+				for _ , t := range txs {
+					for j := range utxos {
+						a := &utxos[j]
+						a.Address = t.Name
+						a.Path = t.Path
+					}
 				}
 				r = append(r, utxos...)
 			}
