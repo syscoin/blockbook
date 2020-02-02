@@ -289,7 +289,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 					if bha.Tokens == nil {
 						bha.Tokens = map[uint32]TokenBalanceHistory{}
 					}
-					bhaToken := &bha.Tokens[i]
+					bhaToken := bha.Tokens[i]
 					if bhaToken.SentSat == nil {
 						bhaToken.SentSat = &bchain.Amount{}
 					}

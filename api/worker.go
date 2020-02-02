@@ -502,7 +502,7 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (bchain.AddrBalance, []bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
+func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
 	var (
 		ba             *bchain.AddrBalance
 		tokens         []bchain.Token
