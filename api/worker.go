@@ -129,7 +129,9 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 	var blockhash string
 	if bchainTx.Confirmations > 0 {
 		if w.chainType == bchain.ChainBitcoinType {
+			glog.Warning("GetTransactionFromBchainTx before tx addresses")
 			ta, err = w.db.GetTxAddresses(bchainTx.Txid)
+			glog.Warning("GetTransactionFromBchainTx after tx addresses")
 			if err != nil {
 				return nil, errors.Annotatef(err, "GetTxAddresses %v", bchainTx.Txid)
 			}
@@ -470,6 +472,8 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 	}
 	if len(ta.TokenTransfers) < 0 {
 		glog.Errorf("txFromTxAddress %v", ta.TokenTransfers[0].From)
+	} else {
+		glog.Errorf("txFromTxAddress TokenTransfers empty")
 	}
 	r := &Tx{
 		Blockhash:     bi.Hash,
@@ -858,7 +862,9 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 	var bchainTx *bchain.Tx
 	var height uint32
 	if w.chainType == bchain.ChainBitcoinType {
+		glog.Warning("balanceHistoryForTxid before tx addresses")
 		ta, err = w.db.GetTxAddresses(txid)
+		glog.Warning("balanceHistoryForTxid after tx addresses")
 		if err != nil {
 			return nil, err
 		}
