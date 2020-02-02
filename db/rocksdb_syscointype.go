@@ -90,7 +90,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		assetBalanceTransfer := balanceTransfer.AssetBalances[assetGuid]
 		assetBalance := balance.AssetBalances[assetGuid]
 		assetBalanceTransfer.BalanceAssetSat = assetBalance.BalanceAssetSat
-		assetBalance.BalanceAssetSat.Set(*big.NewInt(0))
+		assetBalance.BalanceAssetSat = *big.NewInt(0)
 		balanceTransfer.AssetBalances[assetGuid] = assetBalanceTransfer
 		balance.AssetBalances[assetGuid] = assetBalance
 	} else {
@@ -369,7 +369,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		assetBalance := balance.AssetBalances[assetGuid]
 		assetBalanceTransfer := balanceTransfer.AssetBalances[assetGuid]
 		assetBalanceTransfer.BalanceAssetSat = assetBalance.BalanceAssetSat
-		assetBalance.BalanceAssetSat.Set(*big.NewInt(0))
+		assetBalance.BalanceAssetSat = *big.NewInt(0)
 		balance.AssetBalances[assetGuid] = assetBalance
 		balanceTransfer.AssetBalances[assetGuid] = assetBalanceTransfer
 		
