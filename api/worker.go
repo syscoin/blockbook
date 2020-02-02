@@ -271,7 +271,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			if erc20c == nil {
 				erc20c = &bchain.Erc20Contract{Name: e.Contract}
 			}
-			tokens = append(tokens, &bchain.TokenTransfer{
+			tokens[i] = &bchain.TokenTransfer{
 				Type:     bchain.ERC20TokenType,
 				Token:    e.Contract,
 				From:     e.From,
@@ -785,12 +785,13 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	} 
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
 		tokens = make([]*bchain.Token, len(ba.AssetBalances))
+		var i int = 0
 		for k, v := range ba.AssetBalances {
 			balanceAssetSat := &v.BalanceAssetSat
 			sentAssetSat := &v.SentAssetSat
 			totalReceived := bchain.ReceivedSatFromBalances(balanceAssetSat, sentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
-			tokens = append(tokens, &bchain.Token{
+			tokens[i] = &bchain.Token{
 				Type:             bchain.SPTAllocatedTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
@@ -800,6 +801,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				TotalSentSat:     (*bchain.Amount)(sentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
 			})
+			i++
 		}
 	}
 	r := &Address{
