@@ -120,7 +120,7 @@ type Tx struct {
 	Rbf              bool              `json:"rbf,omitempty"`
 	CoinSpecificData interface{}       `json:"-"`
 	CoinSpecificJSON json.RawMessage   `json:"-"`
-	TokenTransfers   []bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers   []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 
@@ -184,7 +184,7 @@ type Address struct {
 	Txids                 []string              `json:"txids,omitempty"`
 	Nonce                 string                `json:"nonce,omitempty"`
 	UsedTokens            int                   `json:"usedTokens,omitempty"`
-	Tokens                []bchain.Token        `json:"tokens,omitempty"`
+	Tokens                []*bchain.Token        `json:"tokens,omitempty"`
 	Erc20Contract         *bchain.Erc20Contract `json:"erc20Contract,omitempty"`
 	// helpers for explorer
 	Filter        string              `json:"-"`
@@ -285,11 +285,14 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 			(*big.Int)(bha.ReceivedSat).Add((*big.Int)(bha.ReceivedSat), (*big.Int)(bh.ReceivedSat))
 
 			if len(bh.Tokens) > 0 {
-				for i, token := range bh.Tokens {
-					if bha.Tokens == nil {
-						bha.Tokens = map[uint32]*TokenBalanceHistory{}
+				if bha.Tokens == nil {
+					bha.Tokens = map[uint32]*TokenBalanceHistory{}
+				}
+				for key, token := range bh.Tokens {
+					if bhaToken, ok := bha.Tokens[key]; !ok {
+						bhaToken = &TokenBalanceHistory{}
+						bha.Tokens[key] = bhaToken
 					}
-					bhaToken := bha.Tokens[i]
 					if bhaToken.SentSat == nil {
 						bhaToken.SentSat = &bchain.Amount{}
 					}
