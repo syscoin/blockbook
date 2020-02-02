@@ -339,7 +339,8 @@ func txToResTx(tx *api.Tx) resTx {
 			if err != nil {
 				return resultTx
 			}
-			if token, ok := mapTokens[uint32(assetGuid)]; !ok {
+			token, ok := mapTokens[uint32(assetGuid)]
+			if !ok {
 				token = big.NewInt(0)
 				mapTokens[uint32(assetGuid)] = token
 			}

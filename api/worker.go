@@ -901,7 +901,8 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			if err != nil {
 				return nil, err
 			}
-			if token, ok := bh.Tokens[uint32(assetGuid)]; !ok {
+			token, ok := bh.Tokens[uint32(assetGuid)]
+			if !ok {
 				token = &TokenBalanceHistory{}
 				bh.Tokens[uint32(assetGuid)] = token
 			}

@@ -289,7 +289,8 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 					bha.Tokens = map[uint32]*TokenBalanceHistory{}
 				}
 				for key, token := range bh.Tokens {
-					if bhaToken, ok := bha.Tokens[key]; !ok {
+					bhaToken, ok := bha.Tokens[key];
+					if !ok {
 						bhaToken = &TokenBalanceHistory{}
 						bha.Tokens[key] = bhaToken
 					}
