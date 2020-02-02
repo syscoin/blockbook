@@ -502,10 +502,10 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []*bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
+func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (bchain.AddrBalance, []bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
 	var (
-		ba             *bchain.AddrBalance
-		tokens         []*bchain.Token
+		ba             bchain.AddrBalance
+		tokens         []bchain.Token
 		ci             *bchain.Erc20Contract
 		n              uint64
 		nonContractTxs int
@@ -539,7 +539,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 			}
 		}
 		if details > AccountDetailsBasic {
-			tokens = make([]*bchain.Token, len(ca.Contracts))
+			tokens = make([]bchain.Token, len(ca.Contracts))
 			var j int
 			for i, c := range ca.Contracts {
 				if len(filterDesc) > 0 {
@@ -573,7 +573,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 				} else {
 					b = nil
 				}
-				tokens[j] = &bchain.Token{
+				tokens[j] = bchain.Token{
 					Type:          bchain.ERC20TokenType,
 					BalanceSat:    (*bchain.Amount)(b),
 					Contract:      ci.Contract,
@@ -605,7 +605,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 	} else {
 		// addresses without any normal transactions can have internal transactions and therefore balance
 		if b != nil {
-			ba = &bchain.AddrBalance{
+			ba = bchain.AddrBalance{
 				BalanceSat: *b,
 			}
 		}
@@ -677,7 +677,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	}
 	var (
 		ba                       *bchain.AddrBalance
-		tokens                   []*bchain.Token
+		tokens                   []bchain.Token
 		erc20c                   *bchain.Erc20Contract
 		txm                      []string
 		txs                      []*Tx
@@ -786,7 +786,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalSent = &ba.SentSat
 	} 
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
-		tokens = make([]*bchain.Token, len(ba.AssetBalances))
+		tokens = make([]bchain.Token, len(ba.AssetBalances))
 		var i int
 		for k, v := range ba.AssetBalances {
 			balanceAssetSat := &v.BalanceAssetSat
