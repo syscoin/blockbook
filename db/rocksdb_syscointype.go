@@ -135,7 +135,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		return errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
 	txAddresses.TokenTransfers = make([]*bchain.TokenTransfer, len(assetAllocation.ListSendingAllocationAmounts))
-	for _, allocation := range assetAllocation.ListSendingAllocationAmounts {
+	for i, allocation := range assetAllocation.ListSendingAllocationAmounts {
 		receiverAddress := allocation.WitnessAddress.ToString("sys")
 		addrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverAddress)
 		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
@@ -183,7 +183,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAssetSat := &assetBalance.BalanceAssetSat
 		balanceAssetSat.Add(balanceAssetSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
-		txAddresses.TokenTransfers = append(txAddresses.TokenTransfers, &bchain.TokenTransfer {
+		txAddresses.TokenTransfers[i] = &bchain.TokenTransfer {
 			Type:     bchain.SPTAllocatedTokenType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
@@ -191,7 +191,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			Decimals: 8,
 			Value:    (*bchain.Amount)(amount),
 			Symbol:   "SPT",
-		})
+		}
 	}
 	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
