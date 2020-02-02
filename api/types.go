@@ -303,7 +303,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 				}
 			}
 		}
-		if len(bh.Tokens) > 0 {
+		if tokens != nil {
 			// then flatten to array of token balances from the map
 			for _, token := range tokens {
 				bha.Tokens = append(bha.Tokens, token)
