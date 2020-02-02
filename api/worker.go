@@ -296,7 +296,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			Nonce:    ethTxData.Nonce,
 			Status:   ethTxData.Status,
 		}
-		tokens = &tokensEth
 	}
 	// for now do not return size, we would have to compute vsize of segwit transactions
 	// size:=len(bchainTx.Hex) / 2
