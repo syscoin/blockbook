@@ -332,7 +332,9 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 	if len(tokensEth) > 0 {
 		r.TokenTransfers = tokensEth
 	} else if ta != nil && len(ta.TokenTransfers) > 0 {
+		glog.Warningf("GetTransactionFromBchainTx from %v", ta.TokenTransfers[0].From)
 		r.TokenTransfers = ta.TokenTransfers
+		glog.Warningf("GetTransactionFromBchainTx1 from %v", r.TokenTransfers[0].From)
 	}
 	return r, nil
 }
@@ -466,6 +468,9 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 	if feesSat.Sign() == -1 {
 		feesSat.SetUint64(0)
 	}
+	if len(ta.TokenTransfers) < 0 {
+		glog.Errorf("txFromTxAddress %v", ta.TokenTransfers[0].From)
+	}
 	r := &Tx{
 		Blockhash:     bi.Hash,
 		Blockheight:   int(ta.Height),
@@ -478,6 +483,9 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		Vin:           vins,
 		Vout:          vouts,
 		TokenTransfers:  ta.TokenTransfers,
+	}
+	if len(ta.TokenTransfers) < 0 {
+		glog.Errorf("txFromTxAddress %v", r.TokenTransfers[0].From)
 	}
 	return r
 }
