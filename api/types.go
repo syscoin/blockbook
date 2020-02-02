@@ -224,8 +224,8 @@ func (a Utxos) Less(i, j int) bool {
 
 // history of tokens mapped to uint32 asset guid's in BalanceHistory obj
 type TokenBalanceHistory struct {
-	ReceivedSat bchain.Amount `json:"received,omitempty"`
-	SentSat    	bchain.Amount `json:"sent,omitempty"`	
+	ReceivedSat *bchain.Amount `json:"received,omitempty"`
+	SentSat    	*bchain.Amount `json:"sent,omitempty"`	
 }
 
 // BalanceHistory contains info about one point in time of balance history
@@ -236,7 +236,7 @@ type BalanceHistory struct {
 	SentSat     *bchain.Amount `json:"sent"`
 	FiatRate    float64 `json:"fiatRate,omitempty"`
 	Txid        string  `json:"txid,omitempty"`
-	Tokens		map[uint32]*TokenBalanceHistory `json:"tokens,omitempty"`	
+	Tokens	    map[uint32]TokenBalanceHistory `json:"tokens,omitempty"`	
 }
 
 // BalanceHistories is array of BalanceHistory
@@ -286,18 +286,18 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 
 			if len(bh.Tokens) > 0 {
 				for i, token := range bh.Tokens {
-					var bhaToken *TokenBalanceHistory
-					var ok bool
 					if bha.Tokens == nil {
-						bha.Tokens = map[uint32]*TokenBalanceHistory{}
+						bha.Tokens = map[uint32]TokenBalanceHistory{}
 					}
-					if bhaToken, ok = bha.Tokens[i]; !ok {
-						bhaToken = &TokenBalanceHistory{}
+					bhaToken := &bha.Tokens[i]
+					if bhaToken.SentSat == nil {
+						bhaToken.SentSat = &bchain.Amount{}
 					}
-					sentSat := &bhaToken.SentSat
-					receivedSat := &bhaToken.ReceivedSat
-					(*big.Int)(sentSat).Add((*big.Int)(sentSat), (*big.Int)(&token.SentSat))
-					(*big.Int)(receivedSat).Add((*big.Int)(receivedSat), (*big.Int)(&token.ReceivedSat))
+					if bhaToken.ReceivedSat == nil {
+						bhaToken.ReceivedSat = &bchain.Amount{}
+					}
+					(*big.Int)(bhaToken.SentSat).Add((*big.Int)(bhaToken.SentSat), (*big.Int)(token.SentSat))
+					(*big.Int)(bhaToken.ReceivedSat).Add((*big.Int)(bhaToken.ReceivedSat), (*big.Int)(token.ReceivedSat))
 				}
 			}
 		}
