@@ -316,7 +316,7 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	buf = append(buf, []byte(tt.Symbol)...)
 	l = p.BaseParser.PackVaruint(uint(tt.Decimals), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.PackBigint((*big.Int)(&tt.Value), varBuf)
+	l = p.BaseParser.PackBigint(&tt.Value, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
@@ -399,9 +399,9 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	}
 	tokenTransfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.TokenTransfers = make([]*bchain.TokenTransfer, tokenTransfers)
+	ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
 	for i := uint(0); i < tokenTransfers; i++ {
-		l += p.UnpackTokenTransfer(ta.TokenTransfers[i], buf[l:])
+		l += p.UnpackTokenTransfer(&ta.TokenTransfers[i], buf[l:])
 	}
 	return &ta, nil
 }

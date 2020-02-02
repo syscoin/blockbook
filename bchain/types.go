@@ -424,7 +424,7 @@ type TokenTransfer struct {
 	Name     string    `json:"name"`
 	Symbol   string    `json:"symbol"`
 	Decimals int       `json:"decimals"`
-	Value    Amount   `json:"value"`
+	Value    big.Int   `json:"value"`
 }
 
 // TxAddresses stores transaction inputs and outputs with amounts
@@ -433,7 +433,7 @@ type TxAddresses struct {
 	Height  uint32
 	Inputs  []TxInput
 	Outputs []TxOutput
-	TokenTransfers []*TokenTransfer
+	TokenTransfers []TokenTransfer
 }
 
 type DbOutpoint struct {
