@@ -371,7 +371,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		assetBalance.BalanceAssetSat.Add(&assetBalance.BalanceAssetSat, valueSat)
 		assetBalance.SentAssetSat.Sub(&assetBalance.SentAssetSat, valueSat)
 		if assetBalance.SentAssetSat.Sign() < 0 {
-			d.resetValueSatToZero(assetBalance.SentAssetSat, assetSenderAddrDesc, "balance")
+			d.resetValueSatToZero(&assetBalance.SentAssetSat, assetSenderAddrDesc, "balance")
 		}
 	} else {
 		glog.Warningf("DisconnectAssetOutput: Asset Sent balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
