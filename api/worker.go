@@ -124,7 +124,6 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
 	var err error
 	var ta *bchain.TxAddresses
-	var tokens *[]bchain.TokenTransfer
 	var tokensEth []bchain.TokenTransfer
 	var ethSpecific *EthereumSpecific
 	var blockhash string
@@ -251,9 +250,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		if ta != nil && len(ta.TokenTransfers) > 0 {
-			tokens = &ta.TokenTransfers
-		}
 	} else if w.chainType == bchain.ChainEthereumType {
 		ets, err := w.chainParser.EthereumTypeGetErc20FromTx(bchainTx)
 		if err != nil {
@@ -334,8 +330,10 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		CoinSpecificJSON: sj,
 		EthereumSpecific: ethSpecific,
 	}
-	if tokens != nil {
-		r.TokenTransfers = *tokens
+	if len(tokensEth) > 0 {
+		r.TokenTransfers = tokensEth
+	} else if ta != nil && len(ta.TokenTransfers) > 0 {
+		r.TokenTransfers = ta.TokenTransfers
 	}
 	return r, nil
 }
