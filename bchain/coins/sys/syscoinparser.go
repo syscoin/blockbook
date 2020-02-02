@@ -402,8 +402,8 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	if tokenTransfers > 0 {
 		ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
 		for i := uint(0); i < tokenTransfers; i++ {
-			ta.TokenTransfers[i] = &bchain.TokenTransfer{}
-			l += p.UnpackTokenTransfer(&ta.TokenTransfers[i], buf[l:])
+			ta.TokenTransfers[i] = bchain.TokenTransfer{}
+			l += p.UnpackTokenTransfer(&(ta.TokenTransfers[i]), buf[l:])
 		}
 	}
 	return &ta, nil
