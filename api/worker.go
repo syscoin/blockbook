@@ -896,7 +896,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			var err error
 			var assetGuid int
 			tatt := ta.TokenTransfers[0]
-			bh.Tokens = make([]*TokenBalanceHistory{}, 1)
+			bh.Tokens = make([]*TokenBalanceHistory, 1)
 			assetGuid, err = strconv.Atoi(tatt.Token)
 			sentSat := big.NewInt(0)
 			receivedSat := big.NewInt(0)
@@ -924,7 +924,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				}
 			}
 			bh.Tokens[0] = &TokenBalanceHistory{
-				AssetGuid: assetGuid, 
+				AssetGuid: uint32(assetGuid), 
 				SentSat: (*bchain.Amount)(sentSat),
 				ReceivedSat: (*bchain.Amount)(receivedSat),
 			}
