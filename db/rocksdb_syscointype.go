@@ -183,7 +183,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAssetSat := &assetBalance.BalanceAssetSat
 		balanceAssetSat.Add(balanceAssetSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
-		txAddresses.TokenTransfers[i] = bchain.TokenTransfer {
+		txAddresses.TokenTransfers = append(txAddresses.TokenTransfers, bchain.TokenTransfer {
 			Type:     bchain.SPTAllocatedTokenType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
@@ -191,7 +191,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			Decimals: 8,
 			Value:    (*bchain.Amount)(amount),
 			Symbol:   "SPT",
-		}
+		})
 	}
 	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }

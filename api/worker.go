@@ -899,7 +899,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			var assetGuid int
 			tatt := &ta.TokenTransfers[0]
 			if bh.Tokens == nil {
-				bh.Tokens = map[uint32]TokenBalanceHistory{}
+				bh.Tokens = map[uint32]*TokenBalanceHistory{}
 			}
 			assetGuid, err = strconv.Atoi(tatt.Token)
 			if err != nil {
