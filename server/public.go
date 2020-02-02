@@ -1011,7 +1011,7 @@ func (s *PublicServer) apiXpub(r *http.Request, apiVersion int) (interface{}, er
 }
 
 func (s *PublicServer) apiUtxo(r *http.Request, apiVersion int) (interface{}, error) {
-	var utxo []api.Utxo
+	var utxo []*api.Utxo
 	var err error
 	if i := strings.LastIndexByte(r.URL.Path, '/'); i > 0 {
 		onlyConfirmed := false
@@ -1041,7 +1041,7 @@ func (s *PublicServer) apiUtxo(r *http.Request, apiVersion int) (interface{}, er
 }
 
 func (s *PublicServer) apiBalanceHistory(r *http.Request, apiVersion int) (interface{}, error) {
-	var history []api.BalanceHistory
+	var history []*api.BalanceHistory
 	var fromTime, toTime time.Time
 	var err error
 	if i := strings.LastIndexByte(r.URL.Path, '/'); i > 0 {

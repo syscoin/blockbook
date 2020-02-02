@@ -305,7 +305,7 @@ func txToResTx(tx *api.Tx) resTx {
 		vin := tx.Vin[i]
 		txid := vin.Txid
 		script := vin.Hex
-		input := txInputs{
+		input := &txInputs{
 			Txid:        &txid,
 			Script:      &script,
 			Sequence:    int64(vin.Sequence),
@@ -318,7 +318,7 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		inputs[i] = input
 	}
-	outputs := make([]txOutputs, len(tx.Vout))
+	outputs := make([]&txOutputs, len(tx.Vout))
 	for i := range tx.Vout {
 		vout := tx.Vout[i]
 		script := vout.Hex
