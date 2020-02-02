@@ -324,7 +324,7 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte) int {
 	var Decimals uint
 	var Value big.Int
-	tt := bchain.TokenTransfer{}
+	tt = bchain.TokenTransfer{}
 	al, l := p.BaseParser.UnpackVaruint(buf)
 	tt.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := uint(l)+al
