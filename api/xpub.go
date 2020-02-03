@@ -233,24 +233,20 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 		var i int = 0
 		if option >= AccountDetailsTokenBalances {
 			tokens = make([]*bchain.Token, 1 + len(ad.balance.AssetBalances))
-			balance := &ad.balance.BalanceSat
-			totalSent := &ad.balance.SentSat
 			totalReceived := ad.balance.ReceivedSat()
 			tokens[i] = &bchain.Token{
 				Type:             bchain.XPUBAddressTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
-				BalanceSat:       (*bchain.Amount)(balance),
+				BalanceSat:       (*bchain.Amount)(&ad.balance.BalanceSat),
 				TotalReceivedSat: (*bchain.Amount)(totalReceived),
-				TotalSentSat:     (*bchain.Amount)(totalSent),
+				TotalSentSat:     (*bchain.Amount)(&ad.balance.SentSat),
 				Transfers:        transfers,
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 			}
 			i++
 			for k, v := range ad.balance.AssetBalances {
-				balanceAssetSat := &v.BalanceAssetSat
-				sentAssetSat := &v.SentAssetSat
-				totalReceived := bchain.ReceivedSatFromBalances(balanceAssetSat, sentAssetSat)
+				totalReceived := bchain.ReceivedSatFromBalances(&v.BalanceAssetSat, &v.SentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
 				tokens[i] = &bchain.Token{
 					Type:             bchain.SPTAllocatedTokenType,
@@ -258,8 +254,8 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Decimals:         w.chainParser.AmountDecimals(),
 					Symbol:			  "SPT",
 					BalanceSat:       (*bchain.Amount)(balanceAssetSat),
-					TotalReceivedSat: (*bchain.Amount)(totalReceived),
-					TotalSentSat:     (*bchain.Amount)(sentAssetSat),
+					TotalReceivedSat: (*bchain.Amount)(v.BalanceAssetSat),
+					TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  strconv.FormatUint(uint64(k), 10),
 				}

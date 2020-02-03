@@ -789,18 +789,16 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		tokens = make([]*bchain.Token, len(ba.AssetBalances))
 		var i int = 0
 		for k, v := range ba.AssetBalances {
-			balanceAssetSat := &v.BalanceAssetSat
-			sentAssetSat := &v.SentAssetSat
-			totalReceived := bchain.ReceivedSatFromBalances(balanceAssetSat, sentAssetSat)
+			totalReceived := bchain.ReceivedSatFromBalances(&v.BalanceAssetSat, &v.SentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
 			tokens[i] = &bchain.Token{
 				Type:             bchain.SPTAllocatedTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
 				Symbol:			  "SPT",
-				BalanceSat:       (*bchain.Amount)(balanceAssetSat),
+				BalanceSat:       (*bchain.Amount)(&v.BalanceAssetSat),
 				TotalReceivedSat: (*bchain.Amount)(totalReceived),
-				TotalSentSat:     (*bchain.Amount)(sentAssetSat),
+				TotalSentSat:     (*bchain.Amount)(&v.SentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
 			}
 			i++
