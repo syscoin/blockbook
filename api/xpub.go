@@ -246,16 +246,18 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			}
 			i++
 			for k, v := range ad.balance.AssetBalances {
-				totalAssetReceived := bchain.ReceivedSatFromBalances(&v.BalanceAssetSat, &v.SentAssetSat)
+				balanceAssetSat := v.BalanceAssetSat
+				sentAssetSat := v.BalanceAssetSat
+				totalAssetReceived := bchain.ReceivedSatFromBalances(&v.BalanceAssetSat, &sentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
 				tokens[i] = &bchain.Token{
 					Type:             bchain.SPTAllocatedTokenType,
 					Name:             address,
 					Decimals:         w.chainParser.AmountDecimals(),
 					Symbol:			  "SPT",
-					BalanceSat:       (*bchain.Amount)(&v.BalanceAssetSat),
+					BalanceSat:       (*bchain.Amount)(&balanceAssetSat),
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
-					TotalSentSat:     (*bchain.Amount)(&v.SentAssetSat),
+					TotalSentSat:     (*bchain.Amount)(&sentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  strconv.FormatUint(uint64(k), 10),
 				}
