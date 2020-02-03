@@ -48,10 +48,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		d.cbs.balancesHit++
 	}
 
-	counted := addToAddressesMap(addresses, senderStr, btxID, outputIndex)
-	if !counted {
-		balance.Txs++
-	}
+	countedSender := addToAddressesMap(addresses, senderStr, btxID, outputIndex)
 	txAddresses.TokenTransfers = make([]*bchain.TokenTransfer, 1)
 	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
 		receiverAddress := asset.WitnessAddressTransfer.ToString("sys")
@@ -82,23 +79,26 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		} else {
 			d.cbs.balancesHit++
 		}
-		counted := addToAddressesMap(addresses, transferStr, btxID, outputIndex)
-		if !counted {
-			balanceTransfer.Txs++
-		}
+		countedTransfer := addToAddressesMap(addresses, transferStr, btxID, outputIndex)
 		// transfer balance from old address to transfered address
 		if balanceTransfer.AssetBalances == nil{
 			balanceTransfer.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		balanceAssetTransfer, ok := balanceTransfer.AssetBalances[assetGuid]
 		if !ok {
-			balanceAssetTransfer = &bchain.AssetBalance{BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAssetTransfer = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 			balanceTransfer.AssetBalances[assetGuid] = balanceAssetTransfer
+		}
+		if !countedTransfer {
+			balanceAssetTransfer.Transfers++
 		}
 		balanceAsset, ok := balance.AssetBalances[assetGuid]
 		if !ok {
-			balanceAsset = &bchain.AssetBalance{BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
+		}
+		if !countedSender {
+			balanceAsset.Transfers++
 		}
 		// transfer balance to new receiver
 		balanceAssetTransfer.UnallocatedBalanceSat.Set(balanceAsset.UnallocatedBalanceSat)
@@ -120,7 +120,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		balanceAsset, ok := balance.AssetBalances[assetGuid]
 		if !ok {
-			balanceAsset = &bchain.AssetBalance{BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
 		}
 		valueTo := big.NewInt(asset.Balance)
@@ -194,17 +194,17 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 
 		// for each address returned, add it to map
 		counted := addToAddressesMap(addresses, receiverStr, btxID, outputIndex)
-		if !counted {
-			balance.Txs++
-		}
 
 		if balance.AssetBalances == nil {
 			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		balanceAsset, ok := balance.AssetBalances[assetGuid]
 		if !ok {
-			balanceAsset = &bchain.AssetBalance{BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
+		}
+		if !counted {
+			balanceAsset.Transfers++
 		}
 		amount := big.NewInt(allocation.ValueSat)
 		balanceAsset.BalanceAssetSat.Add(balanceAsset.BalanceAssetSat, amount)
@@ -278,18 +278,16 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 		if err != nil {
 			return err
 		}
-		if balance != nil {
-			// subtract number of txs only once
-			if !exist {
-				balance.Txs--
-			}
-		} else {
+		if balance == nil {
 			ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
 			glog.Warningf("DisconnectAssetAllocationOutput Balance for asset address %v (%v) not found", ad, addrDesc)
 		}
 
 		if balance.AssetBalances != nil{
 			balanceAsset := balance.AssetBalances[assetGuid]
+			if !exist {
+				balanceAsset.Transfers--
+			}
 			amount := big.NewInt(allocation.ValueSat)
 			balanceAsset.BalanceAssetSat.Sub(balanceAsset.BalanceAssetSat, amount)
 			if balanceAsset.BalanceAssetSat.Sign() < 0 {
@@ -330,7 +328,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	}
 	balanceAsset, ok := balance.AssetBalances[assetGuid]
 	if !ok {
-		balanceAsset = &bchain.AssetBalance{BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 		balance.AssetBalances[assetGuid] = balanceAsset
 	}
 	var balanceAssetSat *big.Int
@@ -380,20 +378,15 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 	if err != nil {
 		return err
 	}
-	if balance != nil {
-		// subtract number of txs only once
-		if !exist {
-			balance.Txs--
-		}
-	} else {
+	if balance == nil {
 		ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(assetSenderAddrDesc)
 		glog.Warningf("DisconnectAssetOutput Balance for asset address %s (%s) not found", ad, assetSenderAddrDesc)
 	}
 	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
 		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddressTransfer.ToString("sys"))
 		transferStr := string(assetTransferWitnessAddrDesc)
-		_, exist := addresses[transferStr]
-		if !exist {
+		_, existTransfer := addresses[transferStr]
+		if !existTransfer {
 			addresses[transferStr] = struct{}{}
 		}
 		balanceTransfer, err := getAddressBalance(assetTransferWitnessAddrDesc)
@@ -401,17 +394,18 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 			return err
 		}
 		if balanceTransfer != nil {
-			// subtract number of txs only once
-			if !exist {
-				balanceTransfer.Txs--
-			}
-		} else {
 			ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(assetTransferWitnessAddrDesc)
 			glog.Warningf("DisconnectAssetOutput Balance for transfer asset address %s (%s) not found", ad, assetTransferWitnessAddrDesc)
 		}
 
 		balanceAsset := balance.AssetBalances[assetGuid]
+		if !exist {
+			balanceAsset.Transfers--
+		}
 		balanceTransferAsset := balanceTransfer.AssetBalances[assetGuid]
+		if !existTransfer {
+			balanceTransferAsset.Transfers--
+		}
 		// transfer balance back to sender
 		balanceAsset.UnallocatedBalanceSat.Set(balanceTransferAsset.UnallocatedBalanceSat)
 		// clear balance on receiver
@@ -513,17 +507,17 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 
 	// for each address returned, add it to map
 	counted := addToAddressesMap(addresses, receiverStr, btxID, outputIndex)
-	if !counted {
-		balance.Txs++
-	}
 
 	if balance.AssetBalances == nil {
 		balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 	}
 	balanceAsset, ok := balance.AssetBalances[assetGuid]
 	if !ok {
-		balanceAsset = &bchain.AssetBalance{BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 		balance.AssetBalances[assetGuid] = balanceAsset
+	}
+	if !counted {
+		balanceAsset.Transfers++
 	}
 	amount := big.NewInt(mintasset.ValueAsset)
 	balanceAsset.BalanceAssetSat.Add(balanceAsset.BalanceAssetSat, amount)
@@ -594,18 +588,16 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	if err != nil {
 		return err
 	}
-	if balance != nil {
-		// subtract number of txs only once
-		if !exist {
-			balance.Txs--
-		}
-	} else {
+	if balance == nil {
 		ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
 		glog.Warningf("DisconnectMintAssetOutput Balance for asset address %v (%v) not found", ad, addrDesc)
 	}
 	var totalAssetSentValue *big.Int
 	if balance.AssetBalances != nil{
 		balanceAsset := balance.AssetBalances[assetGuid]
+		if !exist {
+			balanceAsset.Transfers--
+		}
 		totalAssetSentValue := big.NewInt(mintasset.ValueAsset)
 		balanceAsset.BalanceAssetSat.Sub(balanceAsset.BalanceAssetSat, totalAssetSentValue)
 		if balanceAsset.BalanceAssetSat.Sign() < 0 {

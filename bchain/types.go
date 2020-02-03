@@ -204,6 +204,7 @@ type Utxo struct {
 }
 // holds balance information for an asset indexed by a uint32 asset guid
 type AssetBalance struct {
+	Transfers		uint32
 	SentAssetSat 	*big.Int
 	BalanceAssetSat *big.Int
 	UnallocatedBalanceSat *big.Int

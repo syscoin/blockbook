@@ -801,6 +801,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
+				Transfers:		  v.Transfers,
 			}
 			i++
 		}
@@ -903,6 +904,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				return nil, err
 			}
 			bh.Tokens[0] = &TokenBalanceHistory{
+				Transfers: 1,
 				AssetGuid: uint32(assetGuid), 
 				SentSat:  (*bchain.Amount)(big.NewInt(0)),
 				ReceivedSat: (*bchain.Amount)(big.NewInt(0)),
