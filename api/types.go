@@ -120,7 +120,7 @@ type Tx struct {
 	Rbf              bool              `json:"rbf,omitempty"`
 	CoinSpecificData interface{}       `json:"-"`
 	CoinSpecificJSON json.RawMessage   `json:"-"`
-	TokenTransfers   []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers   []bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 
@@ -237,7 +237,7 @@ type BalanceHistory struct {
 	SentSat     *bchain.Amount `json:"sent"`
 	FiatRate    float64 `json:"fiatRate,omitempty"`
 	Txid        string  `json:"txid,omitempty"`
-	Tokens	    []*TokenBalanceHistory `json:"tokens,omitempty"`	
+	Tokens	    []TokenBalanceHistory `json:"tokens,omitempty"`	
 }
 
 // BalanceHistories is array of BalanceHistory
@@ -257,7 +257,7 @@ func (a BalanceHistories) Less(i, j int) bool {
 // SortAndAggregate sums BalanceHistories to groups defined by parameter groupByTime
 func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories {
 	bhs := make(BalanceHistories, 0)
-	var tokens map[uint32]*TokenBalanceHistory
+	var tokens map[uint32]TokenBalanceHistory
 	if len(a) > 0 {
 		bha := BalanceHistory{
 			SentSat:     &bchain.Amount{},
@@ -284,14 +284,14 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 				bha.Txid = bh.Txid
 				if len(bh.Tokens) > 0 {
 					if bha.Tokens == nil {
-						bha.Tokens = []*TokenBalanceHistory{}
-						tokens = map[uint32]*TokenBalanceHistory{}
+						bha.Tokens = []TokenBalanceHistory{}
+						tokens = map[uint32]TokenBalanceHistory{}
 					}
 					// fill up map of balances for each asset guid
 					for _, token := range bh.Tokens {
 						bhaToken, ok := tokens[token.AssetGuid];
 						if !ok {
-							bhaToken = &TokenBalanceHistory{AssetGuid: token.AssetGuid, SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
+							bhaToken = TokenBalanceHistory{AssetGuid: token.AssetGuid, SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
 							tokens[token.AssetGuid] = bhaToken
 						}
 						(*big.Int)(bhaToken.SentSat).Add((*big.Int)(bhaToken.SentSat), (*big.Int)(token.SentSat))

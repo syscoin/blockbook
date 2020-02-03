@@ -5,7 +5,6 @@ import (
 	"blockbook/bchain/coins/btc"
 	"blockbook/bchain/coins/utils"
 	"bytes"
-	"math/big"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
@@ -316,14 +315,13 @@ func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	buf = append(buf, []byte(tt.Symbol)...)
 	l = p.BaseParser.PackVaruint(uint(tt.Decimals), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.PackBigint((*big.Int)(tt.Value), varBuf)
+	l = p.BaseParser.PackBigint(&tt.Value, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
 
 func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte) int {
 	var Decimals uint
-	var Value big.Int
 	al, l := p.BaseParser.UnpackVaruint(buf)
 	tt.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := l+int(al)
@@ -346,9 +344,8 @@ func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	Decimals, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
 	tt.Decimals = int(Decimals)
-	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
+	tt.Value, l = p.BaseParser.UnpackBigint(buf[ll:])
 	ll += l
-	tt.Value = (*bchain.Amount)(&Value)
 	return ll
 }
 
@@ -369,10 +366,13 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	for i := range ta.Outputs {
 		buf = p.BitcoinParser.AppendTxOutput(&ta.Outputs[i], buf, varBuf)
 	}
-	l = p.BaseParser.PackVaruint(uint(len(ta.TokenTransfers)), varBuf)
+	tokenTransfers := len(ta.TokenTransfers)
+	l = p.BaseParser.PackVaruint(uint(tokenTransfers), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	for i := range ta.TokenTransfers {
-		buf = p.AppendTokenTransfer(ta.TokenTransfers[i], buf, varBuf)
+	if tokenTransfers > 0 {
+		for i := range ta.TokenTransfers {
+			buf = p.AppendTokenTransfer(&ta.TokenTransfers[i], buf, varBuf)
+		}
 	}
 	return buf
 }
@@ -399,10 +399,12 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	}
 	tokenTransfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	ta.TokenTransfers = make([]*bchain.TokenTransfer, tokenTransfers)
-	for i := uint(0); i < tokenTransfers; i++ {
-		ta.TokenTransfers[i] = &bchain.TokenTransfer{}
-		l += p.UnpackTokenTransfer(ta.TokenTransfers[i], buf[l:])
+	if tokenTransfers > 0 {
+		ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
+		for i := uint(0); i < tokenTransfers; i++ {
+			ta.TokenTransfers[i] = &bchain.TokenTransfer{}
+			l += p.UnpackTokenTransfer(&(ta.TokenTransfers[i]), buf[l:])
+		}
 	}
 	return &ta, nil
 }

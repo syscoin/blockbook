@@ -215,7 +215,7 @@ type AddrBalance struct {
 	BalanceSat big.Int
 	Utxos      []Utxo
 	utxosMap   map[string]int
-	AssetBalances map[uint32]*AssetBalance
+	AssetBalances map[uint32]AssetBalance
 }
 
 
@@ -433,7 +433,7 @@ type TxAddresses struct {
 	Height  uint32
 	Inputs  []TxInput
 	Outputs []TxOutput
-	TokenTransfers []*TokenTransfer
+	TokenTransfers []TokenTransfer
 }
 
 type DbOutpoint struct {
