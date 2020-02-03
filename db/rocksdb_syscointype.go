@@ -111,7 +111,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			From:     senderAddress,
 			To:       receiverAddress,
 			Decimals: 8,
-			Value:    (*bchain.Amount)(copyAmount),
+			Value:    (*bchain.Amount)(&copyAmount),
 			Symbol:   "SPT",
 		}
 	} else {
@@ -334,7 +334,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		balance.AssetBalances[assetGuid] = balanceAsset
 	}
 	var balanceAssetSat *big.Int
-	if version == SYSCOIN_TX_VERSION_ASSET_UPDATE {
+	if version == syscoin.SYSCOIN_TX_VERSION_ASSET_UPDATE {
 		balanceAssetSat := balanceAsset.UnallocatedBalanceAssetSat
 	} else {
 		balanceAssetSat := balanceAsset.BalanceAssetSat
@@ -441,9 +441,9 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	}
 
 	if balance.AssetBalances != nil {
-
+		balanceAsset := balance.AssetBalances[assetGuid]
 		var balanceAssetSat *big.Int
-		if version == SYSCOIN_TX_VERSION_ASSET_UPDATE {
+		if version == syscoin.SYSCOIN_TX_VERSION_ASSET_UPDATE {
 			balanceAssetSat := balanceAsset.UnallocatedBalanceAssetSat
 		} else {
 			balanceAssetSat := balanceAsset.BalanceAssetSat
