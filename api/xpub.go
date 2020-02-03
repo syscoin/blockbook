@@ -232,8 +232,10 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 		transfers := int(ad.balance.Txs)
 		var i int = 0
 		if option >= AccountDetailsTokenBalances {
+			// + 1 for base plus any assets in AssetBalances
 			tokens = make([]*bchain.Token, 1 + len(ad.balance.AssetBalances))
 			totalReceived := ad.balance.ReceivedSat()
+			// for base token
 			tokens[i] = &bchain.Token{
 				Type:             bchain.XPUBAddressTokenType,
 				Name:             address,
@@ -245,6 +247,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 			}
 			i++
+			// for asset tokens
 			for k, v := range ad.balance.AssetBalances {
 				balanceAssetSat := v.BalanceAssetSat
 				sentAssetSat := v.BalanceAssetSat
@@ -256,6 +259,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Decimals:         w.chainParser.AmountDecimals(),
 					Symbol:			  "SPT",
 					BalanceSat:       (*bchain.Amount)(&balanceAssetSat),
+					UnallocatedBalanceSat:  (*bchain.Amount)(v.UnallocatedBalanceAssetSat),
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 					TotalSentSat:     (*bchain.Amount)(&sentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
