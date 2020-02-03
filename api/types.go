@@ -257,7 +257,7 @@ func (a BalanceHistories) Less(i, j int) bool {
 // SortAndAggregate sums BalanceHistories to groups defined by parameter groupByTime
 func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories {
 	bhs := make(BalanceHistories, 0)
-	var tokens map[uint32]TokenBalanceHistory
+	var tokens map[uint32]*TokenBalanceHistory
 	if len(a) > 0 {
 		bha := BalanceHistory{
 			SentSat:     &bchain.Amount{},
