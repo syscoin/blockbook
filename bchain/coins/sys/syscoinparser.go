@@ -285,7 +285,7 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	for key, value := range ab.AssetBalances {
 		l = p.BaseParser.PackVaruint(uint(key), varBuf)
 		buf = append(buf, varBuf[:l]...)
-		l := p.BaseParser.PackVaruint(uint(value.Transfers), varBuf)
+		l = p.BaseParser.PackVaruint(uint(value.Transfers), varBuf)
 		buf = append(buf, varBuf[:l]...)
 		l = p.BaseParser.PackBigint(value.BalanceAssetSat, varBuf)
 		buf = append(buf, varBuf[:l]...)
