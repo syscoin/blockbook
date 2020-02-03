@@ -219,7 +219,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			Symbol:   "SPT",
 		}
 	}
-	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, btxID, outputIndex)
 }
 
 func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
@@ -302,7 +302,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
 
-func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
+func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, addresses bchain.AddressesMap, btxID []byte, outputIndex int32) error {
 	if totalAssetSentValue == nil {
 		return errors.New("totalAssetSentValue was nil cannot connect allocation input")
 	}
@@ -330,6 +330,10 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	if !ok {
 		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 		balance.AssetBalances[assetGuid] = balanceAsset
+	}
+	counted := addToAddressesMap(addresses, assetStrSenderAddrDesc, btxID, outputIndex)
+	if !counted {
+		balanceAsset.Transfers++
 	}
 	var balanceAssetSat *big.Int
 	if d.chainParser.IsAssetSendTx(version) {
@@ -433,9 +437,15 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 		}
 		balances[assetStrSenderAddrDesc] = balance
 	}
-
+	_, exist := addresses[assetStrSenderAddrDesc]
+	if !exist {
+		addresses[assetStrSenderAddrDesc] = struct{}{}
+	}
 	if balance.AssetBalances != nil {
 		balanceAsset := balance.AssetBalances[assetGuid]
+		if !exist {
+			balanceAsset.Transfers--
+		}
 		var balanceAssetSat *big.Int
 		if d.chainParser.IsAssetSendTx(version) {
 			balanceAssetSat = balanceAsset.UnallocatedBalanceSat
