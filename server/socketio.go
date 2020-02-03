@@ -349,7 +349,7 @@ func txToResTx(tx *api.Tx) resTx {
 		for _, v := range mapTokens {
 			resultTx.Tokens[i] = v
 			// we just need total output satoshi because inputs == outputs with assets, theres no fees so just make recv and sent the same
-			resultTx.Tokens[i].ReceivedSat.Set(resultTx.Tokens[i].SentSat)
+			(*big.Int)(resultTx.Tokens[i].ReceivedSat).Set((*big.Int)(resultTx.Tokens[i].SentSat))
 			i++
 		}
 		resultTx.TokenTransfers = tx.TokenTransfers
