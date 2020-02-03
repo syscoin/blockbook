@@ -271,6 +271,14 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 				if bha.Time != 0 {
 					// in aggregate, do not return txid as it could multiple of them
 					bha.Txid = ""
+					if tokens != nil {
+						bha.Tokens = []*TokenBalanceHistory{}
+						// then flatten to array of token balances from the map
+						for _, token := range tokens {
+							bha.Tokens = append(bha.Tokens, token)
+						}
+						tokens = map[uint32]*TokenBalanceHistory{}
+					}
 					bhs = append(bhs, bha)
 				}
 				bha = BalanceHistory{
@@ -279,8 +287,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 					ReceivedSat: &bchain.Amount{},
 				}
 				if len(bh.Tokens) > 0 {
-					if bha.Tokens == nil {
-						bha.Tokens = []*TokenBalanceHistory{}
+					if tokens == nil {
 						tokens = map[uint32]*TokenBalanceHistory{}
 					}
 					for _, token := range bh.Tokens {
@@ -297,8 +304,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 				bha.Txid = bh.Txid
 			}
 			if len(bh.Tokens) > 0 {
-				if bha.Tokens == nil {
-					bha.Tokens = []*TokenBalanceHistory{}
+				if tokens == nil {
 					tokens = map[uint32]*TokenBalanceHistory{}
 				}
 				// fill up map of balances for each asset guid
@@ -315,14 +321,15 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 			(*big.Int)(bha.SentSat).Add((*big.Int)(bha.SentSat), (*big.Int)(bh.SentSat))
 			(*big.Int)(bha.ReceivedSat).Add((*big.Int)(bha.ReceivedSat), (*big.Int)(bh.ReceivedSat))
 		}
-		if tokens != nil {
-			// then flatten to array of token balances from the map
-			for _, token := range tokens {
-				bha.Tokens = append(bha.Tokens, token)
-			}
-		}
 		if bha.Txs > 0 {
 			bha.Txid = ""
+			if tokens != nil {
+				bha.Tokens = []*TokenBalanceHistory{}
+				// then flatten to array of token balances from the map
+				for _, token := range tokens {
+					bha.Tokens = append(bha.Tokens, token)
+				}
+			}
 			bhs = append(bhs, bha)
 		}
 	}
