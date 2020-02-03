@@ -341,6 +341,7 @@ func txToResTx(tx *api.Tx) resTx {
 			token, ok := mapTokens[uint32(assetGuid)]
 			if !ok {
 				token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
+				mapTokens[uint32(assetGuid)] = token
 			}
 			(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
 		}
@@ -467,6 +468,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 					token, ok := mapTokens[uint32(assetGuid)]
 					if !ok {
 						token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
+						mapTokens[uint32(assetGuid)] = token
 					}
 					if a != "" {
 						(*big.Int)(token.ReceivedSat).Add((*big.Int)(token.ReceivedSat), (*big.Int)(tokenTransfer.Value))
