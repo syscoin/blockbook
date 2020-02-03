@@ -48,7 +48,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		d.cbs.balancesHit++
 	}
 
-	countedSender := addToAddressesMap(addresses, senderStr, btxID, outputIndex)
 	txAddresses.TokenTransfers = make([]*bchain.TokenTransfer, 1)
 	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
 		receiverAddress := asset.WitnessAddressTransfer.ToString("sys")
@@ -97,9 +96,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
 		}
-		if !countedSender {
-			balanceAsset.Transfers++
-		}
+		balanceAsset.Transfers++
 		// transfer balance to new receiver
 		balanceAssetTransfer.UnallocatedBalanceSat.Set(balanceAsset.UnallocatedBalanceSat)
 		// clear balance on sender
@@ -331,10 +328,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 		balance.AssetBalances[assetGuid] = balanceAsset
 	}
-	counted := addToAddressesMap(addresses, assetStrSenderAddrDesc, btxID, outputIndex)
-	if !counted {
-		balanceAsset.Transfers++
-	}
+	balanceAsset.Transfers++
 	var balanceAssetSat *big.Int
 	if d.chainParser.IsAssetSendTx(version) {
 		balanceAssetSat = balanceAsset.UnallocatedBalanceSat
