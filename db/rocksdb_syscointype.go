@@ -293,7 +293,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 			glog.Warningf("DisconnectAssetAllocationOutput Asset Balance for asset address %v (%v) not found", ad, addrDesc)
 		}
 	}
-	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
+	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses)
 }
 
 func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, addresses bchain.AddressesMap, outputIndex int32) error {
@@ -415,7 +415,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 	return nil
 
 }
-func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
+func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, addresses map[string]struct{}) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
@@ -608,7 +608,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 		glog.Warningf("DisconnectMintAssetOutput Asset Balance for asset address %v (%v) not found", ad, addrDesc)
 	}
 	
-	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
+	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses)
 }
 func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
