@@ -857,6 +857,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			glog.Warning("DB inconsistency:  tx ", txid, ": not found in txAddresses")
 			return nil, nil
 		}
+		glog.Warning("balanceHistoryForTxid %v tokentransfers %v", txid, len(ta.TokenTransfers))
 		height = ta.Height
 	} else if w.chainType == bchain.ChainEthereumType {
 		var h int
