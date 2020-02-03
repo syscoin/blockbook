@@ -374,7 +374,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	buf = append(buf, varBuf[:l]...)
 	if tokenTransfers > 0 {
 		for i := range ta.TokenTransfers {
-			buf = p.AppendTokenTransfer(&ta.TokenTransfers[i], buf, varBuf)
+			buf = p.AppendTokenTransfer(ta.TokenTransfers[i], buf, varBuf)
 		}
 	}
 	return buf
