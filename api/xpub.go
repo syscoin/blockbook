@@ -257,7 +257,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Decimals:         w.chainParser.AmountDecimals(),
 					Symbol:			  "SPT",
 					BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
-					UnallocatedBalanceSat:  (*bchain.Amount)(v.UnallocatedBalanceAssetSat),
+					UnallocatedBalanceSat:  (*bchain.Amount)(v.UnallocatedBalanceSat),
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 					TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),

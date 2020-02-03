@@ -797,7 +797,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				Decimals:         w.chainParser.AmountDecimals(),
 				Symbol:			  "SPT",
 				BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
-				UnallocatedBalanceSat:  (*bchain.Amount)(v.UnallocatedBalanceAssetSat),
+				UnallocatedBalanceSat:  (*bchain.Amount)(v.UnallocatedBalanceSat),
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
