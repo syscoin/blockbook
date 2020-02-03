@@ -453,7 +453,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 			mapTokens := map[uint32]*api.TokenBalanceHistory{}
 			// we only need to check From once because transfers create multiple outputs from single senders to multiple receivers
 			// only one sender is allowed per transactions so just check the first one
-			a := addressInSlice([]string{tokenTransfer[0].From}, addr)
+			a := addressInSlice([]string{tx.TokenTransfers[0].From}, addr)
 			var b string = ""
 			for _, tokenTransfer := range tx.TokenTransfers {
 				assetGuid, err := strconv.Atoi(tokenTransfer.Token)
@@ -474,8 +474,6 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 						(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
 					}
 				}
-				
-	
 			}
 			ahi.Tokens = make([]*api.TokenBalanceHistory, len(mapTokens))
 			var i int = 0
