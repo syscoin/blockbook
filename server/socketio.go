@@ -454,12 +454,12 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 			// we only need to check From once because transfers create multiple outputs from single senders to multiple receivers
 			// only one sender is allowed per transactions so just check the first one
 			a := addressInSlice([]string{tokenTransfer[0].From}, addr)
+			var b string = ""
 			for _, tokenTransfer := range tx.TokenTransfers {
 				assetGuid, err := strconv.Atoi(tokenTransfer.Token)
 				if err != nil {
 					return res, err
 				}
-				var b string = ""
 				if a == "" {
 					b = addressInSlice([]string{tokenTransfer.To}, addr)
 				}
