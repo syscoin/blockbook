@@ -460,7 +460,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				var b string = ""
 				a := addressInSlice([]string{tokenTransfer.From}, addr)
 				if a == "" {
-					b := addressInSlice([]string{tokenTransfer.To}, addr)
+					b = addressInSlice([]string{tokenTransfer.To}, addr)
 				}
 				if a != "" || b != "" {
 					token, ok := mapTokens[uint32(assetGuid)]
