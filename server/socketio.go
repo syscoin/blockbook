@@ -278,7 +278,7 @@ type resTx struct {
 	Outputs        []txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`
-	TokenTransfers []bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	TokenOutputSatoshis  map[uint32]int64    `json:"tokenOutputSatoshis,omitempty"`
 }
 
@@ -344,7 +344,7 @@ func txToResTx(tx *api.Tx) resTx {
 				token = big.NewInt(0)
 				mapTokens[uint32(assetGuid)] = token
 			}
-			token.Add(token, &tokenTransfer.Value)
+			token.Add(token, tokenTransfer.Value)
 		}
 		resultTx.TokenOutputSatoshis = make(map[uint32]int64, len(mapTokens))
 		for k, v := range mapTokens {
@@ -461,7 +461,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 					if !ok {
 						token = big.NewInt(0)
 					}
-					token.Add(token, &tokenTransfer.Value)
+					token.Add(token, tokenTransfer.Value)
 				}
 				b := addressInSlice([]string{tokenTransfer.To}, addr)
 				if b != "" {
@@ -469,7 +469,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 					if !ok {
 						token = big.NewInt(0)
 					}
-					token.Add(token, &tokenTransfer.Value)
+					token.Add(token, tokenTransfer.Value)
 				}
 			}
 			ahi.TokenReceivedSatoshis = make(map[uint32]int64, len(mapTokensIn))
