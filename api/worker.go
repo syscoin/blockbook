@@ -579,7 +579,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 					Contract:      ci.Contract,
 					Name:          ci.Name,
 					Symbol:        ci.Symbol,
-					Transfers:     c.Txs,
+					Transfers:     uint32(c.Txs),
 					Decimals:      ci.Decimals,
 					ContractIndex: strconv.Itoa(i + 1),
 				}

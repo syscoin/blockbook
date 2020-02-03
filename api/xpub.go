@@ -229,7 +229,6 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 	}
 
 	if ad.balance != nil {
-		transfers := int(ad.balance.Txs)
 		var i int = 0
 		if option >= AccountDetailsTokenBalances {
 			// + 1 for base plus any assets in AssetBalances
@@ -243,7 +242,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				BalanceSat:       (*bchain.Amount)(&ad.balance.BalanceSat),
 				TotalReceivedSat: (*bchain.Amount)(totalReceived),
 				TotalSentSat:     (*bchain.Amount)(&ad.balance.SentSat),
-				Transfers:        transfers,
+				Transfers:        ad.balance.Txs,
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 			}
 			i++
