@@ -277,9 +277,9 @@ type resTx struct {
 	InputSatoshis  int64       `json:"inputSatoshis,omitempty"`
 	Outputs        []txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
-	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`
+	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`		   
 	TokenTransfers []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
-	TokenOutputSatoshis  map[uint32]int64    `json:"tokenOutputSatoshis,omitempty"`
+	Tokens	       []*api.TokenBalanceHistory    `json:"tokens,omitempty"`	
 }
 
 type addressHistoryItem struct {
@@ -287,8 +287,7 @@ type addressHistoryItem struct {
 	Satoshis      int64                             `json:"satoshis"`
 	Confirmations int                               `json:"confirmations"`
 	Tx            resTx                             `json:"tx"`
-	TokenReceivedSatoshis map[uint32]int64                     `json:"tokenReceivedSatoshis,omitempty"`
-	TokenSentSatoshis map[uint32]int64                         `json:"tokenSentSatoshis,omitempty"`
+	Tokens	      []*api.TokenBalanceHistory 			`json:"tokens,omitempty"`	
 }
 
 type resultGetAddressHistory struct {
@@ -332,8 +331,8 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		outputs[i] = output
 	}
-	if len(tx.TokenTransfers) > 0 {
-		mapTokens := map[uint32]*big.Int{}
+	if len(tx.TokenTransfers) > 0{
+		mapTokens := map[uint32]*api.TokenBalanceHistory{}
 		for _, tokenTransfer := range tx.TokenTransfers {
 			assetGuid, err := strconv.Atoi(tokenTransfer.Token)
 			if err != nil {
@@ -341,14 +340,17 @@ func txToResTx(tx *api.Tx) resTx {
 			}
 			token, ok := mapTokens[uint32(assetGuid)]
 			if !ok {
-				token = big.NewInt(0)
-				mapTokens[uint32(assetGuid)] = token
+				token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
 			}
-			token.Add(token, (*big.Int)(tokenTransfer.Value))
+			(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
 		}
-		resultTx.TokenOutputSatoshis = make(map[uint32]int64, len(mapTokens))
-		for k, v := range mapTokens {
-			resultTx.TokenOutputSatoshis[k] = v.Int64()
+		ahi.Tokens = make([]*api.TokenBalanceHistory, len(mapTokens))
+		var i int = 0
+		for _, v := range mapTokens {
+			ahi.Tokens[i] = v
+			// we just need total output satoshi because inputs == outputs with assets, theres no fees so just make recv and sent the same
+			ahi.Tokens[i].ReceivedSat.Set(ahi.Tokens[i].SentSat)
+			i++
 		}
 		resultTx.TokenTransfers = tx.TokenTransfers
 	}
@@ -448,40 +450,39 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 			}
 		}
 		if len(tx.TokenTransfers) > 0{
-			mapTokensIn := map[uint32]*big.Int{}
-			mapTokensOut := map[uint32]*big.Int{}
+			mapTokens := map[uint32]*api.TokenBalanceHistory{}
+			
 			for _, tokenTransfer := range tx.TokenTransfers {
 				assetGuid, err := strconv.Atoi(tokenTransfer.Token)
 				if err != nil {
 					return res, err
 				}
+				var b string = ""
 				a := addressInSlice([]string{tokenTransfer.From}, addr)
-				if a != "" {
-					token, ok := mapTokensOut[uint32(assetGuid)]
-					if !ok {
-						token = big.NewInt(0)
-					}
-					token.Add(token, (*big.Int)(tokenTransfer.Value))
+				if a == "" {
+					b := addressInSlice([]string{tokenTransfer.To}, addr)
 				}
-				b := addressInSlice([]string{tokenTransfer.To}, addr)
-				if b != "" {
-					token, ok := mapTokensIn[uint32(assetGuid)]
+				if a != "" || b != "" {
+					token, ok := mapTokens[uint32(assetGuid)]
 					if !ok {
-						token = big.NewInt(0)
+						token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
 					}
-					token.Add(token, (*big.Int)(tokenTransfer.Value))
+					if a != "" {
+						(*big.Int)(token.ReceivedSat).Add((*big.Int)(token.ReceivedSat), (*big.Int)(tokenTransfer.Value))
+					} else {
+						(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
+					}
 				}
+				
+	
 			}
-			ahi.TokenReceivedSatoshis = make(map[uint32]int64, len(mapTokensIn))
-			for k, v := range mapTokensIn {
-				ahi.TokenReceivedSatoshis[k] = v.Int64()
+			ahi.Tokens = make([]*api.TokenBalanceHistory, len(mapTokens))
+			var i int = 0
+			for _, v := range mapTokens {
+				ahi.Tokens[i] = v
+				i++
 			}
-			ahi.TokenSentSatoshis = make(map[uint32]int64, len(mapTokensOut))
-			for k, v := range mapTokensOut {
-				ahi.TokenSentSatoshis[k] = v.Int64()
-			}
-		}
-		
+		}	
 		ahi.Addresses = ads
 		ahi.Confirmations = int(tx.Confirmations)
 		ahi.Satoshis = totalSat.Int64()
