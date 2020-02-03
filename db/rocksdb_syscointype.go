@@ -179,7 +179,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			From:     senderAddress,
 			To:       receiverAddress,
 			Decimals: 8,
-			Value:    *amount,
+			Value:    amount,
 			Symbol:   "SPT",
 		}
 	}
