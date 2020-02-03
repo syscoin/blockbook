@@ -652,17 +652,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 		// if the tx is already in the slice, append the index to the array of indexes
 		for i, t := range at {
 			if bytes.Equal(btxID, t.BtxID) {
-				// ensure index isn't added multiple times
-				var haveIndex bool = false
-				for _, indexInternal := range t.Indexes {
-					if indexInternal == index {
-						haveIndex = true
-						break
-					}
-				}
-				if haveIndex == false {
-					at[i].Indexes = append(t.Indexes, index)
-				}
+				at[i].Indexes = append(t.Indexes, index)
 				return true
 			}
 		}
