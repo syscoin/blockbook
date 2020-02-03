@@ -883,6 +883,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 		Txid:        txid,
 	}
 	if w.chainType == bchain.ChainBitcoinType {
+		glog.Warning("balanceHistoryForTxid1 %v tokentransfers %v", txid, len(ta.TokenTransfers))
 		for i := range ta.Inputs {
 			tai := &ta.Inputs[i]
 			if bytes.Equal(addrDesc, tai.AddrDesc) {
