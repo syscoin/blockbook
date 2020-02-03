@@ -135,6 +135,9 @@ func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN || nVersion == SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION ||
         nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_LOCK || nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
 }
+func (p *SyscoinParser) IsAssetSendTx(nVersion int32) bool {
+    return nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
+}
 func (p *SyscoinParser) IsSyscoinTx(nVersion int32) bool {
     return p.IsAssetTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }

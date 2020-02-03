@@ -334,7 +334,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		balance.AssetBalances[assetGuid] = balanceAsset
 	}
 	var balanceAssetSat *big.Int
-	if version == syscoin.SYSCOIN_TX_VERSION_ASSET_UPDATE {
+	if d.chainParser.IsAssetSendTx(version) {
 		balanceAssetSat := balanceAsset.UnallocatedBalanceAssetSat
 	} else {
 		balanceAssetSat := balanceAsset.BalanceAssetSat
@@ -443,7 +443,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	if balance.AssetBalances != nil {
 		balanceAsset := balance.AssetBalances[assetGuid]
 		var balanceAssetSat *big.Int
-		if version == syscoin.SYSCOIN_TX_VERSION_ASSET_UPDATE {
+		if d.chainParser.IsAssetSendTx(version) {
 			balanceAssetSat := balanceAsset.UnallocatedBalanceAssetSat
 		} else {
 			balanceAssetSat := balanceAsset.BalanceAssetSat

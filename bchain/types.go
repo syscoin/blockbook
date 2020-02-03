@@ -575,6 +575,7 @@ type BlockChainParser interface {
 	IsSyscoinMintTx(nVersion int32) bool
 	IsAssetTx(nVersion int32) bool
 	IsAssetAllocationTx(nVersion int32) bool
+	IsAssetSendTx(nVersion int32) bool
 	TryGetOPReturn(script []byte) []byte
 }
 

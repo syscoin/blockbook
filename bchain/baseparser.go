@@ -313,6 +313,9 @@ func (p *BaseParser) IsAssetTx(nVersion int32) bool {
 func (p *BaseParser) IsAssetAllocationTx(nVersion int32) bool {
 	return false
 }
+func (p *BaseParser) IsAssetSendTx(nVersion int32) bool {
+	return false
+}
 func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
