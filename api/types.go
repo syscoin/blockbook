@@ -120,7 +120,7 @@ type Tx struct {
 	Rbf              bool              `json:"rbf,omitempty"`
 	CoinSpecificData interface{}       `json:"-"`
 	CoinSpecificJSON json.RawMessage   `json:"-"`
-	TokenTransfers   []bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
+	TokenTransfers   []*bchain.TokenTransfer   `json:"tokenTransfers,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 

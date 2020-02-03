@@ -5,6 +5,7 @@ import (
 	"blockbook/bchain/coins/btc"
 	"blockbook/bchain/coins/utils"
 	"bytes"
+	"math/big"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
@@ -402,10 +403,10 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	tokenTransfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	if tokenTransfers > 0 {
-		ta.TokenTransfers = make([]bchain.TokenTransfer, tokenTransfers)
+		ta.TokenTransfers = make([]*bchain.TokenTransfer, tokenTransfers)
 		for i := uint(0); i < tokenTransfers; i++ {
 			ta.TokenTransfers[i] = &bchain.TokenTransfer{}
-			l += p.UnpackTokenTransfer(&(ta.TokenTransfers[i]), buf[l:])
+			l += p.UnpackTokenTransfer(ta.TokenTransfers[i], buf[l:])
 		}
 	}
 	return &ta, nil

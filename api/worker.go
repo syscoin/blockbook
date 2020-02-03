@@ -124,8 +124,8 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
 	var err error
 	var ta *bchain.TxAddresses
-	var tokens *[]bchain.TokenTransfer
-	var tokensEth []bchain.TokenTransfer
+	var tokens *[]*bchain.TokenTransfer
+	var tokensEth []*bchain.TokenTransfer
 	var ethSpecific *EthereumSpecific
 	var blockhash string
 	if bchainTx.Confirmations > 0 {
@@ -257,7 +257,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		if err != nil {
 			glog.Errorf("GetErc20FromTx error %v, %v", err, bchainTx)
 		}
-		tokensEth = make([]bchain.TokenTransfer, len(ets))
+		tokensEth = make([]*bchain.TokenTransfer, len(ets))
 		for i := range ets {
 			e := &ets[i]
 			cd, err := w.chainParser.GetAddrDescFromAddress(e.Contract)
@@ -272,7 +272,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			if erc20c == nil {
 				erc20c = &bchain.Erc20Contract{Name: e.Contract}
 			}
-			tokensEth[i] = bchain.TokenTransfer{
+			tokensEth[i] = &bchain.TokenTransfer{
 				Type:     bchain.ERC20TokenType,
 				Token:    e.Contract,
 				From:     e.From,
