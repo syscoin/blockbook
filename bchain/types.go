@@ -433,7 +433,7 @@ type TxAddresses struct {
 	Height  uint32
 	Inputs  []TxInput
 	Outputs []TxOutput
-	TokenTransfers []TokenTransfer
+	TokenTransfers []*TokenTransfer
 }
 
 type DbOutpoint struct {
