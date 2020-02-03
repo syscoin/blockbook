@@ -344,12 +344,12 @@ func txToResTx(tx *api.Tx) resTx {
 			}
 			(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
 		}
-		ahi.Tokens = make([]*api.TokenBalanceHistory, len(mapTokens))
+		resultTx.Tokens = make([]*api.TokenBalanceHistory, len(mapTokens))
 		var i int = 0
 		for _, v := range mapTokens {
-			ahi.Tokens[i] = v
+			resultTx.Tokens[i] = v
 			// we just need total output satoshi because inputs == outputs with assets, theres no fees so just make recv and sent the same
-			ahi.Tokens[i].ReceivedSat.Set(ahi.Tokens[i].SentSat)
+			resultTx.Tokens[i].ReceivedSat.Set(resultTx.Tokens[i].SentSat)
 			i++
 		}
 		resultTx.TokenTransfers = tx.TokenTransfers
