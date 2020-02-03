@@ -424,7 +424,7 @@ type TokenTransfer struct {
 	Name     string    `json:"name"`
 	Symbol   string    `json:"symbol"`
 	Decimals int       `json:"decimals"`
-	Value    Amount   `json:"value"`
+	Value    *Amount   `json:"value"`
 }
 
 // TxAddresses stores transaction inputs and outputs with amounts
