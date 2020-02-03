@@ -901,7 +901,6 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			bh.Tokens = make([]*TokenBalanceHistory, 1)
 			assetGuid, err = strconv.Atoi(tatt.Token)
 			if err != nil {
-				glog.Warning("token error ", tatt.Token)
 				return nil, err
 			}
 			bh.Tokens[0] = &TokenBalanceHistory{
@@ -929,7 +928,6 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					}
 				}
 			}
-			glog.Warning("balanceHistoryForTxid:  tx ", txid, " from ", tatt.From, " : adding guid ", assetGuid, " sentSat ", bh.Tokens[0].SentSat, " receivedSat ", bh.Tokens[0].ReceivedSat)
 		}	
 	} else if w.chainType == bchain.ChainEthereumType {
 		var value big.Int

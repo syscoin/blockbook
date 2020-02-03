@@ -286,18 +286,6 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 					SentSat:     &bchain.Amount{},
 					ReceivedSat: &bchain.Amount{},
 				}
-				if len(bh.Tokens) > 0 {
-					if tokens == nil {
-						tokens = map[uint32]*TokenBalanceHistory{}
-					}
-					for _, token := range bh.Tokens {
-						bhaToken, ok := tokens[token.AssetGuid];
-						if !ok {
-							bhaToken = &TokenBalanceHistory{AssetGuid: token.AssetGuid, SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
-							tokens[token.AssetGuid] = bhaToken
-						}
-					}
-				}
 			}
 			if bha.Txid != bh.Txid {
 				bha.Txs += bh.Txs
