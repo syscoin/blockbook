@@ -228,8 +228,6 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	if numAssetBalances > 0 {
 		ab.AssetBalances = make(map[uint32]*bchain.AssetBalance, numAssetBalances)
 		for i := uint(0); i < numAssetBalances; i++ {
-			transfers, ll := p.BaseParser.UnpackVaruint(buf)
-			l += ll
 			asset, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			l += ll
 			balancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])
@@ -237,7 +235,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			sentvalue, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
 			unallocatedbalancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])
-			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{Transfers: uint32(transfers), SentAssetSat: &sentvalue, BalanceAssetSat: &balancevalue, UnallocatedBalanceSat: &unallocatedbalancevalue}
+			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{SentAssetSat: &sentvalue, BalanceAssetSat: &balancevalue, UnallocatedBalanceSat: &unallocatedbalancevalue}
 			l += ll
 		}
 	}
@@ -284,8 +282,6 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.AssetBalances {
 		l = p.BaseParser.PackVaruint(uint(key), varBuf)
-		buf = append(buf, varBuf[:l]...)
-		l = p.BaseParser.PackVaruint(uint(value.Transfers), varBuf)
 		buf = append(buf, varBuf[:l]...)
 		l = p.BaseParser.PackBigint(value.BalanceAssetSat, varBuf)
 		buf = append(buf, varBuf[:l]...)

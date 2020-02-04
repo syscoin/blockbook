@@ -261,7 +261,6 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  strconv.FormatUint(uint64(k), 10),
-					Transfers:		  v.Transfers,
 				}
 				i++
 			}
