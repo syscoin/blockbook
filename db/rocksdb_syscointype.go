@@ -744,8 +744,8 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 		if asset, ok = AssetCache[assetGuid]; !ok {
 			AssetCache[assetGuid] = asset
 		}
-		// total supply of 0 signals asset to be removed from db - happens on disconnect
-		if asset.TotalSupply == 0) {
+		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
+		if asset.TotalSupply == -1 {
 			wb.DeleteCF(d.cfh[cfAssets], guid)
 		} else {
 			var buffer bytes.Buffer
