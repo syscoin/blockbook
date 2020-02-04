@@ -220,7 +220,7 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 	return lastUsed, addresses, nil
 }
 
-func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) []*bchain.Token {
+func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) ([]*bchain.Token, error) {
 	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
 	var tokens []*bchain.Token
 	var address string
@@ -251,14 +251,14 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			for k, v := range ad.balance.AssetBalances {
 				dbAsset, errAsset := w.db.GetAsset(uint32(k))
 				if errAsset != nil {
-					return nil
+					return nil, errAsset
 				}
 				if !ownerFound {
 					// add token as unallocated if address matches asset owner address
 					ownerAddress := dbAsset.WitnessAddress.ToString("sys")
 					ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
 					if e != nil {
-						return nil
+						return nil, e
 					}
 					if bytes.Equal(ad.addrDesc, ownerAddrDesc) {
 						ownerBalance := big.NewInt(dbAsset.Balance)
@@ -296,7 +296,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			}
 		}
 	}
-	return tokens
+	return tokens, nil
 }
 
 func evictXpubCacheItems() {
@@ -570,7 +570,10 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				usedTokens++
 			}
 			if option > AccountDetailsBasic {
-				tokensXPub := w.tokenFromXpubAddress(data, ad, ci, i, option)
+				tokensXPub, errXpub := w.tokenFromXpubAddress(data, ad, ci, i, option)
+				if errXpub != nil {
+					return nil, errXpub
+				}
 				for _, token := range tokensXPub {
 					if filter.TokensToReturn == TokensToReturnDerived ||
 						filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
@@ -629,7 +632,10 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 				return nil, err
 			}
 			if len(utxos) > 0 {
-				txs := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
+				txs, errXpub := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
+				if errXpub != nil {
+					return nil, errXpub
+				}
 				for _ , t := range txs {
 					for j := range utxos {
 						a := &utxos[j]
