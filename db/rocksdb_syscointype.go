@@ -9,6 +9,8 @@ import (
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
+	"unsafe"
+	"io"
 )
 var AssetCache map[uint32]wire.AssetType
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
@@ -751,7 +753,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 		if asset.TotalSupply == -1 {
 			wb.DeleteCF(d.cfh[cfAssets], assetGuid)
 		} else {
-			var buffer bytes.Buffer
+			var buffer io.Writer
 			err := asset.Serialize(buffer)
 			if err != nil {
 				return err
@@ -762,9 +764,10 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 	return nil
 }
 
-// GetAddrDescContracts returns AddrContracts for given addrDesc
 func (d *RocksDB) GetAsset(guid uint32) (*wire.AssetType, error) {
-	if asset, ok := AssetCache[guid]; ok {
+	var asset wire.AssetType
+	var ok bool
+	if asset, ok = AssetCache[guid]; ok {
 		return &asset, nil
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&h))[:]
