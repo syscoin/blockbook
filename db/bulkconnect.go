@@ -41,7 +41,7 @@ const (
 	partialStoreBalances      = maxBulkBalances / 10
 	maxBulkAddrContracts      = 1200000
 	partialStoreAddrContracts = maxBulkAddrContracts / 10
-	maxBulkAssets             = 10
+	maxBulkAssets             = 100
 	partialStoreAssets        = maxBulkAssets / 10
 )
 
