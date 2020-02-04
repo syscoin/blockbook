@@ -343,8 +343,8 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		balanceAssetSat = balanceAsset.UnallocatedBalanceSat
 	} else {
 		balanceAssetSat = balanceAsset.BalanceAssetSat
-		balanceAsset.SentAssetSat.Add(balanceAsset.SentAssetSat, totalAssetSentValue)
 	}
+	balanceAsset.SentAssetSat.Add(balanceAsset.SentAssetSat, totalAssetSentValue)
 	balanceAssetSat.Sub(balanceAssetSat, totalAssetSentValue)
 	if balanceAssetSat.Sign() < 0 {
 		d.resetValueSatToZero(balanceAssetSat, assetSenderAddrDesc, "balance")
@@ -450,10 +450,10 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 			balanceAssetSat = balanceAsset.UnallocatedBalanceSat
 		} else {
 			balanceAssetSat = balanceAsset.BalanceAssetSat
-			balanceAsset.SentAssetSat.Sub(balanceAsset.SentAssetSat, totalAssetSentValue)
-			if balanceAsset.SentAssetSat.Sign() < 0 {
-				d.resetValueSatToZero(balanceAsset.SentAssetSat, assetSenderAddrDesc, "balance")
-			}
+		}
+		balanceAsset.SentAssetSat.Sub(balanceAsset.SentAssetSat, totalAssetSentValue)
+		if balanceAsset.SentAssetSat.Sign() < 0 {
+			d.resetValueSatToZero(balanceAsset.SentAssetSat, assetSenderAddrDesc, "balance")
 		}
 		balanceAssetSat.Add(balanceAssetSat, totalAssetSentValue)
 
