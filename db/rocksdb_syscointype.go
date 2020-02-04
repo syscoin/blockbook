@@ -777,7 +777,7 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wi
 	var ok bool
 	glog.Warningf("get asset %v", guid)
 	if assets != nil {
-		if asset, ok = assets[guid]; ok {
+		if asset, ok = (*assets)[guid]; ok {
 			glog.Warningf("got asset %v in l1cache", guid)
 			return asset, nil
 		}
