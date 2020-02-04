@@ -745,7 +745,9 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 }
 
 func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.AssetType) error {
+	
 	for guid, asset := range assets {
+		glog.Warningf("store asset %v", guid)
 		if _, ok := AssetCache[guid]; !ok {
 			AssetCache[guid] = *asset
 		}
@@ -768,7 +770,9 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 func (d *RocksDB) GetAsset(guid uint32) (*wire.AssetType, error) {
 	var asset wire.AssetType
 	var ok bool
+	glog.Warningf("get asset %v", guid)
 	if asset, ok = AssetCache[guid]; ok {
+		glog.Warningf("got asset %v in cache", guid)
 		return &asset, nil
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
@@ -779,12 +783,13 @@ func (d *RocksDB) GetAsset(guid uint32) (*wire.AssetType, error) {
 	defer val.Free()
 	buf := val.Data()
 	if len(buf) == 0 {
-		return nil, nil
+		return nil, errors.New("asset data empty in database")
 	}
 	r := bytes.NewReader(buf)
 	err = asset.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
+	glog.Warningf("got asset %v from db", guid)
 	return &asset, nil
 }
