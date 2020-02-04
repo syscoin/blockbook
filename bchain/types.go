@@ -207,6 +207,7 @@ type AssetBalance struct {
 	SentAssetSat 	*big.Int
 	BalanceAssetSat *big.Int
 	UnallocatedBalanceSat *big.Int
+	Transfers	uint32
 }
 
 // AddrBalance stores number of transactions and balances of an address

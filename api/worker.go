@@ -801,6 +801,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
 				Contract:		  strconv.FormatUint(uint64(k), 10),
+				Transfers:		  v.Transfers,
 			}
 			i++
 		}

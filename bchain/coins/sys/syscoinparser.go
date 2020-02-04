@@ -235,8 +235,10 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			sentvalue, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
 			unallocatedbalancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])
-			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{SentAssetSat: &sentvalue, BalanceAssetSat: &balancevalue, UnallocatedBalanceSat: &unallocatedbalancevalue}
 			l += ll
+			transfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
+			l += ll
+			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{Transfers: uint32(transfers), SentAssetSat: &sentvalue, BalanceAssetSat: &balancevalue, UnallocatedBalanceSat: &unallocatedbalancevalue}
 		}
 	}
 	if detail != bchain.AddressBalanceDetailNoUTXO {
@@ -288,6 +290,8 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 		l = p.BaseParser.PackBigint(value.SentAssetSat, varBuf)
 		buf = append(buf, varBuf[:l]...)
 		l = p.BaseParser.PackBigint(value.UnallocatedBalanceSat, varBuf)
+		buf = append(buf, varBuf[:l]...)
+		l = p.BaseParser.PackVaruint(uint(value.Transfers), varBuf)
 		buf = append(buf, varBuf[:l]...)
 	}
 	for _, utxo := range ab.Utxos {
