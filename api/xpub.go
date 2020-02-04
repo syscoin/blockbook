@@ -251,14 +251,14 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			for k, v := range ad.balance.AssetBalances {
 				dbAsset, errAsset := w.db.GetAsset(uint32(k))
 				if errAsset != nil {
-					return errAsset
+					return nil
 				}
 				if !ownerFound {
 					// add token as unallocated if address matches asset owner address
 					ownerAddress := dbAsset.WitnessAddress.ToString("sys")
 					ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
 					if e != nil {
-						return e
+						return nil
 					}
 					if bytes.Equal(ad.addrDesc, ownerAddrDesc) {
 						ownerBalance := big.NewInt(dbAsset.Balance)
