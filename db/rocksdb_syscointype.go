@@ -121,6 +121,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
 		}
+		balanceAsset.Transfers++
 		valueTo := big.NewInt(asset.Balance)
 		balanceAsset.UnallocatedBalanceSat.Add(balanceAsset.UnallocatedBalanceSat, valueTo)
 		txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
@@ -416,6 +417,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		balanceTransferAsset.UnallocatedBalanceSat.Set(big.NewInt(0))		
 	} else if balance.AssetBalances != nil {
 		balanceAsset := balance.AssetBalances[assetGuid]
+		balanceAsset.Transfers--
 		balanceAsset.UnallocatedBalanceSat.Sub(balanceAsset.UnallocatedBalanceSat, big.NewInt(asset.Balance))
 	} else {
 		glog.Warningf("DisconnectAssetOutput: Asset Sent balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
