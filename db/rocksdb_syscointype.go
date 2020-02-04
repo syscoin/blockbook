@@ -219,7 +219,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			Symbol:   "SPT",
 		}
 		if d.chainParser.IsAssetSendTx(version) {
-			txAddresses.TokenTransfers[i].Type = SPTAssetSendType
+			txAddresses.TokenTransfers[i].Type = bchain.SPTAssetSendType
 		}
 	}
 	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex)
