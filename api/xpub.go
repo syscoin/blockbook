@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 	"strconv"
-
+	"bytes"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 )
@@ -247,23 +247,20 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			}
 			i++
 			// for asset tokens
+			var ownerFound bool = false
 			for k, v := range ad.balance.AssetBalances {
 				dbAsset, errAsset := w.db.GetAsset(uint32(k))
 				if errAsset != nil {
-					return nil, errAsset
+					return errAsset
 				}
 				if !ownerFound {
 					// add token as unallocated if address matches asset owner address
 					ownerAddress := dbAsset.WitnessAddress.ToString("sys")
 					ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
 					if e != nil {
-						return nil, e
+						return e
 					}
 					if bytes.Equal(ad.addrDesc, ownerAddrDesc) {
-						dbAsset, err = w.db.GetAsset(uint32(k))
-						if err != nil {
-							return nil, err
-						}
 						ownerBalance := big.NewInt(dbAsset.Balance)
 						totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
 						tokens[i] = &bchain.Token{
