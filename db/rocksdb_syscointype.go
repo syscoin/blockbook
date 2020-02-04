@@ -776,7 +776,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wire.AssetType, error) {
 	var assetDb wire.AssetType
 	var assetL1 *wire.AssetType
-	var ok bool
+	var ok bool = false
 	if assets != nil {
 		if assetL1, ok = (*assets)[guid]; ok {
 			return assetL1, nil
