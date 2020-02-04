@@ -746,28 +746,29 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 		if _, ok := AssetCache[guid]; !ok {
 			AssetCache[guid] = *asset
 		}
+		assetGuid := (*[4]byte)(unsafe.Pointer(&h))[:]
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.TotalSupply == -1 {
-			wb.DeleteCF(d.cfh[cfAssets], ([]byte)(guid))
+			wb.DeleteCF(d.cfh[cfAssets], assetGuid)
 		} else {
 			var buffer bytes.Buffer
 			err := asset.Serialize(buffer)
 			if err != nil {
 				return err
 			}
-			wb.PutCF(d.cfh[cfAssets], ([]byte)(guid), buffer.Bytes())
+			wb.PutCF(d.cfh[cfAssets], assetGuid, buffer.Bytes())
 		}
 	}
 	return nil
 }
 
 // GetAddrDescContracts returns AddrContracts for given addrDesc
-func (d *RocksDB) GetAsset(assetGuid uint32) (*wire.AssetType, error) {
-	var asset wire.AssetType
-	if asset, ok = AssetCache[assetGuid]; ok {
+func (d *RocksDB) GetAsset(guid uint32) (*wire.AssetType, error) {
+	if asset, ok := AssetCache[guid]; ok {
 		return &asset
 	}
-	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], ([]byte)(assetGuid))
+	assetGuid := (*[4]byte)(unsafe.Pointer(&h))[:]
+	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], assetGuid)
 	if err != nil {
 		return nil, err
 	}
@@ -776,7 +777,8 @@ func (d *RocksDB) GetAsset(assetGuid uint32) (*wire.AssetType, error) {
 	if len(buf) == 0 {
 		return nil, nil
 	}
-	err = asset.Deserialize(buf)
+	r := bytes.NewReader(buf)
+	err = asset.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
