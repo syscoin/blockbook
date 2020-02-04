@@ -776,15 +776,12 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wi
 	var assetDb wire.AssetType
 	var assetL1 *wire.AssetType
 	var ok bool
-	glog.Warningf("get asset %v", guid)
 	if assets != nil {
 		if assetL1, ok = (*assets)[guid]; ok {
-			glog.Warningf("got asset %v in l1cache", guid)
 			return assetL1, nil
 		}
 	}
 	if assetDb, ok = AssetCache[guid]; ok {
-		glog.Warningf("got asset %v in l2cache", guid)
 		return &assetDb, nil
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
@@ -802,6 +799,10 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wi
 	if err != nil {
 		return nil, err
 	}
-	glog.Warningf("got asset %v from db", guid)
+	// cache miss, add it, we also add it on storeAsset but on API queries we should not have to wait until a block
+	// with this asset to store it in cache
+	if !ok {
+		AssetCache[guid] = assetDb
+	}
 	return &assetDb, nil
 }
