@@ -21,7 +21,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		return err
 	}
 	assetGuid := asset.Asset
-	dBAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil || dBAsset == nil {
 		if !d.chainParser.IsAssetActivateTx(version) {
 			if err != nil {
@@ -183,7 +183,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	dBAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil {
 		return err
 	}
@@ -421,7 +421,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		return b, nil
 	}
 	assetGuid := asset.Asset
-	dBAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil {
 		return err
 	}
@@ -520,7 +520,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 		var dBAsset *wire.AssetType
 		var err error
 		if isAssetSend {
-			dBAsset, err = d.GetAsset(assetGuid)
+			dBAsset, err = d.GetAsset(assetGuid, &assets)
 			if err != nil {
 				return err
 			}
@@ -553,7 +553,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		return err
 	}
 	assetGuid := mintasset.AssetAllocationTuple.Asset
-	dBAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil {
 		return err
 	}
@@ -772,12 +772,18 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 	return nil
 }
 
-func (d *RocksDB) GetAsset(guid uint32) (*wire.AssetType, error) {
+func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wire.AssetType, error) {
 	var asset wire.AssetType
 	var ok bool
 	glog.Warningf("get asset %v", guid)
+	if assets != nil {
+		if asset, ok = assets[guid]; ok {
+			glog.Warningf("got asset %v in l1cache", guid)
+			return asset, nil
+		}
+	}
 	if asset, ok = AssetCache[guid]; ok {
-		glog.Warningf("got asset %v in cache", guid)
+		glog.Warningf("got asset %v in l2cache", guid)
 		return &asset, nil
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]

@@ -790,7 +790,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		var i int = 0
 		var ownerFound bool = false
 		for k, v := range ba.AssetBalances {
-			dbAsset, errAsset := w.db.GetAsset(uint32(k))
+			dbAsset, errAsset := w.db.GetAsset(uint32(k), nil)
 			if errAsset != nil {
 				return nil, errAsset
 			}
