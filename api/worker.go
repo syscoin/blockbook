@@ -903,7 +903,6 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				return nil, err
 			}
 			bh.Tokens[0] = &TokenBalanceHistory{
-				Txs: 1,
 				AssetGuid: uint32(assetGuid), 
 				SentSat:  (*bchain.Amount)(big.NewInt(0)),
 				ReceivedSat: (*bchain.Amount)(big.NewInt(0)),
