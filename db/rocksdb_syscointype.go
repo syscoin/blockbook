@@ -748,13 +748,11 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 }
 
 func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.AssetType) error {
-	
+	if AssetCache == nil {
+		AssetCache = map[uint32]wire.AssetType{}
+	}
 	for guid, asset := range assets {
 		glog.Warningf("store asset %v", guid)
-		
-		if AssetCache == nil {
-			AssetCache = map[uint32]wire.AssetType{}
-		}
 		if _, ok := AssetCache[guid]; !ok {
 			AssetCache[guid] = *asset
 		}
