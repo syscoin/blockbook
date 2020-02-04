@@ -940,7 +940,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 // Disconnect blocks
 
 func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32, btxID []byte, inputs []bchain.DbOutpoint, txa *bchain.TxAddresses,
-	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, map[uint32]*wire.AssetType) error {
+	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType) error {
 	var err error
 	var balance *bchain.AddrBalance
 	addresses := make(map[string]struct{})
