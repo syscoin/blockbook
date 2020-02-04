@@ -751,12 +751,12 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 	
 	for guid, asset := range assets {
 		glog.Warningf("store asset %v", guid)
+		
 		if AssetCache == nil {
 			AssetCache = map[uint32]wire.AssetType{}
-		} else {
-			if _, ok := AssetCache[guid]; !ok {
-				AssetCache[guid] = *asset
-			}
+		}
+		if _, ok := AssetCache[guid]; !ok {
+			AssetCache[guid] = *asset
 		}
 
 		assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
