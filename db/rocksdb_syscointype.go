@@ -22,9 +22,14 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 	}
 	assetGuid := asset.Asset
 	dBAsset, err = d.GetAsset(assetGuid)
-	if err != nil {
+	if err != nil || dBAsset == nil {
 		if !d.chainParser.IsAssetActivateTx(version) {
-			return err
+			if err != nil {
+				return err
+			} else {
+				glog.Warningf("ConnectAssetOutput asset %v was empty, skipping transaction...")
+				return nil
+			}
 		} else {
 			dBAsset = &asset
 		}
@@ -783,7 +788,7 @@ func (d *RocksDB) GetAsset(guid uint32) (*wire.AssetType, error) {
 	defer val.Free()
 	buf := val.Data()
 	if len(buf) == 0 {
-		return nil, errors.New("asset data empty in database")
+		return nil, nil
 	}
 	r := bytes.NewReader(buf)
 	err = asset.Deserialize(r)
