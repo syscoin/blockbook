@@ -510,6 +510,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 		var balanceAssetSat *big.Int
 		isAssetSend := d.chainParser.IsAssetSendTx(version)
 		var dBAsset *wire.AssetType
+		var err error
 		if isAssetSend {
 			dBAsset, err = d.GetAsset(assetGuid)
 			if err != nil {
