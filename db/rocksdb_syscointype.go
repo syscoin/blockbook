@@ -785,8 +785,10 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wi
 			return assetL1, nil
 		}
 	}
-	if assetDb, ok = AssetCache[guid]; ok {
-		return &assetDb, nil
+	if AssetCache != nil {
+		if assetDb, ok = AssetCache[guid]; ok {
+			return &assetDb, nil
+		}
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], assetGuid)
