@@ -11,7 +11,7 @@ import (
 	"github.com/tecbot/gorocksdb"
 	"unsafe"
 )
-var AssetCache map[uint32]wire.AssetType
+var AssetCache map[uint32]wire.AssetType{}
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var asset wire.AssetType
