@@ -138,6 +138,9 @@ func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
 func (p *SyscoinParser) IsAssetSendTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
 }
+func (p *SyscoinParser) IsAssetActivateTx(nVersion int32) bool {
+    return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE
+}
 func (p *SyscoinParser) IsSyscoinTx(nVersion int32) bool {
     return p.IsAssetTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }

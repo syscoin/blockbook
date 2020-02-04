@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
+	"github.com/tecbot/gorocksdb"
 )
 var AssetCache map[uint32]*wire.AssetType
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
@@ -19,7 +20,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		return err
 	}
 	assetGuid := asset.Asset
-	dbAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid)
 	if err != nil {
 		if !IsAssetActivateTx(version) {
 			return err
@@ -106,7 +107,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		balanceAsset.Transfers++
 		// transfer balance to new receiver
-		totalSupplyDb := big.Int(dBAsset.TotalSupply)
+		totalSupplyDb := big.NewInt(dBAsset.TotalSupply)
 		txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
 			Type:     bchain.SPTAssetTransferType,
 			Token:    strAssetGuid,
@@ -116,8 +117,8 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			Decimals: int(dBAsset.Precision),
 			Symbol:   string(dBAsset.Symbol),
 		}
-		dbAsset.WitnessAddress = asset.WitnessAddressTransfer
-		assets[assetGuid] = dbAsset
+		dBAsset.WitnessAddress = asset.WitnessAddressTransfer
+		assets[assetGuid] = dBAsset
 	} else {
 		if balance.AssetBalances == nil{
 			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
@@ -130,23 +131,23 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		balanceAsset.Transfers++
 		valueTo := big.NewInt(asset.Balance)
 		if !IsAssetActivateTx(version) {
-			balanceDb := big.NewInt(dbAsset.Balance)
+			balanceDb := big.NewInt(dBAsset.Balance)
 			balanceDb.Add(balanceDb, valueTo)
-			supplyDb := big.NewInt(dbAsset.TotalSupply)
+			supplyDb := big.NewInt(dBAsset.TotalSupply)
 			supplyDb.Add(supplyDb, valueTo)
-			dbAsset.Balance = balanceDb.Int64()
-			dbAsset.TotalSupply = supplyDb.Int64()
+			dBAsset.Balance = balanceDb.Int64()
+			dBAsset.TotalSupply = supplyDb.Int64()
 			// logic follows core CheckAssetInputs()
 			if len(asset.PubData) > 0 {
-				dbAsset.PubData = asset.PubData
+				dBAsset.PubData = asset.PubData
 			}
 			if len(asset.Contract) > 0 {
-				dbAsset.Contract = asset.Contract
+				dBAsset.Contract = asset.Contract
 			}
-			if asset.UpdateFlags != dbAsset.UpdateFlags {
-				dbAsset.UpdateFlags = asset.UpdateFlags
+			if asset.UpdateFlags != dBAsset.UpdateFlags {
+				dBAsset.UpdateFlags = asset.UpdateFlags
 			}
-			assets[assetGuid] = dbAsset
+			assets[assetGuid] = dBAsset
 		} else {
 			asset.TotalSupply = asset.Balance
 			assets[assetGuid] = asset
@@ -174,7 +175,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
-	dbAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid)
 	if err != nil {
 		return err
 	}
@@ -373,7 +374,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	var balanceAssetSat *big.Int
 	isAssetSend := d.chainParser.IsAssetSendTx(version)
 	if isAssetSend {
-		balanceAssetSat = big.NewInt(dbAsset.Balance)
+		balanceAssetSat = big.NewInt(dBAsset.Balance)
 	} else {
 		balanceAssetSat = balanceAsset.BalanceAssetSat
 	}
@@ -383,8 +384,8 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		d.resetValueSatToZero(balanceAssetSat, assetSenderAddrDesc, "balance")
 	}
 	if isAssetSend {
-		dbAsset.Balance = balanceAssetSat.Int64()
-		assets[assetGuid] = dbAsset
+		dBAsset.Balance = balanceAssetSat.Int64()
+		assets[assetGuid] = dBAsset
 	}
 	return nil
 
@@ -412,7 +413,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		return b, nil
 	}
 	assetGuid := asset.Asset
-	dbAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid)
 	if err != nil {
 		return err
 	}
@@ -457,27 +458,27 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		balanceTransferAsset.Transfers--
 		valueTo := big.NewInt(asset.Balance)
 		// reset owner back to original asset sender
-		dbAsset.WitnessAddress = asset.WitnessAddress
-		assets[assetGuid] = dbAsset
+		dBAsset.WitnessAddress = asset.WitnessAddress
+		assets[assetGuid] = dBAsset
 	} else if balance.AssetBalances != nil {
 		balanceAsset := balance.AssetBalances[assetGuid]
 		balanceAsset.Transfers--
 		if !IsAssetActivateTx(version) {
-			balanceDb := big.NewInt(dbAsset.Balance)
+			balanceDb := big.NewInt(dBAsset.Balance)
 			balanceDb.Sub(balanceDb, valueTo)
-			supplyDb := big.NewInt(dbAsset.TotalSupply)
+			supplyDb := big.NewInt(dBAsset.TotalSupply)
 			supplyDb.Sub(supplyDb, valueTo)
-			dbAsset.Balance = balanceDb.Int64()
-			if dbAsset.Balance < 0 {
-				glog.Warningf("DisconnectAssetOutput balance is negative %v, setting to 0...", dbAsset.Balance)
-				dbAsset.Balance = 0
+			dBAsset.Balance = balanceDb.Int64()
+			if dBAsset.Balance < 0 {
+				glog.Warningf("DisconnectAssetOutput balance is negative %v, setting to 0...", dBAsset.Balance)
+				dBAsset.Balance = 0
 			}
-			dbAsset.TotalSupply = supplyDb.Int64()
-			if dbAsset.TotalSupply < 0 {
-				glog.Warningf("DisconnectAssetOutput total supply is negative %v, setting to 0...", dbAsset.TotalSupply)
-				dbAsset.TotalSupply = 0
+			dBAsset.TotalSupply = supplyDb.Int64()
+			if dBAsset.TotalSupply < 0 {
+				glog.Warningf("DisconnectAssetOutput total supply is negative %v, setting to 0...", dBAsset.TotalSupply)
+				dBAsset.TotalSupply = 0
 			}
-			assets[assetGuid] = dbAsset
+			assets[assetGuid] = dBAsset
 		} else {
 			// flag to erase asset
 			asset.TotalSupply = -1
@@ -510,11 +511,11 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 		isAssetSend := d.chainParser.IsAssetSendTx(version)
 		var dBAsset *wire.AssetType
 		if isAssetSend {
-			dbAsset, err = d.GetAsset(assetGuid)
+			dBAsset, err = d.GetAsset(assetGuid)
 			if err != nil {
 				return err
 			}
-			balanceAssetSat = big.NewInt(dbAsset.Balance)
+			balanceAssetSat = big.NewInt(dBAsset.Balance)
 		} else {
 			balanceAssetSat = balanceAsset.BalanceAssetSat
 		}
@@ -524,8 +525,8 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 		}
 		balanceAssetSat.Add(balanceAssetSat, totalAssetSentValue)
 		if isAssetSend {
-			dbAsset.Balance = balanceAssetSat.Int64()
-			assets[assetGuid] = dbAsset
+			dBAsset.Balance = balanceAssetSat.Int64()
+			assets[assetGuid] = dBAsset
 		}
 
 	} else {
@@ -543,7 +544,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		return err
 	}
 	assetGuid := mintasset.AssetAllocationTuple.Asset
-	dbAsset, err = d.GetAsset(assetGuid)
+	dBAsset, err = d.GetAsset(assetGuid)
 	if err != nil {
 		return err
 	}
@@ -617,7 +618,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		Decimals: int(dBAsset.Precision),
 		Symbol:   string(dBAsset.Symbol),
 	}
-	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex, dbAsset)
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset)
 }
 func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
 	r := bytes.NewReader(sptData)
@@ -738,8 +739,6 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 }
 
 func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.AssetType) error {
-	
-	buf := make([]byte, 64)
 	for guid, asset := range assets {
 		if asset, ok = AssetCache[assetGuid]; !ok {
 			AssetCache[assetGuid] = asset
@@ -750,6 +749,9 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 		} else {
 			var buffer bytes.Buffer
 			err = asset.Serialize(buffer)
+			if err != nil {
+				return err
+			}
 			wb.PutCF(d.cfh[cfAssets], guid, buffer.Bytes())
 		}
 	}

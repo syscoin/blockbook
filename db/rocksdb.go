@@ -940,7 +940,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 // Disconnect blocks
 
 func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32, btxID []byte, inputs []bchain.DbOutpoint, txa *bchain.TxAddresses,
-	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance) error {
+	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, map[uint32]*wire.AssetType) error {
 	var err error
 	var balance *bchain.AddrBalance
 	addresses := make(map[string]struct{})
@@ -1037,7 +1037,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
 				}
 			} else if isSyscoinTx && t.AddrDesc[0] == txscript.OP_RETURN {
-				err = d.DisconnectSyscoinOutputs(t.AddrDesc, balances, txa.Version, addresses)
+				err = d.DisconnectSyscoinOutputs(t.AddrDesc, balances, txa.Version, addresses, assets)
 				if err != nil {
 					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, error %v", height, btxID, err)
 				}
@@ -1070,6 +1070,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	txAddressesToUpdate := make(map[string]*bchain.TxAddresses)
 	txsToDelete := make(map[string]struct{})
 	balances := make(map[string]*bchain.AddrBalance)
+	assets := make(map[uint32]*wire.AssetType{})
 	for height := higher; height >= lower; height-- {
 		blockTxs := blocks[height-lower]
 		glog.Info("Disconnecting block ", height, " containing ", len(blockTxs), " transactions")
@@ -1089,7 +1090,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 				glog.Warning("TxAddress for txid ", ut, " not found")
 				continue
 			}
-			if err := d.disconnectTxAddresses(wb, height, btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, balances); err != nil {
+			if err := d.disconnectTxAddresses(wb, height, btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, balances, assets); err != nil {
 				return err
 			}
 		}
@@ -1099,6 +1100,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	}
 	d.storeTxAddresses(wb, txAddressesToUpdate)
 	d.storeBalancesDisconnect(wb, balances)
+	d.storeAssets(wb, assets)
 	for s := range txsToDelete {
 		b := []byte(s)
 		wb.DeleteCF(d.cfh[cfTransactions], b)

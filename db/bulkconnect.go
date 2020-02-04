@@ -400,14 +400,14 @@ func (b *BulkConnect) ConnectBlock(block *bchain.Block, storeBlockTxs bool) erro
 func (b *BulkConnect) Close() error {
 	glog.Info("rocksdb: bulk connect closing")
 	start := time.Now()
-	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan, assetsChan chan error
+	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan, storeAssetsChan chan error
 	if b.chainType == bchain.ChainBitcoinType {
 		storeTxAddressesChan = make(chan error)
 		go b.parallelStoreTxAddresses(storeTxAddressesChan, true)
 		storeBalancesChan = make(chan error)
 		go b.parallelStoreBalances(storeBalancesChan, true)
-		assetsChan = make(chan error)
-		go b.parallelStoreAssets(assetsChan, true)
+		storeAssetsChan = make(chan error)
+		go b.parallelStoreAssets(storeAssetsChan, true)
 	} else if b.chainType == bchain.ChainEthereumType {
 		storeAddressContractsChan = make(chan error)
 		go b.parallelStoreAddressContracts(storeAddressContractsChan, true)
