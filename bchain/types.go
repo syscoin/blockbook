@@ -358,9 +358,13 @@ const ERC20TokenType TokenType = "ERC20"
 const XPUBAddressTokenType TokenType = "XPUBAddress"
 
 // Syscoin SPT transaction
-const SPTAllocatedTokenType TokenType = "SPTAllocated"
-const SPTUnAllocatedTokenType TokenType = "SPTUnAllocated"
-
+const SPTTokenType TokenType = "SPT"
+const SPTAssetAllocationType TokenType = "SPTAssetAllocation"
+const SPTAssetNewType TokenType = "SPTAssetNew"
+const SPTAssetUpdateType TokenType = "SPTAssetUpdate"
+const SPTAssetTransferType TokenType = "SPTAssetTransfer"
+const SPTAssetSendType TokenType = "SPTAssetSend"
+const SPTAssetMintType TokenType = "SPTAssetMint"
 
 // Amount is datatype holding amounts
 type Amount big.Int

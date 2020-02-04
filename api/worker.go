@@ -792,7 +792,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
 			// add token as unallocated if address matches asset owner address other wise its allocated
 			tokens[i] = &bchain.Token{
-				Type:             bchain.SPTAllocatedTokenType,
+				Type:             bchain.SPTTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
 				Symbol:			  "SPT",

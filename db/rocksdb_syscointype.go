@@ -104,7 +104,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		copyAmount := *balanceAsset.UnallocatedBalanceSat
 		balanceAsset.UnallocatedBalanceSat.Set(big.NewInt(0))
 		txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
-			Type:     bchain.SPTAllocatedTokenType,
+			Type:     bchain.SPTAssetUpdateType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       receiverAddress,
@@ -125,7 +125,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		valueTo := big.NewInt(asset.Balance)
 		balanceAsset.UnallocatedBalanceSat.Add(balanceAsset.UnallocatedBalanceSat, valueTo)
 		txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
-			Type:     bchain.SPTAllocatedTokenType,
+			Type:     bchain.SPTAssetTransferType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       senderAddress,
@@ -210,13 +210,16 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAsset.BalanceAssetSat.Add(balanceAsset.BalanceAssetSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		txAddresses.TokenTransfers[i] = &bchain.TokenTransfer {
-			Type:     bchain.SPTAllocatedTokenType,
+			Type:     bchain.SPTAssetAllocationType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       receiverAddress,
 			Decimals: 8,
 			Value:    (*bchain.Amount)(amount),
 			Symbol:   "SPT",
+		}
+		if d.chainParser.IsAssetSendTx(version) {
+			txAddresses.TokenTransfers[i].Type = SPTAssetSendType
 		}
 	}
 	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex)
@@ -530,7 +533,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	balanceAsset.BalanceAssetSat.Add(balanceAsset.BalanceAssetSat, amount)
 	txAddresses.TokenTransfers = make([]*bchain.TokenTransfer, 1)
 	txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
-		Type:     bchain.SPTAllocatedTokenType,
+		Type:     bchain.SPTAssetMintType,
 		Token:    strAssetGuid,
 		From:     senderAddress,
 		To:       receiverAddress,
