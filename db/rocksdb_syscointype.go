@@ -456,7 +456,6 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		balanceAsset.Transfers--
 		balanceTransferAsset := balanceTransfer.AssetBalances[assetGuid]
 		balanceTransferAsset.Transfers--
-		valueTo := big.NewInt(asset.Balance)
 		// reset owner back to original asset sender
 		dBAsset.WitnessAddress = asset.WitnessAddress
 		assets[assetGuid] = dBAsset
@@ -465,6 +464,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		balanceAsset.Transfers--
 		if !d.chainParser.IsAssetActivateTx(version) {
 			balanceDb := big.NewInt(dBAsset.Balance)
+			valueTo := big.NewInt(asset.Balance)
 			balanceDb.Sub(balanceDb, valueTo)
 			supplyDb := big.NewInt(dBAsset.TotalSupply)
 			supplyDb.Sub(supplyDb, valueTo)
