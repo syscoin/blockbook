@@ -234,11 +234,9 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			l += ll
 			sentvalue, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
-			unallocatedbalancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])
-			l += ll
 			transfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			l += ll
-			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{Transfers: uint32(transfers), SentAssetSat: &sentvalue, BalanceAssetSat: &balancevalue, UnallocatedBalanceSat: &unallocatedbalancevalue}
+			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{Transfers: uint32(transfers), SentAssetSat: &sentvalue, BalanceAssetSat: &balancevalue}
 		}
 	}
 	if detail != bchain.AddressBalanceDetailNoUTXO {
@@ -288,8 +286,6 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 		l = p.BaseParser.PackBigint(value.BalanceAssetSat, varBuf)
 		buf = append(buf, varBuf[:l]...)
 		l = p.BaseParser.PackBigint(value.SentAssetSat, varBuf)
-		buf = append(buf, varBuf[:l]...)
-		l = p.BaseParser.PackBigint(value.UnallocatedBalanceSat, varBuf)
 		buf = append(buf, varBuf[:l]...)
 		l = p.BaseParser.PackVaruint(uint(value.Transfers), varBuf)
 		buf = append(buf, varBuf[:l]...)

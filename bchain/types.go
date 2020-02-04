@@ -206,7 +206,6 @@ type Utxo struct {
 type AssetBalance struct {
 	SentAssetSat 	*big.Int
 	BalanceAssetSat *big.Int
-	UnallocatedBalanceSat *big.Int
 	Transfers	uint32
 }
 
@@ -358,7 +357,8 @@ const ERC20TokenType TokenType = "ERC20"
 const XPUBAddressTokenType TokenType = "XPUBAddress"
 
 // Syscoin SPT transaction
-const SPTTokenType TokenType = "SPT"
+const SPTTokenType TokenType = "SPTAllocated"
+const SPTUnallocatedTokenType TokenType = "SPTUnallocated"
 const SPTAssetAllocationType TokenType = "SPTAssetAllocation"
 const SPTAssetNewType TokenType = "SPTAssetNew"
 const SPTAssetUpdateType TokenType = "SPTAssetUpdate"
@@ -416,7 +416,6 @@ type Token struct {
 	Symbol           string    `json:"symbol,omitempty"`
 	Decimals         int       `json:"decimals,omitempty"`
 	BalanceSat       *Amount   `json:"balance,omitempty"`
-	UnallocatedBalanceSat *Amount   `json:"unallocatedBalance,omitempty"`
 	TotalReceivedSat *Amount   `json:"totalReceived,omitempty"`
 	TotalSentSat     *Amount   `json:"totalSent,omitempty"`
 	ContractIndex    string    `json:"-"`

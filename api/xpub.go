@@ -248,15 +248,47 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			i++
 			// for asset tokens
 			for k, v := range ad.balance.AssetBalances {
+				dbAsset, err = w.db.GetAsset(uint32(k))
+				if err != nil {
+					return nil, err
+				}
+				if !ownerFound {
+					// add token as unallocated if address matches asset owner address
+					ownerAddress := dbAsset.WitnessAddress.ToString("sys")
+					ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
+					if e != nil {
+						return nil, e
+					}
+					if bytes.Equal(ad.addrDesc, ownerAddrDesc) {
+						dbAsset, err = w.db.GetAsset(uint32(k))
+						if err != nil {
+							return nil, err
+						}
+						ownerBalance := big.NewInt(dbAsset.Balance)
+						totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
+						tokens[i] = &bchain.Token{
+							Type:             bchain.SPTUnallocatedTokenType,
+							Name:             address,
+							Decimals:         int(dbAsset.Precision),
+							Symbol:			  string(dbAsset.Symbol),
+							BalanceSat:       (*bchain.Amount)(ownerBalance),
+							TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
+							TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
+							Contract:		  strconv.FormatUint(uint64(k), 10),
+							Transfers:		  v.Transfers,
+						}
+						ownerFound = true
+						i++
+					}
+				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
 				tokens[i] = &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             address,
-					Decimals:         w.chainParser.AmountDecimals(),
-					Symbol:			  "SPT",
+					Decimals:         int(dbAsset.Precision),
+					Symbol:			  string(dbAsset.Symbol),
 					BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
-					UnallocatedBalanceSat:  (*bchain.Amount)(v.UnallocatedBalanceSat),
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 					TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),

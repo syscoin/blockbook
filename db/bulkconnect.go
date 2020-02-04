@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/tecbot/gorocksdb"
+	"github.com/syscoin/btcd/wire"
 )
 
 // bulk connect
@@ -28,6 +29,7 @@ type BulkConnect struct {
 	txAddressesMap     map[string]*bchain.TxAddresses
 	balances           map[string]*bchain.AddrBalance
 	addressContracts   map[string]*AddrContracts
+	assets             map[uint32]*wire.AssetType
 	height             uint32
 }
 
@@ -39,6 +41,8 @@ const (
 	partialStoreBalances      = maxBulkBalances / 10
 	maxBulkAddrContracts      = 1200000
 	partialStoreAddrContracts = maxBulkAddrContracts / 10
+	maxBulkAssets             = 100
+	partialStoreAssets        = maxBulkAssets / 10
 )
 
 // InitBulkConnect initializes bulk connect and switches DB to inconsistent state
@@ -49,6 +53,7 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 		txAddressesMap:   make(map[string]*bchain.TxAddresses),
 		balances:         make(map[string]*bchain.AddrBalance),
 		addressContracts: make(map[string]*AddrContracts),
+		assets:         make(map[uint32]*wire.AssetType),
 	}
 	if err := d.SetInconsistentState(true); err != nil {
 		return nil, err
@@ -115,6 +120,46 @@ func (b *BulkConnect) parallelStoreTxAddresses(c chan error, all bool) {
 	c <- nil
 }
 
+func (b *BulkConnect) storeAssets(wb *gorocksdb.WriteBatch, all bool) (int, error) {
+	var assets map[uint32]*wire.AssetType
+	if all {
+		assets = b.assets
+		b.assets = make(map[uint32]*wire.AssetType)
+	} else {
+		assets = make(map[uint32]*wire.AssetType)
+		// store some random assets
+		for k, a := range b.assets {
+			assets[k] = a
+			delete(b.assets, k)
+			if len(assets) >= partialStoreAssets {
+				break
+			}
+		}
+	}
+	if err := b.d.storeAssets(wb, assets); err != nil {
+		return 0, err
+	}
+	return len(assets), nil
+}
+
+func (b *BulkConnect) parallelStoreAssets(c chan error, all bool) {
+	defer close(c)
+	start := time.Now()
+	wb := gorocksdb.NewWriteBatch()
+	defer wb.Destroy()
+	count, err := b.storeAssets(wb, all)
+	if err != nil {
+		c <- err
+		return
+	}
+	if err := b.d.db.Write(b.d.wo, wb); err != nil {
+		c <- err
+		return
+	}
+	glog.Info("rocksdb: height ", b.height, ", stored ", count, " assets, ", len(b.assets), " remaining, done in ", time.Since(start))
+	c <- nil
+}
+
 func (b *BulkConnect) storeBalances(wb *gorocksdb.WriteBatch, all bool) (int, error) {
 	var bal map[string]*bchain.AddrBalance
 	if all {
@@ -171,12 +216,12 @@ func (b *BulkConnect) storeBulkAddresses(wb *gorocksdb.WriteBatch) error {
 
 func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs bool) error {
 	addresses := make(bchain.AddressesMap)
-	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances); err != nil {
+	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, b.assets); err != nil {
 		return err
 	}
-	var storeAddressesChan, storeBalancesChan chan error
+	var storeAddressesChan, storeBalancesChan, storeAssetsChan chan error
 	var sa bool
-	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances {
+	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances || len(b.assets) > maxBulkAssets {
 		sa = true
 		if len(b.txAddressesMap)+partialStoreAddresses > maxBulkTxAddresses {
 			storeAddressesChan = make(chan error)
@@ -185,6 +230,10 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 		if len(b.balances)+partialStoreBalances > maxBulkBalances {
 			storeBalancesChan = make(chan error)
 			go b.parallelStoreBalances(storeBalancesChan, false)
+		}
+		if len(b.assets)+partialStoreAssets > maxBulkAssets {
+			storeAssetsChan = make(chan error)
+			go b.parallelStoreAssets(storeAssetsChan, false)
 		}
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
@@ -228,6 +277,11 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 	}
 	if storeBalancesChan != nil {
 		if err := <-storeBalancesChan; err != nil {
+			return err
+		}
+	}
+	if storeAssetsChan != nil {
+		if err := <-storeAssetsChan; err != nil {
 			return err
 		}
 	}
@@ -346,12 +400,14 @@ func (b *BulkConnect) ConnectBlock(block *bchain.Block, storeBlockTxs bool) erro
 func (b *BulkConnect) Close() error {
 	glog.Info("rocksdb: bulk connect closing")
 	start := time.Now()
-	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan chan error
+	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan, assetsChan chan error
 	if b.chainType == bchain.ChainBitcoinType {
 		storeTxAddressesChan = make(chan error)
 		go b.parallelStoreTxAddresses(storeTxAddressesChan, true)
 		storeBalancesChan = make(chan error)
 		go b.parallelStoreBalances(storeBalancesChan, true)
+		assetsChan = make(chan error)
+		go b.parallelStoreAssets(assetsChan, true)
 	} else if b.chainType == bchain.ChainEthereumType {
 		storeAddressContractsChan = make(chan error)
 		go b.parallelStoreAddressContracts(storeAddressContractsChan, true)
@@ -378,6 +434,11 @@ func (b *BulkConnect) Close() error {
 	}
 	if storeAddressContractsChan != nil {
 		if err := <-storeAddressContractsChan; err != nil {
+			return err
+		}
+	}
+	if storeAssetsChan != nil {
+		if err := <-storeAssetsChan; err != nil {
 			return err
 		}
 	}

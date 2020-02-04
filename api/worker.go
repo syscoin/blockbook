@@ -788,19 +788,48 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
 		tokens = make([]*bchain.Token, len(ba.AssetBalances))
 		var i int = 0
+		var ownerFound bool = false
 		for k, v := range ba.AssetBalances {
+			dbAsset, err = w.db.GetAsset(uint32(k))
+			if err != nil {
+				return nil, err
+			}
+			if !ownerFound {
+				// add token as unallocated if address matches asset owner address
+				ownerAddress := dbAsset.WitnessAddress.ToString("sys")
+				ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
+				if e != nil {
+					return nil, e
+				}
+				if bytes.Equal(addrDesc, ownerAddrDesc) {
+					ownerBalance := big.NewInt(dbAsset.Balance)
+					totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
+					tokens[i] = &bchain.Token{
+						Type:             bchain.SPTUnallocatedTokenType,
+						Name:             address,
+						Decimals:         int(dbAsset.Precision),
+						Symbol:			  string(dbAsset.Symbol),
+						BalanceSat:       (*bchain.Amount)(ownerBalance),
+						TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
+						TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
+						Contract:		  strconv.FormatUint(uint64(assetGuid), 10),
+						Transfers:		  v.Transfers,
+					}
+					ownerFound = true
+					i++
+				}
+			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
-			// add token as unallocated if address matches asset owner address other wise its allocated
+			
 			tokens[i] = &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             address,
-				Decimals:         w.chainParser.AmountDecimals(),
-				Symbol:			  "SPT",
+				Decimals:         int(dbAsset.Precision),
+				Symbol:			  string(dbAsset.Symbol),
 				BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
-				UnallocatedBalanceSat:  (*bchain.Amount)(v.UnallocatedBalanceSat),
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
-				Contract:		  strconv.FormatUint(uint64(k), 10),
+				Contract:		  strconv.FormatUint(uint64(assetGuid), 10),
 				Transfers:		  v.Transfers,
 			}
 			i++

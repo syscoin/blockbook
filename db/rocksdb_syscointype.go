@@ -9,15 +9,22 @@ import (
 	"github.com/syscoin/btcd/wire"
 	"github.com/juju/errors"
 )
-
-func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
+var AssetCache map[uint32]*wire.AssetType
+func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var asset wire.AssetType
+	var dBAsset *wire.AssetType
 	err := asset.Deserialize(r)
 	if err != nil {
 		return err
 	}
 	assetGuid := asset.Asset
+	dbAsset, err = d.GetAsset(assetGuid)
+	if err != nil {
+		if !IsAssetActivateTx(version) {
+			return err
+		}
+	}
 	strAssetGuid := strconv.FormatUint(uint64(assetGuid), 10)
 	senderAddress := asset.WitnessAddress.ToString("sys")
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderAddress)
@@ -88,50 +95,70 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		balanceAssetTransfer, ok := balanceTransfer.AssetBalances[assetGuid]
 		if !ok {
-			balanceAssetTransfer = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAssetTransfer = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0)}
 			balanceTransfer.AssetBalances[assetGuid] = balanceAssetTransfer
 		}
 		balanceAssetTransfer.Transfers++
 		balanceAsset, ok := balance.AssetBalances[assetGuid]
 		if !ok {
-			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
 		}
 		balanceAsset.Transfers++
 		// transfer balance to new receiver
-		balanceAssetTransfer.UnallocatedBalanceSat.Set(balanceAsset.UnallocatedBalanceSat)
-		// clear balance on sender
-		copyAmount := *balanceAsset.UnallocatedBalanceSat
-		balanceAsset.UnallocatedBalanceSat.Set(big.NewInt(0))
+		totalSupplyDb := big.Int(dBAsset.TotalSupply)
 		txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
-			Type:     bchain.SPTAssetUpdateType,
+			Type:     bchain.SPTAssetTransferType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       receiverAddress,
-			Decimals: 8,
-			Value:    (*bchain.Amount)(&copyAmount),
-			Symbol:   "SPT",
+			Value:    (*bchain.Amount)(totalSupplyDb),
+			Decimals: int(dBAsset.Precision),
+			Symbol:   string(dBAsset.Symbol),
 		}
+		dbAsset.WitnessAddress = asset.WitnessAddressTransfer
+		assets[assetGuid] = dbAsset
 	} else {
 		if balance.AssetBalances == nil{
 			balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
 		}
 		balanceAsset, ok := balance.AssetBalances[assetGuid]
 		if !ok {
-			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
 		}
 		balanceAsset.Transfers++
 		valueTo := big.NewInt(asset.Balance)
-		balanceAsset.UnallocatedBalanceSat.Add(balanceAsset.UnallocatedBalanceSat, valueTo)
+		if !IsAssetActivateTx(version) {
+			balanceDb := big.NewInt(dbAsset.Balance)
+			balanceDb.Add(balanceDb, valueTo)
+			supplyDb := big.NewInt(dbAsset.TotalSupply)
+			supplyDb.Add(supplyDb, valueTo)
+			dbAsset.Balance = balanceDb.Int64()
+			dbAsset.TotalSupply = supplyDb.Int64()
+			// logic follows core CheckAssetInputs()
+			if len(asset.PubData) > 0 {
+				dbAsset.PubData = asset.PubData
+			}
+			if len(asset.Contract) > 0 {
+				dbAsset.Contract = asset.Contract
+			}
+			if asset.UpdateFlags != dbAsset.UpdateFlags {
+				dbAsset.UpdateFlags = asset.UpdateFlags
+			}
+			assets[assetGuid] = dbAsset
+		} else {
+			asset.TotalSupply = asset.Balance
+			assets[assetGuid] = asset
+		}
 		txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
-			Type:     bchain.SPTAssetTransferType,
+			Type:     bchain.SPTAssetUpdateType,
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       senderAddress,
-			Decimals: 8,
 			Value:    (*bchain.Amount)(valueTo),
-			Symbol:   "SPT",
+			Decimals: int(dBAsset.Precision),
+			Symbol:   string(dBAsset.Symbol),
 		}
 	}
 	return nil
@@ -140,12 +167,17 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
+	var dBAsset *wire.AssetType
 	err := assetAllocation.Deserialize(r)
 	if err != nil {
 		return err
 	}
 	totalAssetSentValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
+	dbAsset, err = d.GetAsset(assetGuid)
+	if err != nil {
+		return err
+	}
 	strAssetGuid := strconv.FormatUint(uint64(assetGuid), 10)
 	senderAddress := assetAllocation.AssetAllocationTuple.WitnessAddress.ToString("sys")
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderAddress)
@@ -202,7 +234,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 		balanceAsset, ok := balance.AssetBalances[assetGuid]
 		if !ok {
-			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+			balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0)}
 			balance.AssetBalances[assetGuid] = balanceAsset
 		}
 		balanceAsset.Transfers++
@@ -214,18 +246,18 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       receiverAddress,
-			Decimals: 8,
 			Value:    (*bchain.Amount)(amount),
-			Symbol:   "SPT",
+			Decimals: int(dBAsset.Precision),
+			Symbol:   string(dBAsset.Symbol),
 		}
 		if d.chainParser.IsAssetSendTx(version) {
 			txAddresses.TokenTransfers[i].Type = bchain.SPTAssetSendType
 		}
 	}
-	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex)
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset)
 }
 
-func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
+func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
 	err := assetAllocation.Deserialize(r)
@@ -305,10 +337,10 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 			glog.Warningf("DisconnectAssetAllocationOutput Asset Balance for asset address %v (%v) not found", ad, addrDesc)
 		}
 	}
-	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
+	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
 
-func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, addresses bchain.AddressesMap, outputIndex int32) error {
+func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, addresses bchain.AddressesMap, outputIndex int32, dBAsset *wire.AssetType, assets map[uint32]*wire.AssetType) error {
 	if totalAssetSentValue == nil {
 		return errors.New("totalAssetSentValue was nil cannot connect allocation input")
 	}
@@ -334,13 +366,14 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	}
 	balanceAsset, ok := balance.AssetBalances[assetGuid]
 	if !ok {
-		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0)}
 		balance.AssetBalances[assetGuid] = balanceAsset
 	}
 	balanceAsset.Transfers++
 	var balanceAssetSat *big.Int
-	if d.chainParser.IsAssetSendTx(version) {
-		balanceAssetSat = balanceAsset.UnallocatedBalanceSat
+	isAssetSend := d.chainParser.IsAssetSendTx(version)
+	if isAssetSend {
+		balanceAssetSat = big.NewInt(dbAsset.Balance)
 	} else {
 		balanceAssetSat = balanceAsset.BalanceAssetSat
 	}
@@ -349,14 +382,18 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	if balanceAssetSat.Sign() < 0 {
 		d.resetValueSatToZero(balanceAssetSat, assetSenderAddrDesc, "balance")
 	}
-	
+	if isAssetSend {
+		dbAsset.Balance = balanceAssetSat.Int64()
+		assets[assetGuid] = dbAsset
+	}
 	return nil
 
 }
 
-func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
+func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var asset wire.AssetType
+	var dBAsset *wire.AssetType
 	err := asset.Deserialize(r)
 	if err != nil {
 		return err
@@ -375,6 +412,10 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		return b, nil
 	}
 	assetGuid := asset.Asset
+	dbAsset, err = d.GetAsset(assetGuid)
+	if err != nil {
+		return err
+	}
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddress.ToString("sys"))
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	_, exist := addresses[assetStrSenderAddrDesc]
@@ -414,21 +455,41 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		balanceAsset.Transfers--
 		balanceTransferAsset := balanceTransfer.AssetBalances[assetGuid]
 		balanceTransferAsset.Transfers--
-		// transfer balance back to sender
-		balanceAsset.UnallocatedBalanceSat.Set(balanceTransferAsset.UnallocatedBalanceSat)
-		// clear balance on receiver
-		balanceTransferAsset.UnallocatedBalanceSat.Set(big.NewInt(0))		
+		valueTo := big.NewInt(asset.Balance)
+		// reset owner back to original asset sender
+		dbAsset.WitnessAddress = asset.WitnessAddress
+		assets[assetGuid] = dbAsset
 	} else if balance.AssetBalances != nil {
 		balanceAsset := balance.AssetBalances[assetGuid]
 		balanceAsset.Transfers--
-		balanceAsset.UnallocatedBalanceSat.Sub(balanceAsset.UnallocatedBalanceSat, big.NewInt(asset.Balance))
+		if !IsAssetActivateTx(version) {
+			balanceDb := big.NewInt(dbAsset.Balance)
+			balanceDb.Sub(balanceDb, valueTo)
+			supplyDb := big.NewInt(dbAsset.TotalSupply)
+			supplyDb.Sub(supplyDb, valueTo)
+			dbAsset.Balance = balanceDb.Int64()
+			if dbAsset.Balance < 0 {
+				glog.Warningf("DisconnectAssetOutput balance is negative %v, setting to 0...", dbAsset.Balance)
+				dbAsset.Balance = 0
+			}
+			dbAsset.TotalSupply = supplyDb.Int64()
+			if dbAsset.TotalSupply < 0 {
+				glog.Warningf("DisconnectAssetOutput total supply is negative %v, setting to 0...", dbAsset.TotalSupply)
+				dbAsset.TotalSupply = 0
+			}
+			assets[assetGuid] = dbAsset
+		} else {
+			// flag to erase asset
+			asset.TotalSupply = -1
+			assets[assetGuid] = asset
+		}
 	} else {
 		glog.Warningf("DisconnectAssetOutput: Asset Sent balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
 	}
 	return nil
 
 }
-func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance) error {
+func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
 	if !e {
@@ -446,8 +507,14 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 		balanceAsset := balance.AssetBalances[assetGuid]
 		balanceAsset.Transfers--
 		var balanceAssetSat *big.Int
-		if d.chainParser.IsAssetSendTx(version) {
-			balanceAssetSat = balanceAsset.UnallocatedBalanceSat
+		isAssetSend := d.chainParser.IsAssetSendTx(version)
+		var dBAsset *wire.AssetType
+		if isAssetSend {
+			dbAsset, err = d.GetAsset(assetGuid)
+			if err != nil {
+				return err
+			}
+			balanceAssetSat = big.NewInt(dbAsset.Balance)
 		} else {
 			balanceAssetSat = balanceAsset.BalanceAssetSat
 		}
@@ -456,6 +523,10 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 			d.resetValueSatToZero(balanceAsset.SentAssetSat, assetSenderAddrDesc, "balance")
 		}
 		balanceAssetSat.Add(balanceAssetSat, totalAssetSentValue)
+		if isAssetSend {
+			dbAsset.Balance = balanceAssetSat.Int64()
+			assets[assetGuid] = dbAsset
+		}
 
 	} else {
 		glog.Warningf("DisconnectAssetAllocationInput: Asset Sent balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
@@ -466,11 +537,16 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
 	r := bytes.NewReader(sptData)
 	var mintasset wire.MintSyscoinType
+	var dBAsset *wire.AssetType
 	err := mintasset.Deserialize(r)
 	if err != nil {
 		return err
 	}
 	assetGuid := mintasset.AssetAllocationTuple.Asset
+	dbAsset, err = d.GetAsset(assetGuid)
+	if err != nil {
+		return err
+	}
 	strAssetGuid := strconv.FormatUint(uint64(assetGuid), 10)
 	senderAddress := "burn"
 	receiverAddress := mintasset.AssetAllocationTuple.WitnessAddress.ToString("sys")
@@ -525,7 +601,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	}
 	balanceAsset, ok := balance.AssetBalances[assetGuid]
 	if !ok {
-		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0), UnallocatedBalanceSat: big.NewInt(0)}
+		balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceAssetSat: big.NewInt(0), SentAssetSat: big.NewInt(0)}
 		balance.AssetBalances[assetGuid] = balanceAsset
 	}
 	balanceAsset.Transfers++
@@ -537,11 +613,11 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		Token:    strAssetGuid,
 		From:     senderAddress,
 		To:       receiverAddress,
-		Decimals: 8,
 		Value:    (*bchain.Amount)(amount),
-		Symbol:   "SPT",
+		Decimals: int(dBAsset.Precision),
+		Symbol:   string(dBAsset.Symbol),
 	}
-	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex)
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex, dbAsset)
 }
 func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
 	r := bytes.NewReader(sptData)
@@ -623,7 +699,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	
 	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
 }
-func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
+func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -633,16 +709,16 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 		return nil
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
-		return d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses)
+		return d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
 	} else if d.chainParser.IsAssetTx(version) {
-		return d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses)
+		return d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
 		return d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses)
 	}
 	return nil
 }
 
-func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
+func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -652,11 +728,52 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 		return nil
 	}
 	if d.chainParser.IsAssetAllocationTx(version) {
-		return d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses)
+		return d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses, assets)
 	} else if d.chainParser.IsAssetTx(version) {
-		return d.DisconnectAssetOutput(sptData, balances, version, addresses)
+		return d.DisconnectAssetOutput(sptData, balances, version, addresses, assets)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
 		return d.DisconnectMintAssetOutput(sptData, balances, version, addresses)
 	}
 	return nil
+}
+
+func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.AssetType) error {
+	
+	buf := make([]byte, 64)
+	for guid, asset := range assets {
+		if asset, ok = AssetCache[assetGuid]; !ok {
+			AssetCache[assetGuid] = asset
+		}
+		// total supply of 0 signals asset to be removed from db - happens on disconnect
+		if asset.TotalSupply == 0) {
+			wb.DeleteCF(d.cfh[cfAssets], guid)
+		} else {
+			var buffer bytes.Buffer
+			err = asset.Serialize(buffer)
+			wb.PutCF(d.cfh[cfAssets], guid, buffer.Bytes())
+		}
+	}
+	return nil
+}
+
+// GetAddrDescContracts returns AddrContracts for given addrDesc
+func (d *RocksDB) GetAsset(assetGuid uint32) (*wire.AssetType, error) {
+	var asset wire.AssetType
+	if asset, ok = AssetCache[assetGuid]; ok {
+		return &asset
+	}
+	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], assetGuid)
+	if err != nil {
+		return nil, err
+	}
+	defer val.Free()
+	buf := val.Data()
+	if len(buf) == 0 {
+		return nil, nil
+	}
+	err = asset.Deserialize(buf)
+	if err != nil {
+		return nil, err
+	}
+	return &asset, nil
 }

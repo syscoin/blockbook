@@ -19,6 +19,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
+	"github.com/syscoin/btcd/wire"
 )
 
 const dbVersion = 5
@@ -99,6 +100,9 @@ const (
 	cfTxAddresses
 	// EthereumType
 	cfAddressContracts = cfAddressBalance
+	// SyscoinType
+	cfAssets
+
 )
 
 // common columns
@@ -106,7 +110,7 @@ var cfNames []string
 var cfBaseNames = []string{"default", "height", "addresses", "blockTxs", "transactions", "fiatRates"}
 
 // type specific columns
-var cfNamesBitcoinType = []string{"addressBalance", "txAddresses"}
+var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "cfAssets"}
 var cfNamesEthereumType = []string{"addressContracts"}
 
 func openDB(path string, c *gorocksdb.Cache, openFiles int) (*gorocksdb.DB, []*gorocksdb.ColumnFamilyHandle, error) {
@@ -431,9 +435,10 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	}
 	addresses := make(bchain.AddressesMap)
 	if chainType == bchain.ChainBitcoinType {
+		assets := map[uint32]*wire.AssetType{}
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
-		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances); err != nil {
+		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets); err != nil {
 			return err
 		}
 		if err := d.storeTxAddresses(wb, txAddressesMap); err != nil {
@@ -443,6 +448,9 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 			return err
 		}
 		if err := d.storeAndCleanupBlockTxs(wb, block); err != nil {
+			return err
+		}
+		if err := d.storeAssets(wb, assets); err != nil {
 			return err
 		}
 	} else if chainType == bchain.ChainEthereumType {
@@ -487,7 +495,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	// first process all outputs so that inputs can refer to txs in this block
@@ -549,7 +557,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				}
 			// process syscoin tx
 			} else if isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
-				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxID, int32(i), &ta)
+				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxID, int32(i), &ta, assets)
 				if err != nil {
 					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 				}
