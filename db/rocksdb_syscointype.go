@@ -11,7 +11,7 @@ import (
 	"github.com/tecbot/gorocksdb"
 	"unsafe"
 )
-var AssetCache map[uint32]wire.AssetType{}
+var AssetCache map[uint32]wire.AssetType
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var asset wire.AssetType
@@ -710,6 +710,9 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
 func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
+	if AssetCache == nil {
+		AssetCache = map[uint32]wire.AssetType{}
+	}
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -729,6 +732,9 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 }
 
 func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType) error {
+	if AssetCache == nil {
+		AssetCache = map[uint32]wire.AssetType{}
+	}
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
