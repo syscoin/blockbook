@@ -27,7 +27,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			if err != nil {
 				return err
 			} else {
-				glog.Warningf("ConnectAssetOutput asset %v was empty, skipping transaction...")
+				glog.Warningf("ConnectAssetOutput asset %v was empty, skipping transaction...", assetGuid)
 				return nil
 			}
 		} else {
