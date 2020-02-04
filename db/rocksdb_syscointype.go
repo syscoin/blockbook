@@ -751,9 +751,14 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 	
 	for guid, asset := range assets {
 		glog.Warningf("store asset %v", guid)
-		if _, ok := AssetCache[guid]; !ok {
-			AssetCache[guid] = *asset
+		if AssetCache == nil {
+			AssetCache = map[uint32]wire.AssetType{}
+		} else {
+			if _, ok := AssetCache[guid]; !ok {
+				AssetCache[guid] = *asset
+			}
 		}
+
 		assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.TotalSupply == -1 {
