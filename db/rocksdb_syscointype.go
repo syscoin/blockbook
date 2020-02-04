@@ -723,8 +723,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 	} else if d.chainParser.IsAssetTx(version) {
 		return d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
-		// assets only used on connect allocation input that this fn uses and that fn only uses if its an asset send, so pass nil here
-		return d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, nil)
+		return d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
 	}
 	return nil
 }
@@ -743,8 +742,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 	} else if d.chainParser.IsAssetTx(version) {
 		return d.DisconnectAssetOutput(sptData, balances, version, addresses, assets)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
-		// assets only used on disconnect allocation input that this fn uses and that fn only uses if its an asset send, so pass nil here
-		return d.DisconnectMintAssetOutput(sptData, balances, version, addresses, nil)
+		return d.DisconnectMintAssetOutput(sptData, balances, version, addresses, assets)
 	}
 	return nil
 }
