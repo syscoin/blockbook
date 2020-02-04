@@ -765,7 +765,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 // GetAddrDescContracts returns AddrContracts for given addrDesc
 func (d *RocksDB) GetAsset(guid uint32) (*wire.AssetType, error) {
 	if asset, ok := AssetCache[guid]; ok {
-		return &asset
+		return &asset, nil
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&h))[:]
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], assetGuid)
