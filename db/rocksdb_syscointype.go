@@ -773,18 +773,18 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.
 }
 
 func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wire.AssetType, error) {
-	var asset wire.AssetType
+	var assetDb wire.AssetType
 	var ok bool
 	glog.Warningf("get asset %v", guid)
 	if assets != nil {
-		if asset, ok = (*assets)[guid]; ok {
+		if assetL1, ok = (*assets)[guid]; ok {
 			glog.Warningf("got asset %v in l1cache", guid)
-			return asset, nil
+			return assetL1, nil
 		}
 	}
-	if asset, ok = AssetCache[guid]; ok {
+	if assetDb, ok = AssetCache[guid]; ok {
 		glog.Warningf("got asset %v in l2cache", guid)
-		return &asset, nil
+		return &assetDb, nil
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], assetGuid)
@@ -797,10 +797,10 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wi
 		return nil, nil
 	}
 	r := bytes.NewReader(buf)
-	err = asset.Deserialize(r)
+	err = assetDb.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
 	glog.Warningf("got asset %v from db", guid)
-	return &asset, nil
+	return &assetDb, nil
 }
