@@ -26,7 +26,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		if !d.chainParser.IsAssetActivateTx(version) {
 			return err
 		} else {
-			dbAsset = asset
+			dbAsset = &asset
 		}
 	}
 	strAssetGuid := strconv.FormatUint(uint64(assetGuid), 10)
