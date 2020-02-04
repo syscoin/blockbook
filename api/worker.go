@@ -790,9 +790,9 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		var i int = 0
 		var ownerFound bool = false
 		for k, v := range ba.AssetBalances {
-			dbAsset, err = w.db.GetAsset(uint32(k))
-			if err != nil {
-				return nil, err
+			dbAsset, errAsset := w.db.GetAsset(uint32(k))
+			if errAsset != nil {
+				return nil, errAsset
 			}
 			if !ownerFound {
 				// add token as unallocated if address matches asset owner address
@@ -812,7 +812,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 						BalanceSat:       (*bchain.Amount)(ownerBalance),
 						TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
 						TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
-						Contract:		  strconv.FormatUint(uint64(assetGuid), 10),
+						Contract:		  strconv.FormatUint(uint64(k), 10),
 						Transfers:		  v.Transfers,
 					}
 					ownerFound = true
@@ -829,7 +829,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
-				Contract:		  strconv.FormatUint(uint64(assetGuid), 10),
+				Contract:		  strconv.FormatUint(uint64(k), 10),
 				Transfers:		  v.Transfers,
 			}
 			i++
