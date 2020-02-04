@@ -10,7 +10,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
 )
-var AssetCache map[uint32]*wire.AssetType
+var AssetCache map[uint32]wire.AssetType
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var asset wire.AssetType
@@ -743,19 +743,19 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 
 func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*wire.AssetType) error {
 	for guid, asset := range assets {
-		if asset, ok = AssetCache[assetGuid]; !ok {
-			AssetCache[assetGuid] = asset
+		if _, ok := AssetCache[guid]; !ok {
+			AssetCache[guid] = *asset
 		}
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.TotalSupply == -1 {
-			wb.DeleteCF(d.cfh[cfAssets], guid)
+			wb.DeleteCF(d.cfh[cfAssets], ([]byte)(guid))
 		} else {
 			var buffer bytes.Buffer
-			err = asset.Serialize(buffer)
+			err := asset.Serialize(buffer)
 			if err != nil {
 				return err
 			}
-			wb.PutCF(d.cfh[cfAssets], guid, buffer.Bytes())
+			wb.PutCF(d.cfh[cfAssets], ([]byte)(guid), buffer.Bytes())
 		}
 	}
 	return nil
@@ -767,7 +767,7 @@ func (d *RocksDB) GetAsset(assetGuid uint32) (*wire.AssetType, error) {
 	if asset, ok = AssetCache[assetGuid]; ok {
 		return &asset
 	}
-	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], assetGuid)
+	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], ([]byte)(assetGuid))
 	if err != nil {
 		return nil, err
 	}
