@@ -1070,7 +1070,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	txAddressesToUpdate := make(map[string]*bchain.TxAddresses)
 	txsToDelete := make(map[string]struct{})
 	balances := make(map[string]*bchain.AddrBalance)
-	assets := make(map[uint32]*wire.AssetType{})
+	assets := make(map[uint32]*wire.AssetType)
 	for height := higher; height >= lower; height-- {
 		blockTxs := blocks[height-lower]
 		glog.Info("Disconnecting block ", height, " containing ", len(blockTxs), " transactions")

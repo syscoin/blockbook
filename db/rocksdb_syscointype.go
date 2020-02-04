@@ -22,7 +22,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 	assetGuid := asset.Asset
 	dBAsset, err = d.GetAsset(assetGuid)
 	if err != nil {
-		if !IsAssetActivateTx(version) {
+		if !d.chainParser.IsAssetActivateTx(version) {
 			return err
 		}
 	}
@@ -130,7 +130,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		balanceAsset.Transfers++
 		valueTo := big.NewInt(asset.Balance)
-		if !IsAssetActivateTx(version) {
+		if !d.chainParser.IsAssetActivateTx(version) {
 			balanceDb := big.NewInt(dBAsset.Balance)
 			balanceDb.Add(balanceDb, valueTo)
 			supplyDb := big.NewInt(dBAsset.TotalSupply)
@@ -150,7 +150,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			assets[assetGuid] = dBAsset
 		} else {
 			asset.TotalSupply = asset.Balance
-			assets[assetGuid] = asset
+			assets[assetGuid] = &asset
 		}
 		txAddresses.TokenTransfers[0] = &bchain.TokenTransfer {
 			Type:     bchain.SPTAssetUpdateType,
@@ -165,7 +165,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 	return nil
 }
 
-func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
+func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
 	var dBAsset *wire.AssetType
@@ -255,7 +255,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 			txAddresses.TokenTransfers[i].Type = bchain.SPTAssetSendType
 		}
 	}
-	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset)
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset, assets)
 }
 
 func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType) error {
@@ -463,7 +463,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 	} else if balance.AssetBalances != nil {
 		balanceAsset := balance.AssetBalances[assetGuid]
 		balanceAsset.Transfers--
-		if !IsAssetActivateTx(version) {
+		if !d.chainParser.IsAssetActivateTx(version) {
 			balanceDb := big.NewInt(dBAsset.Balance)
 			balanceDb.Sub(balanceDb, valueTo)
 			supplyDb := big.NewInt(dBAsset.TotalSupply)
@@ -482,7 +482,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		} else {
 			// flag to erase asset
 			asset.TotalSupply = -1
-			assets[assetGuid] = asset
+			assets[assetGuid] = &asset
 		}
 	} else {
 		glog.Warningf("DisconnectAssetOutput: Asset Sent balance not found guid %v (%v)", assetGuid, assetStrSenderAddrDesc)
@@ -535,7 +535,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	return nil
 
 }
-func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses) error {
+func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var mintasset wire.MintSyscoinType
 	var dBAsset *wire.AssetType
@@ -618,9 +618,9 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		Decimals: int(dBAsset.Precision),
 		Symbol:   string(dBAsset.Symbol),
 	}
-	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset)
+	return d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset, assets)
 }
-func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}) error {
+func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType) error {
 	r := bytes.NewReader(sptData)
 	var mintasset wire.MintSyscoinType
 	err := mintasset.Deserialize(r)
@@ -698,7 +698,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 		glog.Warningf("DisconnectMintAssetOutput Asset Balance for asset address %v (%v) not found", ad, addrDesc)
 	}
 	
-	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances)
+	return d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
 func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
@@ -714,7 +714,8 @@ func (d *RocksDB) ConnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, balan
 	} else if d.chainParser.IsAssetTx(version) {
 		return d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
-		return d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses)
+		// assets only used on connect allocation input that this fn uses and that fn only uses if its an asset send, so pass nil here
+		return d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, nil)
 	}
 	return nil
 }
@@ -733,7 +734,8 @@ func (d *RocksDB) DisconnectSyscoinOutputs(addrDesc bchain.AddressDescriptor, ba
 	} else if d.chainParser.IsAssetTx(version) {
 		return d.DisconnectAssetOutput(sptData, balances, version, addresses, assets)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
-		return d.DisconnectMintAssetOutput(sptData, balances, version, addresses)
+		// assets only used on disconnect allocation input that this fn uses and that fn only uses if its an asset send, so pass nil here
+		return d.DisconnectMintAssetOutput(sptData, balances, version, addresses, nil)
 	}
 	return nil
 }
