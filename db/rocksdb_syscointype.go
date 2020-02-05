@@ -10,6 +10,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
 	"unsafe"
+	"encoding/hex"
 )
 var AssetCache map[uint32]wire.AssetType
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
@@ -850,20 +851,20 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 			break
 		}
 		if glog.V(2) {
-			glog.Infof("rocksdb: assets %s: %s", uint32(key), hex.EncodeToString(val))
+			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), hex.EncodeToString(tx))
 		}
 		_, height, err := d.chainParser.UnpackAssetKey(key)
 		if err != nil {
 			return err
 		}
-		if err := fn(tx, height); err != nil {
+		if err := fn(string(tx), height); err != nil {
 			if _, ok := err.(*StopIteration); ok {
 				return nil
 			}
 			return err
 		}
-		if len(val) != 0 {
-			glog.Warningf("rocksdb: assets contain incorrect data %s: %s", uint32(key), hex.EncodeToString(val))
+		if len(tx) != 0 {
+			glog.Warningf("rocksdb: assets contain incorrect data %s: %s", binary.BigEndian.Uint32(key), hex.EncodeToString(tx))
 		}
 	}
 	return nil
