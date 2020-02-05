@@ -500,7 +500,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType, txAssets map[string]*TxAsset) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	// first process all outputs so that inputs can refer to txs in this block
@@ -562,7 +562,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				}
 			// process syscoin tx
 			} else if isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
-				err := d.ConnectSyscoinOutputs(block.Height, btxID, addrDesc, balances, tx.Version, addresses, btxID, int32(i), &ta, assets, txAssets)
+				err := d.ConnectSyscoinOutputs(block.Height, addrDesc, balances, tx.Version, addresses, btxID, int32(i), &ta, assets, txAssets)
 				if err != nil {
 					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 				}

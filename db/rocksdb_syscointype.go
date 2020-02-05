@@ -12,6 +12,8 @@ import (
 	"unsafe"
 )
 var AssetCache map[uint32]wire.AssetType
+// GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
+type GetTxAssetsCallback func(txid string, height uint32) error
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var asset wire.AssetType
@@ -708,7 +710,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	}
 	return assetGuid, d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
-func (d *RocksDB) ConnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
+func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -717,7 +719,6 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bc
 	if sptData == nil {
 		return nil
 	}
-	var err error
 	var assetGuid uint32
 	if d.chainParser.IsAssetAllocationTx(version) {
 		assetGuid, err = d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
@@ -741,7 +742,6 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 	if sptData == nil {
 		return nil
 	}
-	var err error
 	var assetGuid uint32
 	if d.chainParser.IsAssetAllocationTx(version) {
 		assetGuid, err = d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses, assets)
@@ -821,14 +821,14 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*wire.AssetType) (*wi
 	}
 	return &assetDb, nil
 }
-func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*TxAsset) error {
+func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
 	for txID, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		wb.PutCF(d.cfh[cfTxAssets], key, []byte(txID))
 	}
 	return nil
 }
-func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*TxAsset) error {
+func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
 	for txID, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
