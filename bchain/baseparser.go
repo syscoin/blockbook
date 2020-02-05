@@ -331,11 +331,11 @@ func (p *BaseParser) PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
 func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
 	return nil, errors.New("Not supported")
 }
-func (p *BaseParser) PackAssetKey(uint32 assetGuid, uint32 height) []byte {
+func (p *BaseParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	return nil
 }
 func (p *BaseParser) UnpackAssetKey(buf []byte) (uint32, uint32, error) {
-	return nil, errors.New("Not supported")
+	return 0, 0, errors.New("Not supported")
 }
 const packedHeightBytes = 4
 func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {

@@ -215,7 +215,7 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 const packedHeightBytes = 4
-func (p *SyscoinParser) PackAssetKey(uint32 assetGuid, height uint32) []byte {
+func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	assetGuidBytes := (*[4]byte)(unsafe.Pointer(&assetGuid))[:]
 	buf := make([]byte, len(assetGuidBytes)+packedHeightBytes)
 	copy(buf, assetGuidBytes)
