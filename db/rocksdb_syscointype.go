@@ -733,7 +733,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 	return err
 }
 
-func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) (uint32, error) {
+func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err

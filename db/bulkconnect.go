@@ -30,7 +30,7 @@ type BulkConnect struct {
 	balances           map[string]*bchain.AddrBalance
 	addressContracts   map[string]*AddrContracts
 	assets             map[uint32]*wire.AssetType
-	txAssetsMap        map[string]*bchain.TxAsset
+	txAssets        map[string]*bchain.TxAsset
 	height             uint32
 }
 
@@ -57,7 +57,7 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 		balances:         make(map[string]*bchain.AddrBalance),
 		addressContracts: make(map[string]*AddrContracts),
 		assets:           make(map[uint32]*wire.AssetType),
-		txAssetsMap:      make(map[string]*bchain.TxAsset),
+		txAssets:      make(map[string]*bchain.TxAsset),
 	}
 	if err := d.SetInconsistentState(true); err != nil {
 		return nil, err
@@ -168,14 +168,14 @@ func (b *BulkConnect) parallelStoreAssets(c chan error, all bool) {
 func (b *BulkConnect) storeTxAssets(wb *gorocksdb.WriteBatch, all bool) (int, error) {
 	var assetsMap map[string]*bchain.TxAsset
 	if all {
-		assetsMap = b.txAssetsMap
-		b.txAssetsMap = make(map[string]*bchain.TxAsset)
+		assetsMap = b.txAssets
+		b.txAssets = make(map[string]*bchain.TxAsset)
 	} else {
 		assetsMap = make(map[string]*bchain.TxAsset)
 		// store some random asset txids
-		for k, a := range b.txAssetsMap {
+		for k, a := range b.txAssets {
 			assetsMap[k] = a
-			delete(b.txAssetsMap, k)
+			delete(b.txAssets, k)
 			if len(assetsMap) >= partialStoreAssets {
 				break
 			}
@@ -261,7 +261,7 @@ func (b *BulkConnect) storeBulkAddresses(wb *gorocksdb.WriteBatch) error {
 
 func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs bool) error {
 	addresses := make(bchain.AddressesMap)
-	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, b.assets); err != nil {
+	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, b.assets, b.txAssets); err != nil {
 		return err
 	}
 	var storeAddressesChan, storeBalancesChan, storeAssetsChan, storeTxAssetsChan chan error
@@ -280,7 +280,7 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 			storeAssetsChan = make(chan error)
 			go b.parallelStoreAssets(storeAssetsChan, false)
 		}
-		if len(b.txAssetsMap)+partialStoreTxAssets > maxBulkTxAssets {
+		if len(b.txAssets)+partialStoreTxAssets > maxBulkTxAssets {
 			storeTxAssetsChan = make(chan error)
 			go b.parallelStoreTxAssets(storeTxAssetsChan, false)
 		}

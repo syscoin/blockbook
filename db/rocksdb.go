@@ -437,7 +437,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	addresses := make(bchain.AddressesMap)
 	if chainType == bchain.ChainBitcoinType {
 		assets := map[uint32]*wire.AssetType{}
-		txAssets := map[string]*TxAsset{}
+		txAssets := map[string]*bchain.TxAsset{}
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
 		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets, txAssets); err != nil {
@@ -455,7 +455,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 		if err := d.storeAssets(wb, assets); err != nil {
 			return err
 		}
-		if err := d.storeTxAssets(wb, txAssetsMap); err != nil {
+		if err := d.storeTxAssets(wb, txAssets); err != nil {
 			return err
 		}
 	} else if chainType == bchain.ChainEthereumType {

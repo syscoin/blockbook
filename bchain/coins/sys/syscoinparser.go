@@ -214,7 +214,25 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	}
 	return nil
 }
+const packedHeightBytes = 4
+func (p *SyscoinParser) PackAssetKey(uint32 assetGuid, height uint32) []byte {
+	assetGuidBytes := (*[4]byte)(unsafe.Pointer(&assetGuid))[:]
+	buf := make([]byte, len(assetGuidBytes)+packedHeightBytes)
+	copy(buf, assetGuidBytes)
+	// pack height as binary complement to achieve ordering from newest to oldest block
+	binary.BigEndian.PutUint32(buf[len(assetGuidBytes):], ^height)
+	return buf
+}
 
+func (p *SyscoinParser) UnpackAssetKey(key []byte) (uint32, uint32, error) {
+	i := len(key) - packedHeightBytes
+	if i <= 0 {
+		return 0, 0, errors.New("Invalid asset key")
+	}
+	assetGuid := binary.BigEndian.Uint32(key[:i])
+	// height is packed in binary complement, convert it
+	return assetGuid, ^p.UnpackUint(key[i : i+packedHeightBytes]), nil
+}
 func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
 	txs, l := p.BaseParser.UnpackVaruint(buf)
 	sentSat, sl := p.BaseParser.UnpackBigint(buf[l:])

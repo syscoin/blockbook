@@ -589,6 +589,8 @@ type BlockChainParser interface {
 	IsAssetActivateTx(nVersion int32) bool
 	IsAssetSendTx(nVersion int32) bool
 	TryGetOPReturn(script []byte) []byte
+	PackAssetKey(uint32 assetGuid, height uint32) []byte
+	UnpackAssetKey(key []byte) (uint32, uint32, error)
 }
 
 // Mempool defines common interface to mempool
