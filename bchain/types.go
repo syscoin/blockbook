@@ -433,6 +433,12 @@ type TokenTransfer struct {
 	Value    *Amount   `json:"value"`
 }
 
+// used to store all txids related to an asset for asset history
+type TxAsset struct {
+	AssetGuid uint32
+	Height  uint32
+}
+
 // TxAddresses stores transaction inputs and outputs with amounts
 type TxAddresses struct {
 	Version int32

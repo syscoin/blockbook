@@ -102,6 +102,7 @@ const (
 	cfAddressContracts = cfAddressBalance
 	// SyscoinType
 	cfAssets
+	cfTxAssets
 
 )
 
@@ -110,7 +111,7 @@ var cfNames []string
 var cfBaseNames = []string{"default", "height", "addresses", "blockTxs", "transactions", "fiatRates"}
 
 // type specific columns
-var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "cfAssets"}
+var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "cfAssets", "cfTxAssets"}
 var cfNamesEthereumType = []string{"addressContracts"}
 
 func openDB(path string, c *gorocksdb.Cache, openFiles int) (*gorocksdb.DB, []*gorocksdb.ColumnFamilyHandle, error) {
@@ -436,9 +437,10 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	addresses := make(bchain.AddressesMap)
 	if chainType == bchain.ChainBitcoinType {
 		assets := map[uint32]*wire.AssetType{}
+		txAssets := map[string]*TxAsset{}
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
-		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets); err != nil {
+		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets, txAssets); err != nil {
 			return err
 		}
 		if err := d.storeTxAddresses(wb, txAddressesMap); err != nil {
@@ -451,6 +453,9 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 			return err
 		}
 		if err := d.storeAssets(wb, assets); err != nil {
+			return err
+		}
+		if err := d.storeTxAssets(wb, txAssetsMap); err != nil {
 			return err
 		}
 	} else if chainType == bchain.ChainEthereumType {
@@ -495,7 +500,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType, txAssets map[string]*TxAsset) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	// first process all outputs so that inputs can refer to txs in this block
@@ -557,7 +562,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				}
 			// process syscoin tx
 			} else if isSyscoinTx && addrDesc[0] == txscript.OP_RETURN {
-				err := d.ConnectSyscoinOutputs(addrDesc, balances, tx.Version, addresses, btxID, int32(i), &ta, assets)
+				err := d.ConnectSyscoinOutputs(block.Height, btxID, addrDesc, balances, tx.Version, addresses, btxID, int32(i), &ta, assets, txAssets)
 				if err != nil {
 					glog.Warningf("rocksdb: ConnectSyscoinOutputs: height %d, tx %v, output %v, error %v", block.Height, tx.Txid, output, err)
 				}
@@ -940,7 +945,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 // Disconnect blocks
 
 func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32, btxID []byte, inputs []bchain.DbOutpoint, txa *bchain.TxAddresses,
-	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType) error {
+	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
 	var err error
 	var balance *bchain.AddrBalance
 	addresses := make(map[string]struct{})
@@ -1037,7 +1042,7 @@ func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32,
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
 				}
 			} else if isSyscoinTx && t.AddrDesc[0] == txscript.OP_RETURN {
-				err = d.DisconnectSyscoinOutputs(t.AddrDesc, balances, txa.Version, addresses, assets)
+				err = d.DisconnectSyscoinOutputs(height, btxID, t.AddrDesc, balances, txa.Version, addresses, assets, txAssets)
 				if err != nil {
 					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, error %v", height, btxID, err)
 				}
@@ -1071,6 +1076,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	txsToDelete := make(map[string]struct{})
 	balances := make(map[string]*bchain.AddrBalance)
 	assets := make(map[uint32]*wire.AssetType)
+	txAssets := make(map[string]*bchain.TxAsset)
 	for height := higher; height >= lower; height-- {
 		blockTxs := blocks[height-lower]
 		glog.Info("Disconnecting block ", height, " containing ", len(blockTxs), " transactions")
@@ -1090,7 +1096,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 				glog.Warning("TxAddress for txid ", ut, " not found")
 				continue
 			}
-			if err := d.disconnectTxAddresses(wb, height, btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, balances, assets); err != nil {
+			if err := d.disconnectTxAddresses(wb, height, btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, balances, assets, txAssets); err != nil {
 				return err
 			}
 		}
@@ -1101,6 +1107,7 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	d.storeTxAddresses(wb, txAddressesToUpdate)
 	d.storeBalancesDisconnect(wb, balances)
 	d.storeAssets(wb, assets)
+	d.removeTxAssets(wb, txAssets)
 	for s := range txsToDelete {
 		b := []byte(s)
 		wb.DeleteCF(d.cfh[cfTransactions], b)
