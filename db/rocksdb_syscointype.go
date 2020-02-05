@@ -831,7 +831,7 @@ func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*b
 	return nil
 }
 func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
-	for txID, txAsset := range txassets {
+	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
@@ -840,7 +840,6 @@ func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*
 // GetTxAssets finds all asset transactions for each asset
 // Transaction are passed to callback function in the order from newest block to the oldest
 func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn GetTxAssetsCallback) (err error) {
-	txidUnpackedLen := d.chainParser.PackedTxidLen()
 	startKey := d.chainParser.PackAssetKey(assetGuid, higher)
 	stopKey := d.chainParser.PackAssetKey(assetGuid, lower)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfTxAssets])
