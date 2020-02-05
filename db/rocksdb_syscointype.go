@@ -11,6 +11,7 @@ import (
 	"github.com/tecbot/gorocksdb"
 	"unsafe"
 	"encoding/hex"
+	"encoding/binary"
 )
 var AssetCache map[uint32]wire.AssetType
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
@@ -836,7 +837,7 @@ func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*
 	}
 	return nil
 }
-// GetTxAssets finds all asset transactions for asset guid
+// GetTxAssets finds all asset transactions for each asset
 // Transaction are passed to callback function in the order from newest block to the oldest
 func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn GetTxAssetsCallback) (err error) {
 	txidUnpackedLen := d.chainParser.PackedTxidLen()
