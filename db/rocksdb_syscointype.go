@@ -708,7 +708,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	}
 	return assetGuid, d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
-func (d *RocksDB) ConnectSyscoinOutputs(height uint32, []byte btxID, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
+func (d *RocksDB) ConnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -732,7 +732,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, []byte btxID, addrDesc bc
 	return err
 }
 
-func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, []byte btxID, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) (uint32, error) {
+func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) (uint32, error) {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
