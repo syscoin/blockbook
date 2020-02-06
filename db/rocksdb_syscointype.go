@@ -865,7 +865,7 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 	return assetDb, nil
 }
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
-	for txAsset := range txassets {
+	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		buffer := &bytes.Buffer{}
 		gob.NewEncoder(buffer).Encode(txAsset.Txids)
@@ -874,7 +874,7 @@ func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*b
 	return nil
 }
 func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets []*bchain.TxAsset) error {
-	for txAsset := range txassets {
+	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
