@@ -24,7 +24,7 @@ func (d *RocksDB) GetAuxFeeAddr(pubData []byte) (*bchain.AddressDescriptor, erro
 	if err != nil {
 		return nil, err
 	}
-	addrDesc, err = d.chainParser.GetAddrDescFromAddress(f.Aux_fees.Address))
+	addrDesc, err = d.chainParser.GetAddrDescFromAddress(f.Aux_fees.Address)
 	if err != nil {
 		return nil, err
 	}
