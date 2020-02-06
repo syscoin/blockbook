@@ -11,6 +11,7 @@ import (
 	"unsafe"
 	"encoding/binary"
 	"encoding/json"
+	"github.com/syscoin/btcd/wire"
 )
 var AssetCache map[uint32]bchain.Asset
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
@@ -231,7 +232,6 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		From:     senderAddress,
 		Decimals: int(dBAsset.AssetObj.Precision),
 		Symbol:   string(dBAsset.AssetObj.Symbol),
-		Transfers: transfers,
 	}
 	if d.chainParser.IsAssetSendTx(version) {
 		txAddresses.TokenTransferSummary.Type = bchain.SPTAssetSendType
@@ -286,8 +286,8 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAsset.BalanceAssetSat.Add(balanceAsset.BalanceAssetSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		// if receiver is aux fees address for this asset, add fee for summary
-		if dBAsset.AuxFeesAddr == addrDesc {
-			totalFee.Add(totalFee, amount)
+		if bytes.Equal(dBAsset.AuxFeesAddr, addrDesc) {
+			totalFeeValue.Add(totalFeeValue, amount)
 		}
 		txAddresses.TokenTransferSummary.Recipients[i] = &bchain.TokenTransferRecipient {
 			To:       receiverAddress,
@@ -296,7 +296,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	}
 	txAddresses.TokenTransferSummary.Value = (*bchain.Amount)(totalAssetSentValue)
 	if totalFee.Int64() > 0 {
-		txAddresses.TokenTransferSummary.Fee = (*bchain.Amount)(totalFee)
+		txAddresses.TokenTransferSummary.Fee = (*bchain.Amount)(totalFeeValue)
 	}
 	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset, assets)
 }

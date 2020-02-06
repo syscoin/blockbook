@@ -13,6 +13,7 @@ import (
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/martinboehm/btcutil"
 	"github.com/juju/errors"
+	vlq "github.com/bsm/go-vlq"
 )
 
 // magic numbers
@@ -400,7 +401,7 @@ func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSumm
 	buf = append(buf, varBuf[:l]...)
 	if recipients > 0 {
 		tts.Recipients = make([]*bchain.TokenTransferRecipient, recipients)
-		for i := uint(0); i < recipients; i++ {
+		for i := 0; i < recipients; i++ {
 			buf = p.AppendTokenTransferRecipient(tts.Recipients[i], buf, varBuf)
 		}
 	}
@@ -416,10 +417,10 @@ func (p *SyscoinParser) UnpackTokenTransferRecipient(ttr *bchain.TokenTransferRe
 	ttr.Value = (*bchain.Amount)(&Value)
 	return ll+l
 }
-func (p *SyscoinParser) AppendTokenTransferRecipient(ttr *bchain.TokenTransferRecipient, buf []byte, varBuf []byte) int {
+func (p *SyscoinParser) AppendTokenTransferRecipient(ttr *bchain.TokenTransferRecipient, buf []byte, varBuf []byte) []byte] {
 	l := p.BaseParser.PackVaruint(uint(len(ttr.To)), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.PackBigint((*big.Int)(tt.Value), varBuf)
+	l = p.BaseParser.PackBigint((*big.Int)(ttr.Value), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
@@ -504,5 +505,5 @@ func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 		return nil, err
 	}
 	asset.AuxFeesAddr = append([]byte(nil), buf[r.Len():]...)
-	return &asset
+	return &asset, nil
 }
