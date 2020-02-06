@@ -614,6 +614,8 @@ type BlockChainParser interface {
 	TryGetOPReturn(script []byte) []byte
 	PackAssetKey(assetGuid uint32, height uint32) []byte
 	UnpackAssetKey(key []byte) (uint32, uint32, error)
+	PackAsset(asset *Asset) ([]byte, error)
+	UnpackAsset(buf []byte) (*Asset, error) 
 }
 
 // Mempool defines common interface to mempool

@@ -409,7 +409,7 @@ func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSumm
 
 func (p *SyscoinParser) UnpackTokenTransferRecipient(ttr *bchain.TokenTransferRecipient, buf []byte) int {
 	var Value big.Int
-	al, l := p.BaseParser.UnpackVaruint(buf[])
+	al, l := p.BaseParser.UnpackVaruint(buf)
 	ttr.To = string(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := l+int(al)
 	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
