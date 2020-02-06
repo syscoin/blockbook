@@ -28,7 +28,7 @@ type BulkConnect struct {
 	txAddressesMap     map[string]*bchain.TxAddresses
 	balances           map[string]*bchain.AddrBalance
 	addressContracts   map[string]*AddrContracts
-	assets             map[uint32]*bchain.bchain.Asset
+	assets             map[uint32]*bchain.Asset
 	txAssets           map[string]*bchain.TxAsset
 	height             uint32
 }
