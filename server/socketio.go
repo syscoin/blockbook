@@ -253,12 +253,16 @@ func (s *SocketIoServer) getAddressTxids(addr []string, opts *addrOpts) (res res
 	return res, nil
 }
 
-func (s *SocketIoServer) getAssetTxids(assets []uint32, opts *addrOpts) (res resultAddressTxids, err error) {
+func (s *SocketIoServer) getAssetTxids(assets []string, opts *addrOpts) (res resultAddressTxids, err error) {
 	txids := make([]string, 0, 8)
 	lower, higher := uint32(opts.End), uint32(opts.Start)
 	for _, asset := range assets {
+		assetGuid, err := strconv.Atoi(summary.Token)
+		if err != nil {
+			return nil, err
+		}
 		if !opts.QueryMempoolOnly {
-			err = s.db.GetTxAssets(asset, lower, higher, func(txids []string) error {
+			err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, func(txids []string) error {
 				txids = append(txids, txids...)
 				return nil
 			})
@@ -379,7 +383,7 @@ func txToResTx(tx *api.Tx) resTx {
 	}
 	if len(tx.TokenTransferSummary) > 0 {
 		mapTokens := map[uint32]*api.TokenBalanceHistory{}
-		for summary := range tx.TokenTransferSummary {
+		for _, summary := range tx.TokenTransferSummary {
 			assetGuid, err := strconv.Atoi(summary.Token)
 			if err != nil {
 				return resultTx
@@ -500,7 +504,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 		}
 		if len(tx.TokenTransferSummary) > 0 {
 			mapTokens := map[uint32]*api.TokenBalanceHistory{}
-			for summary := range tx.TokenTransferSummary {
+			for _, summary := range tx.TokenTransferSummary {
 				assetGuid, err := strconv.Atoi(summary.Token)
 				if err != nil {
 					return res, err
@@ -541,7 +545,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	}
 	return
 }
-func (s *SocketIoServer) getAssetHistory(assets []uint32, opts *addrOpts) (res resultGetAssetHistory, err error) {
+func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res resultGetAssetHistory, err error) {
 	txr, err := s.getAssetTxids(assets, opts)
 	if err != nil {
 		return
@@ -557,7 +561,7 @@ func (s *SocketIoServer) getAssetHistory(assets []uint32, opts *addrOpts) (res r
 		if err != nil {
 			return res, err
 		}
-		for summary := range tx.TokenTransferSummary {
+		for _, summary := range tx.TokenTransferSummary {
 			// we don't need recipient data for asset history list
 			summary.Recipients = nil
 			res.Result.Items = append(res.Result.Items, summary)
