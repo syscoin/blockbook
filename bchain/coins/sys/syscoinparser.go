@@ -328,33 +328,11 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	}
 	return buf
 }
-
-func (p *SyscoinParser) AppendTokenTransfer(tt *bchain.TokenTransfer, buf []byte, varBuf []byte) []byte {
-	l := p.BaseParser.PackVaruint(uint(len(tt.Type)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, []byte(tt.Type)...)
-	l = p.BaseParser.PackVaruint(uint(len(tt.From)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, []byte(tt.From)...)
-	l = p.BaseParser.PackVaruint(uint(len(tt.To)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, []byte(tt.To)...)
-	l = p.BaseParser.PackVaruint(uint(len(tt.Token)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, []byte(tt.Token)...)
-	l = p.BaseParser.PackVaruint(uint(len(tt.Symbol)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, []byte(tt.Symbol)...)
-	l = p.BaseParser.PackVaruint(uint(tt.Decimals), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	l = p.BaseParser.PackBigint((*big.Int)(tt.Value), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	return buf
-}
-
-func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte) int {
+func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSummary, buf []byte) int {
 	var Decimals uint
 	var Value big.Int
+	var Fee big.Int
+	var recipients uint
 	al, l := p.BaseParser.UnpackVaruint(buf)
 	tt.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := l+int(al)
@@ -380,9 +358,71 @@ func (p *SyscoinParser) UnpackTokenTransfer(tt *bchain.TokenTransfer, buf []byte
 	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
 	tt.Value = (*bchain.Amount)(&Value)
 	ll += l
+	Fee, l = p.BaseParser.UnpackBigint(buf[ll:])
+	tt.Fee = (*bchain.Amount)(&Fee)
+	ll += l
+	recipients, l = p.BaseParser.UnpackVaruint(buf[ll:])
+	ll += l
+	if recipients > 0 {
+		tts.Recipients = make([]*bchain.TokenTransferRecipients, recipients)
+		for i := uint(0); i < recipients; i++ {
+			tts.Recipients[i] = &bchain.TokenTransferRecipient{}
+			l += p.UnpackTokenTransfer(tts.Recipients[i] , buf[ll:])
+			ll += l
+		}
+	}
 	return ll
 }
+func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSummary, buf []byte, varBuf []byte) []byte {
+	l := p.BaseParser.PackVaruint(uint(len(tts.Type)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tts.Type)...)
+	l = p.BaseParser.PackVaruint(uint(len(tts.From)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tts.From)...)
+	l = p.BaseParser.PackVaruint(uint(len(tts.To)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tts.To)...)
+	l = p.BaseParser.PackVaruint(uint(len(tts.Token)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tts.Token)...)
+	l = p.BaseParser.PackVaruint(uint(len(tts.Symbol)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(tts.Symbol)...)
+	l = p.BaseParser.PackVaruint(uint(tts.Decimals), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackBigint((*big.Int)(tts.Value), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackBigint((*big.Int)(tts.Fee), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	var recipients := len(tts.Recipients)
+	l = p.BaseParser.PackVaruint(uint(recipients), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	if recipients > 0 {
+		tts.TokenTransferSummary.Recipients = make([]*bchain.TokenTransferRecipient, recipients)
+		for i := uint(0); i < recipients; i++ {
+			buf = p.AppendTokenTransferRecipient(tts.TokenTransferSummary.Recipients[i], buf, varBuf)
+		}
+	}
+	return buf
+}
 
+func (p *SyscoinParser) UnpackTokenTransferRecipient(ttr *bchain.TokenTransferRecipient, buf []byte) int {
+	var Value big.Int
+	al, l := p.BaseParser.UnpackVaruint(buf[])
+	ttr.To = string(append([]byte(nil), buf[l:l+int(al)]...))
+	ll := l+int(al)
+	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
+	ttr.Value = (*bchain.Amount)(&Value)
+	return ll+l
+}
+func (p *SyscoinParser) AppendTokenTransferRecipient(ttr *bchain.TokenTransferRecipient, buf []byte) int {
+	l := p.BaseParser.PackVaruint(uint(len(tt.To)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackBigint((*big.Int)(tt.Value), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
 func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	// pack version info for syscoin to detect sysx tx types
@@ -400,13 +440,15 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	for i := range ta.Outputs {
 		buf = p.BitcoinParser.AppendTxOutput(&ta.Outputs[i], buf, varBuf)
 	}
-	tokenTransfers := len(ta.TokenTransfers)
-	l = p.BaseParser.PackVaruint(uint(tokenTransfers), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	if tokenTransfers > 0 {
-		for i := range ta.TokenTransfers {
-			buf = p.AppendTokenTransfer(ta.TokenTransfers[i], buf, varBuf)
-		}
+	// if there is TTS then send a 1 for a signal it exists following the TTS 
+	// otherwise 0 so when unpacking we know theres no token transfers
+	if ta.TokenTransferSummary != nil {
+		l = p.BaseParser.PackVaruint(1, varBuf)
+		buf = append(buf, varBuf[:l]...)
+		buf = p.AppendTokenTransferSummary(ta.TokenTransferSummary, buf, varBuf)
+	} else {
+		l = p.BaseParser.PackVaruint(0, varBuf)
+		buf = append(buf, varBuf[:l]...)	
 	}
 	return buf
 }
@@ -431,14 +473,36 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	for i := uint(0); i < outputs; i++ {
 		l += p.BitcoinParser.UnpackTxOutput(&ta.Outputs[i], buf[l:])
 	}
-	tokenTransfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	tokenTransferSummary, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
-	if tokenTransfers > 0 {
-		ta.TokenTransfers = make([]*bchain.TokenTransfer, tokenTransfers)
-		for i := uint(0); i < tokenTransfers; i++ {
-			ta.TokenTransfers[i] = &bchain.TokenTransfer{}
-			l += p.UnpackTokenTransfer(ta.TokenTransfers[i], buf[l:])
-		}
+	// ensure there is token info before unpacking it
+	if tokenTransferSummary > 0 {
+		ta.TokenTransferSummary = &bchain.TokenTransferSummary{}
+		l += p.UnpackTokenTransferSummary(ta.TokenTransferSummary, buf[l:])
 	}
 	return &ta, nil
+}
+
+func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
+	buf := make([]byte, 0, 32)
+	basset := make([]byte, vlq.MaxLen32)
+	var buffer bytes.Buffer
+	err := asset.assetObj.Serialize(&buffer)
+	if err != nil {
+		return nil, err
+	}
+	buf = append(buf, buffer.Bytes()...)
+	buf = append(buf, asset.auxFeesAddr...)
+	return buf, nil
+}
+
+func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
+	var asset bchain.Asset
+	r := bytes.NewReader(buf)
+	err := asset.assetObj.Deserialize(r)
+	if err != nil {
+		return nil, err
+	}
+	asset.auxFeesAddr = append([]byte(nil), buf[r.Len():]...)
+	return &asset
 }

@@ -124,8 +124,7 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
 	var err error
 	var ta *bchain.TxAddresses
-	var tokens *[]*bchain.TokenTransfer
-	var tokensEth []*bchain.TokenTransfer
+	var tokens []*bchain.TokenTransferSummary
 	var ethSpecific *EthereumSpecific
 	var blockhash string
 	if bchainTx.Confirmations > 0 {
@@ -251,13 +250,15 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		tokens = &ta.TokenTransfers
+		if ta.TokenTransferSummary != nil {
+			tokens = []*TokenTransferSummary{ta.TokenTransferSummary}
+		}
 	} else if w.chainType == bchain.ChainEthereumType {
 		ets, err := w.chainParser.EthereumTypeGetErc20FromTx(bchainTx)
 		if err != nil {
 			glog.Errorf("GetErc20FromTx error %v, %v", err, bchainTx)
 		}
-		tokensEth = make([]*bchain.TokenTransfer, len(ets))
+		tokens = make([]*bchain.TokenTransferSummary, len(ets))
 		for i := range ets {
 			e := &ets[i]
 			cd, err := w.chainParser.GetAddrDescFromAddress(e.Contract)
@@ -272,7 +273,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			if erc20c == nil {
 				erc20c = &bchain.Erc20Contract{Name: e.Contract}
 			}
-			tokensEth[i] = &bchain.TokenTransfer{
+			tokens[i] = &bchain.TokenTransferSummary{
 				Type:     bchain.ERC20TokenType,
 				Token:    e.Contract,
 				From:     e.From,
@@ -298,7 +299,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			Nonce:    ethTxData.Nonce,
 			Status:   ethTxData.Status,
 		}
-		tokens = &tokensEth
 	}
 	// for now do not return size, we would have to compute vsize of segwit transactions
 	// size:=len(bchainTx.Hex) / 2
@@ -330,7 +330,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Vout:             vouts,
 		CoinSpecificData: bchainTx.CoinSpecificData,
 		CoinSpecificJSON: sj,
-		TokenTransfers:   *tokens,
+		TokenTransferSummary:   tokens,
 		EthereumSpecific: ethSpecific,
 	}
 	return r, nil
@@ -396,6 +396,45 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 	return txids, nil
 }
 
+func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
+	var err error
+	txids := make([]string, 0, 4)
+	var callback db.GetTxAssetsCallback
+	callback = func(txids []string) error {
+		txids = append(txids, txids...)
+		if len(txids) >= maxResults {
+			return &db.StopIteration{}
+		}
+		return nil
+	}
+	if mempool {
+		// TODO: for now don't have mempool storage of asset txids per guid, will do in future
+		/*uniqueTxs := make(map[string]struct{})
+		o, err := w.mempool.GetTxAssets(assetGuid)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range o {
+			if _, found := uniqueTxs[m.Txid]; !found {
+				l := len(txids)
+				callback(m.Txid, 0)
+				if len(txids) > l {
+					uniqueTxs[m.Txid] = struct{}{}
+				}
+			}
+		}*/
+	} else {
+		to := filter.ToHeight
+		if to == 0 {
+			to = maxUint32
+		}
+		err = w.db.GetTxAssets(assetGuid, filter.FromHeight, to, callback)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return txids, nil
+}
 func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
 	for _, vout := range t.Vout {
@@ -476,7 +515,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
 		Vin:           vins,
 		Vout:          vouts,
-		TokenTransfers:  ta.TokenTransfers,
+		TokenTransferSummary:  []*TokenTransferSummary{a.TokenTransferSummary},
 	}
 	return r
 }
@@ -796,19 +835,19 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			}
 			if !ownerFound {
 				// add token as unallocated if address matches asset owner address
-				ownerAddress := dbAsset.WitnessAddress.ToString("sys")
+				ownerAddress := dbAsset.assetObj.WitnessAddress.ToString("sys")
 				ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
 				if e != nil {
 					return nil, e
 				}
 				if bytes.Equal(addrDesc, ownerAddrDesc) {
-					ownerBalance := big.NewInt(dbAsset.Balance)
+					ownerBalance := big.NewInt(dbAsset.assetObj.Balance)
 					totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
 					tokens[i] = &bchain.Token{
 						Type:             bchain.SPTUnallocatedTokenType,
 						Name:             address,
-						Decimals:         int(dbAsset.Precision),
-						Symbol:			  string(dbAsset.Symbol),
+						Decimals:         int(dbAsset.assetObj.Precision),
+						Symbol:			  string(dbAsset.assetObj.Symbol),
 						BalanceSat:       (*bchain.Amount)(ownerBalance),
 						TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
 						TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
@@ -824,8 +863,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			tokens[i] = &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             address,
-				Decimals:         int(dbAsset.Precision),
-				Symbol:			  string(dbAsset.Symbol),
+				Decimals:         int(dbAsset.assetObj.Precision),
+				Symbol:			  string(dbAsset.assetObj.Symbol),
 				BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
@@ -923,12 +962,11 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				(*big.Int)(bh.ReceivedSat).Add((*big.Int)(bh.ReceivedSat), &tao.ValueSat)
 			}
 		}
-		if len(ta.TokenTransfers) > 0 {
+		if ta.TokenTransferSummary != nil {
 			var err error
 			var assetGuid int
-			tatt := ta.TokenTransfers[0]
 			bh.Tokens = make([]*TokenBalanceHistory, 1)
-			assetGuid, err = strconv.Atoi(tatt.Token)
+			assetGuid, err = strconv.Atoi(ta.TokenTransferSummary.Token)
 			if err != nil {
 				return nil, err
 			}
@@ -939,15 +977,15 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 			}
 			// only need to check one from, as from for all token transfers should be the same per tx
 			var tattAddrFromDesc, tattAddrToDesc bchain.AddressDescriptor
-			tattAddrFromDesc, err = w.chainParser.GetAddrDescFromAddress(tatt.From)
+			tattAddrFromDesc, err = w.chainParser.GetAddrDescFromAddress(ta.TokenTransferSummary.From)
 			if err != nil {
 				return nil, err
 			}
 			if bytes.Equal(addrDesc, tattAddrFromDesc) {
-				(*big.Int)(bh.Tokens[0].SentSat).Add((*big.Int)(bh.Tokens[0].SentSat), (*big.Int)(tatt.Value))
+				(*big.Int)(bh.Tokens[0].SentSat).Add((*big.Int)(bh.Tokens[0].SentSat), (*big.Int)(ta.TokenTransferSummary.Value))
 			// if From addr is found then don't need to check To, because From and To's are mutually exclusive
 			} else {
-				for _,tattr := range ta.TokenTransfers {
+				for _,tattr := range ta.TokenTransferSummary.Recipients {
 					tattAddrToDesc, err = w.chainParser.GetAddrDescFromAddress(tattr.To)
 					if err != nil {
 						return nil, err

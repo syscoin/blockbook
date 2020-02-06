@@ -255,19 +255,19 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				}
 				if !ownerFound {
 					// add token as unallocated if address matches asset owner address
-					ownerAddress := dbAsset.WitnessAddress.ToString("sys")
+					ownerAddress := dbAsset.assetObj.WitnessAddress.ToString("sys")
 					ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
 					if e != nil {
 						return nil, e
 					}
 					if bytes.Equal(ad.addrDesc, ownerAddrDesc) {
-						ownerBalance := big.NewInt(dbAsset.Balance)
+						ownerBalance := big.NewInt(dbAsset.assetObj.Balance)
 						totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
 						tokens[i] = &bchain.Token{
 							Type:             bchain.SPTUnallocatedTokenType,
 							Name:             address,
-							Decimals:         int(dbAsset.Precision),
-							Symbol:			  string(dbAsset.Symbol),
+							Decimals:         int(dbAsset.assetObj.Precision),
+							Symbol:			  string(dbAsset.assetObj.Symbol),
 							BalanceSat:       (*bchain.Amount)(ownerBalance),
 							TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
 							TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
@@ -283,8 +283,8 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				tokens[i] = &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             address,
-					Decimals:         int(dbAsset.Precision),
-					Symbol:			  string(dbAsset.Symbol),
+					Decimals:         int(dbAsset.assetObj.Precision),
+					Symbol:			  string(dbAsset.assetObj.Symbol),
 					BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 					TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),

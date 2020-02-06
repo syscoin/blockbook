@@ -10,6 +10,7 @@ import (
 	"unsafe"
 	"bytes"
 	"github.com/golang/glog"
+	"github.com/syscoin/btcd/wire"
 )
 
 // ChainType is type of the blockchain
@@ -406,6 +407,20 @@ func (a *Amount) AsInt64() int64 {
 	return (*big.Int)(a).Int64()
 }
 
+// for unmarshalling auxiliary fees in Syscoin pub data field
+type AuxFeesObj struct {
+	Address string `json:"address"`
+}
+
+type AuxFees struct {
+	Aux_fees AuxFeesObj `json:"aux_fees"`
+}
+  
+// encapuslates Syscoin SPT as well as aux fees object unmarshalled
+type Asset struct {
+	assetObj wire.AssetType
+	auxFees AuxFees
+}
 // Token contains info about tokens held by an address
 type Token struct {
 	Type             TokenType `json:"type"`
@@ -421,8 +436,13 @@ type Token struct {
 	ContractIndex    string    `json:"-"`
 }
 
-// TokenTransfer contains info about a token transfer done in a transaction
-type TokenTransfer struct {
+// TokenTransferRecipient contains a recipient for an asset, can be multiple in a token transfer
+type TokenTransferRecipient struct {
+	To       string    `json:"to"`
+	Value    *Amount   `json:"value"`
+}
+// TokenTransferSummary contains info about a token transfer done in a transaction
+type TokenTransferSummary struct {
 	Type     TokenType `json:"type"`
 	From     string    `json:"from"`
 	To       string    `json:"to"`
@@ -430,13 +450,16 @@ type TokenTransfer struct {
 	Name     string    `json:"name"`
 	Symbol   string    `json:"symbol"`
 	Decimals int       `json:"decimals"`
-	Value    *Amount   `json:"value"`
+	Value	 *Amount   `json:"totalAmount"`
+	Fee      *Amount   `json:"fee"`
+	Recipients []*TokenTransferRecipient `json:"recipients"`
 }
 
 // used to store all txids related to an asset for asset history
 type TxAsset struct {
 	AssetGuid uint32
 	Height  uint32
+	txids: []string
 }
 
 // TxAddresses stores transaction inputs and outputs with amounts
@@ -445,7 +468,7 @@ type TxAddresses struct {
 	Height  uint32
 	Inputs  []TxInput
 	Outputs []TxOutput
-	TokenTransfers []*TokenTransfer
+	TokenTransferSummary *TokenTransferSummary
 }
 
 type DbOutpoint struct {
@@ -597,6 +620,7 @@ type BlockChainParser interface {
 type Mempool interface {
 	Resync() (int, error)
 	GetTransactions(address string) ([]Outpoint, error)
+	GetTxAssets(assetGuid uint32) ([]string, error)
 	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
 	GetTransactionTime(txid string) uint32

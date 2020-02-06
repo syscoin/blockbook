@@ -6,7 +6,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/tecbot/gorocksdb"
-	"github.com/syscoin/btcd/wire"
 )
 
 // bulk connect
@@ -29,8 +28,8 @@ type BulkConnect struct {
 	txAddressesMap     map[string]*bchain.TxAddresses
 	balances           map[string]*bchain.AddrBalance
 	addressContracts   map[string]*AddrContracts
-	assets             map[uint32]*wire.AssetType
-	txAssets        map[string]*bchain.TxAsset
+	assets             map[uint32]*bchain.bchain.Asset
+	txAssets           map[string]*bchain.TxAsset
 	height             uint32
 }
 
@@ -56,8 +55,8 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 		txAddressesMap:   make(map[string]*bchain.TxAddresses),
 		balances:         make(map[string]*bchain.AddrBalance),
 		addressContracts: make(map[string]*AddrContracts),
-		assets:           make(map[uint32]*wire.AssetType),
-		txAssets:      make(map[string]*bchain.TxAsset),
+		assets:           make(map[uint32]*bchain.Asset),
+		txAssets:         make(map[string]*bchain.TxAsset),
 	}
 	if err := d.SetInconsistentState(true); err != nil {
 		return nil, err
@@ -125,12 +124,12 @@ func (b *BulkConnect) parallelStoreTxAddresses(c chan error, all bool) {
 }
 
 func (b *BulkConnect) storeAssets(wb *gorocksdb.WriteBatch, all bool) (int, error) {
-	var assets map[uint32]*wire.AssetType
+	var assets map[uint32]*bchain.Asset
 	if all {
 		assets = b.assets
-		b.assets = make(map[uint32]*wire.AssetType)
+		b.assets = make(map[uint32]*bchain.Asset)
 	} else {
-		assets = make(map[uint32]*wire.AssetType)
+		assets = make(map[uint32]*bchain.Asset)
 		// store some random assets
 		for k, a := range b.assets {
 			assets[k] = a

@@ -19,7 +19,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
-	"github.com/syscoin/btcd/wire"
 )
 
 const dbVersion = 5
@@ -436,8 +435,8 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	}
 	addresses := make(bchain.AddressesMap)
 	if chainType == bchain.ChainBitcoinType {
-		assets := map[uint32]*wire.AssetType{}
-		txAssets := map[string]*bchain.TxAsset{}
+		assets := map[uint32]*bchain.Asset
+		txAssets := map[string]*bchain.TxAsset
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
 		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets, txAssets); err != nil {
@@ -500,7 +499,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*bchain.Asset, txAssets map[string]*bchain.TxAsset) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	// first process all outputs so that inputs can refer to txs in this block
@@ -945,7 +944,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 // Disconnect blocks
 
 func (d *RocksDB) disconnectTxAddresses(wb *gorocksdb.WriteBatch, height uint32, btxID []byte, inputs []bchain.DbOutpoint, txa *bchain.TxAddresses,
-	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*wire.AssetType, txAssets map[string]*bchain.TxAsset) error {
+	txAddressesToUpdate map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*bchain.Asset, txAssets []*bchain.TxAsset) error {
 	var err error
 	var balance *bchain.AddrBalance
 	addresses := make(map[string]struct{})
@@ -1075,8 +1074,8 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	txAddressesToUpdate := make(map[string]*bchain.TxAddresses)
 	txsToDelete := make(map[string]struct{})
 	balances := make(map[string]*bchain.AddrBalance)
-	assets := make(map[uint32]*wire.AssetType)
-	txAssets := make(map[string]*bchain.TxAsset)
+	assets := map[uint32]*bchain.Asset
+	txAssets := []*bchain.TxAsset
 	for height := higher; height >= lower; height-- {
 		blockTxs := blocks[height-lower]
 		glog.Info("Disconnecting block ", height, " containing ", len(blockTxs), " transactions")
