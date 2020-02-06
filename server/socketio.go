@@ -340,7 +340,7 @@ type resultGetAddressHistory struct {
 type resultGetAssetHistory struct {
 	Result struct {
 		TotalCount int                  `json:"totalCount"`
-		Items      []*TokenTransferSummary `json:"items"`
+		Items      []*bchain.TokenTransferSummary `json:"items"`
 	} `json:"result"`
 }
 func txToResTx(tx *api.Tx) resTx {
@@ -377,19 +377,21 @@ func txToResTx(tx *api.Tx) resTx {
 		}
 		outputs[i] = output
 	}
-	if tx.TokenTransferSummary != nil {
+	if len(tx.TokenTransferSummary) > 0 {
 		mapTokens := map[uint32]*api.TokenBalanceHistory{}
-		assetGuid, err := strconv.Atoi(tx.TokenTransferSummary.Token)
-		if err != nil {
-			return resultTx
-		}
-		for _, tokenTransfer := range tx.TokenTransferSummary.Recipients {
-			token, ok := mapTokens[uint32(assetGuid)]
-			if !ok {
-				token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
-				mapTokens[uint32(assetGuid)] = token
+		for summary := range tx.TokenTransferSummary {
+			assetGuid, err := strconv.Atoi(summary.Token)
+			if err != nil {
+				return resultTx
 			}
-			(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
+			for _, tokenTransfer := range summary.Recipients {
+				token, ok := mapTokens[uint32(assetGuid)]
+				if !ok {
+					token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
+					mapTokens[uint32(assetGuid)] = token
+				}
+				(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
+			}
 		}
 		resultTx.Tokens = make([]*api.TokenBalanceHistory, len(mapTokens))
 		var i int = 0
@@ -496,28 +498,30 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 			}
 		}
-		if tx.TokenTransferSummary != nil {
+		if len(tx.TokenTransferSummary) > 0 {
 			mapTokens := map[uint32]*api.TokenBalanceHistory{}
-			assetGuid, err := strconv.Atoi(tx.TokenTransferSummary.Token)
-			if err != nil {
-				return res, err
-			}
-			a := addressInSlice([]string{tx.TokenTransferSummary.From}, addr)
-			var b string = ""
-			for _, tokenTransferRecipient := range tx.TokenTransferSummary.Recipients {
-				if a == "" {
-					b = addressInSlice([]string{tokenTransferRecipient.To}, addr)
+			for summary := range tx.TokenTransferSummary {
+				assetGuid, err := strconv.Atoi(summary.Token)
+				if err != nil {
+					return res, err
 				}
-				if a != "" || b != "" {
-					token, ok := mapTokens[uint32(assetGuid)]
-					if !ok {
-						token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
-						mapTokens[uint32(assetGuid)] = token
+				a := addressInSlice([]string{summary.From}, addr)
+				var b string = ""
+				for _, tokenTransferRecipient := range summary.Recipients {
+					if a == "" {
+						b = addressInSlice([]string{tokenTransferRecipient.To}, addr)
 					}
-					if a != "" {
-						(*big.Int)(token.ReceivedSat).Add((*big.Int)(token.ReceivedSat), (*big.Int)(tokenTransferRecipient.Value))
-					} else {
-						(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransferRecipient.Value))
+					if a != "" || b != "" {
+						token, ok := mapTokens[uint32(assetGuid)]
+						if !ok {
+							token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
+							mapTokens[uint32(assetGuid)] = token
+						}
+						if a != "" {
+							(*big.Int)(token.ReceivedSat).Add((*big.Int)(token.ReceivedSat), (*big.Int)(tokenTransferRecipient.Value))
+						} else {
+							(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransferRecipient.Value))
+						}
 					}
 				}
 			}
@@ -527,7 +531,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				ahi.Tokens[i] = v
 				i++
 			}
-		}	
+		}
 		ahi.Addresses = ads
 		ahi.Confirmations = int(tx.Confirmations)
 		ahi.Satoshis = totalSat.Int64()
@@ -553,9 +557,11 @@ func (s *SocketIoServer) getAssetHistory(assets []uint32, opts *addrOpts) (res r
 		if err != nil {
 			return res, err
 		}
-		// we don't need recipient data for asset history list
-		tx.TokenTransferSummary.Recipients = nil
-		res.Result.Items = append(res.Result.Items, tx.TokenTransferSummary...)
+		for summary := range tx.TokenTransferSummary {
+			// we don't need recipient data for asset history list
+			summary.Recipients = nil
+			res.Result.Items = append(res.Result.Items, summary)
+		}
 	}
 	res.Result.TotalCount = len(res.Result.Items)
 	return
