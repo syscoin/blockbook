@@ -257,9 +257,9 @@ func (s *SocketIoServer) getAssetTxids(assets []string, opts *addrOpts) (res res
 	txids := make([]string, 0, 8)
 	lower, higher := uint32(opts.End), uint32(opts.Start)
 	for _, asset := range assets {
-		assetGuid, err := strconv.Atoi(summary.Token)
+		assetGuid, err := strconv.Atoi(asset)
 		if err != nil {
-			return nil, err
+			return res, err
 		}
 		if !opts.QueryMempoolOnly {
 			err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, func(txids []string) error {
@@ -323,7 +323,7 @@ type resTx struct {
 	Outputs        []txOutputs `json:"outputs"`
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`		   
-	TokenTransferSummary *bchain.TokenTransferSummary   `json:"tokenTransfers,omitempty"`
+	TokenTransferSummary []*bchain.TokenTransferSummary   `json:"tokenTransfers,omitempty"`
 	Tokens	       []*api.TokenBalanceHistory    `json:"tokens,omitempty"`	
 }
 
@@ -551,7 +551,7 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		return
 	}
 	txids := txr.Result
-	res.Result.Items = make([]*api.TokenTransferSummary)
+	res.Result.Items = make([]*bchain.TokenTransferSummary)
 	to := len(txids)
 	if to > opts.To {
 		to = opts.To
