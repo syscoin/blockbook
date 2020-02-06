@@ -11,11 +11,12 @@ import (
 	"unsafe"
 	"encoding/binary"
 	"encoding/json"
+	"encoding/gob"
 	"github.com/syscoin/btcd/wire"
 )
 var AssetCache map[uint32]bchain.Asset
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
-type GetTxAssetsCallback func(txids []string, height uint32) error
+type GetTxAssetsCallback func(txids []string) error
 func (d *RocksDB) GetAuxFeeAddr(pubData []byte) bchain.AddressDescriptor {
 	f := bchain.AuxFees{}
 	var err error
@@ -837,7 +838,8 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 		// so it will store later in cache
 		ok = false
 	} else {
-		if assetDb, ok = AssetCache[guid]; ok {
+		assetDb, ok = AssetCache[guid]
+		if ok {
 			return assetDb, nil
 		}
 	}
@@ -863,7 +865,7 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 	return assetDb, nil
 }
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
-	for _, txAsset := range txassets {
+	for txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		buffer := &bytes.Buffer{}
 		gob.NewEncoder(buffer).Encode(txAsset.Txids)
