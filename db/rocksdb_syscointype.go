@@ -772,7 +772,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 			txAsset = &bchain.TxAsset{txids: []string{}, AssetGuid: assetGuid, Height: height}
 			txAssets[strTxid] = txAsset
 		}
-		txAsset.txids = append(txAssets.txids, strTxid)
+		txAsset.Txids = append(txAssets.Txids, strTxid)
 	}	
 	return err
 }
@@ -879,7 +879,7 @@ func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*b
 	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		buffer := &bytes.Buffer{}
-		gob.NewEncoder(buffer).Encode(txAsset.txids)
+		gob.NewEncoder(buffer).Encode(txAsset.Txids)
 		wb.PutCF(d.cfh[cfTxAssets], key, buffer.Bytes())
 	}
 	return nil

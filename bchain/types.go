@@ -458,8 +458,8 @@ type TokenTransferSummary struct {
 // used to store all txids related to an asset for asset history
 type TxAsset struct {
 	AssetGuid uint32
-	Height  uint32
-	txids: []string
+	Height    uint32
+	Txids     []string
 }
 
 // TxAddresses stores transaction inputs and outputs with amounts
@@ -620,7 +620,6 @@ type BlockChainParser interface {
 type Mempool interface {
 	Resync() (int, error)
 	GetTransactions(address string) ([]Outpoint, error)
-	GetTxAssets(assetGuid uint32) ([]string, error)
 	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
 	GetTransactionTime(txid string) uint32
