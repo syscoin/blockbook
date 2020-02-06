@@ -17,6 +17,7 @@ import (
 var AssetCache map[uint32]bchain.Asset
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
 type GetTxAssetsCallback func(txids []string) error
+
 func (d *RocksDB) GetAuxFeeAddr(pubData []byte) bchain.AddressDescriptor {
 	f := bchain.AuxFees{}
 	var err error
@@ -37,6 +38,7 @@ func (d *RocksDB) GetAuxFeeAddr(pubData []byte) bchain.AddressDescriptor {
 	return addrDesc
 
 }
+
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var asset bchain.Asset
@@ -534,6 +536,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 	return assetGuid, nil
 
 }
+
 func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, assets map[uint32]*bchain.Asset) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
@@ -580,6 +583,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	return nil
 
 }
+
 func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var mintasset wire.MintSyscoinType
@@ -668,6 +672,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	}
 	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset, assets)
 }
+
 func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var mintasset wire.MintSyscoinType
@@ -747,6 +752,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	}
 	return assetGuid, d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
+
 func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset, txAssets map[string]*bchain.TxAsset) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
@@ -864,6 +870,7 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 	}
 	return assetDb, nil
 }
+
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
 	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
@@ -873,6 +880,7 @@ func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*b
 	}
 	return nil
 }
+
 func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets []*bchain.TxAsset) error {
 	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
@@ -880,6 +888,7 @@ func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets []*bchain.Tx
 	}
 	return nil
 }
+
 // GetTxAssets finds all asset transactions for each asset
 // Transaction are passed to callback function in the order from newest block to the oldest
 func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn GetTxAssetsCallback) (err error) {

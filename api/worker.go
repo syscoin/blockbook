@@ -251,7 +251,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		}
 		pValInSat = &valInSat
 		if ta.TokenTransferSummary != nil {
-			tokens = []*TokenTransferSummary{ta.TokenTransferSummary}
+			tokens = []*bchain.TokenTransferSummary{ta.TokenTransferSummary}
 		}
 	} else if w.chainType == bchain.ChainEthereumType {
 		ets, err := w.chainParser.EthereumTypeGetErc20FromTx(bchainTx)
@@ -515,7 +515,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
 		Vin:           vins,
 		Vout:          vouts,
-		TokenTransferSummary:  []*TokenTransferSummary{a.TokenTransferSummary},
+		TokenTransferSummary:  []*bchain.TokenTransferSummary{a.TokenTransferSummary},
 	}
 	return r
 }
