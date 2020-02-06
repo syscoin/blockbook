@@ -515,7 +515,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		ValueOutSat:   (*bchain.Amount)(&valOutSat),
 		Vin:           vins,
 		Vout:          vouts,
-		TokenTransferSummary:  []*bchain.TokenTransferSummary{a.TokenTransferSummary},
+		TokenTransferSummary:  []*bchain.TokenTransferSummary{ta.TokenTransferSummary},
 	}
 	return r
 }
