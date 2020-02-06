@@ -295,7 +295,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 	}
 	txAddresses.TokenTransferSummary.Value = (*bchain.Amount)(totalAssetSentValue)
-	if totalFee.Int64() > 0 {
+	if totalFeeValue.Int64() > 0 {
 		txAddresses.TokenTransferSummary.Fee = (*bchain.Amount)(totalFeeValue)
 	}
 	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset, assets)
@@ -765,9 +765,9 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 	}
 	if assetGuid > 0 && err == nil {
 		strTxid := string(btxID)
-		txAsset, ok = txAssets[strTxid]
+		txAsset, ok := txAssets[strTxid]
 		if !ok {
-			txAsset = &bchain.TxAsset{txids: []string{}, AssetGuid: assetGuid, Height: height}
+			txAsset = &bchain.TxAsset{Txids: []string{}, AssetGuid: assetGuid, Height: height}
 			txAssets[strTxid] = txAsset
 		}
 		txAsset.Txids = append(txAssets.Txids, strTxid)
@@ -826,13 +826,11 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 }
 
 func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bchain.Asset, error) {
-	var assetDb bchain.Asset
+	var assetDb *bchain.Asset
 	var assetL1 *bchain.Asset
 	var ok bool
-	if assets != nil {
-		if assetL1, ok = (*assets)[guid]; ok {
-			return assetL1, nil
-		}
+	if assetL1, ok = (*assets)[guid]; ok {
+		return assetL1, nil
 	}
 	if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
@@ -840,7 +838,7 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 		ok = false
 	} else {
 		if assetDb, ok = AssetCache[guid]; ok {
-			return &assetDb, nil
+			return assetDb, nil
 		}
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
@@ -860,14 +858,11 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 	// cache miss, add it, we also add it on storeAsset but on API queries we should not have to wait until a block
 	// with this asset to store it in cache
 	if !ok {
-		AssetCache[guid] = assetDb
+		AssetCache[guid] = *assetDb
 	}
-	return &assetDb, nil
+	return assetDb, nil
 }
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
-	if txassets == nil {
-		return nil
-	}
 	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		buffer := &bytes.Buffer{}
@@ -877,9 +872,6 @@ func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*b
 	return nil
 }
 func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets []*bchain.TxAsset) error {
-	if txassets == nil {
-		return nil
-	}
 	for txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
