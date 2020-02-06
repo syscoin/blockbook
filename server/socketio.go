@@ -551,7 +551,7 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		return
 	}
 	txids := txr.Result
-	res.Result.Items = make([]*bchain.TokenTransferSummary)
+	res.Result.Items = make([]*bchain.TokenTransferSummary, 0)
 	to := len(txids)
 	if to > opts.To {
 		to = opts.To
