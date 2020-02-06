@@ -9,7 +9,6 @@ import (
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
 	"unsafe"
-	"encoding/hex"
 	"encoding/binary"
 	"encoding/json"
 )
@@ -20,15 +19,20 @@ func (d *RocksDB) GetAuxFeeAddr(pubData []byte) (bchain.AddressDescriptor, error
 	f := bchain.AuxFees{}
 	var err error
 	var addrDesc bchain.AddressDescriptor
+	// cannot unmarshal, likely no auxfees defined
 	err = json.Unmarshal(pubData, &f)
 	if err != nil {
-		return nil, err
+		return nil, nil
+	}
+	// no auxfees defined
+	if len(f.Aux_fees.Address) == 0 {
+		return nil, nil
 	}
 	addrDesc, err = d.chainParser.GetAddrDescFromAddress(f.Aux_fees.Address)
 	if err != nil {
 		return nil, err
 	}
-	return addrDesc
+	return addrDesc, nil
 
 }
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
@@ -54,7 +58,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 	}
 	strAssetGuid := strconv.FormatUint(uint64(assetGuid), 10)
-	senderAddress := asset.WitnessAddress.ToString("sys")
+	senderAddress := asset.AssetObj.WitnessAddress.ToString("sys")
 	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(senderAddress)
 	if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 		if err != nil {
@@ -83,8 +87,8 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		d.cbs.balancesHit++
 	}
 
-	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
-		receiverAddress := asset.WitnessAddressTransfer.ToString("sys")
+	if len(asset.AssetObj.WitnessAddressTransfer.WitnessProgram) > 0 {
+		receiverAddress := asset.AssetObj.WitnessAddressTransfer.ToString("sys")
 		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(receiverAddress)
 		if err != nil || len(assetSenderAddrDesc) == 0 || len(assetSenderAddrDesc) > maxAddrDescLen {
 			if err != nil {
@@ -165,8 +169,11 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			dBAsset.AssetObj.TotalSupply = supplyDb.Int64()
 			// logic follows core CheckAssetInputs()
 			if len(asset.AssetObj.PubData) > 0 {
-				dBAsset.AssetObj.PubData = asset.PubData
-				dBAsset.AuxFeesAddr = d.GetAuxFeeAddr(asset.AssetObj.PubData)
+				dBAsset.AssetObj.PubData = asset.AssetObj.PubData
+				dBAsset.AuxFeesAddr, err = d.GetAuxFeeAddr(asset.AssetObj.PubData)
+				if err != nil {
+					return nil, err
+				}
 			}
 			if len(asset.AssetObj.Contract) > 0 {
 				dBAsset.AssetObj.Contract = asset.AssetObj.Contract
@@ -177,7 +184,10 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			assets[assetGuid] = dBAsset
 		} else {
 			asset.AssetObj.TotalSupply = asset.AssetObj.Balance
-			asset.AuxFeesAddr = d.GetAuxFeeAddr(asset.AssetObj.PubData)
+			asset.AuxFeesAddr, err = d.GetAuxFeeAddr(asset.AssetObj.PubData)
+			if err != nil {
+				return nil, err
+			}
 			assets[assetGuid] = &asset
 		}
 		txAddresses.TokenTransferSummary = &bchain.TokenTransferSummary {
@@ -456,7 +466,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 	if err != nil {
 		return assetGuid, err
 	}
-	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddress.ToString("sys"))
+	assetSenderAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.AssetObj.WitnessAddress.ToString("sys"))
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	_, exist := addresses[assetStrSenderAddrDesc]
 	if !exist {
@@ -470,8 +480,8 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 		ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(assetSenderAddrDesc)
 		glog.Warningf("DisconnectAssetOutput Balance for asset address %s (%s) not found", ad, assetSenderAddrDesc)
 	}
-	if len(asset.WitnessAddressTransfer.WitnessProgram) > 0 {
-		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.WitnessAddressTransfer.ToString("sys"))
+	if len(asset.AssetObj.WitnessAddressTransfer.WitnessProgram) > 0 {
+		assetTransferWitnessAddrDesc, err := d.chainParser.GetAddrDescFromAddress(asset.AssetObj.WitnessAddressTransfer.ToString("sys"))
 		transferStr := string(assetTransferWitnessAddrDesc)
 		_, exist := addresses[transferStr]
 		if !exist {
@@ -751,9 +761,6 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 	if sptData == nil {
 		return nil
 	}
-	if assets == nil {
-		assets = make(map[uint32]*bchain.Asset)
-	}
 	var assetGuid uint32
 	if d.chainParser.IsAssetAllocationTx(version) {
 		assetGuid, err = d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
@@ -763,9 +770,6 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 		assetGuid, err = d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
 	}
 	if assetGuid > 0 && err == nil {
-		if txAssets == nil {
-			txAssets = make([string]*bchain.TxAsset)
-		}
 		strTxid := string(btxID)
 		txAsset, ok = txAssets[strTxid]
 		if !ok {
@@ -786,9 +790,6 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 	if sptData == nil {
 		return nil
 	}
-	if assets == nil {
-		assets = make(map[uint32]*bchain.Asset)
-	}
 	var assetGuid uint32
 	if d.chainParser.IsAssetAllocationTx(version) {
 		assetGuid, err = d.DisconnectAssetAllocationOutput(sptData, balances, version, addresses, assets)
@@ -798,9 +799,6 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 		assetGuid, err = d.DisconnectMintAssetOutput(sptData, balances, version, addresses, assets)
 	}
 	if assetGuid > 0 && err == nil {
-		if txAssets == nil {
-			txAssets = make([]*bchain.TxAsset, 1)
-		}
 		txAssets = append(txAssets, &bchain.TxAsset{AssetGuid: assetGuid, Height: height})
 	}
 	return err

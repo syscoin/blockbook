@@ -334,40 +334,40 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 	var Fee big.Int
 	var recipients uint
 	al, l := p.BaseParser.UnpackVaruint(buf)
-	tt.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
+	tts.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := l+int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
-	tt.From = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	tts.From = string(append([]byte(nil), buf[ll:ll+int(al)]...))
 	ll += int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
-	tt.To = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	tts.To = string(append([]byte(nil), buf[ll:ll+int(al)]...))
 	ll += int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
-	tt.Token = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	tts.Token = string(append([]byte(nil), buf[ll:ll+int(al)]...))
 	ll += int(al)
 	al, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
-	tt.Symbol = string(append([]byte(nil), buf[ll:ll+int(al)]...))
+	tts.Symbol = string(append([]byte(nil), buf[ll:ll+int(al)]...))
 	ll += int(al)
 	Decimals, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
-	tt.Decimals = int(Decimals)
+	tts.Decimals = int(Decimals)
 	Value, l = p.BaseParser.UnpackBigint(buf[ll:])
-	tt.Value = (*bchain.Amount)(&Value)
+	tts.Value = (*bchain.Amount)(&Value)
 	ll += l
 	Fee, l = p.BaseParser.UnpackBigint(buf[ll:])
-	tt.Fee = (*bchain.Amount)(&Fee)
+	tts.Fee = (*bchain.Amount)(&Fee)
 	ll += l
 	recipients, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
 	if recipients > 0 {
-		tts.Recipients = make([]*bchain.TokenTransferRecipients, recipients)
+		tts.Recipients = make([]*bchain.TokenTransferRecipient, recipients)
 		for i := uint(0); i < recipients; i++ {
 			tts.Recipients[i] = &bchain.TokenTransferRecipient{}
-			l += p.UnpackTokenTransfer(tts.Recipients[i] , buf[ll:])
+			l += p.UnpackTokenTransferRecipient(tts.Recipients[i] , buf[ll:])
 			ll += l
 		}
 	}

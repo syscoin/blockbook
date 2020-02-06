@@ -435,8 +435,8 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	}
 	addresses := make(bchain.AddressesMap)
 	if chainType == bchain.ChainBitcoinType {
-		assets := map[uint32]*bchain.Asset{}
-		txAssets := map[string]*bchain.TxAsset{}
+		assets := make(map[uint32]*bchain.Asset)
+		txAssets := make([string]*bchain.TxAsset)
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
 		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets, txAssets); err != nil {
@@ -1074,8 +1074,8 @@ func (d *RocksDB) DisconnectBlockRangeBitcoinType(lower uint32, higher uint32) e
 	txAddressesToUpdate := make(map[string]*bchain.TxAddresses)
 	txsToDelete := make(map[string]struct{})
 	balances := make(map[string]*bchain.AddrBalance)
-	assets := map[uint32]*bchain.Asset{}
-	txAssets = []*bchain.TxAsset{}
+	assets := make(map[uint32]*bchain.Asset)
+	txAssets := make([]*bchain.TxAsset)
 	for height := higher; height >= lower; height-- {
 		blockTxs := blocks[height-lower]
 		glog.Info("Disconnecting block ", height, " containing ", len(blockTxs), " transactions")
