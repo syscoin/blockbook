@@ -487,7 +487,7 @@ func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 	buf := make([]byte, 0, 32)
 	basset := make([]byte, vlq.MaxLen32)
 	var buffer bytes.Buffer
-	err := asset.assetObj.Serialize(&buffer)
+	err := asset.AssetObj.Serialize(&buffer)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +499,7 @@ func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 	var asset bchain.Asset
 	r := bytes.NewReader(buf)
-	err := asset.assetObj.Deserialize(r)
+	err := asset.AssetObj.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
