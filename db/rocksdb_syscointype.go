@@ -150,6 +150,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			Value:    (*bchain.Amount)(totalSupplyDb),
 			Decimals: int(dBAsset.AssetObj.Precision),
 			Symbol:   string(dBAsset.AssetObj.Symbol),
+			Fee:      big.NewInt(0),
 		}
 		dBAsset.AssetObj.WitnessAddress = asset.AssetObj.WitnessAddressTransfer
 		assets[assetGuid] = dBAsset
@@ -195,6 +196,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			Value:    (*bchain.Amount)(valueTo),
 			Decimals: int(dBAsset.AssetObj.Precision),
 			Symbol:   string(dBAsset.AssetObj.Symbol),
+			Fee:      big.NewInt(0),
 		}
 	}
 	return assetGuid, nil
@@ -235,6 +237,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		From:     senderAddress,
 		Decimals: int(dBAsset.AssetObj.Precision),
 		Symbol:   string(dBAsset.AssetObj.Symbol),
+		Fee:      big.NewInt(0),
 	}
 	if d.chainParser.IsAssetSendTx(version) {
 		txAddresses.TokenTransferSummary.Type = bchain.SPTAssetSendType
@@ -664,6 +667,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		Value:    (*bchain.Amount)(amount),
 		Decimals: int(dBAsset.AssetObj.Precision),
 		Symbol:   string(dBAsset.AssetObj.Symbol),
+		Fee:      big.NewInt(0),
 	}
 	txAddresses.TokenTransferSummary.Recipients = make([]*bchain.TokenTransferRecipient, 1)
 	txAddresses.TokenTransferSummary.Recipients[0] = &bchain.TokenTransferRecipient{
