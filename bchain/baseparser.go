@@ -515,11 +515,11 @@ func (p *BaseParser) UnpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
+func (p *BaseParser) UnpackAsset(buf []byte) (*Asset, error) {
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
+func (p *BaseParser) PackAsset(asset *Asset) ([]byte, error) {
 	return nil, errors.New("Not supported")
 }
 
