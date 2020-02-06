@@ -15,24 +15,24 @@ import (
 var AssetCache map[uint32]bchain.Asset
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
 type GetTxAssetsCallback func(txids []string, height uint32) error
-func (d *RocksDB) GetAuxFeeAddr(pubData []byte) (bchain.AddressDescriptor, error) {
+func (d *RocksDB) GetAuxFeeAddr(pubData []byte) bchain.AddressDescriptor {
 	f := bchain.AuxFees{}
 	var err error
 	var addrDesc bchain.AddressDescriptor
 	// cannot unmarshal, likely no auxfees defined
 	err = json.Unmarshal(pubData, &f)
 	if err != nil {
-		return nil, nil
+		return nil
 	}
 	// no auxfees defined
 	if len(f.Aux_fees.Address) == 0 {
-		return nil, nil
+		return nil
 	}
 	addrDesc, err = d.chainParser.GetAddrDescFromAddress(f.Aux_fees.Address)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return addrDesc, nil
+	return addrDesc
 
 }
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
@@ -170,10 +170,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			// logic follows core CheckAssetInputs()
 			if len(asset.AssetObj.PubData) > 0 {
 				dBAsset.AssetObj.PubData = asset.AssetObj.PubData
-				dBAsset.AuxFeesAddr, err = d.GetAuxFeeAddr(asset.AssetObj.PubData)
-				if err != nil {
-					return nil, err
-				}
+				dBAsset.AuxFeesAddr = d.GetAuxFeeAddr(asset.AssetObj.PubData)
 			}
 			if len(asset.AssetObj.Contract) > 0 {
 				dBAsset.AssetObj.Contract = asset.AssetObj.Contract
@@ -184,10 +181,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			assets[assetGuid] = dBAsset
 		} else {
 			asset.AssetObj.TotalSupply = asset.AssetObj.Balance
-			asset.AuxFeesAddr, err = d.GetAuxFeeAddr(asset.AssetObj.PubData)
-			if err != nil {
-				return nil, err
-			}
+			asset.AuxFeesAddr = d.GetAuxFeeAddr(asset.AssetObj.PubData)
 			assets[assetGuid] = &asset
 		}
 		txAddresses.TokenTransferSummary = &bchain.TokenTransferSummary {
