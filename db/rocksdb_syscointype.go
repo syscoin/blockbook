@@ -771,7 +771,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 			txAsset = &bchain.TxAsset{Txids: []string{}, AssetGuid: assetGuid, Height: height}
 			txAssets[strTxid] = txAsset
 		}
-		txAsset.Txids = append(txAssets.Txids, strTxid)
+		txAsset.Txids = append(txAsset.Txids, strTxid)
 	}	
 	return err
 }
@@ -838,9 +838,9 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 		// so it will store later in cache
 		ok = false
 	} else {
-		assetDb, ok = AssetCache[guid]
+		var assetDbCache, ok = AssetCache[guid]
 		if ok {
-			return assetDb, nil
+			return &assetDbCache, nil
 		}
 	}
 	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
