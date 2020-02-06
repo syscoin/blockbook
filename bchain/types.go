@@ -419,7 +419,7 @@ type AuxFees struct {
 // encapuslates Syscoin SPT as well as aux fees object unmarshalled
 type Asset struct {
 	AssetObj wire.AssetType
-	auxFees AuxFees
+	AuxFeesAddr AddressDescriptor
 }
 // Token contains info about tokens held by an address
 type Token struct {
