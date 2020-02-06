@@ -16,7 +16,7 @@ import (
 var AssetCache map[uint32]bchain.Asset
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
 type GetTxAssetsCallback func(txids []string, height uint32) error
-func (d *RocksDB) GetAuxFeeAddr(pubData []byte) (*bchain.AddressDescriptor, error) {
+func (d *RocksDB) GetAuxFeeAddr(pubData []byte) (bchain.AddressDescriptor, error) {
 	f := bchain.AuxFees{}
 	var err error
 	var addrDesc bchain.AddressDescriptor
@@ -28,7 +28,7 @@ func (d *RocksDB) GetAuxFeeAddr(pubData []byte) (*bchain.AddressDescriptor, erro
 	if err != nil {
 		return nil, err
 	}
-	return &addrDesc
+	return addrDesc
 
 }
 func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
@@ -166,7 +166,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			// logic follows core CheckAssetInputs()
 			if len(asset.assetObj.PubData) > 0 {
 				dBAsset.assetObj.PubData = asset.PubData
-				dBAsset.auxFeesAddr = d.GetAuxFeeAddr(asset.assetObj.PubData)
+				dBAsset.AuxFeesAddr = d.GetAuxFeeAddr(asset.assetObj.PubData)
 			}
 			if len(asset.assetObj.Contract) > 0 {
 				dBAsset.assetObj.Contract = asset.assetObj.Contract
@@ -177,7 +177,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			assets[assetGuid] = dBAsset
 		} else {
 			asset.assetObj.TotalSupply = asset.assetObj.Balance
-			asset.auxFeesAddr = d.GetAuxFeeAddr(asset.assetObj.PubData)
+			asset.AuxFeesAddr = d.GetAuxFeeAddr(asset.assetObj.PubData)
 			assets[assetGuid] = &asset
 		}
 		txAddresses.TokenTransferSummary = &bchain.TokenTransferSummary {
@@ -282,7 +282,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		balanceAsset.BalanceAssetSat.Add(balanceAsset.BalanceAssetSat, amount)
 		totalAssetSentValue.Add(totalAssetSentValue, amount)
 		// if receiver is aux fees address for this asset, add fee for summary
-		if dBAsset.auxFeesAddr == addrDesc {
+		if dBAsset.AuxFeesAddr == addrDesc {
 			totalFee.Add(totalFee, amount)
 		}
 		txAddresses.TokenTransferSummary.Recipients[i] = &bchain.TokenTransferRecipient {
@@ -766,7 +766,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 		if txAssets == nil {
 			txAssets = make([string]*bchain.TxAsset)
 		}
-		var strTxid := string(btxID)
+		strTxid := string(btxID)
 		txAsset, ok = txAssets[strTxid]
 		if !ok {
 			txAsset = &bchain.TxAsset{txids: []string{}, AssetGuid: assetGuid, Height: height}
