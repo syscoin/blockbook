@@ -380,7 +380,7 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 		tts.Recipients = make([]*bchain.TokenTransferRecipient, recipients)
 		for i := uint(0); i < recipients; i++ {
 			tts.Recipients[i] = &bchain.TokenTransferRecipient{}
-			l += p.UnpackTokenTransferRecipient(tts.Recipients[i] , buf[ll:])
+			l = p.UnpackTokenTransferRecipient(tts.Recipients[i] , buf[ll:])
 			ll += l
 		}
 	}
@@ -412,10 +412,8 @@ func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSumm
 	recipients := len(tts.Recipients)
 	l = p.BaseParser.PackVaruint(uint(recipients), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	if recipients > 0 {
-		for i := range tts.Recipients {
-			buf = p.AppendTokenTransferRecipient(tts.Recipients[i], buf, varBuf)
-		}
+	for i := range tts.Recipients {
+		buf = p.AppendTokenTransferRecipient(tts.Recipients[i], buf, varBuf)
 	}
 	return buf
 }
