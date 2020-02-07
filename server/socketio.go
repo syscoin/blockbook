@@ -262,9 +262,8 @@ func (s *SocketIoServer) getAssetTxids(assets []string, opts *addrOpts) (res res
 			return res, err
 		}
 		if !opts.QueryMempoolOnly {
-			err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, func(txids []string) error {
-				txids = append(txids, txids...)
-				glog.Warningf("new length %v", len(txids))
+			err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, func(txidsIn []string) error {
+				txids = append(txids, txidsIn...)
 				return nil
 			})
 			if err != nil {
@@ -281,9 +280,7 @@ func (s *SocketIoServer) getAssetTxids(assets []string, opts *addrOpts) (res res
 			}*/
 		}
 	}
-	glog.Warningf("res.Result before %v", len(txids))
 	res.Result = api.GetUniqueTxids(txids)
-	glog.Warningf("res.Result before %v", len(res.Result))
 	return res, nil
 }
 
