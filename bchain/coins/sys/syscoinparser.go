@@ -415,6 +415,7 @@ func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSumm
 	if recipients > 0 {
 		tts.Recipients = make([]*bchain.TokenTransferRecipient, recipients)
 		for i := 0; i < recipients; i++ {
+			tts.Recipients[i] = bchain.TokenTransferRecipient{}
 			buf = p.AppendTokenTransferRecipient(tts.Recipients[i], buf, varBuf)
 		}
 	}
