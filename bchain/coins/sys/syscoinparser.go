@@ -6,7 +6,6 @@ import (
 	"blockbook/bchain/coins/utils"
 	"encoding/binary"
 	"bytes"
-	"unsafe"
 	"math/big"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
@@ -228,24 +227,23 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 
-const packedHeightBytes = 4
+const packedBytes = 4
 func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
-	assetGuidBytes := (*[4]byte)(unsafe.Pointer(&assetGuid))[:]
-	buf := make([]byte, len(assetGuidBytes)+packedHeightBytes)
-	copy(buf, assetGuidBytes)
+	varBuf := make([]byte, packedBytes)
+	buf := make([]byte, packedBytes*2)
+	l := p.BaseParser.PackVaruint(uint(assetGuid), varBuf)
+	buf = append(buf, varBuf[:l]...)
 	// pack height as binary complement to achieve ordering from newest to oldest block
-	binary.BigEndian.PutUint32(buf[len(assetGuidBytes):], ^height)
+	l = p.BaseParser.PackVaruint(uint(^height), varBuf)
+	buf = append(buf, varBuf[:l]...)
 	return buf
 }
 
-func (p *SyscoinParser) UnpackAssetKey(key []byte) (uint32, uint32, error) {
-	i := len(key) - packedHeightBytes
-	if i <= 0 {
-		return 0, 0, errors.New("Invalid asset key")
-	}
-	assetGuid := binary.BigEndian.Uint32(key[:i])
+func (p *SyscoinParser) UnpackAssetKey(key []byte) (uint32, uint32) {
+	assetGuid, l := p.BaseParser.UnpackVaruint(buf)
+	height, _ := p.BaseParser.UnpackVaruint(buf[l:])
 	// height is packed in binary complement, convert it
-	return assetGuid, ^p.UnpackUint(key[i : i+packedHeightBytes]), nil
+	return assetGuid, ^height
 }
 
 func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {

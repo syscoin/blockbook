@@ -8,7 +8,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
-	"unsafe"
 	"encoding/binary"
 	"encoding/json"
 	"encoding/gob"
@@ -820,17 +819,17 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		if _, ok := AssetCache[guid]; !ok {
 			AssetCache[guid] = *asset
 		}
-
-		assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
+		varBuf := make([]byte, 4)
+		d.chainParser.PackVaruint(uint(guid), varBuf)
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.AssetObj.TotalSupply == -1 {
-			wb.DeleteCF(d.cfh[cfAssets], assetGuid)
+			wb.DeleteCF(d.cfh[cfAssets], varBuf)
 		} else {
 			buf, err := d.chainParser.PackAsset(asset)
 			if err != nil {
 				return err
 			}
-			wb.PutCF(d.cfh[cfAssets], assetGuid, buf)
+			wb.PutCF(d.cfh[cfAssets], varBuf, buf)
 		}
 	}
 	return nil
@@ -855,8 +854,9 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 			return &assetDbCache, nil
 		}
 	}
-	assetGuid := (*[4]byte)(unsafe.Pointer(&guid))[:]
-	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], assetGuid)
+	varBuf := make([]byte, 4)
+	d.chainParser.PackVaruint(uint(guid), varBuf)
+	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], varBuf)
 	if err != nil {
 		return nil, err
 	}
