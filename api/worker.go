@@ -909,10 +909,15 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		unconfirmedTxs           int
 		totalResults             int
 	)
-	
+	var err error
+	var assetGuid uint32
+	assetGuid, err = strconv.Atoi(asset)
+	if err != nil {
+		return nil, err
+	}
 	// process mempool, only if toHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
-		txm, err = w.getAssetTxids(asset, true, filter, maxInt)
+		txm, err = w.getAssetTxids(assetGuid, true, filter, maxInt)
 		if err != nil {
 			return nil, errors.Annotatef(err, "getAssetTxids %v true", asset)
 		}
@@ -938,7 +943,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	}
 	// get tx history if requested by option or check mempool if there are some transactions for a new address
 	if option >= AccountDetailsTxidHistory {
-		txc, err := w.getAssetTxids(asset, false, filter, (page+1)*txsOnPage)
+		txc, err := w.getAssetTxids(assetGuid, false, filter, (page+1)*txsOnPage)
 		if err != nil {
 			return nil, errors.Annotatef(err, "getAssetTxids %v false", asset)
 		}
@@ -968,17 +973,21 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			}
 		}
 	}
-	dbAsset, errAsset := w.db.GetAsset(uint32(asset), nil)
+	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 	if errAsset != nil {
 		return nil, errAsset
 	}
 	r := &Asset{
 		Asset:			   	   dbAsset,
 		Paging:                pg,
-		Txs:                   int(ba.Txs),
 		UnconfirmedTxs:        unconfirmedTxs,
 		Transactions:          txs,
 		Txids:                 txids,
+	}
+	if option == AccountDetailsTxidHistory {
+		r.Txs = len(txids)
+	} else {
+		r.Txs = len(txs)
 	}
 	glog.Info("GetAsset ", asset, " finished in ", time.Since(start))
 	return r, nil
