@@ -324,7 +324,6 @@ type resTx struct {
 	OutputSatoshis int64       `json:"outputSatoshis,omitempty"`
 	FeeSatoshis    int64       `json:"feeSatoshis,omitempty"`		   
 	TokenTransferSummary []*bchain.TokenTransferSummary   `json:"tokenTransfers,omitempty"`
-	Tokens	       []*api.TokenBalanceHistory    `json:"tokens,omitempty"`	
 }
 
 type addressHistoryItem struct {
@@ -382,29 +381,6 @@ func txToResTx(tx *api.Tx) resTx {
 		outputs[i] = output
 	}
 	if len(tx.TokenTransferSummary) > 0 {
-		mapTokens := map[uint32]*api.TokenBalanceHistory{}
-		for _, summary := range tx.TokenTransferSummary {
-			assetGuid, err := strconv.Atoi(summary.Token)
-			if err != nil {
-				return resultTx
-			}
-			for _, tokenTransfer := range summary.Recipients {
-				token, ok := mapTokens[uint32(assetGuid)]
-				if !ok {
-					token = &api.TokenBalanceHistory{AssetGuid: uint32(assetGuid), ReceivedSat: &bchain.Amount{}, SentSat: &bchain.Amount{}}
-					mapTokens[uint32(assetGuid)] = token
-				}
-				(*big.Int)(token.SentSat).Add((*big.Int)(token.SentSat), (*big.Int)(tokenTransfer.Value))
-			}
-		}
-		resultTx.Tokens = make([]*api.TokenBalanceHistory, len(mapTokens))
-		var i int = 0
-		for _, v := range mapTokens {
-			resultTx.Tokens[i] = v
-			// we just need total output satoshi because inputs == outputs with assets, theres no fees so just make recv and sent the same
-			(*big.Int)(resultTx.Tokens[i].ReceivedSat).Set((*big.Int)(resultTx.Tokens[i].SentSat))
-			i++
-		}
 		resultTx.TokenTransferSummary = tx.TokenTransferSummary
 	}
 	var h int
