@@ -435,6 +435,7 @@ func (p *SyscoinParser) UnpackTokenTransferRecipient(ttr *bchain.TokenTransferRe
 func (p *SyscoinParser) AppendTokenTransferRecipient(ttr *bchain.TokenTransferRecipient, buf []byte, varBuf []byte) []byte {
 	l := p.BaseParser.PackVaruint(uint(len(ttr.To)), varBuf)
 	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, []byte(ttr.To)...)
 	l = p.BaseParser.PackBigint((*big.Int)(ttr.Value), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	return buf
