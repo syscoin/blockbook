@@ -819,17 +819,16 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		if _, ok := AssetCache[guid]; !ok {
 			AssetCache[guid] = *asset
 		}
-		varBuf := make([]byte, 4)
-		d.chainParser.PackVaruint(uint(guid), varBuf)
+		key := d.chainParser.PackUint(guid)
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.AssetObj.TotalSupply == -1 {
-			wb.DeleteCF(d.cfh[cfAssets], varBuf)
+			wb.DeleteCF(d.cfh[cfAssets], key)
 		} else {
 			buf, err := d.chainParser.PackAsset(asset)
 			if err != nil {
 				return err
 			}
-			wb.PutCF(d.cfh[cfAssets], varBuf, buf)
+			wb.PutCF(d.cfh[cfAssets], key, buf)
 		}
 	}
 	return nil
@@ -854,9 +853,8 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 			return &assetDbCache, nil
 		}
 	}
-	varBuf := make([]byte, 4)
-	d.chainParser.PackVaruint(uint(guid), varBuf)
-	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], varBuf)
+	key := d.chainParser.PackUint(guid)
+	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 	if err != nil {
 		return nil, err
 	}

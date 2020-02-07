@@ -228,7 +228,8 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 const packedBytes = 4
 func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	varBuf := make([]byte, packedBytes)
-	buf := make([]byte, packedBytes*2)
+	// mul by 4 because vlq uses 64 bit integers to store even 32 bit ones
+	buf := make([]byte, packedBytes*4)
 	l := p.BaseParser.PackVaruint(uint(assetGuid), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	// pack height as binary complement to achieve ordering from newest to oldest block
