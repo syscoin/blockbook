@@ -901,6 +901,7 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 	startKey := d.chainParser.PackAssetKey(assetGuid, higher)
 	stopKey := d.chainParser.PackAssetKey(assetGuid, lower)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfTxAssets])
+	var err error
 	defer it.Close()
 	for it.Seek(startKey); it.Valid(); it.Next() {
 		key := it.Key().Data()
@@ -920,7 +921,7 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 				return err
 			}
 		}
-		if err := fn(txs); err != nil {
+		if err = fn(txs); err != nil {
 			if _, ok := err.(*StopIteration); ok {
 				return nil
 			}
