@@ -547,7 +547,7 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		for i := range tx.Vin {
 			vin := &tx.Vin[i]
 			// use first summary response as from address to filter vin/vouts because From is the person who spends inputs and creates outputs in asset tx
-			a := addressInSlice(vin.Addresses, tx.TokenTransferSummary[0].From)
+			a := addressInSlice(vin.Addresses, []string{tx.TokenTransferSummary[0].From})
 			if a != "" {
 				hi := ads[a]
 				if hi == nil {
@@ -562,7 +562,7 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		}
 		for i := range tx.Vout {
 			vout := &tx.Vout[i]
-			a := addressInSlice(vout.Addresses, tx.TokenTransferSummary[0].From)
+			a := addressInSlice(vout.Addresses, []string{tx.TokenTransferSummary[0].From})
 			if a != "" {
 				hi := ads[a]
 				if hi == nil {
