@@ -894,6 +894,96 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	return r, nil
 }
 
+// GetAsset gets transactions for given asset
+func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AddressFilter) (*Asset, error) {
+	start := time.Now()
+	page--
+	if page < 0 {
+		page = 0
+	}
+	var (
+		txm                      []string
+		txs                      []*Tx
+		txids                    []string
+		pg                       Paging
+		unconfirmedTxs           int
+		totalResults             int
+	)
+	
+	// process mempool, only if toHeight is not specified
+	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
+		txm, err = w.getAssetTxids(asset, true, filter, maxInt)
+		if err != nil {
+			return nil, errors.Annotatef(err, "getAssetTxids %v true", asset)
+		}
+		for _, txid := range txm {
+			tx, err := w.GetTransaction(txid, false, false)
+			// mempool transaction may fail
+			if err != nil || tx == nil {
+				glog.Warning("GetTransaction in mempool: ", err)
+			} else {
+				// skip already confirmed txs, mempool may be out of sync
+				if tx.Confirmations == 0 {
+					unconfirmedTxs++
+					if page == 0 {
+						if option == AccountDetailsTxidHistory {
+							txids = append(txids, tx.Txid)
+						} else if option >= AccountDetailsTxHistoryLight {
+							txs = append(txs, tx)
+						}
+					}
+				}
+			}
+		}
+	}
+	// get tx history if requested by option or check mempool if there are some transactions for a new address
+	if option >= AccountDetailsTxidHistory {
+		txc, err := w.getAssetTxids(asset, false, filter, (page+1)*txsOnPage)
+		if err != nil {
+			return nil, errors.Annotatef(err, "getAssetTxids %v false", asset)
+		}
+		bestheight, _, err := w.db.GetBestBlock()
+		if err != nil {
+			return nil, errors.Annotatef(err, "GetBestBlock")
+		}
+		var from, to int
+		pg, from, to, page = computePaging(len(txc), page, txsOnPage)
+		if len(txc) >= txsOnPage {
+			if totalResults < 0 {
+				pg.TotalPages = -1
+			} else {
+				pg, _, _, _ = computePaging(totalResults, page, txsOnPage)
+			}
+		}
+		for i := from; i < to; i++ {
+			txid := txc[i]
+			if option == AccountDetailsTxidHistory {
+				txids = append(txids, txid)
+			} else {
+				tx, err := w.txFromTxid(txid, bestheight, option, nil)
+				if err != nil {
+					return nil, err
+				}
+				txs = append(txs, tx)
+			}
+		}
+	}
+	dbAsset, errAsset := w.db.GetAsset(uint32(asset), nil)
+	if errAsset != nil {
+		return nil, errAsset
+	}
+	r := &Asset{
+		Asset:			   	   dbAsset,
+		Paging:                pg,
+		Txs:                   int(ba.Txs),
+		UnconfirmedTxs:        unconfirmedTxs,
+		Transactions:          txs,
+		Txids:                 txids,
+	}
+	glog.Info("GetAsset ", asset, " finished in ", time.Since(start))
+	return r, nil
+}
+
 func (w *Worker) balanceHistoryHeightsFromTo(fromTime, toTime time.Time) (uint32, uint32, uint32, uint32) {
 	fromUnix := uint32(0)
 	toUnix := maxUint32

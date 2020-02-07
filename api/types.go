@@ -191,6 +191,18 @@ type Address struct {
 	XPubAddresses map[string]struct{} `json:"-"`
 }
 
+// Asset holds information about asset and its transactions
+type Asset struct {
+	Paging
+	Asset			  	  *bchain.Asset			`json:"asset"`
+	UnconfirmedTxs        int                   `json:"unconfirmedTxs"`
+	Txs                   int                   `json:"txs"`
+	Transactions          []*Tx                 `json:"transactions,omitempty"`
+	Txids                 []string              `json:"txids,omitempty"`
+	// helpers for explorer
+	Filter        string              `json:"-"`
+}
+
 // Utxo is one unspent transaction output
 type Utxo struct {
 	Txid          string  `json:"txid"`
