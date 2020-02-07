@@ -914,6 +914,12 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 		txs := []string{}
 		buffer := bytes.NewReader(val)
 		gob.NewDecoder(buffer).Decode(&txs)
+		for i := range txs {
+			txs[i], err = d.chainParser.UnpackTxid(txs[i])
+			if err != nil {
+				return err
+			}
+		}
 		if err := fn(txs); err != nil {
 			if _, ok := err.(*StopIteration); ok {
 				return nil
