@@ -413,7 +413,7 @@ func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSumm
 	l = p.BaseParser.PackVaruint(uint(recipients), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	if recipients > 0 {
-		for i := uint(0); i < recipients; i++ {
+		for i := range tts.Recipients {
 			buf = p.AppendTokenTransferRecipient(tts.Recipients[i], buf, varBuf)
 		}
 	}
