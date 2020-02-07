@@ -911,7 +911,7 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 		if glog.V(2) {
 			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
 		}
-		_, _, err := d.chainParser.UnpackAssetKey(key)
+		guidUnpacked, heightUnpacked, err := d.chainParser.UnpackAssetKey(key)
 		if err != nil {
 			return err
 		}
@@ -924,9 +924,9 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 			}
 			return err
 		}
-		if len(val) != 0 {
-			glog.Warningf("rocksdb: assets contain incorrect data %s: %s", binary.BigEndian.Uint32(key), string(val))
-		}
+		
+			glog.Warningf("rocksdb: assets contain incorrect data %s: %s", guidUnpacked, heightUnpacked)
+		
 	}
 	return nil
 }
