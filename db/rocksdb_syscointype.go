@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"encoding/gob"
+	"encoding/hex"
 	"github.com/syscoin/btcd/wire"
 )
 var AssetCache map[uint32]bchain.Asset
@@ -911,16 +912,13 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 		if glog.V(2) {
 			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
 		}
-		txs := [][]byte{}
+		txs := []string{}
 		buffer := bytes.NewReader(val)
 		gob.NewDecoder(buffer).Decode(&txs)
 		for i := range txs {
-			txs[i], err = d.chainParser.UnpackTxid(txs[i])
-			if err != nil {
-				return err
-			}
+			txs[i] = hex.EncodeToString(([]byte)](txs[i]))
 		}
-		if err = fn(txs); err != nil {
+		if err := fn(txs); err != nil {
 			if _, ok := err.(*StopIteration); ok {
 				return nil
 			}
