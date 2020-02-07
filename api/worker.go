@@ -401,13 +401,7 @@ func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AddressFi
 	txids := make([]string, 0, 4)
 	var callback db.GetTxAssetsCallback
 	callback = func(txidsIn []string) error {
-		if len(txidsIn) > 1 {
-			glog.Warning("txidsIn %v size len txids %v before", len(txidsIn), len(txids))
-		}
 		txids = append(txids, txidsIn...)
-		if len(txidsIn) > 1 {
-			glog.Warning("txidsIn %v size len txids %v after", len(txidsIn), len(txids))
-		}
 		if len(txids) >= maxResults {
 			return &db.StopIteration{}
 		}

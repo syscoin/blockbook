@@ -778,9 +778,10 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDes
 		strTxid := string(btxID)
 		txAsset, ok := txAssets[blockHash]
 		if !ok {
-			txAsset = &bchain.TxAsset{Txids: []string{}, AssetGuid: assetGuid, Height: height}
+			txAsset = &bchain.TxAsset{Txids: []string{}, AssetGuid: assetGuid}
 			txAssets[blockHash] = txAsset
 		}
+		txAsset.Height = height
 		txAsset.Txids = append(txAsset.Txids, strTxid)
 	}	
 	return err
