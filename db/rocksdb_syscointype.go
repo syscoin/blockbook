@@ -911,7 +911,7 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 		if glog.V(2) {
 			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
 		}
-		txs := []byte{}
+		txs := [][]byte{}
 		buffer := bytes.NewReader(val)
 		gob.NewDecoder(buffer).Decode(&txs)
 		for i := range txs {
