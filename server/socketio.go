@@ -521,31 +521,66 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	}
 	return
 }
-func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res resultGetAssetHistory, err error) {
+func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res resultGetAddressHistory, err error) {
 	txr, err := s.getAssetTxids(assets, opts)
 	if err != nil {
 		return
 	}
 	txids := txr.Result
-	res.Result.Items = make([]*bchain.TokenTransferSummary, 0)
+	res.Result.TotalCount = len(txids)
+	res.Result.Items = make([]addressHistoryItem, 0, 8)
 	to := len(txids)
 	if to > opts.To {
 		to = opts.To
 	}
+	ahi := addressHistoryItem{}
 	for txi := opts.From; txi < to; txi++ {
 		tx, err := s.api.GetTransaction(txids[txi], false, false)
 		if err != nil {
 			return res, err
 		}
-		for _, summary := range tx.TokenTransferSummary {
-			// we don't need recipient data for asset history list
-			summary.Recipients = nil
-			res.Result.Items = append(res.Result.Items, summary)
+		ads := make(map[string]*addressHistoryIndexes)
+		var totalSat big.Int
+		for i := range tx.Vin {
+			vin := &tx.Vin[i]
+			a := addressInSlice(vin.Addresses, addr)
+			if a != "" {
+				hi := ads[a]
+				if hi == nil {
+					hi = &addressHistoryIndexes{OutputIndexes: []int{}}
+					ads[a] = hi
+				}
+				hi.InputIndexes = append(hi.InputIndexes, int(vin.N))
+				if vin.ValueSat != nil {
+					totalSat.Sub(&totalSat, (*big.Int)(vin.ValueSat))
+				}
+			}
 		}
+		for i := range tx.Vout {
+			vout := &tx.Vout[i]
+			a := addressInSlice(vout.Addresses, addr)
+			if a != "" {
+				hi := ads[a]
+				if hi == nil {
+					hi = &addressHistoryIndexes{InputIndexes: []int{}}
+					ads[a] = hi
+				}
+				hi.OutputIndexes = append(hi.OutputIndexes, int(vout.N))
+				if vout.ValueSat != nil {
+					totalSat.Add(&totalSat, (*big.Int)(vout.ValueSat))
+				}
+			}
+		}
+		ahi.Addresses = ads
+		ahi.Confirmations = int(tx.Confirmations)
+		ahi.Satoshis = totalSat.Int64()
+		ahi.Tx = txToResTx(tx)
+		res.Result.Items = append(res.Result.Items, ahi)
+		// }
 	}
-	res.Result.TotalCount = len(res.Result.Items)
 	return
 }
+
 func unmarshalArray(params []byte, np int) (p []interface{}, err error) {
 	err = json.Unmarshal(params, &p)
 	if err != nil {
