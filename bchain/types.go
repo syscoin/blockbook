@@ -613,7 +613,7 @@ type BlockChainParser interface {
 	IsAssetSendTx(nVersion int32) bool
 	TryGetOPReturn(script []byte) []byte
 	PackAssetKey(assetGuid uint32, height uint32) []byte
-	UnpackAssetKey(key []byte) (uint32, uint32, error)
+	UnpackAssetKey(key []byte) (uint32, uint32)
 	PackAsset(asset *Asset) ([]byte, error)
 	UnpackAsset(buf []byte) (*Asset, error) 
 }

@@ -334,8 +334,8 @@ func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail A
 func (p *BaseParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	return nil
 }
-func (p *BaseParser) UnpackAssetKey(buf []byte) (uint32, uint32, error) {
-	return 0, 0, errors.New("Not supported")
+func (p *BaseParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
+	return 0, 0
 }
 const packedHeightBytes = 4
 func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {

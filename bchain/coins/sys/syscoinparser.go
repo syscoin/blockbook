@@ -4,14 +4,12 @@ import (
 	"blockbook/bchain"
 	"blockbook/bchain/coins/btc"
 	"blockbook/bchain/coins/utils"
-	"encoding/binary"
 	"bytes"
 	"math/big"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/martinboehm/btcutil"
-	"github.com/juju/errors"
 )
 
 // magic numbers
@@ -239,11 +237,11 @@ func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	return buf
 }
 
-func (p *SyscoinParser) UnpackAssetKey(key []byte) (uint32, uint32) {
+func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
 	assetGuid, l := p.BaseParser.UnpackVaruint(buf)
 	height, _ := p.BaseParser.UnpackVaruint(buf[l:])
 	// height is packed in binary complement, convert it
-	return assetGuid, ^height
+	return uint32(assetGuid, ^uint32(height)
 }
 
 func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
