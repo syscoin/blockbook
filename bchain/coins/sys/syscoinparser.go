@@ -241,7 +241,7 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
 	assetGuid, l := p.BaseParser.UnpackVaruint(buf)
 	height, _ := p.BaseParser.UnpackVaruint(buf[l:])
 	// height is packed in binary complement, convert it
-	return uint32(assetGuid, ^uint32(height)
+	return uint32(assetGuid), ^uint32(height)
 }
 
 func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
