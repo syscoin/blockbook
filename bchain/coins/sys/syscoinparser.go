@@ -225,7 +225,6 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 
-const packedBytes = 4
 func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	varBuf := p.BaseParser.PackUint(assetGuid)
 	buf = append(buf, varBuf...)
