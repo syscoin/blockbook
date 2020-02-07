@@ -400,8 +400,8 @@ func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AddressFi
 	var err error
 	txids := make([]string, 0, 4)
 	var callback db.GetTxAssetsCallback
-	callback = func(txids []string) error {
-		txids = append(txids, txids...)
+	callback = func(txidsIn []string) error {
+		txids = append(txids, txidsIn...)
 		if len(txids) >= maxResults {
 			return &db.StopIteration{}
 		}
