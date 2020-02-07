@@ -543,32 +543,26 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		var totalSat big.Int
 		for i := range tx.Vin {
 			vin := &tx.Vin[i]
-			a := addressInSlice(vin.Addresses, addr)
-			if a != "" {
-				hi := ads[a]
-				if hi == nil {
-					hi = &addressHistoryIndexes{OutputIndexes: []int{}}
-					ads[a] = hi
-				}
-				hi.InputIndexes = append(hi.InputIndexes, int(vin.N))
-				if vin.ValueSat != nil {
-					totalSat.Sub(&totalSat, (*big.Int)(vin.ValueSat))
-				}
+			hi := ads[a]
+			if hi == nil {
+				hi = &addressHistoryIndexes{OutputIndexes: []int{}}
+				ads[a] = hi
+			}
+			hi.InputIndexes = append(hi.InputIndexes, int(vin.N))
+			if vin.ValueSat != nil {
+				totalSat.Sub(&totalSat, (*big.Int)(vin.ValueSat))
 			}
 		}
 		for i := range tx.Vout {
 			vout := &tx.Vout[i]
-			a := addressInSlice(vout.Addresses, addr)
-			if a != "" {
-				hi := ads[a]
-				if hi == nil {
-					hi = &addressHistoryIndexes{InputIndexes: []int{}}
-					ads[a] = hi
-				}
-				hi.OutputIndexes = append(hi.OutputIndexes, int(vout.N))
-				if vout.ValueSat != nil {
-					totalSat.Add(&totalSat, (*big.Int)(vout.ValueSat))
-				}
+			hi := ads[a]
+			if hi == nil {
+				hi = &addressHistoryIndexes{InputIndexes: []int{}}
+				ads[a] = hi
+			}
+			hi.OutputIndexes = append(hi.OutputIndexes, int(vout.N))
+			if vout.ValueSat != nil {
+				totalSat.Add(&totalSat, (*big.Int)(vout.ValueSat))
 			}
 		}
 		ahi.Addresses = ads
