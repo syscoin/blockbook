@@ -910,11 +910,12 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		totalResults             int
 	)
 	var err error
-	var assetGuid uint32
-	assetGuid, err = strconv.Atoi(asset)
+	var assetGuidInt int
+	assetGuidInt, err = strconv.Atoi(asset)
 	if err != nil {
 		return nil, err
 	}
+	assetGuid := uint32(assetGuidInt)
 	// process mempool, only if toHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txm, err = w.getAssetTxids(assetGuid, true, filter, maxInt)
