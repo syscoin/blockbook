@@ -263,7 +263,6 @@ func (s *SocketIoServer) getAssetTxids(assets []string, opts *addrOpts) (res res
 		}
 		if !opts.QueryMempoolOnly {
 			err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, func(txids []string) error {
-				glog.Warningf("txid 0 %v", txids[0])
 				txids = append(txids, txids...)
 				return nil
 			})
@@ -552,6 +551,7 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		return
 	}
 	txids := txr.Result
+	glog.Warningf("txids len %v", len(txids))
 	res.Result.Items = make([]*bchain.TokenTransferSummary, 0)
 	to := len(txids)
 	if to > opts.To {
@@ -562,12 +562,15 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		if err != nil {
 			return res, err
 		}
+		glog.Warningf("tx.TokenTransferSummary len %v", len(tx.TokenTransferSummary))
 		for _, summary := range tx.TokenTransferSummary {
 			// we don't need recipient data for asset history list
 			summary.Recipients = nil
+			glog.Warningf("adding summary")
 			res.Result.Items = append(res.Result.Items, summary)
 		}
 	}
+	glog.Warningf("total count %v", len(res.Result.Items))
 	res.Result.TotalCount = len(res.Result.Items)
 	return
 }
