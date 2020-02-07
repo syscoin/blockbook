@@ -825,7 +825,7 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 		}
 		asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AddressFilter{Vout: api.AddressFilterVoutOff})
 		if err == nil {
-			http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(asset.Asset.AssetObj.Asset), 10), 302)
+			http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(asset.Asset.AssetObj.Asset), 10)), 302)
 			return noTpl, nil, nil
 		}
 	}
