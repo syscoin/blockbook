@@ -797,7 +797,8 @@ func (s *PublicServer) explorerIndex(w http.ResponseWriter, r *http.Request) (tp
 func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	var tx *api.Tx
-	var address *api.Address
+	var addaress *api.Address
+	var asset *api.Asset
 	var block *api.Block
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "search"}).Inc()
