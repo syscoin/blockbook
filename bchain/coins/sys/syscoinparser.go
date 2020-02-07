@@ -227,16 +227,16 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 
 func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	varBuf := p.BaseParser.PackUint(assetGuid)
-	buf = append(buf, varBuf...)
+	buf := append(buf, varBuf...)
 	// pack height as binary complement to achieve ordering from newest to oldest block
-	varBuf := p.BaseParser.PackUint(^height)
+	varBuf = p.BaseParser.PackUint(^height)
 	buf = append(buf, varBuf...)
 	return buf
 }
 
 func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
-	assetGuid, l := p.BaseParser.UnpackUint(buf)
-	height, _ := p.BaseParser.UnpackUint(buf[l:])
+	assetGuid := p.BaseParser.UnpackUint(buf)
+	height := p.BaseParser.UnpackUint(buf[4:])
 	// height is packed in binary complement, convert it
 	return assetGuid, ^height
 }
