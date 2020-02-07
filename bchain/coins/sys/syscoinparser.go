@@ -227,22 +227,19 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 
 const packedBytes = 4
 func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
-	varBuf := make([]byte, packedBytes)
-	// mul by 4 because vlq uses 64 bit integers to store even 32 bit ones
-	buf := make([]byte, packedBytes*4)
-	l := p.BaseParser.PackVaruint(uint(assetGuid), varBuf)
-	buf = append(buf, varBuf[:l]...)
+	varBuf := p.BaseParser.PackUint(assetGuid)
+	buf = append(buf, varBuf...)
 	// pack height as binary complement to achieve ordering from newest to oldest block
-	l = p.BaseParser.PackVaruint(uint(^height), varBuf)
-	buf = append(buf, varBuf[:l]...)
+	varBuf := p.BaseParser.PackUint(^height)
+	buf = append(buf, varBuf...)
 	return buf
 }
 
 func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
-	assetGuid, l := p.BaseParser.UnpackVaruint(buf)
-	height, _ := p.BaseParser.UnpackVaruint(buf[l:])
+	assetGuid, l := p.BaseParser.UnpackUint(buf)
+	height, _ := p.BaseParser.UnpackUint(buf[l:])
 	// height is packed in binary complement, convert it
-	return uint32(assetGuid), ^uint32(height)
+	return assetGuid, ^height
 }
 
 func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
