@@ -757,7 +757,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	return assetGuid, d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
 
-func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset, txAssets map[string]*bchain.TxAsset) error {
+func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset, txAssets map[string]*bchain.TxAsset) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -776,10 +776,10 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, addrDesc bchain.AddressDe
 	}
 	if assetGuid > 0 && err == nil {
 		strTxid := string(btxID)
-		txAsset, ok := txAssets[strTxid]
+		txAsset, ok := txAssets[blockHash]
 		if !ok {
 			txAsset = &bchain.TxAsset{Txids: []string{}, AssetGuid: assetGuid, Height: height}
-			txAssets[strTxid] = txAsset
+			txAssets[blockHash] = txAsset
 		}
 		txAsset.Txids = append(txAsset.Txids, strTxid)
 	}	
