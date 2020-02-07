@@ -840,8 +840,10 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 	var assetDb *bchain.Asset
 	var assetL1 *bchain.Asset
 	var ok bool
-	if assetL1, ok = (*assets)[guid]; ok {
-		return assetL1, nil
+	if assets != nil {
+		if assetL1, ok = (*assets)[guid]; ok {
+			return assetL1, nil
+		}
 	}
 	if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
