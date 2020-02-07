@@ -921,9 +921,6 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 			}
 			return err
 		}
-		
-			glog.Warningf("rocksdb: assets contain incorrect data %s: %s", guidUnpacked, heightUnpacked)
-		
 	}
 	return nil
 }
