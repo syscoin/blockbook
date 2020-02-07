@@ -539,30 +539,40 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 		if err != nil {
 			return res, err
 		}
+		if len(tx.TokenTransferSummary) == 0 {
+			return res, errors.New("Token transfer information empty in asset history tx response")
+		}
 		ads := make(map[string]*addressHistoryIndexes)
 		var totalSat big.Int
 		for i := range tx.Vin {
 			vin := &tx.Vin[i]
-			hi := ads[a]
-			if hi == nil {
-				hi = &addressHistoryIndexes{OutputIndexes: []int{}}
-				ads[a] = hi
-			}
-			hi.InputIndexes = append(hi.InputIndexes, int(vin.N))
-			if vin.ValueSat != nil {
-				totalSat.Sub(&totalSat, (*big.Int)(vin.ValueSat))
+			// use first summary response as from address to filter vin/vouts because From is the person who spends inputs and creates outputs in asset tx
+			a := addressInSlice(vin.Addresses, tx.TokenTransferSummary[0].From)
+			if a != "" {
+				hi := ads[a]
+				if hi == nil {
+					hi = &addressHistoryIndexes{OutputIndexes: []int{}}
+					ads[a] = hi
+				}
+				hi.InputIndexes = append(hi.InputIndexes, int(vin.N))
+				if vin.ValueSat != nil {
+					totalSat.Sub(&totalSat, (*big.Int)(vin.ValueSat))
+				}
 			}
 		}
 		for i := range tx.Vout {
 			vout := &tx.Vout[i]
-			hi := ads[a]
-			if hi == nil {
-				hi = &addressHistoryIndexes{InputIndexes: []int{}}
-				ads[a] = hi
-			}
-			hi.OutputIndexes = append(hi.OutputIndexes, int(vout.N))
-			if vout.ValueSat != nil {
-				totalSat.Add(&totalSat, (*big.Int)(vout.ValueSat))
+			a := addressInSlice(vout.Addresses, tx.TokenTransferSummary[0].From)
+			if a != "" {
+				hi := ads[a]
+				if hi == nil {
+					hi = &addressHistoryIndexes{InputIndexes: []int{}}
+					ads[a] = hi
+				}
+				hi.OutputIndexes = append(hi.OutputIndexes, int(vout.N))
+				if vout.ValueSat != nil {
+					totalSat.Add(&totalSat, (*big.Int)(vout.ValueSat))
+				}
 			}
 		}
 		ahi.Addresses = ads
