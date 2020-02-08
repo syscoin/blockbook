@@ -996,11 +996,8 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Txids:                 txids,
 	}
 	txBytes, byErr := base64.StdEncoding.DecodeString(r.AssetDetails.Contract)
-	if byErr == nil {
-		hexBytes := make([]byte, len(txBytes)*2)
-		hex.Encode(hexBytes, txBytes)
-		r.AssetDetails.Contract = string(hexBytes)
-	}
+	r.AssetDetails.Contract = string(txBytes)
+	
 	json.Unmarshal(dbAsset.AssetObj.PubData, &r.AssetDetails.PubData)
 	if option == AccountDetailsTxidHistory {
 		r.Txs = len(txids)
