@@ -181,7 +181,14 @@ type AddressFilter struct {
 	// OnlyConfirmed set to true will ignore mempool transactions; mempool is also ignored if FromHeight/ToHeight filter is specified
 	OnlyConfirmed bool
 }
-
+// AssetFilter is used to filter data returned from GetAsset api method
+type AssetFilter struct {
+	FromHeight     uint32
+	ToHeight       uint32
+	AssetsMask 	   bchain.AssetsMask
+	// OnlyConfirmed set to true will ignore mempool transactions; mempool is also ignored if FromHeight/ToHeight filter is specified
+	OnlyConfirmed bool
+}
 // Address holds information about address and its transactions
 type Address struct {
 	Paging

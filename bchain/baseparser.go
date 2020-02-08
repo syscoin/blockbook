@@ -319,6 +319,12 @@ func (p *BaseParser) IsAssetSendTx(nVersion int32) bool {
 func (p *BaseParser) IsAssetActivateTx(nVersion int32) bool {
 	return false
 }
+func (p *BaseParser) GetAssetMaskFromVersion(nVersion int32) AssetMask {
+	return AssetAllMask
+}
+func (p *BaseParser) GetAssetTypeFromVersion(nVersion int32) TokenType {
+	return SPTUnknownType
+}
 func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
@@ -336,6 +342,12 @@ func (p *BaseParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 }
 func (p *BaseParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
 	return 0, 0
+}
+func (p *BaseParser) PackAssetTxIndex(txAssetIndex *TxAssetIndex) []byte {
+	return nil
+}
+func (p *BaseParser) UnpackAssetTxIndex(buf []byte) *TxAssetIndex {
+	return nil
 }
 const packedHeightBytes = 4
 func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {

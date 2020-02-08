@@ -429,7 +429,7 @@ func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AddressFi
 		if to == 0 {
 			to = maxUint32
 		}
-		err = w.db.GetTxAssets(assetGuid, filter.FromHeight, to, callback)
+		err = w.db.GetTxAssets(assetGuid, filter.FromHeight, to, filter.AssetsMask, callback)
 		if err != nil {
 			return nil, err
 		}
@@ -896,7 +896,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 }
 
 // GetAsset gets transactions for given asset
-func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AddressFilter) (*Asset, error) {
+func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AssetFilter) (*Asset, error) {
 	start := time.Now()
 	page--
 	if page < 0 {

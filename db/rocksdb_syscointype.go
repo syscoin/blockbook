@@ -143,7 +143,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		// transfer balance to new receiver
 		totalSupplyDb := big.NewInt(dBAsset.AssetObj.TotalSupply)
 		txAddresses.TokenTransferSummary = &bchain.TokenTransferSummary {
-			Type:     bchain.SPTAssetTransferType,
+			Type:     d.chainParser.GetAssetTypeFromVersion(version),
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			To:       receiverAddress,
@@ -190,7 +190,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			assets[assetGuid] = &asset
 		}
 		txAddresses.TokenTransferSummary = &bchain.TokenTransferSummary {
-			Type:     bchain.SPTAssetUpdateType,
+			Type:     d.chainParser.GetAssetTypeFromVersion(version),
 			Token:    strAssetGuid,
 			From:     senderAddress,
 			Value:    (*bchain.Amount)(valueTo),
@@ -232,7 +232,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		return assetGuid, errors.New("ConnectAssetAllocationOutput Skipping asset allocation tx")
 	}
 	txAddresses.TokenTransferSummary = &bchain.TokenTransferSummary {
-		Type:     bchain.SPTAssetAllocationType,
+		Type:     d.chainParser.GetAssetTypeFromVersion(version),
 		Token:    strAssetGuid,
 		From:     senderAddress,
 		Decimals: int(dBAsset.AssetObj.Precision),
@@ -661,7 +661,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	amount := big.NewInt(mintasset.ValueAsset)
 	balanceAsset.BalanceAssetSat.Add(balanceAsset.BalanceAssetSat, amount)
 	txAddresses.TokenTransferSummary = &bchain.TokenTransferSummary {
-		Type:     bchain.SPTAssetMintType,
+		Type:     d.chainParser.GetAssetTypeFromVersion(version),
 		Token:    strAssetGuid,
 		From:     senderAddress,
 		Value:    (*bchain.Amount)(amount),
@@ -778,11 +778,12 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDes
 		strTxid := string(btxID)
 		txAsset, ok := txAssets[blockHash]
 		if !ok {
-			txAsset = &bchain.TxAsset{Txids: []string{}, AssetGuid: assetGuid}
+			txAsset = &bchain.TxAsset{Txs: &bchain.TxAssetIndex{Txids: []string{}}, AssetGuid: assetGuid}
 			txAssets[blockHash] = txAsset
 		}
+		txAsset.Txs.Type = d.chainParser.GetAssetMaskFromVersion(version)
+		txAsset.Txs.Txids = append(txAsset.Txs.Txids, strTxid)
 		txAsset.Height = height
-		txAsset.Txids = append(txAsset.Txids, strTxid)
 	}	
 	return err
 }
@@ -879,9 +880,8 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
 	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
-		buffer := &bytes.Buffer{}
-		gob.NewEncoder(buffer).Encode(txAsset.Txids)
-		wb.PutCF(d.cfh[cfTxAssets], key, buffer.Bytes())
+		buf := d.chainParser.PackAssetTxIndex(txAsset.Txs)
+		wb.PutCF(d.cfh[cfTxAssets], key, buf)
 	}
 	return nil
 }
@@ -896,7 +896,7 @@ func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets []*bchain.Tx
 
 // GetTxAssets finds all asset transactions for each asset
 // Transaction are passed to callback function in the order from newest block to the oldest
-func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn GetTxAssetsCallback) (err error) {
+func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, assetsBitMask uint32, fn GetTxAssetsCallback) (err error) {
 	startKey := d.chainParser.PackAssetKey(assetGuid, higher)
 	stopKey := d.chainParser.PackAssetKey(assetGuid, lower)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfTxAssets])
@@ -910,17 +910,21 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, fn 
 		if glog.V(2) {
 			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
 		}
-		txs := []string{}
-		buffer := bytes.NewReader(val)
-		gob.NewDecoder(buffer).Decode(&txs)
+		txs := d.chainParser.UnpackAssetTxIndex(val)
+		var txids []string
 		for i := range txs {
-			txs[i] = hex.EncodeToString(([]byte)(txs[i]))
-		}
-		if err := fn(txs); err != nil {
-			if _, ok := err.(*StopIteration); ok {
-				return nil
+			type := txs[i].Type
+			if ((assetsBitMask & type) == type) {
+				txids = append(txids, hex.EncodeToString(txs[i].Txid))
 			}
-			return err
+		}
+		if len(txids) > 0 {
+			if err := fn(txids); err != nil {
+				if _, ok := err.(*StopIteration); ok {
+					return nil
+				}
+				return err
+			}
 		}
 	}
 	return nil

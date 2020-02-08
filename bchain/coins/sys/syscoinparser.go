@@ -126,6 +126,59 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		Txs: txs,
 	}, nil
 }
+func (p *SyscoinParser) GetAssetTypeFromVersion(nVersion int32) bchain.TokenType {
+	switch nVersion {
+	case SYSCOIN_TX_VERSION_ASSET_ACTIVATE:
+		return SPTAssetActivateType
+	case SYSCOIN_TX_VERSION_ASSET_UPDATE:
+		return SPTAssetUpdateType
+	case SYSCOIN_TX_VERSION_ASSET_TRANSFER:
+		return SPTAssetTransferType
+	case SYSCOIN_TX_VERSION_ASSET_SEND:
+		return SPTAssetSendType
+	case SYSCOIN_TX_VERSION_ALLOCATION_MINT:
+		return SPTAssetAllocationMintType
+	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM:
+		return SPTAssetAllocationBurnToEthereumType
+	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN:
+		return SPTAssetAllocationBurnToSyscoinType
+	case SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION:
+		return SPTAssetSyscoinBurnToAllocationType
+	case SYSCOIN_TX_VERSION_ALLOCATION_SEND:
+		return SPTAssetAllocationSendType
+	case SYSCOIN_TX_VERSION_ALLOCATION_LOCK:
+		return SPTAssetAllocationLockType
+	default:
+		return SPTUnknownType
+	}
+}
+
+func (p *SyscoinParser) GetAssetMaskFromVersion(nVersion int32) bchain.AssetMask {
+	switch tokenType {
+	case SYSCOIN_TX_VERSION_ASSET_ACTIVATE:
+		return bchain.AssetActivateMask
+	case SYSCOIN_TX_VERSION_ASSET_UPDATE:
+		return bchain.AssetUpdateMask
+	case SYSCOIN_TX_VERSION_ASSET_TRANSFER:
+		return bchain.AssetTransferMask
+	case SYSCOIN_TX_VERSION_ASSET_SEND:
+		return bchain.AssetSendMask
+	case SYSCOIN_TX_VERSION_ALLOCATION_MINT:
+		return bchain.AssetAllocationMintMask
+	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM:
+		return bchain.AssetAllocationBurnToEthereumMask
+	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN:
+		return bchain.AssetAllocationBurnToSyscoinMask
+	case SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION:
+		return bchain.AssetSyscoinBurnToAllocationMask
+	case SYSCOIN_TX_VERSION_ALLOCATION_SEND:
+		return bchain.AssetAllocationSendMask
+	case SYSCOIN_TX_VERSION_ALLOCATION_LOCK:
+		return bchain.AssetAllocationLockMask
+	default:
+		return bchain.AssetAllMask
+	}
+}
 
 func (p *SyscoinParser) IsSyscoinMintTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_MINT
@@ -241,6 +294,38 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
 	// height is packed in binary complement, convert it
 	return assetGuid, ^height
 }
+
+func (p *SyscoinParser) PackAssetTxIndex(txAssetIndex *bchain.TxAssetIndex) []byte {
+	var buf []byte
+	varBuf := make([]byte, vlq.MaxLen64)
+	varBuf = p.BaseParser.PackUint(txAssetIndex.Type)
+	buf = append(buf, varBuf...)
+	l = p.BaseParser.PackVaruint(uint(len(txAssetIndex.Txids)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	for txid := range txAssetIndex.Txids {
+		l = p.BaseParser.PackVaruint(uint(len(txid)), varBuf)
+		buf = append(buf, varBuf[:l]...)
+	}
+	return buf
+}
+
+func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) *bchain.TxAssetIndex {
+	var txAssetIndex bchain.TxAssetIndex
+	txAssetIndex.Type = p.BaseParser.UnpackUint(buf)
+	l := 4
+	numTxids, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	l += ll
+	if numTxids > 0 {
+		txAssetIndex.Txids = make([]string, numTxids)
+		for i := uint(0); i < numTxids; i++ {
+			strLen, ll := p.BaseParser.UnpackVaruint(buf[l:])
+			txAssetIndex.Txids[i] = string(append([]byte(nil), buf[ll:ll+int(strLen)]...))
+			l += ll
+		}
+	}
+	return &txAssetIndex
+}
+
 
 func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
 	txs, l := p.BaseParser.UnpackVaruint(buf)

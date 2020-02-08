@@ -360,12 +360,29 @@ const XPUBAddressTokenType TokenType = "XPUBAddress"
 // Syscoin SPT transaction
 const SPTTokenType TokenType = "SPTAllocated"
 const SPTUnallocatedTokenType TokenType = "SPTUnallocated"
-const SPTAssetAllocationType TokenType = "SPTAssetAllocation"
-const SPTAssetNewType TokenType = "SPTAssetNew"
+const SPTUnknownType TokenType = "SPTUnknown"
+const SPTAssetActivateType TokenType = "SPTAssetActivate"
 const SPTAssetUpdateType TokenType = "SPTAssetUpdate"
 const SPTAssetTransferType TokenType = "SPTAssetTransfer"
 const SPTAssetSendType TokenType = "SPTAssetSend"
-const SPTAssetMintType TokenType = "SPTAssetMint"
+const SPTAssetAllocationMintType TokenType = "SPTAssetAllocationMint"
+const SPTAssetAllocationSendType TokenType = "SPTAssetAllocationSend"
+const SPTAssetAllocationLockType TokenType = "SPTAssetAllocationLock"
+const SPTAssetSyscoinBurnToAllocationType TokenType = "SPTAssetSyscoinBurnToAllocation"
+const SPTAssetAllocationBurnToSyscoinType TokenType = "SPTAssetAllocationBurnToSyscoin"
+const SPTAssetAllocationBurnToEthereumType TokenType = "SPTAssetAllocationBurnToEthereum"
+
+const AssetAllMask AssetsMask = 0
+const AssetActivateMask AssetsMask = 1
+const AssetUpdateMask AssetsMask = 2
+const AssetTransferMask AssetsMask = 4
+const AssetSendMask AssetsMask = 8
+const AssetSyscoinBurnToAllocationMask AssetsMask = 16
+const AssetAllocationBurnToSyscoinMask AssetsMask = 32
+const AssetAllocationBurnToEthereumMask AssetsMask = 64
+const AssetAllocationMintMask AssetsMask = 128
+const AssetAllocationSendMask AssetsMask = 256
+const AssetAllocationLockMask AssetsMask = 512
 
 // Amount is datatype holding amounts
 type Amount big.Int
@@ -456,10 +473,15 @@ type TokenTransferSummary struct {
 }
 
 // used to store all txids related to an asset for asset history
+type TxAssetIndex struct {
+	Type 	  AssetsMask
+	Txids     []string
+}
+
 type TxAsset struct {
 	AssetGuid uint32
 	Height    uint32
-	Txids     []string
+	Txs       *TxAssetIndex
 }
 
 // TxAddresses stores transaction inputs and outputs with amounts
@@ -612,10 +634,14 @@ type BlockChainParser interface {
 	IsAssetActivateTx(nVersion int32) bool
 	IsAssetSendTx(nVersion int32) bool
 	TryGetOPReturn(script []byte) []byte
+	GetAssetMaskFromVersion(nVersion int32) AssetMask
+	GetAssetTypeFromVersion(nVersion int32) TokenType
 	PackAssetKey(assetGuid uint32, height uint32) []byte
 	UnpackAssetKey(key []byte) (uint32, uint32)
+	PackAssetTxIndex(txAssetIndex *TxAssetIndex) []byte
+	UnpackAssetTxIndex(buf []byte) *TxAssetIndex
 	PackAsset(asset *Asset) ([]byte, error)
-	UnpackAsset(buf []byte) (*Asset, error) 
+	UnpackAsset(buf []byte) (*Asset, error)
 }
 
 // Mempool defines common interface to mempool

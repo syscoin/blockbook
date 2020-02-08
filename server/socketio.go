@@ -90,6 +90,15 @@ type addrOpts struct {
 	To               int  `json:"to"`
 }
 
+type assetOpts struct {
+	Start            int  `json:"start"`
+	End              int  `json:"end"`
+	QueryMempoolOnly bool `json:"queryMempoolOnly"`
+	From             int  `json:"from"`
+	To               int  `json:"to"`
+	AssetsMask 	     bchain.AssetsMask
+}
+
 var onMessageHandlers = map[string]func(*SocketIoServer, json.RawMessage) (interface{}, error){
 	"getAddressTxids": func(s *SocketIoServer, params json.RawMessage) (rv interface{}, err error) {
 		addr, opts, err := unmarshalGetAddressRequest(params)
@@ -106,14 +115,14 @@ var onMessageHandlers = map[string]func(*SocketIoServer, json.RawMessage) (inter
 		return
 	},
 	"getAssetTxids": func(s *SocketIoServer, params json.RawMessage) (rv interface{}, err error) {
-		asset, opts, err := unmarshalGetAddressRequest(params)
+		asset, opts, err := unmarshalGetAssetRequest(params)
 		if err == nil {
 			rv, err = s.getAssetTxids(asset, &opts)
 		}
 		return
 	},
 	"getAssetHistory": func(s *SocketIoServer, params json.RawMessage) (rv interface{}, err error) {
-		asset, opts, err := unmarshalGetAddressRequest(params)
+		asset, opts, err := unmarshalGetAssetRequest(params)
 		if err == nil {
 			rv, err = s.getAssetHistory(asset, &opts)
 		}
@@ -223,6 +232,24 @@ func unmarshalGetAddressRequest(params []byte) (addr []string, opts addrOpts, er
 	return
 }
 
+func unmarshalGetAssetRequest(params []byte) (asset string, opts assetOpts, err error) {
+	var p []json.RawMessage
+	err = json.Unmarshal(params, &p)
+	if err != nil {
+		return
+	}
+	if len(p) != 2 {
+		err = errors.New("incorrect number of parameters")
+		return
+	}
+	err = json.Unmarshal(p[0], &addr)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(p[1], &opts)
+	return
+}
+
 type resultAddressTxids struct {
 	Result []string `json:"result"`
 }
@@ -253,32 +280,31 @@ func (s *SocketIoServer) getAddressTxids(addr []string, opts *addrOpts) (res res
 	return res, nil
 }
 
-func (s *SocketIoServer) getAssetTxids(assets []string, opts *addrOpts) (res resultAddressTxids, err error) {
+func (s *SocketIoServer) getAssetTxids(asset string, opts *addrOpts) (res resultAddressTxids, err error) {
 	txids := make([]string, 0, 8)
 	lower, higher := uint32(opts.End), uint32(opts.Start)
-	for _, asset := range assets {
-		assetGuid, err := strconv.Atoi(asset)
+	assetBitMask := uint32(opts.AssetsMask)
+	assetGuid, err := strconv.Atoi(asset)
+	if err != nil {
+		return res, err
+	}
+	if !opts.QueryMempoolOnly {
+		err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, assetBitMask, func(txidsIn []string) error {
+			txids = append(txids, txidsIn...)
+			return nil
+		})
 		if err != nil {
 			return res, err
 		}
-		if !opts.QueryMempoolOnly {
-			err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, func(txidsIn []string) error {
-				txids = append(txids, txidsIn...)
-				return nil
-			})
-			if err != nil {
-				return res, err
-			}
-		} else {
-			// TODO: for now don't have mempool storage of asset txids per guid, will do in future
-			/*o, err := s.mempool.GetTxAssets(asset)
-			if err != nil {
-				return res, err
-			}
-			for _, m := range o {
-				txids = append(txids, m.Txid)
-			}*/
+	} else {
+		// TODO: for now don't have mempool storage of asset txids per guid, will do in future
+		/*o, err := s.mempool.GetTxAssets(asset)
+		if err != nil {
+			return res, err
 		}
+		for _, m := range o {
+			txids = append(txids, m.Txid)
+		}*/
 	}
 	res.Result = api.GetUniqueTxids(txids)
 	return res, nil
@@ -521,8 +547,8 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	}
 	return
 }
-func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res resultGetAddressHistory, err error) {
-	txr, err := s.getAssetTxids(assets, opts)
+func (s *SocketIoServer) getAssetHistory(asset string, opts *addrOpts) (res resultGetAddressHistory, err error) {
+	txr, err := s.getAssetTxids(asset, opts)
 	if err != nil {
 		return
 	}
@@ -576,6 +602,17 @@ func (s *SocketIoServer) getAssetHistory(assets []string, opts *addrOpts) (res r
 			}
 		}
 		ahi.Addresses = ads
+		ahi.AssetDetails =	&AssetSpecific{
+			AssetGuid:		assetGuid,
+			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
+			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
+			Balance:		dbAsset.AssetObj.Balance,
+			TotalSupply:	dbAsset.AssetObj.TotalSupply,
+			MaxSupply:		dbAsset.AssetObj.MaxSupply,
+			Precision:		dbAsset.AssetObj.Precision,
+			UpdateFlags:	dbAsset.AssetObj.UpdateFlags,
+		}
+		json.Unmarshal(dbAsset.AssetObj.PubData, &ahi.AssetDetails.PubData)
 		ahi.Confirmations = int(tx.Confirmations)
 		ahi.Satoshis = totalSat.Int64()
 		ahi.Tx = txToResTx(tx)
