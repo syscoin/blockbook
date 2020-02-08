@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
