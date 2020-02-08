@@ -993,8 +993,8 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Transactions:          txs,
 		Txids:                 txids,
 	}
-	json.Unmarshal(dbAsset.AssetObj.Contract, r.AssetDetails.Contract)
-	json.Unmarshal(dbAsset.AssetObj.PubData, r.AssetDetails.PubData)
+	json.Unmarshal(dbAsset.AssetObj.Contract, &r.AssetDetails.Contract)
+	json.Unmarshal(dbAsset.AssetObj.PubData, &r.AssetDetails.PubData)
 	if option == AccountDetailsTxidHistory {
 		r.Txs = len(txids)
 	} else {
