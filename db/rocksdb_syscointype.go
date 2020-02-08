@@ -10,7 +10,6 @@ import (
 	"github.com/tecbot/gorocksdb"
 	"encoding/binary"
 	"encoding/json"
-	"encoding/gob"
 	"encoding/hex"
 	"github.com/syscoin/btcd/wire"
 )
@@ -775,14 +774,12 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDes
 		assetGuid, err = d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
 	}
 	if assetGuid > 0 && err == nil {
-		strTxid := string(btxID)
 		txAsset, ok := txAssets[blockHash]
 		if !ok {
-			txAsset = &bchain.TxAsset{Txs: &bchain.TxAssetIndex{Txids: []string{}}, AssetGuid: assetGuid}
+			txAsset = &bchain.TxAsset{Txs: []*bchain.TxAssetIndex{}, AssetGuid: assetGuid}
 			txAssets[blockHash] = txAsset
 		}
-		txAsset.Txs.Type = d.chainParser.GetAssetsMaskFromVersion(version)
-		txAsset.Txs.Txids = append(txAsset.Txs.Txids, strTxid)
+		txAsset.Txs = append(txAsset.Txs, &bchain.TxAssetIndex{Type: d.chainParser.GetAssetsMaskFromVersion(version), Txid: btxID})
 		txAsset.Height = height
 	}	
 	return err
@@ -880,7 +877,7 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets map[string]*bchain.TxAsset) error {
 	for _, txAsset := range txassets {
 		key := d.chainParser.PackAssetKey(txAsset.AssetGuid, txAsset.Height)
-		buf := d.chainParser.PackAssetTxIndex(txAsset.Txs)
+		buf := d.chainParser.PackAssetTxIndex(txAsset)
 		wb.PutCF(d.cfh[cfTxAssets], key, buf)
 	}
 	return nil
@@ -910,20 +907,22 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, ass
 		if glog.V(2) {
 			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
 		}
-		txs := d.chainParser.UnpackAssetTxIndex(val)
-		txids := []string{}
-		for i := range txs {
-			mask := txs[i].Type
-			if ((assetsBitMask & mask) == mask) {
-				txids = append(txids, hex.EncodeToString(txs[i].Txid))
-			}
-		}
-		if len(txids) > 0 {
-			if err := fn(txids); err != nil {
-				if _, ok := err.(*StopIteration); ok {
-					return nil
+		txIndexes := d.chainParser.UnpackAssetTxIndex(val)
+		if txIndexes != nil {
+			txids := []string{}
+			for i := range txIndexes {
+				mask := txIndexes[i].Type
+				if ((assetsBitMask & mask) == mask) {
+					txids = append(txids, hex.EncodeToString(txIndexes[i].Txid))
 				}
-				return err
+			}
+			if len(txids) > 0 {
+				if err := fn(txids); err != nil {
+					if _, ok := err.(*StopIteration); ok {
+						return nil
+					}
+					return err
+				}
 			}
 		}
 	}

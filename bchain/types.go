@@ -477,13 +477,13 @@ type TokenTransferSummary struct {
 // used to store all txids related to an asset for asset history
 type TxAssetIndex struct {
 	Type 	  AssetsMask
-	Txids     []string
+	Txid      []byte
 }
 
 type TxAsset struct {
 	AssetGuid uint32
 	Height    uint32
-	Txs       *TxAssetIndex
+	Txs       []*TxAssetIndex
 }
 
 // TxAddresses stores transaction inputs and outputs with amounts
@@ -640,8 +640,8 @@ type BlockChainParser interface {
 	GetAssetTypeFromVersion(nVersion int32) TokenType
 	PackAssetKey(assetGuid uint32, height uint32) []byte
 	UnpackAssetKey(key []byte) (uint32, uint32)
-	PackAssetTxIndex(txAssetIndex *TxAssetIndex) []byte
-	UnpackAssetTxIndex(buf []byte) *TxAssetIndex
+	PackAssetTxIndex(txAsset *TxAsset) []byte
+	UnpackAssetTxIndex(buf []byte) *[]TxAssetIndex
 	PackAsset(asset *Asset) ([]byte, error)
 	UnpackAsset(buf []byte) (*Asset, error)
 }

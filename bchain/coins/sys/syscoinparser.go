@@ -129,27 +129,27 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 func (p *SyscoinParser) GetAssetTypeFromVersion(nVersion int32) bchain.TokenType {
 	switch nVersion {
 	case SYSCOIN_TX_VERSION_ASSET_ACTIVATE:
-		return SPTAssetActivateType
+		return bchain.SPTAssetActivateType
 	case SYSCOIN_TX_VERSION_ASSET_UPDATE:
-		return SPTAssetUpdateType
+		return bchain.SPTAssetUpdateType
 	case SYSCOIN_TX_VERSION_ASSET_TRANSFER:
-		return SPTAssetTransferType
+		return bchain.SPTAssetTransferType
 	case SYSCOIN_TX_VERSION_ASSET_SEND:
-		return SPTAssetSendType
+		return bchain.SPTAssetSendType
 	case SYSCOIN_TX_VERSION_ALLOCATION_MINT:
-		return SPTAssetAllocationMintType
+		return bchain.SPTAssetAllocationMintType
 	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM:
-		return SPTAssetAllocationBurnToEthereumType
+		return bchain.SPTAssetAllocationBurnToEthereumType
 	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN:
-		return SPTAssetAllocationBurnToSyscoinType
+		return bchain.SPTAssetAllocationBurnToSyscoinType
 	case SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION:
-		return SPTAssetSyscoinBurnToAllocationType
+		return bchain.SPTAssetSyscoinBurnToAllocationType
 	case SYSCOIN_TX_VERSION_ALLOCATION_SEND:
-		return SPTAssetAllocationSendType
+		return bchain.SPTAssetAllocationSendType
 	case SYSCOIN_TX_VERSION_ALLOCATION_LOCK:
-		return SPTAssetAllocationLockType
+		return bchain.SPTAssetAllocationLockType
 	default:
-		return SPTUnknownType
+		return bchain.SPTUnknownType
 	}
 }
 
@@ -295,35 +295,36 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
 	return assetGuid, ^height
 }
 
-func (p *SyscoinParser) PackAssetTxIndex(txAssetIndex *bchain.TxAssetIndex) []byte {
+func (p *SyscoinParser) PackAssetTxIndex(txAsset *bchain.TxAsset) []byte {
 	var buf []byte
 	varBuf := make([]byte, vlq.MaxLen64)
-	varBuf = p.BaseParser.PackUint(txAssetIndex.Type)
-	buf = append(buf, varBuf...)
-	l = p.BaseParser.PackVaruint(uint(len(txAssetIndex.Txids)), varBuf)
+	l = p.BaseParser.PackVaruint(uint(len(txAsset.Txs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
-	for txid := range txAssetIndex.Txids {
-		l = p.BaseParser.PackVaruint(uint(len(txid)), varBuf)
+	for txAssetIndex := range txAsset.Txs {
+		varBuf = p.BaseParser.PackUint(txAssetIndex.Type)
+		buf = append(buf, varBuf...)
+		l = p.BaseParser.PackVaruint(uint(len(txAssetIndex.Txid)), varBuf)
 		buf = append(buf, varBuf[:l]...)
+		buf = append(buf, txAssetIndex.Txid...)
 	}
 	return buf
 }
 
-func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) *bchain.TxAssetIndex {
-	var txAssetIndex bchain.TxAssetIndex
-	txAssetIndex.Type = p.BaseParser.UnpackUint(buf)
-	l := 4
-	numTxids, ll := p.BaseParser.UnpackVaruint(buf[l:])
-	l += ll
-	if numTxids > 0 {
-		txAssetIndex.Txids = make([]string, numTxids)
-		for i := uint(0); i < numTxids; i++ {
-			strLen, ll := p.BaseParser.UnpackVaruint(buf[l:])
-			txAssetIndex.Txids[i] = string(append([]byte(nil), buf[ll:ll+int(strLen)]...))
-			l += ll
+func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) []*bchain.TxAssetIndex {
+	var txAssetIndexes []*bchain.TxAssetIndex
+	numTxIndexes, l := p.BaseParser.UnpackVaruint(buf)
+	if numTxIndexes > 0 {
+		txAssetIndexes = make([]*bchain.TxAssetIndex, numTxIndexes)
+		for i := uint(0); i < numTxIndexes; i++ {
+			txAssetIndexes[i].Type = p.BaseParser.UnpackUint(buf[l:])
+			l += 4
+			ll, al := p.BaseParser.UnpackVaruint(buf[l:])
+			l += al
+			txAssetIndexes[i].Txid = append([]byte(nil), buf[l:l+int(ll)]...)
+			l += int(ll)
 		}
 	}
-	return &txAssetIndex
+	return txAssetIndexes
 }
 
 
