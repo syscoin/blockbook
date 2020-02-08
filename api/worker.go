@@ -397,7 +397,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 	return txids, nil
 }
 
-func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
+func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AssetFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
 	var callback db.GetTxAssetsCallback

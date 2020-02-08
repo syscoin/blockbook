@@ -302,7 +302,7 @@ func (p *SyscoinParser) PackAssetTxIndex(txAsset *bchain.TxAsset) []byte {
 	l := p.BaseParser.PackVaruint(uint(len(txAsset.Txs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for _, txAssetIndex := range txAsset.Txs {
-		varBuf = p.BaseParser.PackUint(txAssetIndex.Type)
+		varBuf = p.BaseParser.PackUint(uint32(txAssetIndex.Type))
 		buf = append(buf, varBuf...)
 		l = p.BaseParser.PackVaruint(uint(len(txAssetIndex.Txid)), varBuf)
 		buf = append(buf, varBuf[:l]...)
@@ -317,7 +317,7 @@ func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) []*bchain.TxAssetIndex {
 	if numTxIndexes > 0 {
 		txAssetIndexes = make([]*bchain.TxAssetIndex, numTxIndexes)
 		for i := uint(0); i < numTxIndexes; i++ {
-			txAssetIndexes[i].Type = p.BaseParser.UnpackUint(buf[l:])
+			txAssetIndexes[i].Type = bchain.AssetsMask(p.BaseParser.UnpackUint(buf[l:]))
 			l += 4
 			ll, al := p.BaseParser.UnpackVaruint(buf[l:])
 			l += al
