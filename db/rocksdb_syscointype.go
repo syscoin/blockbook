@@ -893,7 +893,7 @@ func (d *RocksDB) removeTxAssets(wb *gorocksdb.WriteBatch, txassets []*bchain.Tx
 
 // GetTxAssets finds all asset transactions for each asset
 // Transaction are passed to callback function in the order from newest block to the oldest
-func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, assetsBitMask uint32, fn GetTxAssetsCallback) (err error) {
+func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, assetsBitMask bchain.AssetsMask, fn GetTxAssetsCallback) (err error) {
 	startKey := d.chainParser.PackAssetKey(assetGuid, higher)
 	stopKey := d.chainParser.PackAssetKey(assetGuid, lower)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfTxAssets])

@@ -429,7 +429,7 @@ func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AssetFilt
 		if to == 0 {
 			to = maxUint32
 		}
-		err = w.db.GetTxAssets(assetGuid, filter.FromHeight, to, uint32(filter.AssetsMask), callback)
+		err = w.db.GetTxAssets(assetGuid, filter.FromHeight, to, filter.AssetsMask, callback)
 		if err != nil {
 			return nil, err
 		}

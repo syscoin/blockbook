@@ -283,7 +283,7 @@ func (s *SocketIoServer) getAddressTxids(addr []string, opts *addrOpts) (res res
 func (s *SocketIoServer) getAssetTxids(asset string, opts *addrOpts) (res resultAddressTxids, err error) {
 	txids := make([]string, 0, 8)
 	lower, higher := uint32(opts.End), uint32(opts.Start)
-	assetBitMask := uint32(opts.AssetsMask)
+	assetBitMask := opts.AssetsMask
 	assetGuid, err := strconv.Atoi(asset)
 	if err != nil {
 		return res, err
