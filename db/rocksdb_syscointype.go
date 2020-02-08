@@ -165,8 +165,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		}
 		balanceAsset.Transfers++
 		valueTo := big.NewInt(asset.AssetObj.Balance)
-		var prevUpdateFlags uint8 = 0
-		var prevPubData, prevContract []byte
 		if !d.chainParser.IsAssetActivateTx(version) {
 			balanceDb := big.NewInt(dBAsset.AssetObj.Balance)
 			balanceDb.Add(balanceDb, valueTo)
@@ -176,16 +174,19 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			dBAsset.AssetObj.TotalSupply = supplyDb.Int64()
 			// logic follows core CheckAssetInputs()
 			if len(asset.AssetObj.PubData) > 0 {
-				prevPubData = dBAsset.AssetObj.PubData
 				dBAsset.AssetObj.PubData = asset.AssetObj.PubData
 				dBAsset.AuxFeesAddr = d.GetAuxFeeAddr(asset.AssetObj.PubData)
 			}
+			if assetGuid == 1045909988 {
+				glog.Warningf("1045909988 txid %v len(asset.AssetObj.Contract) %v", hex.EncodeToString(btxID), len(asset.AssetObj.Contract))
+			}
 			if len(asset.AssetObj.Contract) > 0 {
-				prevContract = dBAsset.AssetObj.Contract
+				if assetGuid == 1045909988 {
+					glog.Warningf("setting new contract on  1045909988 %v", hex.EncodeToString(asset.AssetObj.Contract))
+				}
 				dBAsset.AssetObj.Contract = asset.AssetObj.Contract
 			}
 			if asset.AssetObj.UpdateFlags != dBAsset.AssetObj.UpdateFlags {
-				prevUpdateFlags = dBAsset.AssetObj.UpdateFlags
 				dBAsset.AssetObj.UpdateFlags = asset.AssetObj.UpdateFlags
 			}
 			assets[assetGuid] = dBAsset
@@ -202,18 +203,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			Decimals: int(dBAsset.AssetObj.Precision),
 			Symbol:   string(dBAsset.AssetObj.Symbol),
 			Fee:       (*bchain.Amount)(big.NewInt(0)),
-		}
-		if updateFlagsUpdated > 0 {
-			txAddresses.TokenTransferSummary.PrevUpdateFlags = &prevUpdateFlags
-			txAddresses.TokenTransferSummary.NewUpdateFlags = &asset.AssetObj.UpdateFlags
-		}
-		if len(prevContract) > 0 {
-			txAddresses.TokenTransferSummary.PrevContract = &prevContract
-			txAddresses.TokenTransferSummary.NewContract = &asset.AssetObj.Contract
-		}
-		if len(prevPubData) > 0 {
-			txAddresses.TokenTransferSummary.PrevPubData = &prevPubData
-			txAddresses.TokenTransferSummary.NewPubData = &asset.AssetObj.PubData
 		}
 	}
 	return assetGuid, nil

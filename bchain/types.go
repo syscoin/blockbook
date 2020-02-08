@@ -453,12 +453,6 @@ type TokenTransferSummary struct {
 	Value	 *Amount   `json:"totalAmount"`
 	Fee      *Amount   `json:"fee"`
 	Recipients []*TokenTransferRecipient `json:"recipients"`
-	PrevUpdateFlags *uint8	`json:"prevUpdateFlags"`
-	NewUpdateFlags  *uint8	`json:"newUpdateFlags"`
-	PrevContract    *[]byte	`json:"prevContract"`
-	NewContract     *[]byte	`json:"newContract"`
-	PrevPubData     *[]byte	`json:"prevPubData"`
-	NewPubData      *[]byte	`json:"newPubData"`
 }
 
 // used to store all txids related to an asset for asset history
