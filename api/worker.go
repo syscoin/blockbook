@@ -995,10 +995,9 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Transactions:          txs,
 		Txids:                 txids,
 	}
-	encodedContract := hex.EncodeToString(r.AssetDetails.Contract)
-	txBytes, _ := base64.StdEncoding.DecodeString(encodedContract)
+	txBytes, _ := base64.StdEncoding.DecodeString(string(r.AssetDetails.Contract))
 	r.AssetDetails.Contract = string(txBytes)
-	glog.Info("db contract %v vs base64 decoded %v",encodedContract, string(txBytes))
+	glog.Info("db contract %v vs base64 decoded %v",string(r.AssetDetails.Contract), string(txBytes))
 	json.Unmarshal(dbAsset.AssetObj.PubData, &r.AssetDetails.PubData)
 	if option == AccountDetailsTxidHistory {
 		r.Txs = len(txids)
