@@ -641,7 +641,7 @@ type BlockChainParser interface {
 	PackAssetKey(assetGuid uint32, height uint32) []byte
 	UnpackAssetKey(key []byte) (uint32, uint32)
 	PackAssetTxIndex(txAsset *TxAsset) []byte
-	UnpackAssetTxIndex(buf []byte) *[]TxAssetIndex
+	UnpackAssetTxIndex(buf []byte) []*TxAssetIndex
 	PackAsset(asset *Asset) ([]byte, error)
 	UnpackAsset(buf []byte) (*Asset, error)
 }

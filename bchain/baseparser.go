@@ -346,7 +346,7 @@ func (p *BaseParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
 func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte {
 	return nil
 }
-func (p *BaseParser) UnpackAssetTxIndex(buf []byte) *[]TxAssetIndex {
+func (p *BaseParser) UnpackAssetTxIndex(buf []byte) []*TxAssetIndex {
 	return nil
 }
 const packedHeightBytes = 4
