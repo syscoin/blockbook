@@ -7,6 +7,7 @@ import (
 	"blockbook/db"
 	"bytes"
 	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -981,14 +982,14 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	r := &Asset{
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		assetGuid,
-			WitnessAddress: dbAsset.WitnessAddress.ToString("sys"),
-			Contract:		hex.DecodeString(dbAsset.Contract),
-			PubData:		hex.DecodeString(dbAsset.PubData),
-			Balance:		dbAsset.Balance,
-			TotalSupply:	dbAsset.TotalSupply,
-			MaxSupply:		dbAsset.MaxSupply,
-			Precision:		dbAsset.Precision,
-			UpdateFlags:	dbAsset.UpdateFlags,
+			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
+			Contract:		hex.DecodeString(dbAsset.AssetObj.Contract),
+			PubData:		hex.DecodeString(dbAsset.AssetObj.PubData),
+			Balance:		dbAsset.AssetObj.Balance,
+			TotalSupply:	dbAsset.AssetObj.TotalSupply,
+			MaxSupply:		dbAsset.AssetObj.MaxSupply,
+			Precision:		dbAsset.AssetObj.Precision,
+			UpdateFlags:	dbAsset.AssetObj.UpdateFlags,
 		},
 		Paging:                pg,
 		UnconfirmedTxs:        unconfirmedTxs,
