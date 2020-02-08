@@ -177,13 +177,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 				dBAsset.AssetObj.PubData = asset.AssetObj.PubData
 				dBAsset.AuxFeesAddr = d.GetAuxFeeAddr(asset.AssetObj.PubData)
 			}
-			if assetGuid == 1045909988 {
-				glog.Warningf("1045909988 txid %v len(asset.AssetObj.Contract) %v", hex.EncodeToString(btxID), len(asset.AssetObj.Contract))
-			}
 			if len(asset.AssetObj.Contract) > 0 {
-				if assetGuid == 1045909988 {
-					glog.Warningf("setting new contract on  1045909988 %v", hex.EncodeToString(asset.AssetObj.Contract))
-				}
 				dBAsset.AssetObj.Contract = asset.AssetObj.Contract
 			}
 			if asset.AssetObj.UpdateFlags != dBAsset.AssetObj.UpdateFlags {
