@@ -979,7 +979,17 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		return nil, errAsset
 	}
 	r := &Asset{
-		Asset:			   	   dbAsset,
+		AssetDetails:	&AssetSpecific{
+			AssetGuid:		assetGuid,
+			WitnessAddress: dbAsset.WitnessAddress.ToString("sys"),
+			Contract:		hex.DecodeString(dbAsset.Contract),
+			PubData:		hex.DecodeString(dbAsset.PubData),
+			Balance:		dbAsset.Balance,
+			TotalSupply:	dbAsset.TotalSupply,
+			MaxSupply:		dbAsset.MaxSupply,
+			Precision:		dbAsset.Precision,
+			UpdateFlags:	dbAsset.UpdateFlags,
+		},
 		Paging:                pg,
 		UnconfirmedTxs:        unconfirmedTxs,
 		Transactions:          txs,

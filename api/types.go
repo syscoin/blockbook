@@ -91,6 +91,19 @@ type Vout struct {
 	Type        string                   `json:"type,omitempty"`
 }
 
+// Contains SysconSpecific asset information hex decoded and pertinent to API display
+type AssetSpecific struct {
+	AssetGuid uint32
+	WitnessAddress string
+	Contract string
+	Symbol string
+	PubData string
+	Balance int64
+	TotalSupply int64
+	MaxSupply int64
+	Precision uint8
+	UpdateFlags uint8
+}
 
 // EthereumSpecific contains ethereum specific transaction data
 type EthereumSpecific struct {
@@ -194,7 +207,7 @@ type Address struct {
 // Asset holds information about asset and its transactions
 type Asset struct {
 	Paging
-	Asset			  	  *bchain.Asset			`json:"asset"`
+	AssetDetails		  *AssetSpecific		`json:"asset"`
 	UnconfirmedTxs        int                   `json:"unconfirmedTxs"`
 	Txs                   int                   `json:"txs"`
 	Transactions          []*Tx                 `json:"transactions,omitempty"`
