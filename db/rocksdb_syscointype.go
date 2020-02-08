@@ -824,9 +824,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		AssetCache = map[uint32]bchain.Asset{}
 	}
 	for guid, asset := range assets {
-		if _, ok := AssetCache[guid]; !ok {
-			AssetCache[guid] = *asset
-		}
+		AssetCache[guid] = *asset
 		key := d.chainParser.PackUint(guid)
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.AssetObj.TotalSupply == -1 {
