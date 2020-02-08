@@ -913,8 +913,8 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, ass
 		txs := d.chainParser.UnpackAssetTxIndex(val)
 		var txids []string
 		for i := range txs {
-			type := txs[i].Type
-			if ((assetsBitMask & type) == type) {
+			mask := txs[i].Type
+			if ((assetsBitMask & mask) == mask) {
 				txids = append(txids, hex.EncodeToString(txs[i].Txid))
 			}
 		}
