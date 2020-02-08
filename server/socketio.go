@@ -369,7 +369,7 @@ type resultGetAddressHistory struct {
 type resultGetAssetHistory struct {
 	Result struct {
 		TotalCount int                  `json:"totalCount"`
-		AssetSpecific  *bchain.AssetSpecific `json:"asset"`
+		AssetSpecific  *api.AssetSpecific `json:"asset"`
 		Items      []*bchain.TokenTransferSummary `json:"items"`
 	} `json:"result"`
 }
