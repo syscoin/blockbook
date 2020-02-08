@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -995,7 +994,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Transactions:          txs,
 		Txids:                 txids,
 	}
-	txBytes, byErr := base64.StdEncoding.DecodeString(r.AssetDetails.Contract)
+	txBytes, _ := base64.StdEncoding.DecodeString(r.AssetDetails.Contract)
 	r.AssetDetails.Contract = string(txBytes)
 	
 	json.Unmarshal(dbAsset.AssetObj.PubData, &r.AssetDetails.PubData)
