@@ -828,6 +828,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		key := d.chainParser.PackUint(guid)
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.AssetObj.TotalSupply == -1 {
+			delete(AssetCache, guid)
 			wb.DeleteCF(d.cfh[cfAssets], key)
 		} else {
 			buf, err := d.chainParser.PackAsset(asset)
