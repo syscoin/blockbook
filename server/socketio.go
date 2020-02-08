@@ -607,7 +607,7 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *addrOpts) (res resu
 		if errAsset != nil {
 			return nil, errAsset
 		}
-		ahi.AssetDetails =	&bchain.AssetSpecific{
+		ahi.AssetDetails =	&api.AssetSpecific{
 			AssetGuid:		assetGuid,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
