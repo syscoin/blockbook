@@ -154,7 +154,7 @@ func (p *SyscoinParser) GetAssetTypeFromVersion(nVersion int32) bchain.TokenType
 }
 
 func (p *SyscoinParser) GetAssetsMaskFromVersion(nVersion int32) bchain.AssetsMask {
-	switch tokenType {
+	switch nVersion {
 	case SYSCOIN_TX_VERSION_ASSET_ACTIVATE:
 		return bchain.AssetActivateMask
 	case SYSCOIN_TX_VERSION_ASSET_UPDATE:

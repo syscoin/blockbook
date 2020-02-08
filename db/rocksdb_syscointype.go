@@ -911,7 +911,7 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, ass
 			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
 		}
 		txs := d.chainParser.UnpackAssetTxIndex(val)
-		var txids []string{}
+		txids := []string{}
 		for i := range txs {
 			mask := txs[i].Type
 			if ((assetsBitMask & mask) == mask) {
