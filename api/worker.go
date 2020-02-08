@@ -7,6 +7,7 @@ import (
 	"blockbook/db"
 	"bytes"
 	"encoding/json"
+	"encoding/base64"
 	"fmt"
 	"math"
 	"math/big"
@@ -993,7 +994,12 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Transactions:          txs,
 		Txids:                 txids,
 	}
-	json.Unmarshal(dbAsset.AssetObj.Contract, &r.AssetDetails.Contract)
+	txBytes, byErr := base64.StdEncoding.DecodeString(r.AssetDetails.Contract)
+	if byErr == nil {
+		hexBytes := make([]byte, len(txBytes)*2)
+		hex.Encode(hexBytes, txBytes)
+		r.AssetDetails.Contract = string(hexBytes)
+	}
 	json.Unmarshal(dbAsset.AssetObj.PubData, &r.AssetDetails.PubData)
 	if option == AccountDetailsTxidHistory {
 		r.Txs = len(txids)
