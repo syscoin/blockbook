@@ -983,7 +983,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		assetGuid,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
-			Contract:		hex.EncodeToString(dbAsset.AssetObj.Contract),
+			Contract:		hex.EncodeToString(([]byte)(dbAsset.AssetObj.Contract)),
 			Balance:		dbAsset.AssetObj.Balance,
 			TotalSupply:	dbAsset.AssetObj.TotalSupply,
 			MaxSupply:		dbAsset.AssetObj.MaxSupply,
