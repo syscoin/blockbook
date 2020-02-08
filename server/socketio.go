@@ -242,7 +242,7 @@ func unmarshalGetAssetRequest(params []byte) (asset string, opts assetOpts, err 
 		err = errors.New("incorrect number of parameters")
 		return
 	}
-	err = json.Unmarshal(p[0], &addr)
+	err = json.Unmarshal(p[0], &asset)
 	if err != nil {
 		return
 	}
@@ -280,7 +280,7 @@ func (s *SocketIoServer) getAddressTxids(addr []string, opts *addrOpts) (res res
 	return res, nil
 }
 
-func (s *SocketIoServer) getAssetTxids(asset string, opts *addrOpts) (res resultAddressTxids, err error) {
+func (s *SocketIoServer) getAssetTxids(asset string, opts *assetOpts) (res resultAddressTxids, err error) {
 	txids := make([]string, 0, 8)
 	lower, higher := uint32(opts.End), uint32(opts.Start)
 	assetBitMask := opts.AssetsMask
@@ -369,6 +369,7 @@ type resultGetAddressHistory struct {
 type resultGetAssetHistory struct {
 	Result struct {
 		TotalCount int                  `json:"totalCount"`
+		AssetSpecific  *bchain.AssetSpecific `json:"asset"`
 		Items      []*bchain.TokenTransferSummary `json:"items"`
 	} `json:"result"`
 }
@@ -547,7 +548,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	}
 	return
 }
-func (s *SocketIoServer) getAssetHistory(asset string, opts *addrOpts) (res resultGetAddressHistory, err error) {
+func (s *SocketIoServer) getAssetHistory(asset string, opts *addrOpts) (res resultGetAssetHistory, err error) {
 	txr, err := s.getAssetTxids(asset, opts)
 	if err != nil {
 		return
@@ -602,7 +603,11 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *addrOpts) (res resu
 			}
 		}
 		ahi.Addresses = ads
-		ahi.AssetDetails =	&AssetSpecific{
+		dbAsset, errAsset := s.db.GetAsset(assetGuid, nil)
+		if errAsset != nil {
+			return nil, errAsset
+		}
+		ahi.AssetDetails =	&bchain.AssetSpecific{
 			AssetGuid:		assetGuid,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),

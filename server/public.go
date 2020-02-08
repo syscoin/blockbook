@@ -653,6 +653,66 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 	}, filterParam, gap
 }
 
+func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.AccountDetails, maxPageSize int) (int, int, api.AccountDetails, *api.AssetFilter, string, int) {
+	var voutFilter = api.AddressFilterVoutOff
+	page, ec := strconv.Atoi(r.URL.Query().Get("page"))
+	if ec != nil {
+		page = 0
+	}
+	pageSize, ec := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	if ec != nil || pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	from, ec := strconv.Atoi(r.URL.Query().Get("from"))
+	if ec != nil {
+		from = 0
+	}
+	to, ec := strconv.Atoi(r.URL.Query().Get("to"))
+	if ec != nil {
+		to = 0
+	}
+	filterParam := r.URL.Query().Get("filter")
+	var assetsMask uint32 = 0
+	if len(filterParam) > 0 {
+		assetsMask, ec := strconv.Atoi(filterParam)
+		if ec != nil {
+			assetsMask = 0
+		}
+	}
+	
+	switch r.URL.Query().Get("details") {
+	case "basic":
+		accountDetails = api.AccountDetailsBasic
+	case "tokens":
+		accountDetails = api.AccountDetailsTokens
+	case "tokenBalances":
+		accountDetails = api.AccountDetailsTokenBalances
+	case "txids":
+		accountDetails = api.AccountDetailsTxidHistory
+	case "txs":
+		accountDetails = api.AccountDetailsTxHistory
+	}
+	tokensToReturn := api.TokensToReturnNonzeroBalance
+	switch r.URL.Query().Get("tokens") {
+	case "derived":
+		tokensToReturn = api.TokensToReturnDerived
+	case "used":
+		tokensToReturn = api.TokensToReturnUsed
+	case "nonzero":
+		tokensToReturn = api.TokensToReturnNonzeroBalance
+	}
+	gap, ec := strconv.Atoi(r.URL.Query().Get("gap"))
+	if ec != nil {
+		gap = 0
+	}
+	return page, pageSize, accountDetails, &api.AssetFilter{
+		TokensToReturn: tokensToReturn,
+		FromHeight:     uint32(from),
+		ToHeight:       uint32(to),
+		AssetsMask:		bchain.AssetsMask(assetsMask),
+	}, filterParam, gap
+}
+
 func (s *PublicServer) explorerAddress(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
 	var addressParam string
 	i := strings.LastIndexByte(r.URL.Path, '/')
@@ -691,7 +751,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 		return errorTpl, nil, api.NewAPIError("Missing asset", true)
 	}
 	s.metrics.ExplorerViews.With(common.Labels{"action": "asset"}).Inc()
-	page, _, _, filter, filterParam, _ := s.getAddressQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
+	page, _, _, filter, filterParam, _ := s.getAssetQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
 	// do not allow details to be changed by query params
 	asset, err := s.api.GetAsset(assetParam, page, txsOnPage, api.AccountDetailsTxHistoryLight, filter)
 	if err != nil {
@@ -1037,7 +1097,7 @@ func (s *PublicServer) apiAsset(r *http.Request, apiVersion int) (interface{}, e
 	var asset *api.Asset
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-asset"}).Inc()
-	page, pageSize, details, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
+	page, pageSize, details, filter, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
 	asset, err = s.api.GetAsset(assetParam, page, pageSize, details, filter)
 	return asset, err
 }
