@@ -97,7 +97,7 @@ type AssetSpecific struct {
 	WitnessAddress string
 	Contract string
 	Symbol string
-	PubData string
+	PubData map[string]interface{}
 	Balance int64
 	TotalSupply int64
 	MaxSupply int64

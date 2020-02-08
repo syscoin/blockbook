@@ -7,7 +7,6 @@ import (
 	"blockbook/db"
 	"bytes"
 	"encoding/json"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -983,8 +982,6 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		assetGuid,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
-			Contract:		hex.EncodeToString(dbAsset.AssetObj.Contract),
-			PubData:		hex.EncodeToString(dbAsset.AssetObj.PubData),
 			Balance:		dbAsset.AssetObj.Balance,
 			TotalSupply:	dbAsset.AssetObj.TotalSupply,
 			MaxSupply:		dbAsset.AssetObj.MaxSupply,
@@ -996,6 +993,8 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Transactions:          txs,
 		Txids:                 txids,
 	}
+	json.Unmarshal(dbAsset.AssetObj.Contract, r.AssetDetails.Contract)
+	json.Unmarshal(dbAsset.AssetObj.PubData, r.AssetDetails.PubData)
 	if option == AccountDetailsTxidHistory {
 		r.Txs = len(txids)
 	} else {
