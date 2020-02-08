@@ -383,7 +383,7 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 	ll += l
 	if prevUpdateFlags > 0 {
 		prevUpdateFlagBytes := buf[ll:ll+1]
-		newUpdateFlagsBytes := buf[ll+1:ll+2]
+		newUpdateFlagBytes := buf[ll+1:ll+2]
 		prevUpdateFlagUint := uint8(prevUpdateFlagBytes[0])
 		newUpdateFlagUint := uint8(newUpdateFlagBytes[0])
 		tts.PrevUpdateFlags	= &prevUpdateFlagUint
@@ -407,11 +407,13 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 	prevPubDataSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
 	if prevPubDataSize > 0 {
-		tts.PrevContract = &append([]byte(nil), buf[ll:ll+int(prevPubDataSize)]...)
+		prevPubDataBytes :=  append([]byte(nil), buf[ll:ll+int(prevPubDataSize)]...)
+		tts.PrevPubData = &prevPubDataBytes
 		ll += int(prevPubDataSize)
 		newPubDataSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
 		ll += l
-		tts.NewPubData = &append([]byte(nil), buf[ll:ll+int(newPubDataSize)]...)
+		newPubDataBytes := append([]byte(nil), buf[ll:ll+int(newPubDataSize)]...)
+		tts.NewPubData = &newPubDataBytes
 		ll += int(newPubDataSize)
 	}
 	return ll
