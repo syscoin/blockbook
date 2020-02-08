@@ -372,6 +372,8 @@ const SPTAssetSyscoinBurnToAllocationType TokenType = "SPTAssetSyscoinBurnToAllo
 const SPTAssetAllocationBurnToSyscoinType TokenType = "SPTAssetAllocationBurnToSyscoin"
 const SPTAssetAllocationBurnToEthereumType TokenType = "SPTAssetAllocationBurnToEthereum"
 
+type AssetsMask uint32
+
 const AssetAllMask AssetsMask = 0
 const AssetActivateMask AssetsMask = 1
 const AssetUpdateMask AssetsMask = 2
@@ -634,7 +636,7 @@ type BlockChainParser interface {
 	IsAssetActivateTx(nVersion int32) bool
 	IsAssetSendTx(nVersion int32) bool
 	TryGetOPReturn(script []byte) []byte
-	GetAssetMaskFromVersion(nVersion int32) AssetMask
+	GetAssetsMaskFromVersion(nVersion int32) AssetsMask
 	GetAssetTypeFromVersion(nVersion int32) TokenType
 	PackAssetKey(assetGuid uint32, height uint32) []byte
 	UnpackAssetKey(key []byte) (uint32, uint32)

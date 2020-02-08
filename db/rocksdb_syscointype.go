@@ -781,7 +781,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDes
 			txAsset = &bchain.TxAsset{Txs: &bchain.TxAssetIndex{Txids: []string{}}, AssetGuid: assetGuid}
 			txAssets[blockHash] = txAsset
 		}
-		txAsset.Txs.Type = d.chainParser.GetAssetMaskFromVersion(version)
+		txAsset.Txs.Type = d.chainParser.GetAssetsMaskFromVersion(version)
 		txAsset.Txs.Txids = append(txAsset.Txs.Txids, strTxid)
 		txAsset.Height = height
 	}	
@@ -911,7 +911,7 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, ass
 			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
 		}
 		txs := d.chainParser.UnpackAssetTxIndex(val)
-		var txids []string
+		var txids []string{}
 		for i := range txs {
 			mask := txs[i].Type
 			if ((assetsBitMask & mask) == mask) {
