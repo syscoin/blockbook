@@ -983,6 +983,8 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		assetGuid,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
+			Contract:		hex.EncodeToString(dbAsset.AssetObj.Contract),
+			PubData:		hex.EncodeToString(dbAsset.AssetObj.PubData),
 			Balance:		dbAsset.AssetObj.Balance,
 			TotalSupply:	dbAsset.AssetObj.TotalSupply,
 			MaxSupply:		dbAsset.AssetObj.MaxSupply,
@@ -994,8 +996,6 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Transactions:          txs,
 		Txids:                 txids,
 	}
-	r.AssetDetails.Contract, _ = hex.DecodeString(dbAsset.AssetObj.Contract)
-	r.AssetDetails.PubData, _ = hex.DecodeString(dbAsset.AssetObj.PubData)
 	if option == AccountDetailsTxidHistory {
 		r.Txs = len(txids)
 	} else {
