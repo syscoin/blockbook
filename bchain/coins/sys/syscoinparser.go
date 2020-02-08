@@ -10,6 +10,7 @@ import (
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/martinboehm/btcutil"
+	vlq "github.com/bsm/go-vlq"
 )
 
 // magic numbers
@@ -298,7 +299,7 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
 func (p *SyscoinParser) PackAssetTxIndex(txAsset *bchain.TxAsset) []byte {
 	var buf []byte
 	varBuf := make([]byte, vlq.MaxLen64)
-	l = p.BaseParser.PackVaruint(uint(len(txAsset.Txs)), varBuf)
+	l := p.BaseParser.PackVaruint(uint(len(txAsset.Txs)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for txAssetIndex := range txAsset.Txs {
 		varBuf = p.BaseParser.PackUint(txAssetIndex.Type)
