@@ -383,24 +383,20 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 	ll += l
 	if prevUpdateFlags > 0 {
 		prevUpdateFlagBytes := buf[ll:ll+1]
-		newUpdateFlagsBytes := buf[ll+1:ll+2]
-		prevUpdateFlagUint := uint8(prevUpdateFlagBytes[0])
-		newUpdateFlagUint := uint8(newUpdateFlagBytes[0])
-		tts.PrevUpdateFlags	= &prevUpdateFlagUint
-		tts.NewUpdateFlags	= &newUpdateFlagUint
+		newUpdateFlagsBYtes := buf[ll+1:ll+2]
+		tts.PrevUpdateFlags	= &uint8(prevUpdateFlagBytes[0])
+		tts.NewUpdateFlags	= &uint8(newUpdateFlagsBYtes[0])
 		ll += 2
 	}
 
 	prevContractSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
 	ll += l
 	if prevContractSize > 0 {
-		prevContractBytes := append([]byte(nil), buf[ll:ll+int(prevContractSize)]...)
-		tts.PrevContract = &prevContractBytes
+		tts.PrevContract = &append([]byte(nil), buf[ll:ll+int(prevContractSize)]...)
 		ll += int(prevContractSize)
 		newContractSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
 		ll += l
-		newContractBytes := append([]byte(nil), buf[ll:ll+int(newContractSize)]...)
-		tts.NewContract = &newContractBytes
+		tts.NewContract = &append([]byte(nil), buf[ll:ll+int(newContractSize)]...)
 		ll += int(newContractSize)
 	}
 
@@ -446,9 +442,12 @@ func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSumm
 		buf = p.AppendTokenTransferRecipient(tts.Recipients[i], buf, varBuf)
 	}
 	if tts.PrevUpdateFlags != nil {
-		l = p.BaseParser.PackVaruint(1, varBuf)
+		l = p.BaseParser.PackVaruint(uint(len(*tts.PrevUpdateFlags)), varBuf)
 		buf = append(buf, varBuf[:l]...)
 		buf = append(buf, *tts.PrevUpdateFlags)
+
+		l = p.BaseParser.PackVaruint(uint(len(*tts.NewUpdateFlags)), varBuf)
+		buf = append(buf, varBuf[:l]...)
 		buf = append(buf, *tts.NewUpdateFlags)
 
 	} else {
