@@ -203,7 +203,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			Symbol:   string(dBAsset.AssetObj.Symbol),
 			Fee:       (*bchain.Amount)(big.NewInt(0)),
 		}
-		if prevUpdateFlags > 0 {
+		if updateFlagsUpdated > 0 {
 			txAddresses.TokenTransferSummary.PrevUpdateFlags = &prevUpdateFlags
 			txAddresses.TokenTransferSummary.NewUpdateFlags = &asset.AssetObj.UpdateFlags
 		}
