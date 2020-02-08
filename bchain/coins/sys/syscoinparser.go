@@ -340,7 +340,7 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 	var Value big.Int
 	var Fee big.Int
 	var recipients uint
-	var prevUpdateFlags, prevContractSize, newContractSize, prevPubDataSize, newPubDataSize uint
+	var prevUpdateFlags, newUpdateFlags, prevContractSize, newContractSize, prevPubDataSize, newPubDataSize uint
 	al, l := p.BaseParser.UnpackVaruint(buf)
 	tts.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := l+int(al)
