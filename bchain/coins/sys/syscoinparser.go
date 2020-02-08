@@ -340,7 +340,6 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 	var Value big.Int
 	var Fee big.Int
 	var recipients uint
-	var prevUpdateFlags, newUpdateFlags, prevContract, newContract, prevPubData, newPubData uint
 	al, l := p.BaseParser.UnpackVaruint(buf)
 	tts.Type = bchain.TokenType(append([]byte(nil), buf[l:l+int(al)]...))
 	ll := l+int(al)
@@ -379,35 +378,6 @@ func (p *SyscoinParser) UnpackTokenTransferSummary(tts *bchain.TokenTransferSumm
 			ll += l
 		}
 	}
-	prevUpdateFlags, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += l
-	if prevUpdateFlags > 0 {
-		tts.PrevUpdateFlags	= &uint8(buf[ll:ll+1])
-		tts.NewUpdateFlags	= &uint8(buf[ll+1:ll+2])
-		ll += 2
-	}
-
-	prevContractSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += l
-	if prevContractSize > 0 {
-		tts.PrevContract = &append([]byte(nil), buf[ll:ll+int(prevContractSize)]...)
-		ll += int(prevContractSize)
-		newContractSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
-		ll += l
-		tts.NewContract = &append([]byte(nil), buf[ll:ll+int(newContractSize)]...)
-		ll += int(newContractSize)
-	}
-
-	prevPubDataSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
-	ll += l
-	if prevPubDataSize > 0 {
-		tts.PrevContract = &append([]byte(nil), buf[ll:ll+int(prevPubDataSize)]...)
-		ll += int(prevPubDataSize)
-		newPubDataSize, l = p.BaseParser.UnpackVaruint(buf[ll:])
-		ll += l
-		tts.NewPubData = &append([]byte(nil), buf[ll:ll+int(newPubDataSize)]...)
-		ll += int(newPubDataSize)
-	}
 	return ll
 }
 
@@ -439,46 +409,6 @@ func (p *SyscoinParser) AppendTokenTransferSummary(tts *bchain.TokenTransferSumm
 	for i := range tts.Recipients {
 		buf = p.AppendTokenTransferRecipient(tts.Recipients[i], buf, varBuf)
 	}
-	if tts.PrevUpdateFlags != nil {
-		l = p.BaseParser.PackVaruint(uint(len(*tts.PrevUpdateFlags)), varBuf)
-		buf = append(buf, varBuf[:l]...)
-		buf = append(buf, *tts.PrevUpdateFlags)
-
-		l = p.BaseParser.PackVaruint(uint(len(*tts.NewUpdateFlags)), varBuf)
-		buf = append(buf, varBuf[:l]...)
-		buf = append(buf, *tts.NewUpdateFlags)
-
-	} else {
-		l = p.BaseParser.PackVaruint(0, varBuf)
-		buf = append(buf, varBuf[:l]...)
-	}
-
-	if tts.PrevContract != nil {
-		l = p.BaseParser.PackVaruint(uint(len(*tts.PrevContract)), varBuf)
-		buf = append(buf, varBuf[:l]...)
-		buf = append(buf, *tts.PrevContract...)
-
-		l = p.BaseParser.PackVaruint(uint(len(*tts.NewContract)), varBuf)
-		buf = append(buf, varBuf[:l]...)
-		buf = append(buf, *tts.NewContract...)
-	} else {
-		l = p.BaseParser.PackVaruint(0, varBuf)
-		buf = append(buf, varBuf[:l]...)
-	}
-
-	if tts.PrevPubData != nil {
-		l = p.BaseParser.PackVaruint(uint(len(*tts.PrevPubData)), varBuf)
-		buf = append(buf, varBuf[:l]...)
-		buf = append(buf, *tts.PrevPubData...)
-
-		l = p.BaseParser.PackVaruint(uint(len(*tts.NewPubData)), varBuf)
-		buf = append(buf, varBuf[:l]...)
-		buf = append(buf, *tts.NewPubData...)
-	} else {
-		l = p.BaseParser.PackVaruint(0, varBuf)
-		buf = append(buf, varBuf[:l]...)
-	}
-
 	return buf
 }
 
