@@ -671,7 +671,7 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 		to = 0
 	}
 	filterParam := r.URL.Query().Get("filter")
-	var assetsMask uint32 = 0
+	var assetsMask int = 0
 	if len(filterParam) > 0 {
 		assetsMask, ec = strconv.Atoi(filterParam)
 		if ec != nil {
