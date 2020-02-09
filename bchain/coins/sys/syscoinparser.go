@@ -317,12 +317,14 @@ func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) []*bchain.TxAssetIndex {
 	if numTxIndexes > 0 {
 		txAssetIndexes = make([]*bchain.TxAssetIndex, numTxIndexes)
 		for i := uint(0); i < numTxIndexes; i++ {
-			txAssetIndexes[i].Type = bchain.AssetsMask(p.BaseParser.UnpackUint(buf[l:]))
+			var txIndex bchain.TxAssetIndex
+			txIndex.Type := bchain.AssetsMask(p.BaseParser.UnpackUint(buf[l:]))
 			l += 4
 			ll, al := p.BaseParser.UnpackVaruint(buf[l:])
 			l += al
-			txAssetIndexes[i].Txid = append([]byte(nil), buf[l:l+int(ll)]...)
+			txIndex.Txid = append([]byte(nil), buf[l:l+int(ll)]...)
 			l += int(ll)
+			txAssetIndexes[i] = &txIndex
 		}
 	}
 	return txAssetIndexes
