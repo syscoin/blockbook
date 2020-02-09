@@ -989,9 +989,9 @@ func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []
 						d.resetValueSatToZero(&balance.SentSat, t.AddrDesc, "sent amount")
 					}
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
-					balance.Utxos = append(balance.Utxos, bchain.Utxo{
+					balance.addUtxoInDisconnect(&bchain.Utxo{
 						BtxID:    input.BtxID,
-						Vout:     input.Index,
+						Vout:     input.index,
 						Height:   inputHeight,
 						ValueSat: t.ValueSat,
 					})
@@ -1058,8 +1058,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.blockTxs) err
 		s := string(addrDesc)
 		b, fb := balances[s]
 		if !fb {
-			// do not use addressBalanceDetailUTXOIndexed as the utxo may be in wrong order for the helper map
-			b, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXO)
+			b, err = d.GetAddrDescBalance(addrDesc, addressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return nil, err
 			}
@@ -1457,7 +1456,7 @@ func (d *RocksDB) fixUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.AddrBala
 	}
 	if checksum.Cmp(&ba.BalanceSat) != 0 {
 		var checksumFromTxs big.Int
-		var utxos []Utxo
+		var utxos []bchain.Utxo
 		err := d.GetAddrDescTransactions(addrDesc, 0, ^uint32(0), func(txid string, height uint32, indexes []int32) error {
 			var ta *TxAddresses
 			var err error
