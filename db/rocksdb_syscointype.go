@@ -207,7 +207,11 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	var dBAsset *bchain.Asset
 	err := assetAllocation.Deserialize(r, version)
 	if err != nil {
+		glog.Warningf("Cannot deserialize version %v", d.chainParser.GetAssetTypeFromVersion(version))
 		return 0, err
+	}
+	if version == 0x7407 {
+		glog.Warningf("found sys burn to eth %v", d.chainParser.GetAssetTypeFromVersion(version))
 	}
 	totalAssetSentValue := big.NewInt(0)
 	totalFeeValue := big.NewInt(0)
