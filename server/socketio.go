@@ -6,6 +6,7 @@ import (
 	"blockbook/common"
 	"blockbook/db"
 	"encoding/json"
+	"encoding/hex"
 	"math/big"
 	"net/http"
 	"runtime/debug"
