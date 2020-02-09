@@ -654,7 +654,6 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 }
 
 func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.AccountDetails, maxPageSize int) (int, int, api.AccountDetails, *api.AssetFilter, string, int) {
-	var voutFilter = api.AddressFilterVoutOff
 	page, ec := strconv.Atoi(r.URL.Query().Get("page"))
 	if ec != nil {
 		page = 0
@@ -674,7 +673,7 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 	filterParam := r.URL.Query().Get("filter")
 	var assetsMask uint32 = 0
 	if len(filterParam) > 0 {
-		assetsMask, ec := strconv.Atoi(filterParam)
+		assetsMask, ec = strconv.Atoi(filterParam)
 		if ec != nil {
 			assetsMask = 0
 		}
