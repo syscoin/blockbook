@@ -613,7 +613,11 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 		if errAsset != nil {
 			return res, errAsset
 		}
-		ahi.AssetDetails =	&api.AssetSpecific{
+		json.Unmarshal(dbAsset.AssetObj.PubData, &ahi.AssetDetails.PubData)
+		ahi.Confirmations = int(tx.Confirmations)
+		ahi.Satoshis = totalSat.Int64()
+		ahi.Tx = txToResTx(tx)
+		res.Result.AssetDetails =	&api.AssetSpecific{
 			AssetGuid:		assetGuid,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
@@ -623,10 +627,6 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 			Precision:		dbAsset.AssetObj.Precision,
 			UpdateFlags:	dbAsset.AssetObj.UpdateFlags,
 		}
-		json.Unmarshal(dbAsset.AssetObj.PubData, &ahi.AssetDetails.PubData)
-		ahi.Confirmations = int(tx.Confirmations)
-		ahi.Satoshis = totalSat.Int64()
-		ahi.Tx = txToResTx(tx)
 		res.Result.Items = append(res.Result.Items, ahi)
 		// }
 	}
