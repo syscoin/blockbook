@@ -210,6 +210,9 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		glog.Warningf("Cannot deserialize version %v", d.chainParser.GetAssetTypeFromVersion(version))
 		return 0, err
 	}
+	if hex.EncodeToString(btxID) == "cbb97f5c4b43381dbb8e4bddabccf32246ed3ffb8fd269308fac410ef95e37ca" {
+		glog.Warningf("found cbb97f5c4b43381dbb8e4bddabccf32246ed3ffb8fd269308fac410ef95e37ca %v version %v", d.chainParser.GetAssetTypeFromVersion(version), version)
+	}
 	if version == 0x7407 {
 		glog.Warningf("found sys burn to eth %v", d.chainParser.GetAssetTypeFromVersion(version))
 	} else {
