@@ -318,7 +318,7 @@ func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) []*bchain.TxAssetIndex {
 		txAssetIndexes = make([]*bchain.TxAssetIndex, numTxIndexes)
 		for i := uint(0); i < numTxIndexes; i++ {
 			var txIndex bchain.TxAssetIndex
-			txIndex.Type := bchain.AssetsMask(p.BaseParser.UnpackUint(buf[l:]))
+			txIndex.Type = bchain.AssetsMask(p.BaseParser.UnpackUint(buf[l:]))
 			l += 4
 			ll, al := p.BaseParser.UnpackVaruint(buf[l:])
 			l += al
