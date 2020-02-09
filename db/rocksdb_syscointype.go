@@ -205,7 +205,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
 	var dBAsset *bchain.Asset
-	err := assetAllocation.Deserialize(r)
+	err := assetAllocation.Deserialize(r, version)
 	if err != nil {
 		return 0, err
 	}
@@ -309,7 +309,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
-	err := assetAllocation.Deserialize(r)
+	err := assetAllocation.Deserialize(r, version)
 	if err != nil {
 		return 0, err
 	}
