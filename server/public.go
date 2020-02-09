@@ -678,7 +678,18 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 			assetsMask = 0
 		}
 	}
-	
+	switch r.URL.Query().Get("details") {
+	case "basic":
+		accountDetails = api.AccountDetailsBasic
+	case "tokens":
+		accountDetails = api.AccountDetailsTokens
+	case "tokenBalances":
+		accountDetails = api.AccountDetailsTokenBalances
+	case "txids":
+		accountDetails = api.AccountDetailsTxidHistory
+	case "txs":
+		accountDetails = api.AccountDetailsTxHistory
+	}
 	gap, ec := strconv.Atoi(r.URL.Query().Get("gap"))
 	if ec != nil {
 		gap = 0
