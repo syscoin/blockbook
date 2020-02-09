@@ -325,7 +325,7 @@ func (p *BaseParser) GetAssetsMaskFromVersion(nVersion int32) AssetsMask {
 func (p *BaseParser) GetAssetTypeFromVersion(nVersion int32) TokenType {
 	return SPTUnknownType
 }
-func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
+func (p *BaseParser) TryGetOPReturn(script []byte, nVersion int32) []byte {
 	return nil
 }
 func (p *BaseParser) GetMaxAddrLength() int {

@@ -770,7 +770,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDes
 	if err != nil {
 		return err
 	}
-	sptData := d.chainParser.TryGetOPReturn(script)
+	sptData := d.chainParser.TryGetOPReturn(script, version)
 	if sptData == nil {
 		return nil
 	}
@@ -799,7 +799,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 	if err != nil {
 		return err
 	}
-	sptData := d.chainParser.TryGetOPReturn(script)
+	sptData := d.chainParser.TryGetOPReturn(script, version)
 	if sptData == nil {
 		return nil
 	}

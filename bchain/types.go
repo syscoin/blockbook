@@ -635,7 +635,7 @@ type BlockChainParser interface {
 	IsAssetAllocationTx(nVersion int32) bool
 	IsAssetActivateTx(nVersion int32) bool
 	IsAssetSendTx(nVersion int32) bool
-	TryGetOPReturn(script []byte) []byte
+	TryGetOPReturn(script []byte, nVersion int32) []byte
 	GetAssetsMaskFromVersion(nVersion int32) AssetsMask
 	GetAssetTypeFromVersion(nVersion int32) TokenType
 	PackAssetKey(assetGuid uint32, height uint32) []byte
