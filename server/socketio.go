@@ -548,7 +548,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	}
 	return
 }
-func (s *SocketIoServer) getAssetHistory(asset string, opts *addrOpts) (res resultGetAssetHistory, err error) {
+func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res resultGetAssetHistory, err error) {
 	txr, err := s.getAssetTxids(asset, opts)
 	if err != nil {
 		return
@@ -603,9 +603,13 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *addrOpts) (res resu
 			}
 		}
 		ahi.Addresses = ads
+		assetGuid, errAG := strconv.Atoi(asset)
+		if errAG != nil {
+			return res, errAG
+		}
 		dbAsset, errAsset := s.db.GetAsset(assetGuid, nil)
 		if errAsset != nil {
-			return nil, errAsset
+			return res, errAsset
 		}
 		ahi.AssetDetails =	&api.AssetSpecific{
 			AssetGuid:		assetGuid,

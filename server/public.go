@@ -680,33 +680,11 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 		}
 	}
 	
-	switch r.URL.Query().Get("details") {
-	case "basic":
-		accountDetails = api.AccountDetailsBasic
-	case "tokens":
-		accountDetails = api.AccountDetailsTokens
-	case "tokenBalances":
-		accountDetails = api.AccountDetailsTokenBalances
-	case "txids":
-		accountDetails = api.AccountDetailsTxidHistory
-	case "txs":
-		accountDetails = api.AccountDetailsTxHistory
-	}
-	tokensToReturn := api.TokensToReturnNonzeroBalance
-	switch r.URL.Query().Get("tokens") {
-	case "derived":
-		tokensToReturn = api.TokensToReturnDerived
-	case "used":
-		tokensToReturn = api.TokensToReturnUsed
-	case "nonzero":
-		tokensToReturn = api.TokensToReturnNonzeroBalance
-	}
 	gap, ec := strconv.Atoi(r.URL.Query().Get("gap"))
 	if ec != nil {
 		gap = 0
 	}
 	return page, pageSize, accountDetails, &api.AssetFilter{
-		TokensToReturn: tokensToReturn,
 		FromHeight:     uint32(from),
 		ToHeight:       uint32(to),
 		AssetsMask:		bchain.AssetsMask(assetsMask),
@@ -883,7 +861,7 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			http.Redirect(w, r, joinURL("/address/", address.AddrStr), 302)
 			return noTpl, nil, nil
 		}
-		asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AddressFilter{Vout: api.AddressFilterVoutOff})
+		asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AssetFilter{AssetsMask: bchain.AssetAllMask})
 		if err == nil {
 			http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(asset.AssetDetails.AssetGuid), 10)), 302)
 			return noTpl, nil, nil
