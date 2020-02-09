@@ -371,7 +371,7 @@ type resultGetAssetHistory struct {
 	Result struct {
 		TotalCount int                  `json:"totalCount"`
 		AssetDetails  *api.AssetSpecific `json:"asset"`
-		Items      []*bchain.TokenTransferSummary `json:"items"`
+		Items      []addressHistoryItem `json:"items"`
 	} `json:"result"`
 }
 func txToResTx(tx *api.Tx) resTx {
@@ -604,10 +604,11 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 			}
 		}
 		ahi.Addresses = ads
-		assetGuid, errAG := strconv.Atoi(asset)
+		guid, errAG := strconv.Atoi(asset)
 		if errAG != nil {
 			return res, errAG
 		}
+		assetGuid := uint32(guid)
 		dbAsset, errAsset := s.db.GetAsset(assetGuid, nil)
 		if errAsset != nil {
 			return res, errAsset
