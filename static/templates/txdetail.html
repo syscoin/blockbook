@@ -130,8 +130,8 @@
             {{- if $tx.FeesSat -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
-            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}{{- if not (eq $tokenTransfer.Fee 0) -}}
-            <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</span>
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}{{- if not (eq $tokenTransfer.Fee "0") -}}
+            <span class="txvalues txvalues-default">Fee: {{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}{{- end -}}{{- end -}}
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
@@ -142,7 +142,7 @@
             {{- end -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tx.ValueOutSat}} {{$cs}}</span>
             {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
-            <span class="txvalues txvalues-primary">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</span>
+            <span class="txvalues txvalues-primary">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}{{- end -}}
         </div>
     </div>
