@@ -114,7 +114,7 @@
                                     <a href="/address/{{$a.To}}">{{$a.To}}</a>
                                 </span>
                                 <span class="tx-amt">
-                                    {{formatAmountWithDecimals $a.Value $a.Decimals}} {{$tokenTransfer.Symbol}}
+                                    {{formatAmountWithDecimals $a.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}
                                 </span>
                             </td>
                         </tr>
@@ -130,9 +130,9 @@
             {{- if $tx.FeesSat -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
-            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}{{- if not eq $tokenTransfer.Fee 0 -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</span>
-            {{- end -}}{{- end -}}
+            {{- end -}}{{- end -}}{{- end -}}
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
             {{- if $tx.Confirmations -}}
