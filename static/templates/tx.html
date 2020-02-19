@@ -65,24 +65,31 @@
                 <td>Fees</td>
                 <td class="data">{{formatAmount $tx.FeesSat}} {{$cs}}</td>
             </tr>{{end -}}
-            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
+            {{- if $tx.TokenTransferSummary -}}
             <tr>
-                <td>Asset</td>
-                <td class="data">{{$tokenTransfer.Symbol}} (<a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a>)</td>
+                <td>Tokens</td>
+                <td style="padding: 0;">
+                    <table class="table data-table">
+                        <tbody>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Type</th>
+                                <th>Total Sent</th>
+                                <th>Fee</th>
+                            </tr>
+                            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+                            <tr>
+                                <td class="data ellipsis"><a href="/asset/{{$t.Token}}">{{$t.Token}}</a></td>
+                                <td class="data">{{$t.Type}}</td>
+                                <td class="data">{{formatAmountWithDecimals $t.Value $t.Decimals}} {{$t.Symbol}}</td>
+                                <td class="data">{{formatAmountWithDecimals $t.Fee $t.Decimals}} {{$t.Symbol}}</td>
+                            </tr>
+                            {{- end -}}
+                        </tbody>
+                    </table>
+                </td>
             </tr>
-            <tr>
-                <td>Type</td>
-                <td class="data">{{$tokenTransfer.Type}}</td>
-            </tr>  
-            <tr>
-                <td>Total Output</td>
-                <td class="data">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</td>
-            </tr>   
-            <tr>
-                <td>Fees</td>
-                <td class="data">{{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</td>
-            </tr>                                
-            {{- end -}}{{- end -}}
+            {{- end -}}
         </tbody>
     </table>
 </div>
