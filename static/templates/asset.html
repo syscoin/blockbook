@@ -10,12 +10,14 @@
             <tbody>
                 <tr>
                     <td style="width: 25%;">Asset Guid</td>
-                    <td class="data">{{$asset.AssetDetails.AssetGuid}} {{$cs}}</td>
+                    <td class="data">{{$asset.AssetDetails.AssetGuid}}</td>
                 </tr>
+                {{- if $asset.AssetDetails.PubData.description -}}
                 <tr>
                     <td>Description</td>
-                    <td class="data">{{$asset.AssetDetails.PubData.Description}}</td>
+                    <td class="data">{{$asset.AssetDetails.PubData.description}}</td>
                 </tr>
+                {{- end}}
                 <tr>
                     <td>Transactions</td>
                     <td class="data">{{$asset.Txs}}</td>
@@ -44,10 +46,12 @@
                     <td>UpdateFlags</td>
                     <td class="data">{{$asset.AssetDetails.UpdateFlags}}</td>
                 </tr>
+                {{- if $asset.AssetDetails.PubData.auxfees -}}
                 <tr>
                     <td>AuxFees</td>
-                    <td class="data">{{$asset.AssetDetails.PubData.AuxFees}}</td>
+                    <td class="data">{{$asset.AssetDetails.PubData.auxfees}}</td>
                 </tr>
+                {{- end}}
             </tbody>
         </table>
     </div>
