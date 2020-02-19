@@ -74,7 +74,7 @@
             </div>
         </div>
     </div>
-    {{- $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+    {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
     <div class="row line-bot">
         <div class="col-xs-7 col-md-8 ellipsis">
                 {{$tokenTransfer.Symbol}} (<a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a>)
