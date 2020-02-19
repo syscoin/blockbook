@@ -69,6 +69,11 @@
                             <td>No Outputs</td>
                         </tr>
                         {{- end -}}
+                        {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+                        <tr>
+                            <td>{{$tokenTransfer}}</td>
+                        </tr>
+                        {{- end -}}
                     </tbody>
                 </table>
             </div>
