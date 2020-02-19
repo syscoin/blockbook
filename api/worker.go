@@ -920,6 +920,17 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		return nil, err
 	}
 	assetGuid := uint32(assetGuidInt)
+	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
+	if errAsset != nil {
+		return nil, errAsset
+	}
+	// totalResults is known only if there is no filter
+	if filter.Vout == AddressFilterVoutOff && filter.FromHeight == 0 && filter.ToHeight == 0 {
+		totalResults = int(dbAsset.Transactions)
+	} else {
+		totalResults = -1
+	}
+	
 	// process mempool, only if toHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txm, err = w.getAssetTxids(assetGuid, true, filter, maxInt)
@@ -977,10 +988,6 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 				txs = append(txs, tx)
 			}
 		}
-	}
-	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
-	if errAsset != nil {
-		return nil, errAsset
 	}
 	r := &Asset{
 		AssetDetails:	&AssetSpecific{
