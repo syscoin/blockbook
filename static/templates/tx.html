@@ -65,6 +65,28 @@
                 <td>Fees</td>
                 <td class="data">{{formatAmount $tx.FeesSat}} {{$cs}}</td>
             </tr>{{end -}}
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
+            <tr>
+                <td>Asset</td>
+                <td class="data">{{$tokenTransfer.Symbol}} (<a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a>)</td>
+            </tr>
+            <tr>
+                <td>Type</td>
+                <td class="data">{{$tokenTransfer.Type}}</td>
+            </tr>  
+            <tr>
+                <td>Type</td>
+                <td class="data">{{$tokenTransfer.Type}}</td>
+            </tr> 
+            <tr>
+                <td>Value</td>
+                <td class="data">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</td>
+            </tr>   
+            <tr>
+                <td>Fees</td>
+                <td class="data">{{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</td>
+            </tr>                                
+            {{end -}}
         </tbody>
     </table>
 </div>
