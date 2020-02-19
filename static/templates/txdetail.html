@@ -74,7 +74,7 @@
             </div>
         </div>
     </div>
-    {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+    {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
     <div class="row line-bot">
         <div class="col-xs-7 col-md-8 ellipsis">
                 {{$tokenTransfer.Symbol}} (<a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a>)
@@ -130,8 +130,8 @@
             {{- if $tx.FeesSat -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
-            {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
-            <span class="txvalues txvalues-default">Fee: {{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</span>
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
+            <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}{{- end -}}
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
@@ -141,8 +141,8 @@
             <span class="txvalues txvalues-danger ng-hide">Unconfirmed Transaction!</span>
             {{- end -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tx.ValueOutSat}} {{$cs}}</span>
-            {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
-            <span class="txvalues txvalues-primary">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</span>
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
+            <span class="txvalues txvalues-primary">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}{{- end -}}
         </div>
     </div>
