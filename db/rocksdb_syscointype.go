@@ -546,8 +546,8 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, assets map[uint32]*bchain.Asset) error {
 	assetStrSenderAddrDesc := string(assetSenderAddrDesc)
 	balance, e := balances[assetStrSenderAddrDesc]
+	var err error
 	if !e {
-		var err error
 		balance, err = d.GetAddrDescBalance(assetSenderAddrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 		if err != nil {
 			return err
