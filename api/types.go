@@ -101,7 +101,7 @@ type AssetSpecific struct {
 	Balance 		*bchain.Amount
 	TotalSupply 	*bchain.Amount
 	MaxSupply 		*bchain.Amount
-	Precision 		int
+	Decimals 		int
 	UpdateFlags 	uint8
 }
 

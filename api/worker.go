@@ -998,7 +998,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			Balance:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.Balance)),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 			MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
-			Precision:		int(dbAsset.AssetObj.Precision),
+			Decimals:		int(dbAsset.AssetObj.Precision),
 			UpdateFlags:	dbAsset.AssetObj.UpdateFlags,
 		},
 		Paging:                pg,
