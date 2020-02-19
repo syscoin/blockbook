@@ -983,6 +983,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	r := &Asset{
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		assetGuid,
+			Symbol:			dbAsset.AssetObj.Symbol,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 			Balance:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.Balance)),
