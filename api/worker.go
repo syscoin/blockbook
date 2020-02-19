@@ -994,7 +994,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Paging:                pg,
 		UnconfirmedTxs:        unconfirmedTxs,
 		Transactions:          txs,
-		Txs:				   dbAsset.Transactions,
+		Txs:				   int(dbAsset.Transactions),
 		Txids:                 txids,
 	}
 	json.Unmarshal(dbAsset.AssetObj.PubData, &r.AssetDetails.PubData)
