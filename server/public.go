@@ -134,6 +134,7 @@ func (s *PublicServer) ConnectFullPublicInterface() {
 		// internal explorer handlers
 		serveMux.HandleFunc(path+"tx/", s.htmlTemplateHandler(s.explorerTx))
 		serveMux.HandleFunc(path+"address/", s.htmlTemplateHandler(s.explorerAddress))
+		serveMux.HandleFunc(path+"asset/", s.htmlTemplateHandler(s.explorerAsset))
 		serveMux.HandleFunc(path+"xpub/", s.htmlTemplateHandler(s.explorerXpub))
 		serveMux.HandleFunc(path+"search/", s.htmlTemplateHandler(s.explorerSearch))
 		serveMux.HandleFunc(path+"blocks", s.htmlTemplateHandler(s.explorerBlocks))
@@ -234,6 +235,11 @@ func (s *PublicServer) txRedirect(w http.ResponseWriter, r *http.Request) {
 func (s *PublicServer) addressRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, joinURL(s.explorerURL, r.URL.Path), 302)
 	s.metrics.ExplorerViews.With(common.Labels{"action": "address-redirect"}).Inc()
+}
+
+func (s *PublicServer) assetRedirect(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, joinURL(s.explorerURL, r.URL.Path), 302)
+	s.metrics.ExplorerViews.With(common.Labels{"action": "asset-redirect"}).Inc()
 }
 
 func splitBinding(binding string) (addr string, path string) {
