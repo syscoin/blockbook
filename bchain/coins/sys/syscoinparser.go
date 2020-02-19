@@ -586,6 +586,9 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 
 func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 	buf := make([]byte, 0, 32)
+	varBuf := make([]byte, vlq.MaxLen64)
+	l := p.BaseParser.PackVaruint(uint(ta.Transactions), varBuf)
+	buf = append(buf, varBuf[:l]...)
 	var buffer bytes.Buffer
 	err := asset.AssetObj.Serialize(&buffer)
 	if err != nil {
@@ -598,7 +601,9 @@ func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 
 func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 	var asset bchain.Asset
-	r := bytes.NewReader(buf)
+	transactions, l := p.BaseParser.UnpackVaruint(buf)
+	asset.Transactions = uint32(transactions)
+	r := bytes.NewReader(buf[l:])
 	err := asset.AssetObj.Deserialize(r)
 	if err != nil {
 		return nil, err

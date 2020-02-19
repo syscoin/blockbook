@@ -994,14 +994,10 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Paging:                pg,
 		UnconfirmedTxs:        unconfirmedTxs,
 		Transactions:          txs,
+		Txs:				   dbAsset.Transactions,
 		Txids:                 txids,
 	}
 	json.Unmarshal(dbAsset.AssetObj.PubData, &r.AssetDetails.PubData)
-	if option == AccountDetailsTxidHistory {
-		r.Txs = len(txids)
-	} else {
-		r.Txs = len(txs)
-	}
 	glog.Info("GetAsset ", asset, " finished in ", time.Since(start))
 	return r, nil
 }
