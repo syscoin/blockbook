@@ -125,7 +125,7 @@
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
             {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
-            <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfery.Symbol}}</span>
+            <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
