@@ -93,16 +93,16 @@ type Vout struct {
 
 // Contains SysconSpecific asset information hex decoded and pertinent to API display
 type AssetSpecific struct {
-	AssetGuid uint32
-	WitnessAddress string
-	Contract string
-	Symbol string
-	PubData map[string]interface{}
-	Balance int64
-	TotalSupply int64
-	MaxSupply int64
-	Precision uint8
-	UpdateFlags uint8
+	AssetGuid 		uint32
+	WitnessAddress 	string
+	Contract 		string
+	Symbol 			string
+	PubData 		map[string]interface{}
+	Balance 		*bchain.Amount
+	TotalSupply 	*bchain.Amount
+	MaxSupply 		*bchain.Amount
+	Precision 		uint8
+	UpdateFlags 	uint8
 }
 
 // EthereumSpecific contains ethereum specific transaction data
