@@ -74,8 +74,14 @@
             </div>
         </div>
     </div>
-    {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+    {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
     <div class="row line-mid">
+        <div class="row line-bot">
+            <div class="col-xs-7 col-md-8 ellipsis">
+                <a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a> {{$tokenTransfer.Symbol}}
+            </div>
+            <div class="col-xs-5 col-md-4 text-muted text-right">{{$tokenTransfer.Type}}</div>
+        </div>
         <div class="col-md-5">
             <div class="row tx-in">
                 <table class="table data-table">
@@ -118,15 +124,15 @@
             </div>
         </div>
     </div>
-    {{- end -}}
+    {{- end -}}{{- end -}}
     <div class="row line-top">
         <div class="col-xs-6 col-sm-4 col-md-4">
             {{- if $tx.FeesSat -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
-            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+            {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</span>
-            {{- end -}}
+            {{- end -}}{{- end -}}
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
             {{- if $tx.Confirmations -}}
@@ -135,9 +141,9 @@
             <span class="txvalues txvalues-danger ng-hide">Unconfirmed Transaction!</span>
             {{- end -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tx.ValueOutSat}} {{$cs}}</span>
-            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+            {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</span>
-            {{- end -}}
+            {{- end -}}{{- end -}}
         </div>
     </div>
 </div>
