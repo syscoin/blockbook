@@ -28,15 +28,15 @@
                 </tr>
                 <tr>
                     <td>Balance</td>
-                    <td class="data">{{formatAmount $asset.AssetDetails.Balance}} {{$asset.AssetDetails.Symbol}}</td>
+                    <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.Balance $asset.AssetDetails.Precision}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
                     <td>TotalSupply</td>
-                    <td class="data">{{formatAmount $asset.AssetDetails.TotalSupply}} {{$asset.AssetDetails.Symbol}}</td>
+                    <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.TotalSupply $asset.AssetDetails.Precision}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
                     <td>MaxSupply</td>
-                    <td class="data">{{formatAmount $asset.AssetDetails.MaxSupply}} {{$asset.AssetDetails.Symbol}}</td>
+                    <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.MaxSupply $asset.AssetDetails.Precision}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
                     <td>Precision</td>

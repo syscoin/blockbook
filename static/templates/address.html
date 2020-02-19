@@ -67,6 +67,35 @@
                     <td>No. Transactions</td>
                     <td class="data">{{$addr.Txs}}</td>
                 </tr>
+                {{- if $addr.Tokens -}}
+                <tr>
+                    <td>Tokens</td>
+                    <td style="padding: 0;">
+                        <table class="table data-table">
+                            <tbody>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>Type</th>
+                                    <th>Total Sent</th>
+                                    <th>Total Received</th>
+                                    <th>Final Balance</th>
+                                    <th style="width: 15%;">Transfers</th>
+                                </tr>
+                                {{- range $t := $addr.Tokens -}}
+                                <tr>
+                                    <td class="data ellipsis">{{if $t.Contract}}<a href="/asset/{{$t.Contract}}">{{$t.Name}}</a>{{else}}{{$t.Name}}{{end}}</td>
+                                    <td class="data">{{$t.Type}}</td>
+                                    <td class="data">{{formatAmountWithDecimals $t.TotalSentSat $t.Decimals}} {{$t.Symbol}}</td>
+                                    <td class="data">{{formatAmountWithDecimals $t.TotalReceivedSat $t.Decimals}} {{$t.Symbol}}</td>
+                                    <td class="data">{{formatAmountWithDecimals $t.BalanceSat $t.Decimals}} {{$t.Symbol}}</td>
+                                    <td class="data">{{$t.Transfers}}</td>
+                                </tr>
+                                {{- end -}}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {{- end -}}
                 {{- end -}}
             </tbody>
         </table>

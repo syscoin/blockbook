@@ -91,7 +91,7 @@
                             <span class="ellipsis tx-addr">
                                 <a href="/address/{{$tokenTransfer.From}}">{{$tokenTransfer.From}}</a>
                             </span>
-                            <span class="tx-amt">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</span>
+                            <span class="tx-amt">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</span>
                         </td>
                     </tr>
                     </tbody>
@@ -114,7 +114,7 @@
                                     <a href="/address/{{$a.To}}">{{$a.To}}</a>
                                 </span>
                                 <span class="tx-amt">
-                                    {{formatAmount $a.Value}} {{$tokenTransfer.Symbol}}
+                                    {{formatAmountWithDecimals $a.Value $a.Decimals}} {{$tokenTransfer.Symbol}}
                                 </span>
                             </td>
                         </tr>

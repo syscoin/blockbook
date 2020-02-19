@@ -76,11 +76,11 @@
             </tr>  
             <tr>
                 <td>Total Output</td>
-                <td class="data">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</td>
+                <td class="data">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</td>
             </tr>   
             <tr>
                 <td>Fees</td>
-                <td class="data">{{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</td>
+                <td class="data">{{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</td>
             </tr>                                
             {{- end -}}{{- end -}}
         </tbody>
