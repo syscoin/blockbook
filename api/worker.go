@@ -925,7 +925,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		return nil, errAsset
 	}
 	// totalResults is known only if there is no filter
-	if filter.Vout == AddressFilterVoutOff && filter.FromHeight == 0 && filter.ToHeight == 0 {
+	if  filter.FromHeight == 0 && filter.ToHeight == 0 {
 		totalResults = int(dbAsset.Transactions)
 	} else {
 		totalResults = -1
