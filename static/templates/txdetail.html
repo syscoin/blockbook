@@ -69,37 +69,23 @@
                             <td>No Outputs</td>
                         </tr>
                         {{- end -}}
-                        {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
-                        <tr class="tx-own">
-                            <td>
-                                {{- range $a := $tokenTransfer.Recipients -}}
-                                <span class="ellipsis tx-addr">
-                                    <a href="/address/{{$a.To}}">{{$a.To}}</a>
-                                </span>
-
-                                <span class="tx-amt">
-                                    {{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}
-                                </span>
-                            </td>
-                        </tr>
-                        {{- end -}}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
-    {{if $tx.TokenTransferSummary}}
+    {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
     <div class="row line-mid">
         <div class="col-md-5">
             <div class="row tx-in">
                 <table class="table data-table">
                     <tbody>
-                    <tr class="tx-own">
+                        <tr{{if isOwnAddress $data $tokenTransfer.From}} class="tx-own"{{end}}>
                         <td>
                             <span class="ellipsis tx-addr">
-                                <a href="/address/{{$tx.TokenTransferSummary.From}}">{{$tx.TokenTransferSummary.From}}</a>
+                                <a href="/address/{{$tokenTransfer.From}}">{{$tokenTransfer.From}}</a>
                             </span>
-                            <span class="tx-amt">{{formatAmount $tx.TokenTransferSummary.Value}} {{$tx.TokenTransferSummary.Symbol}}</span>
+                            <span class="tx-amt">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</span>
                         </td>
                     </tr>
                     </tbody>
@@ -115,16 +101,14 @@
             <div class="row tx-out">
                 <table class="table data-table">
                     <tbody>
-                        {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
-                        <tr class="tx-own">
+                        {{- range $a := $tokenTransfer.Recipients -}}
+                        <tr{{if isOwnAddress $data $tokenTransfer.To}} class="tx-own"{{end}}>
                             <td>
-                                {{- range $a := $tokenTransfer.Recipients -}}
                                 <span class="ellipsis tx-addr">
                                     <a href="/address/{{$a.To}}">{{$a.To}}</a>
                                 </span>
-
                                 <span class="tx-amt">
-                                    {{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}
+                                    {{formatAmount $a.Value}} {{$tokenTransfer.Symbol}}
                                 </span>
                             </td>
                         </tr>
@@ -140,10 +124,8 @@
             {{- if $tx.FeesSat -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
-            {{- if $tx.TokenTransferSummary -}}
-            {{- if $tx.TokenTransferSummary.Fee -}}
-            <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.TokenTransferSummary.Fee}} {{$tx.TokenTransferSummary.Symbol}}</span>
-            {{- end -}}
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+            <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfery.Symbol}}</span>
             {{- end -}}
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
@@ -153,8 +135,8 @@
             <span class="txvalues txvalues-danger ng-hide">Unconfirmed Transaction!</span>
             {{- end -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tx.ValueOutSat}} {{$cs}}</span>
-            {{- if $tx.TokenTransferSummary -}}
-            <span class="txvalues txvalues-primary">{{formatAmount $tx.TokenTransferSummary.Value}} {{$tx.TokenTransferSummary.Symbol}}</span>
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+            <span class="txvalues txvalues-primary">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}
         </div>
     </div>
