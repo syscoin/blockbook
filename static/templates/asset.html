@@ -1,5 +1,5 @@
 {{define "specific"}}{{$cs := .CoinShortcut}}{{$asset := .Asset}}{{$data := .}}
-<h1>Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}} {{$cs}}</small></h1>
+<h1>Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}}</small></h1>
 <div class="alert alert-data ellipsis">
     <span class="data">{{$asset.AssetDetails.WitnessAddress}}</span>
 </div>
@@ -28,15 +28,15 @@
                 </tr>
                 <tr>
                     <td>Balance</td>
-                    <td class="data">{{formatAmount $asset.AssetDetails.Balance}} {{$cs}}</td>
+                    <td class="data">{{formatAmount $asset.AssetDetails.Balance}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
                     <td>TotalSupply</td>
-                    <td class="data">{{formatAmount $asset.AssetDetails.TotalSupply}} {{$cs}}</td>
+                    <td class="data">{{formatAmount $asset.AssetDetails.TotalSupply}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
                     <td>MaxSupply</td>
-                    <td class="data">{{formatAmount $asset.AssetDetails.MaxSupply}} {{$cs}}</td>
+                    <td class="data">{{formatAmount $asset.AssetDetails.MaxSupply}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
                     <td>Precision</td>
