@@ -74,8 +74,7 @@
             </div>
         </div>
     </div>
-    {{ if not (eq (len $tx.TokenTransferSummary) 0) }}
-    {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+    {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
     <div class="row line-bot">
         <div class="col-xs-7 col-md-8 ellipsis">
             <a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a> ({{$tokenTransfer.Symbol}})
@@ -131,7 +130,7 @@
             {{- if $tx.FeesSat -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
-            {{ if not (eq (len $tx.TokenTransferSummary) 0) }}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tokenTransfer.Fee}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}{{- end -}}
         </div>
@@ -142,7 +141,7 @@
             <span class="txvalues txvalues-danger ng-hide">Unconfirmed Transaction!</span>
             {{- end -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tx.ValueOutSat}} {{$cs}}</span>
-            {{ if not (eq (len $tx.TokenTransferSummary) 0) }}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
             <span class="txvalues txvalues-primary">{{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}{{- end -}}
         </div>
