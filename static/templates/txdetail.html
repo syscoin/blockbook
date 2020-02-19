@@ -75,13 +75,13 @@
         </div>
     </div>
     {{- if $tx.TokenTransferSummary -}}{{- range $tokenTransfer := $tx.TokenTransferSummary -}}
-    <div class="row line-mid">
-        <div class="row line-bot">
-            <div class="col-xs-7 col-md-8 ellipsis">
-                <a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a> {{$tokenTransfer.Symbol}}
-            </div>
-            <div class="col-xs-5 col-md-4 text-muted text-right">{{$tokenTransfer.Type}}</div>
+    <div class="row line-bot">
+        <div class="col-xs-7 col-md-8 ellipsis">
+            <a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a> {{$tokenTransfer.Symbol}}
         </div>
+        <div class="col-xs-5 col-md-4 text-muted text-right">{{$tokenTransfer.Type}}</div>
+    </div>
+    <div class="row line-mid">
         <div class="col-md-5">
             <div class="row tx-in">
                 <table class="table data-table">
