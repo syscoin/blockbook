@@ -70,8 +70,17 @@
                         </tr>
                         {{- end -}}
                         {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
-                        <tr>
-                            <td>{{$tokenTransfer}}</td>
+                        <tr class="tx-own">
+                            <td>
+                                {{- range $a := $tokenTransfer.Recipients -}}
+                                <span class="ellipsis tx-addr">
+                                    <a href="/address/{{$a.To}}">{{$a.To}}</a>
+                                </span>
+
+                                <span class="tx-amt">
+                                    {{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}
+                                </span>
+                            </td>
                         </tr>
                         {{- end -}}
                     </tbody>
@@ -79,10 +88,62 @@
             </div>
         </div>
     </div>
+    {{if $tx.TokenTransferSummary}}
+    <div class="row line-mid">
+        <div class="col-md-5">
+            <div class="row tx-in">
+                <table class="table data-table">
+                    <tbody>
+                    <tr class="tx-own">
+                        <td>
+                            <span class="ellipsis tx-addr">
+                                <a href="/address/{{$tx.TokenTransferSummary.From}}">{{$tx.TokenTransferSummary.From}}</a>
+                            </span>
+                            <span class="tx-amt">{{formatAmount $tx.TokenTransferSummary.Value}} {{$tx.TokenTransferSummary.Symbol}}</span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-1 col-xs-12 text-center">
+            <svg class="octicon" viewBox="0 0 8 16">
+                <path fill-rule="evenodd" d="M7.5 8l-5 5L1 11.5 4.75 8 1 4.5 2.5 3l5 5z"></path>
+            </svg>
+        </div>
+        <div class="col-md-6">
+            <div class="row tx-out">
+                <table class="table data-table">
+                    <tbody>
+                        {{- range $tokenTransfer := $tx.TokenTransferSummary -}}
+                        <tr class="tx-own">
+                            <td>
+                                {{- range $a := $tokenTransfer.Recipients -}}
+                                <span class="ellipsis tx-addr">
+                                    <a href="/address/{{$a.To}}">{{$a.To}}</a>
+                                </span>
+
+                                <span class="tx-amt">
+                                    {{formatAmount $tokenTransfer.Value}} {{$tokenTransfer.Symbol}}
+                                </span>
+                            </td>
+                        </tr>
+                        {{- end -}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {{- end -}}
     <div class="row line-top">
         <div class="col-xs-6 col-sm-4 col-md-4">
             {{- if $tx.FeesSat -}}
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
+            {{- end -}}
+            {{- if $tx.TokenTransferSummary -}}
+            {{- if $tx.TokenTransferSummary.Fee -}}
+            <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.TokenTransferSummary.Fee}} {{$tx.TokenTransferSummary.Symbol}}</span>
+            {{- end -}}
             {{- end -}}
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
@@ -92,6 +153,9 @@
             <span class="txvalues txvalues-danger ng-hide">Unconfirmed Transaction!</span>
             {{- end -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tx.ValueOutSat}} {{$cs}}</span>
+            {{- if $tx.TokenTransferSummary -}}
+            <span class="txvalues txvalues-primary">{{formatAmount $tx.TokenTransferSummary.Value}} {{$tx.TokenTransferSummary.Symbol}}</span>
+            {{- end -}}
         </div>
     </div>
 </div>
