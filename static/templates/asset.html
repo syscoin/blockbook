@@ -1,6 +1,5 @@
 {{define "specific"}}{{$cs := .CoinShortcut}}{{$asset := .Asset}}{{$data := .}}
-<h1>Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}} {{$cs}}</small>
-</h1>
+<h1>Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}} {{$cs}}</small></h1>
 <div class="alert alert-data ellipsis">
     <span class="data">{{$asset.AssetDetails.WitnessAddress}}</span>
 </div>
