@@ -620,9 +620,9 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 			AssetGuid:		assetGuid,
 			WitnessAddress: dbAsset.AssetObj.WitnessAddress.ToString("sys"),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
-			Balance:		(*bchain.Amount)big.NewInt(dbAsset.AssetObj.Balance),
-			TotalSupply:	(*bchain.Amount)big.NewInt(dbAsset.AssetObj.TotalSupply),
-			MaxSupply:		(*bchain.Amount)big.NewInt(dbAsset.AssetObj.MaxSupply),
+			Balance:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.Balance)),
+			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
+			MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 			Precision:		dbAsset.AssetObj.Precision,
 			UpdateFlags:	dbAsset.AssetObj.UpdateFlags,
 		}
