@@ -266,8 +266,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
                     if errAssetGuid != nil {
                         return nil, errAssetGuid
                     }
-                    baAsset, errAsset := ba.AssetBalances[uint32(assetGuid)]
-                    if errAsset == nil {
+                    baAsset, fetchedAsset := ba.AssetBalances[uint32(assetGuid)]
+                    if fetchedAsset {
                         if baAsset.SentAssetSat.Int64() > 0 {
                             recipient.Unspent = false
                         }
