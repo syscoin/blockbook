@@ -460,7 +460,7 @@ type Token struct {
 type TokenTransferRecipient struct {
 	To       string    `json:"to"`
 	Value    *Amount   `json:"value"`
-	bool	 Unspent   `json:"-"`
+	Unspent  bool      `json:"-"`
 }
 // TokenTransferSummary contains info about a token transfer done in a transaction
 type TokenTransferSummary struct {
