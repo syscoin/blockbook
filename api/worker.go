@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"sort"
+
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 )
