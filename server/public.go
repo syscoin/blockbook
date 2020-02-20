@@ -442,6 +442,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatUnixTime":           formatUnixTime,
 		"formatAmount":             s.formatAmount,
 		"formatAmountWithDecimals": formatAmountWithDecimals,
+		"formatPercentage": 		formatPercentage,
 		"setTxToTemplateData":      setTxToTemplateData,
 		"isOwnAddress":             isOwnAddress,
 		"isOwnAddresses":           isOwnAddresses,
@@ -527,6 +528,14 @@ func formatAmountWithDecimals(a *bchain.Amount, d int) string {
 		return "0"
 	}
 	return a.DecimalString(d)
+}
+
+func formatPercentage(a string) string {
+	if f, err := strconv.ParseFloat(a, 32); err == nil {
+		f = f*100
+		return fmt.Sprintf("%.2f%%", f)
+	}
+	return "0%"
 }
 
 // called from template to support txdetail.html functionality

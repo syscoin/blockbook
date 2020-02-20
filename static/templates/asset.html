@@ -49,8 +49,26 @@
                 {{- if $asset.AssetDetails.PubData.aux_fees -}}
                 <tr>
                     <td>AuxFees</td>
-                    <td class="data">{{$asset.AssetDetails.PubData.aux_fees}}</td>
+                    <td style="padding: 0;">
+                        <table class="table data-table">
+                            <tbody>
+                                <tr>
+                                    <th>Address</th>
+                                    <th>Bound</th>
+                                    <th>Percentage</th>
+                                </tr>
+                                {{- range $f := $asset.AssetDetails.PubData.aux_fees.fee_struct -}}{{- if $f -}}
+                                <tr>
+                                    <td class="data ellipsis"><a href="/address/{{$asset.AssetDetails.PubData.aux_fees.address}}">{{$asset.AssetDetails.PubData.aux_fees.address}}</a></td>
+                                    <td class="data">{{ index .f 0 } {{$asset.AssetDetails.Symbol}}}</td>
+                                    <td class="data">{{formatPercentage index .f 1}}</td>
+                                </tr>
+                                {{- end -}}{{- end -}}
+                            </tbody>
+                        </table>
+                    </td>
                 </tr>
+                {{- end -}}
                 {{- end}}
             </tbody>
         </table>
