@@ -875,8 +875,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalSent = &ba.SentSat
 	} 
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
-		tokens = make([]*bchain.Token, len(ba.AssetBalances)+1)
-		var i int = 0
+		tokensMap = make(map[uint32]*bchain.Token, len(ba.AssetBalances))
 		var ownerFound bool = false
 		for k, v := range ba.AssetBalances {
 			dbAsset, errAsset := w.db.GetAsset(uint32(k), nil)
@@ -894,7 +893,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					ownerBalance := big.NewInt(dbAsset.AssetObj.Balance)
 					totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
 					assetGuid := strconv.FormatUint(uint64(k), 10)
-					tokens[i] = &bchain.Token{
+					tokensMap[assetGuid-1] = &bchain.Token{
 						Type:             bchain.SPTUnallocatedTokenType,
 						Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
 						Decimals:         int(dbAsset.AssetObj.Precision),
@@ -907,12 +906,11 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 						ContractIndex: 	  assetGuid,
 					}
 					ownerFound = true
-					i++
 				}
 			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
 			assetGuid := strconv.FormatUint(uint64(k), 10)
-			tokens[i] = &bchain.Token{
+			tokens[assetGuid] = &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
 				Decimals:         int(dbAsset.AssetObj.Precision),
@@ -924,7 +922,14 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				Transfers:		  v.Transfers,
 				ContractIndex:    assetGuid,
 			}
-			i++
+		}
+		// assign tokens in sorted order
+		var i int = 0
+		tokens = make([]*bchain.Token, len(tokensMap))
+		for _, v := range tokensMap {
+			if v != nil {
+				tokens[i++] = v
+			}
 		}
 	}
 	r := &Address{
