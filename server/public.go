@@ -538,7 +538,7 @@ func formatAmountWithDecimals(a *bchain.Amount, d int) string {
 func formatPercentage(a string) string {
 	if f, err := strconv.ParseFloat(a, 32); err == nil {
 		f = f*100
-		return fmt.Sprintf("%.2f%%", f)
+		return fmt.Sprintf("%.5f%%", f)
 	}
 	return "0%"
 }
