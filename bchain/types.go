@@ -456,6 +456,10 @@ type Token struct {
 	ContractIndex    string    `json:"-"`
 }
 
+func (t Token) Len() int           { return len(a) }
+func (t Token) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (t Token) Less(i, j int) bool { return a[i].Contract < a[j].Contract }
+
 // TokenTransferRecipient contains a recipient for an asset, can be multiple in a token transfer
 type TokenTransferRecipient struct {
 	To       string    `json:"to"`

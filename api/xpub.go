@@ -231,8 +231,8 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 	if ad.balance != nil {
 		var i int = 0
 		if option >= AccountDetailsTokenBalances {
-			// + 1 for base plus any assets in AssetBalances
-			tokens = make([]*bchain.Token, 1 + len(ad.balance.AssetBalances))
+			// + 1 for base plus any assets in AssetBalances, + 1 for owner asset for unallocated token
+			tokens = make([]*bchain.Token, 2 + len(ad.balance.AssetBalances))
 			totalReceived := ad.balance.ReceivedSat()
 			// for base token
 			tokens[i] = &bchain.Token{
@@ -244,6 +244,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				TotalSentSat:     (*bchain.Amount)(&ad.balance.SentSat),
 				Transfers:        ad.balance.Txs,
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
+				Contract:		  0,
 			}
 			i++
 			// for asset tokens
@@ -298,6 +299,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				}
 				i++
 			}
+			sort.Sort(tokens)
 		}
 	}
 	return tokens, nil

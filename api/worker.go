@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	"sort"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 )
@@ -926,6 +926,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			}
 			i++
 		}
+		sort.Sort(tokens)
 	}
 	r := &Address{
 		Paging:                pg,
