@@ -80,7 +80,7 @@
                                     <th>Final Balance</th>
                                     <th style="width: 15%;">Transfers</th>
                                 </tr>
-                                {{- range $t := $addr.Tokens -}}{{ - if $t -}}
+                                {{- range $t := $addr.Tokens -}}{{- if $t -}}
                                 <tr>
                                     <td class="data ellipsis">{{if $t.Contract}}<a href="/asset/{{$t.Contract}}">{{$t.Contract}}</a>{{else}}{{$t.Name}}{{end}}</td>
                                     <td class="data ellipsis">{{formatAmountWithDecimals $t.TotalSentSat $t.Decimals}} {{$t.Symbol}}</td>
@@ -131,7 +131,7 @@
         <option {{if eq $addr.Filter "outputs" -}} selected{{end}} value="outputs">Outputs</option>
         {{- if $addr.Tokens -}}
         <option {{if eq $addr.Filter "0" -}} selected{{end}} value="0">Non-contract</option>
-        {{- range $t := $addr.Tokens -}}{{ - if $t -}}
+        {{- range $t := $addr.Tokens -}}{{- if $t -}}
         <option {{if eq $addr.Filter $t.ContractIndex -}} selected{{end}} value="{{$t.ContractIndex}}">{{$t.Name}}</option>
         {{- end -}}{{- end -}}
         {{- end -}}
