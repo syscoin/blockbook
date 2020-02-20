@@ -114,9 +114,9 @@
                                     <a href="/address/{{$a.To}}">{{$a.To}}</a>
                                 </span>
                                 <span class="tx-amt">
-                                    {{formatAmountWithDecimals $a.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}{{if $a.Unspent}}<span class="text-success" title="Unspent"> <b>×</b></span>{{else -}}
+                                    {{formatAmountWithDecimals $a.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}} {{if not (isOwnAddress $data $a.To)}}{{if $a.Unspent}}<span class="text-success" title="Unspent"> <b>×</b></span>{{else -}}
                                     <a class="text-danger" href="/address/{{$a.To}}?filter={{$tokenTransfer.Token}}" title="Spent">➡</a>
-                                    {{- end -}}
+                                    {{- end -}}{{- end -}}
                                 </span>
                             </td>
                         </tr>
