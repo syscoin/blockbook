@@ -108,7 +108,7 @@
                 <table class="table data-table">
                     <tbody>
                         {{- range $a := $tokenTransfer.Recipients -}}
-                        <tr{{if isOwnAddress $data $tokenTransfer.To}} class="tx-own"{{end}}>
+                        <tr{{if isOwnAddress $data $a.To}} class="tx-own"{{end}}>
                             <td>
                                 <span class="ellipsis tx-addr">
                                     <a href="/address/{{$a.To}}">{{$a.To}}</a>
