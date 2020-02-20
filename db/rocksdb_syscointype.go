@@ -199,9 +199,9 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			Symbol:   string(dBAsset.AssetObj.Symbol),
 			Fee:       (*bchain.Amount)(big.NewInt(0)),
 		}
-		counted := addToAddressesMap(addresses, senderStr, btxID, int32(assetGuid))
+		counted := addToAddressesMap(addresses, senderStr, btxID, ^int32(assetGuid))
 		if !counted {
-			balanceAsset.Txs++
+			balance.Txs++
 		}
 	}
 	return assetGuid, nil
@@ -444,7 +444,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 	assets[assetGuid] = dBAsset
 	counted := addToAddressesMap(addresses, assetStrSenderAddrDesc, btxID, ^int32(assetGuid))
 	if !counted {
-		balanceAsset.Txs++
+		balance.Txs++
 	}
 	return nil
 
