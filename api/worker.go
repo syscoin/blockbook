@@ -847,7 +847,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				if bytes.Equal(addrDesc, ownerAddrDesc) {
 					ownerBalance := big.NewInt(dbAsset.AssetObj.Balance)
 					totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
-					assetGuid := strconv.FormatUint(uint64(k), 10),
+					assetGuid := strconv.FormatUint(uint64(k), 10)
 					tokens[i] = &bchain.Token{
 						Type:             bchain.SPTUnallocatedTokenType,
 						Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
@@ -865,7 +865,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				}
 			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
-			assetGuid := strconv.FormatUint(uint64(k), 10),
+			assetGuid := strconv.FormatUint(uint64(k), 10)
 			tokens[i] = &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",

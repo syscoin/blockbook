@@ -263,7 +263,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					if bytes.Equal(ad.addrDesc, ownerAddrDesc) {
 						ownerBalance := big.NewInt(dbAsset.AssetObj.Balance)
 						totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
-						assetGuid := strconv.FormatUint(uint64(k), 10),
+						assetGuid := strconv.FormatUint(uint64(k), 10)
 						tokens[i] = &bchain.Token{
 							Type:             bchain.SPTUnallocatedTokenType,
 							Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
@@ -282,7 +282,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
-				assetGuid := strconv.FormatUint(uint64(k), 10),
+				assetGuid := strconv.FormatUint(uint64(k), 10)
 				tokens[i] = &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
