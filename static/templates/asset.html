@@ -24,18 +24,18 @@
                 </tr>
                 <tr>
                     <td>ERC20 Contract</td>
-                    <td class="data">{{$asset.AssetDetails.Contract}}</td>
+                    <td class="data"><a href="https://etherscan.io/address/{{$asset.AssetDetails.Contract}}">{{$asset.AssetDetails.Contract}}</a></td>
                 </tr>
                 <tr>
                     <td>Balance</td>
                     <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.Balance $asset.AssetDetails.Decimals}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
-                    <td>TotalSupply</td>
+                    <td>Total Supply</td>
                     <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.TotalSupply $asset.AssetDetails.Decimals}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
-                    <td>MaxSupply</td>
+                    <td>Max Supply</td>
                     <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals}} {{$asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
@@ -43,7 +43,7 @@
                     <td class="data">{{$asset.AssetDetails.Decimals}}</td>
                 </tr>
                 <tr>
-                        <td>UpdateFlags</td>
+                        <td>Update Flags</td>
                         <td style="padding: 0;">
                             <table class="table data-table">
                                 <tbody>
@@ -69,7 +69,7 @@
                     </tr>
                 {{- if $asset.AssetDetails.PubData.aux_fees -}}
                 <tr>
-                    <td>AuxFees</td>
+                    <td>Aux Fees</td>
                     <td style="padding: 0;">
                         <table class="table data-table">
                             <tbody>
