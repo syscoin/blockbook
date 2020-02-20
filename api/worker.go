@@ -124,7 +124,6 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 
 // GetTransactionFromBchainTx reads transaction data from txid
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
-	glog.Warning("GetTransactionFromBtx beginning\n")
 	var err error
 	var ta *bchain.TxAddresses
 	var tokens []*bchain.TokenTransferSummary
@@ -253,13 +252,10 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		glog.Warning("GetTransactionFromBtx\n")
 		if ta.TokenTransferSummary != nil {
-			glog.Warning("GetTransactionFromBchainTx tt\n")
 			// fill in unspent-ness on recipients
 			for i := range ta.TokenTransferSummary.Recipients {
 				recipient := ta.TokenTransferSummary.Recipients[i]
-				glog.Warning("setting rcp to unspent\n")
 				recipient.Unspent = true
 				addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
 				if errAddrDesc != nil {
@@ -267,16 +263,13 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				}
 				ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
                 if errBalance == nil {
-					glog.Warning("got balance\n")
                     assetGuid, errAssetGuid := strconv.Atoi(ta.TokenTransferSummary.Token)
                     if errAssetGuid != nil {
                         return nil, errAssetGuid
                     }
                     baAsset, fetchedAsset := ba.AssetBalances[uint32(assetGuid)]
                     if fetchedAsset {
-						glog.Warning("fetched asset balance\n")
                         if baAsset.SentAssetSat.Int64() > 0 {
-							glog.Warning("unspent is false\n")
                             recipient.Unspent = false
                         }
                     }
@@ -541,7 +534,6 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		// fill in unspent-ness on recipients
 		for i := range ta.TokenTransferSummary.Recipients {
 			recipient := ta.TokenTransferSummary.Recipients[i]
-			glog.Warning("setting rcp to unspent\n")
 			recipient.Unspent = true
 			addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
 			if errAddrDesc != nil {
@@ -549,16 +541,13 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			}
 			ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
 			if errBalance == nil {
-				glog.Warning("got balance\n")
 				assetGuid, errAssetGuid := strconv.Atoi(ta.TokenTransferSummary.Token)
 				if errAssetGuid != nil {
 					return nil
 				}
 				baAsset, fetchedAsset := ba.AssetBalances[uint32(assetGuid)]
 				if fetchedAsset {
-					glog.Warning("fetched asset balance\n")
 					if baAsset.SentAssetSat.Int64() > 0 {
-						glog.Warning("unspent is false\n")
 						recipient.Unspent = false
 					}
 				}
