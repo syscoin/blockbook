@@ -458,7 +458,6 @@ type Token struct {
 type Tokens []*Token
 func (t Tokens) Len() int           { return len(t) }
 func (t Tokens) Swap(i, j int)      { 
-	lengthTokens := t.Len()
 	if t[i] != nil && t[j] != nil {
 		t[i], t[j] = t[j], t[i] 
 	}
