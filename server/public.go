@@ -687,9 +687,9 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 			bchain.AssetSyscoinBurnToAllocationMask | bchain.AssetAllocationBurnToSyscoinMask | bchain.AssetAllocationBurnToEthereumMask | 
 			bchain.AssetAllocationMintMask | bchain.AssetAllocationLockMask
 		} else {
-			assetsMask, ec = bchain.AssetsMask(strconv.Atoi(filterParam))
-			if ec != nil {
-				assetsMask = bchain.AssetAllMask
+			var mask, ec = strconv.Atoi(filterParam)
+			if ec == nil {
+				assetsMask = bchain.AssetsMask((mask)
 			}
 		}
 	}
