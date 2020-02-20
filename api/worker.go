@@ -260,13 +260,13 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				if errAddrDesc != nil {
 					return nil, errAddrDesc
 				}
-	        	ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
+				ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
                 if errBalance == nil {
                     assetGuid, errAssetGuid := strconv.Atoi(ta.TokenTransferSummary.Token)
                     if errAssetGuid != nil {
                         return nil, errAssetGuid
                     }
-                     baAsset, errAsset := ba.AssetBalances[uint32(assetGuid)]
+                    baAsset, errAsset := ba.AssetBalances[uint32(assetGuid)]
                     if errAsset == nil {
                         if baAsset.SentAssetSat.Int64() > 0 {
                             recipient.Unspent = false
