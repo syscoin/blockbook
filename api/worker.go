@@ -119,46 +119,12 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 		}
 		return nil, NewAPIError(fmt.Sprintf("Transaction '%v' not found (%v)", txid, err), true)
 	}
-	bchainTx, err = w.GetTransactionFromBchainTx(bchainTx, height, spendingTxs, specificJSON)
-	if bchainTx.TokenTransferSummary != nil {
-		for tokenSummary, j := range bchainTx.TokenTransferSummary {
-			if tokenSummary == nil {
-				glog.Infof("GetTransaction null tt\n")
-				break
-			}
-			glog.Infof("GetTransaction tt\n")
-			// fill in unspent-ness on recipients
-			for recipient, i := range tokenSummary.Recipients {
-				glog.Infof("setting rcp to unspent\n")
-				recipient.Unspent = true
-				addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
-				if errAddrDesc != nil {
-					return nil, errAddrDesc
-				}
-				ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
-				if errBalance == nil {
-					glog.Infof("got balance\n")
-					assetGuid, errAssetGuid := strconv.Atoi(tokenSummary.Token)
-					if errAssetGuid != nil {
-						return nil, errAssetGuid
-					}
-					baAsset, fetchedAsset := ba.AssetBalances[uint32(assetGuid)]
-					if fetchedAsset {
-						glog.Warning("fetched asset balance\n")
-						if baAsset.SentAssetSat.Int64() > 0 {
-							glog.Infof("unspent is false\n")
-							recipient.Unspent = false
-						}
-					}
-				}
-			}
-		}
-	}
-	return bchainTx, err
+	return w.GetTransactionFromBchainTx(bchainTx, height, spendingTxs, specificJSON)
 }
 
 // GetTransactionFromBchainTx reads transaction data from txid
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
+	glog.Warning("GetTransactionFromBtx beginning\n")
 	var err error
 	var ta *bchain.TxAddresses
 	var tokens []*bchain.TokenTransferSummary
@@ -287,7 +253,35 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
+		glog.Warning("GetTransactionFromBtx\n")
 		if ta.TokenTransferSummary != nil {
+			glog.Warning("GetTransactionFromBchainTx tt\n")
+			// fill in unspent-ness on recipients
+			for i := range ta.TokenTransferSummary.Recipients {
+				recipient := ta.TokenTransferSummary.Recipients[i]
+				glog.Warning("setting rcp to unspent\n")
+				recipient.Unspent = true
+				addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
+				if errAddrDesc != nil {
+					return nil, errAddrDesc
+				}
+				ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
+                if errBalance == nil {
+					glog.Warning("got balance\n")
+                    assetGuid, errAssetGuid := strconv.Atoi(ta.TokenTransferSummary.Token)
+                    if errAssetGuid != nil {
+                        return nil, errAssetGuid
+                    }
+                    baAsset, fetchedAsset := ba.AssetBalances[uint32(assetGuid)]
+                    if fetchedAsset {
+						glog.Warning("fetched asset balance\n")
+                        if baAsset.SentAssetSat.Int64() > 0 {
+							glog.Warning("unspent is false\n")
+                            recipient.Unspent = false
+                        }
+                    }
+                }
+			}
 			tokens = []*bchain.TokenTransferSummary{ta.TokenTransferSummary}
 		} else {
 			tokens = nil
