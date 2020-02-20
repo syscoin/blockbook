@@ -783,7 +783,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	}
 	data := s.newTemplateData()
 	data.Asset = asset
-	data.AssetUpdateFlags = [5]string{"Admin", "Data", "Contract", "Supply", "Flags"}
+	data.AssetUpdateFlags = []string{"Admin", "Data", "Contract", "Supply", "Flags"}
 	data.Page = asset.Page
 	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
 	if filterParam != "" {
