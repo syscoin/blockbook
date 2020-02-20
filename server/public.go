@@ -677,7 +677,7 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 		to = 0
 	}
 	filterParam := r.URL.Query().Get("filter")
-	var assetsMask AssetsMask = bchain.AssetAllMask
+	var assetsMask := bchain.AssetAllMask
 	if len(filterParam) > 0 {
 		if filterParam == "transfers" {
 			assetsMask = bchain.AssetAllocationSendMask
@@ -687,7 +687,7 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 			bchain.AssetSyscoinBurnToAllocationMask | bchain.AssetAllocationBurnToSyscoinMask | bchain.AssetAllocationBurnToEthereumMask | 
 			bchain.AssetAllocationMintMask | bchain.AssetAllocationLockMask
 		} else {
-			assetsMask, ec = bchain.AssetMask(strconv.Atoi(filterParam))
+			assetsMask, ec = bchain.AssetsMask(strconv.Atoi(filterParam))
 			if ec != nil {
 				assetsMask = bchain.AssetAllMask
 			}
