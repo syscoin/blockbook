@@ -60,8 +60,8 @@
                                 {{- range $f := $asset.AssetDetails.PubData.aux_fees.fee_struct -}}{{- if $f -}}
                                 <tr>
                                     <td class="data ellipsis"><a href="/address/{{$asset.AssetDetails.PubData.aux_fees.address}}">{{$asset.AssetDetails.PubData.aux_fees.address}}</a></td>
-                                    <td class="data">{{ index .f 0 }} {{$asset.AssetDetails.Symbol}}</td>
-                                    <td class="data">{{formatPercentage index .f 1}}</td>
+                                    <td class="data">{{ index $f 0 }} {{$asset.AssetDetails.Symbol}}</td>
+                                    <td class="data">{{formatPercentage index $f 1}}</td>
                                 </tr>
                                 {{- end -}}{{- end -}}
                             </tbody>
