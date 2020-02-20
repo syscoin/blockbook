@@ -591,10 +591,10 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, []*bchain.Token, *bchain.Erc20Contract, uint64, int, int, error) {
+func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescriptor, details AccountDetails, filter *AddressFilter) (*bchain.AddrBalance, bchain.Tokens, *bchain.Erc20Contract, uint64, int, int, error) {
 	var (
 		ba             *bchain.AddrBalance
-		tokens         []*bchain.Token
+		tokens         bchain.Tokens
 		ci             *bchain.Erc20Contract
 		n              uint64
 		nonContractTxs int
@@ -628,7 +628,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 			}
 		}
 		if details > AccountDetailsBasic {
-			tokens = make([]*bchain.Token, len(ca.Contracts))
+			tokens = make(bchain.Tokens, len(ca.Contracts))
 			var j int
 			for i, c := range ca.Contracts {
 				if len(filterDesc) > 0 {
@@ -766,7 +766,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	}
 	var (
 		ba                       *bchain.AddrBalance
-		tokens                   []*bchain.Token
+		tokens                   bchain.Tokens
 		erc20c                   *bchain.Erc20Contract
 		txm                      []string
 		txs                      []*Tx
@@ -875,7 +875,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalSent = &ba.SentSat
 	} 
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
-		tokens = make([]*bchain.Token, len(ba.AssetBalances)+1)
+		tokens = make(bchain.Tokens, len(ba.AssetBalances)+1)
 		var i int = 0
 		var ownerFound bool = false
 		for k, v := range ba.AssetBalances {

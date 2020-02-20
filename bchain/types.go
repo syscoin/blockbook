@@ -455,10 +455,20 @@ type Token struct {
 	TotalSentSat     *Amount   `json:"totalSent,omitempty"`
 	ContractIndex    string    `json:"-"`
 }
-
-func (t Token) Len() int           { return len(t) }
-func (t Token) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-func (t Token) Less(i, j int) bool { return t[i].Contract < t[j].Contract }
+type Tokens []*Token
+func (t Tokens) Len() int           { return len(t) }
+func (t Tokens) Swap(i, j int)      { 
+	lengthTokens := t.Len()
+	if t[i] != nil && t[j] != nil {
+		t[i], t[j] = t[j], t[i] 
+	}
+}
+func (t Tokens) Less(i, j int) bool { 
+	if t[i] == nil || t[j] == nil {
+		return false
+	}
+	return t[i].Contract < t[j].Contract
+}
 
 // TokenTransferRecipient contains a recipient for an asset, can be multiple in a token transfer
 type TokenTransferRecipient struct {

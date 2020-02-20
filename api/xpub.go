@@ -220,9 +220,9 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 	return lastUsed, addresses, nil
 }
 
-func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) ([]*bchain.Token, error) {
+func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) (bchain.Tokens, error) {
 	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
-	var tokens []*bchain.Token
+	var tokens bchain.Tokens
 	var address string
 	if len(a) > 0 {
 		address = a[0]
@@ -232,7 +232,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 		var i int = 0
 		if option >= AccountDetailsTokenBalances {
 			// + 1 for base plus any assets in AssetBalances, + 1 for owner asset for unallocated token
-			tokens = make([]*bchain.Token, 2 + len(ad.balance.AssetBalances))
+			tokens = make(bchain.Tokens, 2 + len(ad.balance.AssetBalances))
 			totalReceived := ad.balance.ReceivedSat()
 			// for base token
 			tokens[i] = &bchain.Token{
@@ -562,10 +562,10 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		txCount = int(data.txCountEstimate)
 	}
 	usedTokens := 0
-	var tokens []*bchain.Token
+	var tokens bchain.Tokens
 	var xpubAddresses map[string]struct{}
 	if option > AccountDetailsBasic {
-		tokens = make([]*bchain.Token, 0, 4)
+		tokens = make(bchain.Tokens, 0, 4)
 		xpubAddresses = make(map[string]struct{})
 	}
 	for ci, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
