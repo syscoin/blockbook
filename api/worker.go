@@ -252,7 +252,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
-		if ta.TokenTransferSummary != nil {
+		if ta != nil && ta.TokenTransferSummary != nil {
 			// fill in unspent-ness on recipients
 			for i := range ta.TokenTransferSummary.Recipients {
 				recipient := ta.TokenTransferSummary.Recipients[i]
