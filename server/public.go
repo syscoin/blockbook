@@ -689,7 +689,7 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 		} else {
 			var mask, ec = strconv.Atoi(filterParam)
 			if ec == nil {
-				assetsMask = bchain.AssetsMask((mask)
+				assetsMask = bchain.AssetsMask(mask)
 			}
 		}
 	}
