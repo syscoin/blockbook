@@ -256,6 +256,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			// fill in unspent-ness on recipients
 			for i := range ta.TokenTransferSummary.Recipients {
 				recipient := ta.TokenTransferSummary.Recipients[i]
+				recipient.Unspent = true
 				addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
 				if errAddrDesc != nil {
 					return nil, errAddrDesc
