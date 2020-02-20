@@ -543,12 +543,12 @@ func formatPercentage(a string) string {
 	return "0%"
 }
 
-func isAssetUpdateFlagSet(td *TemplateData, f string, val uint8) bool {
+func isAssetUpdateFlagSet(td *TemplateData, f string, mask uint8) bool {
 	for index, updateFlag := range td.AssetUpdateFlags {
 		if updateFlag.Value == f {
-			mask := uint(1) << uint(index)
-			ival := uint(val)
-			return (ival & mask) == ival
+			ival := uint(1) << uint(index)
+			imask := uint(mask)
+			return (ival & imask) == ival
 		}
 	}
 	return false
