@@ -419,6 +419,7 @@ type TemplateData struct {
 	Address              *api.Address
 	AddrStr              string
 	Asset				 *api.Asset
+	AssetUpdateFlags	 []string
 	Tx                   *api.Tx
 	Error                *api.APIError
 	Blocks               *api.Blocks
@@ -443,6 +444,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatAmount":             s.formatAmount,
 		"formatAmountWithDecimals": formatAmountWithDecimals,
 		"formatPercentage": 		formatPercentage,
+		"isAssetUpdateFlagSet":     isAssetUpdateFlagSet,
 		"setTxToTemplateData":      setTxToTemplateData,
 		"isOwnAddress":             isOwnAddress,
 		"isOwnAddresses":           isOwnAddresses,
@@ -536,6 +538,16 @@ func formatPercentage(a string) string {
 		return fmt.Sprintf("%.2f%%", f)
 	}
 	return "0%"
+}
+
+func isAssetUpdateFlagSet(td *TemplateData, f string, int val) bool {
+	for updateFlag, index := range td.AssetUpdateFlags {
+		if updateFlag == f {
+			mask := 1 << index
+			return val & mask == val
+		}
+	}
+	return false
 }
 
 // called from template to support txdetail.html functionality
@@ -771,6 +783,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	}
 	data := s.newTemplateData()
 	data.Asset = asset
+	data.AssetUpdateFlags = [5]string{"Admin", "Data", "Contract", "Supply", "Flags"}
 	data.Page = asset.Page
 	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
 	if filterParam != "" {

@@ -43,9 +43,30 @@
                     <td class="data">{{$asset.AssetDetails.Decimals}}</td>
                 </tr>
                 <tr>
-                    <td>UpdateFlags</td>
-                    <td class="data">{{$asset.AssetDetails.UpdateFlags}}</td>
-                </tr>
+                        <td>UpdateFlags</td>
+                        <td style="padding: 0;">
+                            <table class="table data-table">
+                                <tbody>
+                                    <tr>
+                                        <th>Flag</th>
+                                        <th>Set</th>
+                                    </tr>
+                                    {{- range $f := $data.AssetUpdateFlags -}}
+                                    <tr>
+                                        <td class="data">{{$f}}</td>
+                                        <td class="data">
+                                            {{if isAssetUpdateFlagSet $data $f $asset.AssetDetails.UpdateFlags}}
+                                            <span class="text-success">✔</span>
+                                            {{else}}
+                                            <span class="text-danger">✘</span>
+                                            {{end}}
+                                        </td>
+                                    </tr>
+                                    {{- end -}}
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
                 {{- if $asset.AssetDetails.PubData.aux_fees -}}
                 <tr>
                     <td>AuxFees</td>
