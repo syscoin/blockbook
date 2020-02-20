@@ -537,6 +537,34 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 	if feesSat.Sign() == -1 {
 		feesSat.SetUint64(0)
 	}
+	if ta.TokenTransferSummary != nil {
+		// fill in unspent-ness on recipients
+		for i := range ta.TokenTransferSummary.Recipients {
+			recipient := ta.TokenTransferSummary.Recipients[i]
+			glog.Warning("setting rcp to unspent\n")
+			recipient.Unspent = true
+			addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
+			if errAddrDesc != nil {
+				return nil, errAddrDesc
+			}
+			ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
+			if errBalance == nil {
+				glog.Warning("got balance\n")
+				assetGuid, errAssetGuid := strconv.Atoi(ta.TokenTransferSummary.Token)
+				if errAssetGuid != nil {
+					return nil, errAssetGuid
+				}
+				baAsset, fetchedAsset := ba.AssetBalances[uint32(assetGuid)]
+				if fetchedAsset {
+					glog.Warning("fetched asset balance\n")
+					if baAsset.SentAssetSat.Int64() > 0 {
+						glog.Warning("unspent is false\n")
+						recipient.Unspent = false
+					}
+				}
+			}
+		}
+	}
 	r := &Tx{
 		Blockhash:     bi.Hash,
 		Blockheight:   int(ta.Height),
