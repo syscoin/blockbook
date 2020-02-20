@@ -53,12 +53,12 @@
                                     </tr>
                                     {{- range $f := $data.AssetUpdateFlags -}}
                                     <tr>
-                                        <td class="data">{{$f}}</td>
+                                        <td title="{{$f.description}}" class="data">{{$f.value}}</td>
                                         <td class="data">
-                                            {{if isAssetUpdateFlagSet $data $f $asset.AssetDetails.UpdateFlags}}
-                                            <span class="text-success">✔</span>
+                                            {{if isAssetUpdateFlagSet $data $f.value $asset.AssetDetails.UpdateFlags}}
+                                            <span title="{{$f.description}}" class="text-success">✔</span>
                                             {{else}}
-                                            <span class="text-danger">✘</span>
+                                            <span title="{{$f.description}}" class="text-danger">✘</span>
                                             {{end}}
                                         </td>
                                     </tr>

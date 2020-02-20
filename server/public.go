@@ -408,7 +408,10 @@ const (
 
 	tplCount
 )
-
+type AssetUpdateFlag struct {
+	value 		string
+	description string
+}
 // TemplateData is used to transfer data to the templates
 type TemplateData struct {
 	CoinName             string
@@ -419,7 +422,7 @@ type TemplateData struct {
 	Address              *api.Address
 	AddrStr              string
 	Asset				 *api.Asset
-	AssetUpdateFlags	 []string
+	AssetUpdateFlags	 []AssetUpdateFlag
 	Tx                   *api.Tx
 	Error                *api.APIError
 	Blocks               *api.Blocks
@@ -542,7 +545,7 @@ func formatPercentage(a string) string {
 
 func isAssetUpdateFlagSet(td *TemplateData, f string, val uint8) bool {
 	for index, updateFlag := range td.AssetUpdateFlags {
-		if updateFlag == f {
+		if updateFlag.value == f {
 			mask := uint(1) << uint(index)
 			ival := uint(val)
 			return ival & mask == ival
@@ -784,7 +787,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	}
 	data := s.newTemplateData()
 	data.Asset = asset
-	data.AssetUpdateFlags = []string{"Admin", "Data", "Contract", "Supply", "Flags"}
+	data.AssetUpdateFlags = []AssetUpdateFlag{{value: "Admin", description: "God mode flag, governs flags field below"},{value: "Data", description: "Can you update the public data field for this asset?"},{value: "Contract", description: "Can you update the smart contract field for this asset?"},{value: "Supply", description: "Can you update the supply for this asset?"},{value: "Flags", description: "Can you allowed to update the flags field for this asset?"}}
 	data.Page = asset.Page
 	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
 	if filterParam != "" {
