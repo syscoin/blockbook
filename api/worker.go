@@ -253,6 +253,27 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		}
 		pValInSat = &valInSat
 		if ta.TokenTransferSummary != nil {
+			// fill in unspent-ness on recipients
+			for i := range ta.TokenTransferSummary.Recipients {
+				recipient := ta.TokenTransferSummary.Recipients[i]
+				addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
+				if errAddrDesc != nil {
+					return nil, errAddrDesc
+				}
+	        	ba, errBalance := w.db.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailNoUTXO)
+		        if errBalance == nil {
+					assetGuid, errAssetGuid := strconv.Atoi(ta.TokenTransferSummary.Token)
+					if errAssetGuid != nil {
+						return nil, errAssetGuid
+					}
+			 		baAsset, errAsset := ba.AssetBalances[uint32(assetGuid)]
+					if errAsset == nil {
+						if(baAsset.SentAssetSat.Int64() > 0){
+							recipient.Unspent = false
+						}
+					}
+		        }
+			}
 			tokens = []*bchain.TokenTransferSummary{ta.TokenTransferSummary}
 		} else {
 			tokens = nil
