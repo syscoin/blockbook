@@ -38,7 +38,7 @@ func (d *RocksDB) GetAuxFeeAddr(pubData []byte) bchain.AddressDescriptor {
 
 }
 
-func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
+func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var asset bchain.Asset
 	var dBAsset *bchain.Asset
@@ -120,7 +120,7 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		} else {
 			d.cbs.balancesHit++
 		}
-		counted := addToAddressesMap(addresses, transferStr, btxID, outputIndex)
+		counted := addToAddressesMap(addresses, transferStr, btxID, int32(assetGuid))
 		if !counted {
 			balanceTransfer.Txs++
 		}
@@ -199,11 +199,15 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 			Symbol:   string(dBAsset.AssetObj.Symbol),
 			Fee:       (*bchain.Amount)(big.NewInt(0)),
 		}
+		counted := addToAddressesMap(addresses, senderStr, btxID, int32(assetGuid))
+		if !counted {
+			balanceAsset.Txs++
+		}
 	}
 	return assetGuid, nil
 }
 
-func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
+func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
 	var dBAsset *bchain.Asset
@@ -276,7 +280,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 		}
 
 		// for each address returned, add it to map
-		counted := addToAddressesMap(addresses, receiverStr, btxID, outputIndex)
+		counted := addToAddressesMap(addresses, receiverStr, btxID, int32(assetGuid))
 		if !counted {
 			balance.Txs++
 		}
@@ -306,7 +310,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	if totalFeeValue.Int64() > 0 {
 		txAddresses.TokenTransferSummary.Fee = (*bchain.Amount)(totalFeeValue)
 	}
-	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset, assets)
+	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, dBAsset, assets)
 }
 
 func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset) (uint32, error) {
@@ -392,7 +396,7 @@ func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, balances map[s
 	return assetGuid, d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
 
-func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, addresses bchain.AddressesMap, outputIndex int32, dBAsset *bchain.Asset, assets map[uint32]*bchain.Asset) error {
+func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, version int32, totalAssetSentValue *big.Int, assetSenderAddrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, addresses bchain.AddressesMap, dBAsset *bchain.Asset, assets map[uint32]*bchain.Asset) error {
 	if totalAssetSentValue == nil {
 		return errors.New("totalAssetSentValue was nil cannot connect allocation input")
 	}
@@ -438,6 +442,10 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 		dBAsset.AssetObj.Balance = balanceAssetSat.Int64()
 	}
 	assets[assetGuid] = dBAsset
+	counted := addToAddressesMap(addresses, assetStrSenderAddrDesc, btxID, ^int32(assetGuid))
+	if !counted {
+		balanceAsset.Txs++
+	}
 	return nil
 
 }
@@ -590,7 +598,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 
 }
 
-func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
+func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var mintasset wire.MintSyscoinType
 	var dBAsset *bchain.Asset
@@ -648,7 +656,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	}
 
 	// for each address returned, add it to map
-	counted := addToAddressesMap(addresses, receiverStr, btxID, outputIndex)
+	counted := addToAddressesMap(addresses, receiverStr, btxID, int32(assetGuid))
 	if !counted {
 		balance.Txs++
 	}
@@ -678,7 +686,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 		Value: (*bchain.Amount)(amount), 
 		To: receiverAddress,
 	}
-	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, outputIndex, dBAsset, assets)
+	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, dBAsset, assets)
 }
 
 func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]*bchain.AddrBalance, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset) (uint32, error) {
@@ -761,7 +769,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, balances map[string]
 	return assetGuid, d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, assets)
 }
 
-func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte, outputIndex int32, txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset, txAssets map[string]*bchain.TxAsset) error {
+func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDesc bchain.AddressDescriptor, balances map[string]*bchain.AddrBalance, version int32, addresses bchain.AddressesMap, btxID []byte,  txAddresses* bchain.TxAddresses, assets map[uint32]*bchain.Asset, txAssets map[string]*bchain.TxAsset) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -772,11 +780,11 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDes
 	}
 	var assetGuid uint32
 	if d.chainParser.IsAssetAllocationTx(version) {
-		assetGuid, err = d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
+		assetGuid, err = d.ConnectAssetAllocationOutput(sptData, balances, version, addresses, btxID, txAddresses, assets)
 	} else if d.chainParser.IsAssetTx(version) {
-		assetGuid, err = d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
+		assetGuid, err = d.ConnectAssetOutput(sptData, balances, version, addresses, btxID, txAddresses, assets)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
-		assetGuid, err = d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, outputIndex, txAddresses, assets)
+		assetGuid, err = d.ConnectMintAssetOutput(sptData, balances, version, addresses, btxID, txAddresses, assets)
 	}
 	if assetGuid > 0 && err == nil {
 		txAsset, ok := txAssets[blockHash]

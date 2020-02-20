@@ -847,33 +847,36 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				if bytes.Equal(addrDesc, ownerAddrDesc) {
 					ownerBalance := big.NewInt(dbAsset.AssetObj.Balance)
 					totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
+					assetGuid := strconv.FormatUint(uint64(k), 10),
 					tokens[i] = &bchain.Token{
 						Type:             bchain.SPTUnallocatedTokenType,
-						Name:             address,
+						Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
 						Decimals:         int(dbAsset.AssetObj.Precision),
 						Symbol:			  string(dbAsset.AssetObj.Symbol),
 						BalanceSat:       (*bchain.Amount)(ownerBalance),
 						TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
 						TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
-						Contract:		  strconv.FormatUint(uint64(k), 10),
+						Contract:		  assetGuid,
 						Transfers:		  v.Transfers,
+						ContractIndex: 	  assetGuid,
 					}
 					ownerFound = true
 					i++
 				}
 			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
-			
+			assetGuid := strconv.FormatUint(uint64(k), 10),
 			tokens[i] = &bchain.Token{
 				Type:             bchain.SPTTokenType,
-				Name:             address,
+				Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
 				Decimals:         int(dbAsset.AssetObj.Precision),
 				Symbol:			  string(dbAsset.AssetObj.Symbol),
 				BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
-				Contract:		  strconv.FormatUint(uint64(k), 10),
+				Contract:		  assetGuid,
 				Transfers:		  v.Transfers,
+				ContractIndex:    assetGuid,
 			}
 			i++
 		}
