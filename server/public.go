@@ -787,7 +787,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	}
 	data := s.newTemplateData()
 	data.Asset = asset
-	data.AssetUpdateFlags = []AssetUpdateFlag{{Value: "Admin", Description: "God mode flag, governs flags field below"},{Value: "Data", Description: "Can you update the public data field for this asset?"},{Value: "Contract", Description: "Can you update the smart contract field for this asset?"},{Value: "Supply", Description: "Can you update the supply for this asset?"},{Value: "Flags", Description: "Can you allowed to update the flags field for this asset?"}}
+	data.AssetUpdateFlags = []AssetUpdateFlag{{Value: "Admin", Description: "God mode flag, governs Flags field below"},{Value: "Data", Description: "Can you update the public data field for this asset?"},{Value: "Contract", Description: "Can you update the smart contract field for this asset?"},{Value: "Supply", Description: "Can you update the supply for this asset?"},{Value: "Flags", Description: "Can you allowed to update the UpdateFlags field for this asset?"}}
 	data.Page = asset.Page
 	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
 	if filterParam != "" {
