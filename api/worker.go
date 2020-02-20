@@ -545,14 +545,14 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			recipient.Unspent = true
 			addrDescAsset, errAddrDesc := w.chainParser.GetAddrDescFromAddress(recipient.To)
 			if errAddrDesc != nil {
-				return nil, errAddrDesc
+				return nil
 			}
 			ba, errBalance := w.db.GetAddrDescBalance(addrDescAsset, bchain.AddressBalanceDetailNoUTXO)
 			if errBalance == nil {
 				glog.Warning("got balance\n")
 				assetGuid, errAssetGuid := strconv.Atoi(ta.TokenTransferSummary.Token)
 				if errAssetGuid != nil {
-					return nil, errAssetGuid
+					return nil
 				}
 				baAsset, fetchedAsset := ba.AssetBalances[uint32(assetGuid)]
 				if fetchedAsset {
