@@ -950,7 +950,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 func (w *Worker) FindAssets(assetSymbol string) []*Asset {
 	start := time.Now()
 	assets := w.db.FindAssetsFromSymbol(assetSymbol)
-	glog.Info("FindAssets ", asset, " finished in ", time.Since(start))
+	glog.Info("FindAssets ", assetSymbol, " finished in ", time.Since(start))
 	return assets
 }
 // GetAsset gets transactions for given asset
