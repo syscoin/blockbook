@@ -826,7 +826,7 @@ func (d *RocksDB) findAssetsFromSymbol(symbol string) []*bchain.Asset {
 	assets := make([]*bchain.Asset, 0)
 	for _, asset := range AssetCache {
 		if strings.Contains(asset.AssetObj.Symbol, symbol) {
-			assets = assets.append(&asset)
+			assets = append(assets, &asset)
 		}
 	}
 	return assets
