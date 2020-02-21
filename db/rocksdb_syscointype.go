@@ -4,6 +4,7 @@ import (
 	"blockbook/bchain"
 	"bytes"
 	"strconv"
+	"strings"
 	"math/big"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -824,7 +825,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 func (d *RocksDB) findAssetsFromSymbol(symbol string) []*bchain.Asset {
 	assets := make([]*bchain.Asset, 0)
 	for _, asset := range AssetCache {
-		if asset.AssetObj.Symbol.contains(symbol) {
+		if strings.contains(asset.AssetObj.Symbol, symbol) {
 			assets = assets.append(&asset)
 		}
 	}
