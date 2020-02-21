@@ -822,7 +822,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 	return err
 }
 // find assets from cache that contain symbol
-func (d *RocksDB) findAssetsFromSymbol(symbol string) []*bchain.Asset {
+func (d *RocksDB) FindAssetsFromSymbol(symbol string) []*bchain.Asset {
 	assets := make([]*bchain.Asset, 0)
 	for _, asset := range AssetCache {
 		if strings.Contains(asset.AssetObj.Symbol, symbol) {
