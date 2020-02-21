@@ -825,10 +825,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 	assets := make([]*bchain.Asset, 0)
 	for _, asset := range AssetCache {
-		if filter == "" || strings.Contains(asset.AssetObj.Symbol, filter) ||
-		strings.Contains(asset.AssetObj.Contract, filter) || 
-		strings.Contains(asset.AssetObj.PubData.description, filter)
-		{
+		if filter == "" || strings.Contains(asset.AssetObj.Symbol, filter) || strings.Contains(asset.AssetObj.Contract, filter) || strings.Contains(asset.AssetObj.PubData.description, filter) {
 			assets = append(assets, &asset)
 		}
 	}
