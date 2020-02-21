@@ -947,16 +947,11 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	glog.Info("GetAddress ", address, " finished in ", time.Since(start))
 	return r, nil
 }
-func (w *Worker) FindAssets(assetSymbol string) ([]*Asset, error){
+func (w *Worker) FindAssets(assetSymbol string) []*Asset {
 	start := time.Now()
-	assets := make([]*Asset)
-	for _, asset := range w.db.AssetCache {
-		if asset.AssetObj.Symbol.contains(assetSymbol) {
-			assets = assets.append(&asset)
-		}
-	}
+	assets := w.db.findAssetsFromSymbol(assetSymbol)
 	glog.Info("FindAssets ", asset, " finished in ", time.Since(start))
-	return assets, nil
+	return assets
 }
 // GetAsset gets transactions for given asset
 func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AssetFilter) (*Asset, error) {
