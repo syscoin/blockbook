@@ -914,13 +914,15 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			return noTpl, nil, nil
 		}
 
-		findAssets = s.api.FindAssets(q)
+		findAssets = s.api.FindAssets(q, 0, 2)
 		if len(findAssets) > 0 {
 			if len(findAssets) == 1 {
-				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(findAssets[0].AssetObj.AssetGuid), 10)), 302)
+				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(findAssets[0].AssetGuid), 10)), 302)
 				return noTpl, nil, nil
 			} else {
 				glog.Warning("found %d assets matching that criteria", len(findAssets))
+				http.Redirect(w, r, joinURL("/assets/", q), 302)
+				return noTpl, nil, nil
 			}
 		}
 		asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AssetFilter{AssetsMask: bchain.AssetAllMask})

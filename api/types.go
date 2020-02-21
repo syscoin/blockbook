@@ -223,6 +223,15 @@ type Asset struct {
 	Filter        string              `json:"-"`
 }
 
+// Asset holds information about searching/filtering assets
+type Assets struct {
+	Paging
+	AssetDetails		  []*AssetSpecific		`json:"assets"`
+	NumAssets             int                   `json:"numAsseets"`
+	// helpers for explorer
+	Filter        string              `json:"-"`
+}
+
 // Utxo is one unspent transaction output
 type Utxo struct {
 	Txid          string  `json:"txid"`
