@@ -888,6 +888,7 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 	var tx *api.Tx
 	var address *api.Address
 	var asset *api.Asset
+	var findAssets []*api.Asset
 	var block *api.Block
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "search"}).Inc()
@@ -911,6 +912,16 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 		if err == nil {
 			http.Redirect(w, r, joinURL("/address/", address.AddrStr), 302)
 			return noTpl, nil, nil
+		}
+
+		findAssets, err = s.api.FindAssets(q)
+		if err == nil && len(findAssets) > 0 {
+			if len(findAssets) == 1 {
+				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(findAssets[0].AssetObj.AssetGuid), 10)), 302)
+				return noTpl, nil, nil
+			} else {
+				glog.Warning("found %d assets matching that criteria", len(findAssets))
+			}
 		}
 		asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AssetFilter{AssetsMask: bchain.AssetAllMask})
 		if err == nil {
