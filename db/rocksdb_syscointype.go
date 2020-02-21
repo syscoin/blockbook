@@ -825,7 +825,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 func (d *RocksDB) findAssetsFromSymbol(symbol string) []*bchain.Asset {
 	assets := make([]*bchain.Asset, 0)
 	for _, asset := range AssetCache {
-		if strings.contains(asset.AssetObj.Symbol, symbol) {
+		if strings.Contains(asset.AssetObj.Symbol, symbol) {
 			assets = assets.append(&asset)
 		}
 	}
