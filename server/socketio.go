@@ -612,7 +612,7 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 		dbAsset, errAsset := s.db.GetAsset(assetGuid, nil)
 		if errAsset != nil || dbAsset == nil {
 			if err == nil{
-				return assetGuid, errors.New("getAssetHistory Asset not found")
+				return res, errors.New("getAssetHistory Asset not found")
 			}
 			return res, errAsset
 		}
