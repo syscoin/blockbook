@@ -263,6 +263,11 @@ func mainWithExitCode() int {
 		}
 	}
 
+	if err = index.SetupAssetCache(); err != nil {
+		glog.Error("SetupAssetCache ", err)
+		return exitCodeFatal
+	}
+	
 	if *synchronize {
 		internalState.SyncMode = true
 		internalState.InitialSync = true
@@ -303,11 +308,6 @@ func mainWithExitCode() int {
 		publicServer.ConnectFullPublicInterface()
 	}
 
-	if err = index.SetupAssetCache(); err != nil {
-		glog.Error("SetupAssetCache ", err)
-		return exitCodeFatal
-	}
-	
 	if *blockFrom >= 0 {
 		if *blockUntil < 0 {
 			*blockUntil = *blockFrom
