@@ -860,12 +860,17 @@ func (d *RocksDB) SetupAssetCache() error {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
+		val := it.Value()
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
-		glog.Infof("SetupAssetCache: asset %d", assetKey)
-		val := it.Value().Data()
-		assetDb, err := d.chainParser.UnpackAsset(val)
+		
+		defer val.Free()
+		buf := val.Data()
+		if buf == nil || len(buf) == 0 {
+			glog.Infof("SetupAssetCache: null asset %d", assetKey)
+			continue
+		}
+		assetDb, err := d.chainParser.UnpackAsset(buf)
 		if err != nil {
-			glog.Infof("SetupAssetCache: error asset %v %s", assetKey, err)
 			continue
 		}
 		AssetCache[assetKey] = *assetDb
