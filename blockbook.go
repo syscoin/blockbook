@@ -240,6 +240,11 @@ func mainWithExitCode() int {
 		return exitCodeFatal
 	}
 
+	if err = db.SetupAssetCache(); err != nil {
+		glog.Error("SetupAssetCache ", err)
+		return exitCodeFatal
+	}
+
 	// report BlockbookAppInfo metric, only log possible error
 	if err = blockbookAppInfoMetric(index, chain, txCache, internalState, metrics); err != nil {
 		glog.Error("blockbookAppInfoMetric ", err)

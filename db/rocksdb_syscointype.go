@@ -824,6 +824,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 
 // find assets from cache that contain filter
 func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
+	start := time.Now()
 	assets := make([]*bchain.Asset, 0)
 	filterLower := filter.ToLower()
 	for _, asset := range AssetCache {
@@ -832,6 +833,21 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 		}
 	}
 	return assets
+}
+
+func (d *RocksDB) SetupAssetCache() (err error) {
+	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
+	defer it.Close()
+	for it.SeekToFirst(); it.Valid(); it.Next() {
+		val := it.Value().Data()
+		assetDb, err = d.chainParser.UnpackAsset(val)
+		if err != nil {
+			return err
+		}
+		AssetCache[assetDb.Asset] = *assetDb
+	}
+	glog.Info("SetupAssetCache finished in ", time.Since(start))
+	return nil
 }
 
 func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchain.Asset) error {
