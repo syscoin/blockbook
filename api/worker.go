@@ -965,6 +965,7 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 			Decimals:		int(asset.AssetObj.Precision),
 			Txs:			int(asset.Transactions),
 		})
+		json.Unmarshal(asset.AssetObj.PubData, &assetDetails.PubData)
 	}
 	r := &Assets{
 		AssetDetails:		assetDetails,
