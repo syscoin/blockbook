@@ -303,6 +303,11 @@ func mainWithExitCode() int {
 		publicServer.ConnectFullPublicInterface()
 	}
 
+	if err = index.SetupAssetCache(); err != nil {
+		glog.Error("SetupAssetCache ", err)
+		return exitCodeFatal
+	}
+	
 	if *blockFrom >= 0 {
 		if *blockUntil < 0 {
 			*blockUntil = *blockFrom
@@ -321,11 +326,6 @@ func mainWithExitCode() int {
 		}
 	}
 
-	if err = index.SetupAssetCache(); err != nil {
-		glog.Error("SetupAssetCache ", err)
-		return exitCodeFatal
-	}
-	
 	if internalServer != nil || publicServer != nil || chain != nil {
 		// start fiat rates downloader only if not shutting down immediately
 		initFiatRatesDownloader(index, *blockchain)
