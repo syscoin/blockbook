@@ -844,7 +844,7 @@ func (d *RocksDB) SetupAssetCache() (err error) {
 	start := time.Now()
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
-	var assetDb bchain.Asset
+	var assetDb *bchain.Asset
 	var err error
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		val := it.Value().Data()
