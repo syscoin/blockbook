@@ -840,15 +840,13 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 	return assets
 }
 
-func (d *RocksDB) SetupAssetCache() (err error) {
+func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
-	var assetDb *bchain.Asset
-	var err error
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		val := it.Value().Data()
-		assetDb, err = d.chainParser.UnpackAsset(val)
+		assetDb, err := d.chainParser.UnpackAsset(val)
 		if err != nil {
 			return err
 		}
