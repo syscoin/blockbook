@@ -842,10 +842,14 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
+	if AssetCache == nil {
+		AssetCache = map[uint32]bchain.Asset{}
+	}
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
+		glog.Infof("SetupAssetCache: asset %v", assetKey)
 		val := it.Value().Data()
 		assetDb, err := d.chainParser.UnpackAsset(val)
 		if err != nil {
