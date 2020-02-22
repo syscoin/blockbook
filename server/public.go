@@ -425,6 +425,7 @@ type TemplateData struct {
 	Address              *api.Address
 	AddrStr              string
 	Asset				 *api.Asset
+	Assets				 *api.Assets
 	AssetUpdateFlags	 []AssetUpdateFlag
 	Tx                   *api.Tx
 	Error                *api.APIError
@@ -813,10 +814,7 @@ func (s *PublicServer) explorerAssets(w http.ResponseWriter, r *http.Request) (t
 	s.metrics.ExplorerViews.With(common.Labels{"action": "asset"}).Inc()
 	page, _, _, filter, filterParam, _ := s.getAssetQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
 	// do not allow details to be changed by query params
-	assets, err := s.api.FindAssets(assetParam, page, txsOnPage)
-	if err != nil {
-		return errorTpl, nil, err
-	}
+	assets := s.api.FindAssets(assetParam, page, txsOnPage)
 	data := s.newTemplateData()
 	data.Assets = assets
 	data.Page = assets.Page
@@ -1180,11 +1178,10 @@ func (s *PublicServer) apiAssets(r *http.Request, apiVersion int) (interface{}, 
 		return nil, api.NewAPIError("Missing asset", true)
 	}
 	var assets *api.Assets
-	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-asset"}).Inc()
 	page, pageSize, details, filter, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
-	assets, err = s.api.FindAssets(assetParam, page, pageSize)
-	return assets, err
+	assets = s.api.FindAssets(assetParam, page, pageSize)
+	return assets, nil
 }
 
 func (s *PublicServer) apiXpub(r *http.Request, apiVersion int) (interface{}, error) {
