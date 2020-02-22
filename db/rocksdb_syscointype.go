@@ -849,11 +849,11 @@ func (d *RocksDB) SetupAssetCache() error {
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
-		glog.Infof("SetupAssetCache: asset %v", assetKey)
+		glog.Infof("SetupAssetCache: asset %d", assetKey)
 		val := it.Value().Data()
 		assetDb, err := d.chainParser.UnpackAsset(val)
 		if err != nil {
-			glog.Infof("SetupAssetCache: error asset %v", assetKey)
+			glog.Infof("SetupAssetCache: error asset %v %s", assetKey, err)
 			continue
 		}
 		AssetCache[assetKey] = *assetDb
