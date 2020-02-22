@@ -845,12 +845,14 @@ func (d *RocksDB) SetupAssetCache() error {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
+		key := it.Key().Data()
+		assetKey := p.BaseParser.UnpackUint(key)
 		val := it.Value().Data()
 		assetDb, err := d.chainParser.UnpackAsset(val)
 		if err != nil {
 			return err
 		}
-		AssetCache[assetDb.AssetObj.Asset] = *assetDb
+		AssetCache[assetKey] = *assetDb
 	}
 	glog.Info("SetupAssetCache finished in ", time.Since(start))
 	return nil

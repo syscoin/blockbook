@@ -240,11 +240,6 @@ func mainWithExitCode() int {
 		return exitCodeFatal
 	}
 
-	if err = index.SetupAssetCache(); err != nil {
-		glog.Error("SetupAssetCache ", err)
-		return exitCodeFatal
-	}
-
 	// report BlockbookAppInfo metric, only log possible error
 	if err = blockbookAppInfoMetric(index, chain, txCache, internalState, metrics); err != nil {
 		glog.Error("blockbookAppInfoMetric ", err)
@@ -332,6 +327,11 @@ func mainWithExitCode() int {
 		waitForSignalAndShutdown(internalServer, publicServer, chain, 10*time.Second)
 	}
 
+	if err = index.SetupAssetCache(); err != nil {
+		glog.Error("SetupAssetCache ", err)
+		return exitCodeFatal
+	}
+	
 	if *synchronize {
 		close(chanSyncIndex)
 		close(chanSyncMempool)
