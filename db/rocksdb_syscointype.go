@@ -577,7 +577,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil || dBAsset == nil {
 		if err == nil{
-			return assetGuid, errors.New("DisconnectAssetAllocationInput Asset not found")
+			return errors.New("DisconnectAssetAllocationInput Asset not found")
 		}
 		return err
 	}
