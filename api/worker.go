@@ -951,29 +951,30 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	start := time.Now()
 	assetDetails := make([]*AssetsSpecific, 0)
-	assets := w.db.FindAssetsFromFilter(filter)
+	assetsFiltered := w.db.FindAssetsFromFilter(filter)
 	
 	var from, to int
 	var pg Paging
-	pg, from, to, page = computePaging(len(assets), page, txsOnPage)
+	pg, from, to, page = computePaging(len(assetsFiltered), page, txsOnPage)
 	for i := from; i < to; i++ {
-		asset := assets[i]
+		assetFiltered := assetsFiltered[i]
+		glog.Info("asset filtered ", assetFiltered.AssetObj.Symbol)
 		assetSpecific := AssetsSpecific{
-			AssetGuid:		asset.AssetObj.Asset,
-			Symbol:			asset.AssetObj.Symbol,
-			WitnessAddress: asset.AssetObj.WitnessAddress.ToString("sys"),
-			Contract:		"0x" + hex.EncodeToString(asset.AssetObj.Contract),
-			TotalSupply:	(*bchain.Amount)(big.NewInt(asset.AssetObj.TotalSupply)),
-			Decimals:		int(asset.AssetObj.Precision),
-			Txs:			int(asset.Transactions),
+			AssetGuid:		assetFiltered.AssetObj.Asset,
+			Symbol:			assetFiltered.AssetObj.Symbol,
+			WitnessAddress: assetFiltered.AssetObj.WitnessAddress.ToString("sys"),
+			Contract:		"0x" + hex.EncodeToString(assetFiltered.AssetObj.Contract),
+			TotalSupply:	(*bchain.Amount)(big.NewInt(assetFiltered.AssetObj.TotalSupply)),
+			Decimals:		int(assetFiltered.AssetObj.Precision),
+			Txs:			int(assetFiltered.Transactions),
 		}
-		json.Unmarshal(asset.AssetObj.PubData, &assetSpecific.PubData)
+		json.Unmarshal(assetFiltered.AssetObj.PubData, &assetSpecific.PubData)
 		assetDetails = append(assetDetails, &assetSpecific)
 	}
 	r := &Assets{
 		AssetDetails:		assetDetails,
 		Paging:             pg,
-		NumAssets:			len(assets),
+		NumAssets:			len(assetsFiltered),
 		Filter:				filter,
 	}
 	glog.Info("FindAssets filter: ", filter, " finished in ", time.Since(start))

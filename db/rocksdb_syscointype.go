@@ -845,6 +845,7 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 		contractStr := hex.EncodeToString(asset.AssetObj.Contract)
 		contractLower := strings.ToLower(contractStr)
 		if strings.Contains(symbolLower, filterLower) || (len(contractLower) > 0 && strings.Contains(contractLower, filterLower)) {
+			glog.Info("symbolLower ", symbolLower)
 			assets = append(assets, &asset)
 		}
 	}
@@ -866,14 +867,14 @@ func (d *RocksDB) SetupAssetCache() error {
 		defer val.Free()
 		buf := val.Data()
 		if buf == nil || len(buf) == 0 {
-			glog.Infof("SetupAssetCache: null asset %d", assetKey)
+			glog.Info("SetupAssetCache: null asset ", assetKey)
 			continue
 		}
 		assetDb, err := d.chainParser.UnpackAsset(buf)
 		if err != nil {
 			continue
 		}
-		glog.Infof("SetupAssetCache: storing with assetKey %d", assetKey)
+		glog.Info("SetupAssetCache: storing with assetKey ", assetKey)
 		AssetCache[assetKey] = *assetDb
 	}
 	glog.Info("SetupAssetCache finished in ", time.Since(start))
