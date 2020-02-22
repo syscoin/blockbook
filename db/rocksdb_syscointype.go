@@ -836,9 +836,9 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 }
 
 // find assets from cache that contain filter
-func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
+func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 	start := time.Now()
-	assets := make([]*bchain.Asset, 0)
+	assets := make([]bchain.Asset, 0)
 	filterLower := strings.ToLower(filter)
 	for _, assetCached := range AssetCache {
 		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
@@ -846,7 +846,7 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 		contractLower := strings.ToLower(contractStr)
 		if strings.Contains(symbolLower, filterLower) || (len(contractLower) > 0 && strings.Contains(contractLower, filterLower)) {
 			glog.Info("symbolLower ", symbolLower)
-			assets = append(assets, &assetCached)
+			assets = append(assets, assetCached)
 		}
 	}
 	glog.Info("FindAssetsFromFilter finished in ", time.Since(start))
