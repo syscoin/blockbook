@@ -827,7 +827,7 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 	start := time.Now()
 	assets := make([]*bchain.Asset, 0)
-	filterLower := filter.ToLower()
+	filterLower := strings.ToLower(filter)
 	for _, asset := range AssetCache {
 		symbolLower := strings.ToLower(asset.AssetObj.Symbol)
 		contractStr := hex.EncodeToString(asset.AssetObj.Contract)
@@ -836,20 +836,23 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 			assets = append(assets, &asset)
 		}
 	}
+	glog.Info("FindAssetsFromFilter finished in ", time.Since(start))
 	return assets
 }
 
 func (d *RocksDB) SetupAssetCache() (err error) {
+	start := time.Now()
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	var assetDb bchain.Asset
+	var err error
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		val := it.Value().Data()
 		assetDb, err = d.chainParser.UnpackAsset(val)
 		if err != nil {
 			return err
 		}
-		AssetCache[assetDb.Asset] = *assetDb
+		AssetCache[assetDb.AssetGuid] = *assetDb
 	}
 	glog.Info("SetupAssetCache finished in ", time.Since(start))
 	return nil
