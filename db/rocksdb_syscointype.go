@@ -852,7 +852,7 @@ func (d *RocksDB) SetupAssetCache() (err error) {
 		if err != nil {
 			return err
 		}
-		AssetCache[assetDb.AssetGuid] = *assetDb
+		AssetCache[assetDb.AssetObj.Asset] = *assetDb
 	}
 	glog.Info("SetupAssetCache finished in ", time.Since(start))
 	return nil
