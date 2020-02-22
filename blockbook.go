@@ -240,7 +240,7 @@ func mainWithExitCode() int {
 		return exitCodeFatal
 	}
 
-	if err = db.SetupAssetCache(); err != nil {
+	if err = index.SetupAssetCache(); err != nil {
 		glog.Error("SetupAssetCache ", err)
 		return exitCodeFatal
 	}
