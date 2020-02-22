@@ -947,6 +947,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	glog.Info("GetAddress ", address, " finished in ", time.Since(start))
 	return r, nil
 }
+
 func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	start := time.Now()
 	assetDetails := make([]*AssetsSpecific, 0)
@@ -957,7 +958,7 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	pg, from, to, page = computePaging(len(assets), page, txsOnPage)
 	for i := from; i < to; i++ {
 		asset := assets[i]
-		assetDetails = append(assetDetails, &AssetsSpecific{
+		assetSpecific := AssetsSpecific{
 			AssetGuid:		asset.AssetObj.Asset,
 			Symbol:			asset.AssetObj.Symbol,
 			WitnessAddress: asset.AssetObj.WitnessAddress.ToString("sys"),
@@ -965,8 +966,9 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 			TotalSupply:	(*bchain.Amount)(big.NewInt(asset.AssetObj.TotalSupply)),
 			Decimals:		int(asset.AssetObj.Precision),
 			Txs:			int(asset.Transactions),
-		})
+		}
 		json.Unmarshal(asset.AssetObj.PubData, &assetDetails.PubData)
+		assetDetails = append(assetDetails, &assetSpecific)
 	}
 	r := &Assets{
 		AssetDetails:		assetDetails,
@@ -977,6 +979,7 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	glog.Info("FindAssets filter: ", filter, " finished in ", time.Since(start))
 	return r
 }
+
 // GetAsset gets transactions for given asset
 func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AssetFilter) (*Asset, error) {
 	start := time.Now()
