@@ -321,15 +321,15 @@ func mainWithExitCode() int {
 		}
 	}
 
+	if err = index.SetupAssetCache(); err != nil {
+		glog.Error("SetupAssetCache ", err)
+		return exitCodeFatal
+	}
+	
 	if internalServer != nil || publicServer != nil || chain != nil {
 		// start fiat rates downloader only if not shutting down immediately
 		initFiatRatesDownloader(index, *blockchain)
 		waitForSignalAndShutdown(internalServer, publicServer, chain, 10*time.Second)
-	}
-
-	if err = index.SetupAssetCache(); err != nil {
-		glog.Error("SetupAssetCache ", err)
-		return exitCodeFatal
 	}
 	
 	if *synchronize {
