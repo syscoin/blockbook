@@ -949,15 +949,15 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 }
 func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	start := time.Now()
-	assetDetails := make([]*AssetDetails, 0)
+	assetDetails := make([]*AssetsSpecific, 0)
 	assets := w.db.FindAssetsFromFilter(filter)
 	
-	var from, to int
+	var from, to int, pg Paging
 	pg, from, to, page = computePaging(len(assets), page, txsOnPage)
 	for i := from; i < to; i++ {
 		asset := assets[i]
 		assetDetails = append(assetDetails, &AssetsSpecific{
-			AssetGuid:		asset.AssetObj.AssetGuid,
+			AssetGuid:		asset.AssetObj.Asset,
 			Symbol:			asset.AssetObj.Symbol,
 			WitnessAddress: asset.AssetObj.WitnessAddress.ToString("sys"),
 			Contract:		"0x" + hex.EncodeToString(asset.AssetObj.Contract),
