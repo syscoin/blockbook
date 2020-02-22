@@ -135,6 +135,7 @@ func (s *PublicServer) ConnectFullPublicInterface() {
 		serveMux.HandleFunc(path+"tx/", s.htmlTemplateHandler(s.explorerTx))
 		serveMux.HandleFunc(path+"address/", s.htmlTemplateHandler(s.explorerAddress))
 		serveMux.HandleFunc(path+"asset/", s.htmlTemplateHandler(s.explorerAsset))
+		serveMux.HandleFunc(path+"assets/", s.htmlTemplateHandler(s.explorerAssets))
 		serveMux.HandleFunc(path+"xpub/", s.htmlTemplateHandler(s.explorerXpub))
 		serveMux.HandleFunc(path+"search/", s.htmlTemplateHandler(s.explorerSearch))
 		serveMux.HandleFunc(path+"blocks", s.htmlTemplateHandler(s.explorerBlocks))
@@ -183,6 +184,7 @@ func (s *PublicServer) ConnectFullPublicInterface() {
 	serveMux.HandleFunc(path+"api/v2/tx/", s.jsonHandler(s.apiTx, apiV2))
 	serveMux.HandleFunc(path+"api/v2/address/", s.jsonHandler(s.apiAddress, apiV2))
 	serveMux.HandleFunc(path+"api/v2/asset/", s.jsonHandler(s.apiAsset, apiV2))
+	serveMux.HandleFunc(path+"api/v2/assets/", s.jsonHandler(s.apiAssets, apiV2))
 	serveMux.HandleFunc(path+"api/v2/xpub/", s.jsonHandler(s.apiXpub, apiV2))
 	serveMux.HandleFunc(path+"api/v2/utxo/", s.jsonHandler(s.apiUtxo, apiV2))
 	serveMux.HandleFunc(path+"api/v2/block/", s.jsonHandler(s.apiBlock, apiV2))
@@ -400,6 +402,7 @@ const (
 	txTpl
 	addressTpl
 	assetTpl
+	assetsTpl
 	xpubTpl
 	blocksTpl
 	blockTpl
@@ -504,6 +507,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		t[txTpl] = createTemplate("./static/templates/tx.html", "./static/templates/txdetail.html", "./static/templates/base.html")
 		t[addressTpl] = createTemplate("./static/templates/address.html", "./static/templates/txdetail.html", "./static/templates/paging.html", "./static/templates/base.html")
 		t[assetTpl] = createTemplate("./static/templates/asset.html", "./static/templates/txdetail.html", "./static/templates/paging.html", "./static/templates/base.html")
+		t[assetsTpl] = createTemplate("./static/templates/assets.html", "./static/templates/paging.html", "./static/templates/base.html")
 		t[blockTpl] = createTemplate("./static/templates/block.html", "./static/templates/txdetail.html", "./static/templates/paging.html", "./static/templates/base.html")
 	}
 	t[xpubTpl] = createTemplate("./static/templates/xpub.html", "./static/templates/txdetail.html", "./static/templates/paging.html", "./static/templates/base.html")
@@ -797,6 +801,28 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	return assetTpl, data, nil
 }
 
+func (s *PublicServer) explorerAssets(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
+	var assetParam string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		assetParam = r.URL.Path[i+1:]
+	}
+	if len(assetParam) == 0 {
+		return errorTpl, nil, api.NewAPIError("Missing asset", true)
+	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "asset"}).Inc()
+	page, _, _, filter, filterParam, _ := s.getAssetQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
+	// do not allow details to be changed by query params
+	assets, err := s.api.FindAssets(assetParam, page, txsOnPage)
+	if err != nil {
+		return errorTpl, nil, err
+	}
+	data := s.newTemplateData()
+	data.Assets = assets
+	data.Page = assets.Page
+	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(assets.Page, assets.TotalPages)
+	return assetsTpl, data, nil
+}
 
 func (s *PublicServer) explorerXpub(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
 	var xpub string
@@ -888,7 +914,7 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 	var tx *api.Tx
 	var address *api.Address
 	var asset *api.Asset
-	var findAssets []*api.Asset
+	var findAssets *api.Assets
 	var block *api.Block
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "search"}).Inc()
@@ -915,12 +941,12 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 		}
 
 		findAssets = s.api.FindAssets(q, 0, 2)
-		if len(findAssets) > 0 {
-			if len(findAssets) == 1 {
-				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(findAssets[0].AssetGuid), 10)), 302)
+		if len(findAssets.AssetDetails) > 0 {
+			if len(findAssets.AssetDetails) == 1 {
+				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(findAssets.AssetDetails[0].AssetGuid), 10)), 302)
 				return noTpl, nil, nil
 			} else {
-				glog.Warning("found %d assets matching that criteria", len(findAssets))
+				glog.Warning("found %d assets matching that criteria", len(findAssets.AssetDetails))
 				http.Redirect(w, r, joinURL("/assets/", q), 302)
 				return noTpl, nil, nil
 			}
@@ -1142,6 +1168,23 @@ func (s *PublicServer) apiAsset(r *http.Request, apiVersion int) (interface{}, e
 	page, pageSize, details, filter, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
 	asset, err = s.api.GetAsset(assetParam, page, pageSize, details, filter)
 	return asset, err
+}
+
+func (s *PublicServer) apiAssets(r *http.Request, apiVersion int) (interface{}, error) {
+	var assetParam string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		assetParam = r.URL.Path[i+1:]
+	}
+	if len(assetParam) == 0 {
+		return nil, api.NewAPIError("Missing asset", true)
+	}
+	var assets *api.Assets
+	var err error
+	s.metrics.ExplorerViews.With(common.Labels{"action": "api-asset"}).Inc()
+	page, pageSize, details, filter, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
+	assets, err = s.api.FindAssets(assetParam, page, pageSize)
+	return assets, err
 }
 
 func (s *PublicServer) apiXpub(r *http.Request, apiVersion int) (interface{}, error) {

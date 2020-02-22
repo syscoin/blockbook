@@ -956,22 +956,21 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	pg, from, to, page = computePaging(len(assets), page, txsOnPage)
 	for i := from; i < to; i++ {
 		asset := assets[i]
-		assetDetails = append(assetDetails, &AssetSpecific{
+		assetDetails = append(assetDetails, &AssetsSpecific{
 			AssetGuid:		asset.AssetObj.AssetGuid,
 			Symbol:			asset.AssetObj.Symbol,
 			WitnessAddress: asset.AssetObj.WitnessAddress.ToString("sys"),
 			Contract:		"0x" + hex.EncodeToString(asset.AssetObj.Contract),
-			Balance:		(*bchain.Amount)(big.NewInt(asset.AssetObj.Balance)),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(asset.AssetObj.TotalSupply)),
-			MaxSupply:		(*bchain.Amount)(big.NewInt(asset.AssetObj.MaxSupply)),
 			Decimals:		int(asset.AssetObj.Precision),
-			UpdateFlags:	asset.AssetObj.UpdateFlags,
+			Txs:			int(asset.Transactions),
 		})
 	}
 	r := &Assets{
 		AssetDetails:		assetDetails,
 		Paging:             pg,
-		NumAssets:			len(assetDetails),
+		NumAssets:			len(assets),
+		Filter:				filter,
 	}
 	glog.Info("FindAssets filter: ", filter, " finished in ", time.Since(start))
 	return r
