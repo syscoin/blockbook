@@ -958,7 +958,7 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	pg, from, to, page = computePaging(len(assetsFiltered), page, txsOnPage)
 	for i := from; i < to; i++ {
 		assetFiltered := assetsFiltered[i]
-		glog.Info("asset filtered ", assetFiltered.AssetObj.Symbol)
+		glog.Info("asset filtered i ", i, " " , assetFiltered.AssetObj.Symbol)
 		assetSpecific := AssetsSpecific{
 			AssetGuid:		assetFiltered.AssetObj.Asset,
 			Symbol:			assetFiltered.AssetObj.Symbol,
