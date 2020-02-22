@@ -250,7 +250,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			var ownerFound bool = false
 			for k, v := range ad.balance.AssetBalances {
 				dbAsset, errAsset := w.db.GetAsset(uint32(k), nil)
-				if errAsset != nil {
+				if errAsset != nil || dbAsset == nil {
 					return nil, errAsset
 				}
 				if !ownerFound {

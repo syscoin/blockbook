@@ -880,7 +880,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		var ownerFound bool = false
 		for k, v := range ba.AssetBalances {
 			dbAsset, errAsset := w.db.GetAsset(uint32(k), nil)
-			if errAsset != nil {
+			if errAsset != nil || dbAsset == nil {
 				return nil, errAsset
 			}
 			if !ownerFound {
@@ -1003,7 +1003,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	}
 	assetGuid := uint32(assetGuidInt)
 	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
-	if errAsset != nil {
+	if errAsset != nil || dbAsset == nil {
 		return nil, errAsset
 	}
 	// totalResults is known only if there is no filter

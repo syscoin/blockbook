@@ -610,7 +610,7 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 		}
 		assetGuid := uint32(guid)
 		dbAsset, errAsset := s.db.GetAsset(assetGuid, nil)
-		if errAsset != nil {
+		if errAsset != nil || dbAsset == nil {
 			return res, errAsset
 		}
 		ahi.Confirmations = int(tx.Confirmations)

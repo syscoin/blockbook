@@ -221,7 +221,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	totalFeeValue := big.NewInt(0)
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
-	if err != nil {
+	if err != nil || dBAsset == nil {
 		return assetGuid, err
 	}
 	dBAsset.Transactions++
@@ -475,7 +475,7 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 	}
 	assetGuid := asset.AssetObj.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
-	if err != nil {
+	if err != nil || dBAsset == nil {
 		return assetGuid, err
 	}
 	dBAsset.Transactions--
@@ -569,7 +569,7 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	}
 	var dBAsset *bchain.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
-	if err != nil {
+	if err != nil || dBAsset == nil {
 		return err
 	}
 	dBAsset.Transactions--
@@ -610,7 +610,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	}
 	assetGuid := mintasset.AssetAllocationTuple.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
-	if err != nil {
+	if err != nil || dBAsset == nil {
 		return assetGuid, err
 	}
 	dBAsset.Transactions++
@@ -910,6 +910,10 @@ func (d *RocksDB) GetAsset(guid uint32, assets *map[uint32]*bchain.Asset) (*bcha
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 	if err != nil {
 		return nil, err
+	}
+	// nil data means the key was not found in DB
+	if val.Data() == nil {
+		return nil, nil
 	}
 	defer val.Free()
 	buf := val.Data()
