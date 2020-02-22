@@ -787,7 +787,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	page, _, _, filter, filterParam, _ := s.getAssetQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
 	// do not allow details to be changed by query params
 	asset, err := s.api.GetAsset(assetParam, page, txsOnPage, api.AccountDetailsTxHistoryLight, filter)
-	if err != nil || asset == nil {
+	if err != nil {
 		return errorTpl, nil, err
 	}
 	data := s.newTemplateData()
@@ -950,7 +950,7 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			}
 		}
 		asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AssetFilter{AssetsMask: bchain.AssetAllMask})
-		if err == nil && asset != nil {
+		if err == nil {
 			http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(asset.AssetDetails.AssetGuid), 10)), 302)
 			return noTpl, nil, nil
 		}

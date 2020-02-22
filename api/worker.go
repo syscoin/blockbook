@@ -1004,7 +1004,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	assetGuid := uint32(assetGuidInt)
 	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 	if errAsset != nil || dbAsset == nil {
-		return nil, errAsset
+		return nil, NewAPIError("Asset not found", true)
 	}
 	// totalResults is known only if there is no filter
 	if  filter.FromHeight == 0 && filter.ToHeight == 0 {

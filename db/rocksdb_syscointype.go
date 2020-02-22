@@ -222,6 +222,9 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	assetGuid := assetAllocation.AssetAllocationTuple.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil || dBAsset == nil {
+		if err == nil{
+			return assetGuid, errors.New("ConnectAssetAllocationOutput Asset not found")
+		}
 		return assetGuid, err
 	}
 	dBAsset.Transactions++
@@ -476,6 +479,9 @@ func (d *RocksDB) DisconnectAssetOutput(sptData []byte, balances map[string]*bch
 	assetGuid := asset.AssetObj.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil || dBAsset == nil {
+		if err == nil{
+			return assetGuid, errors.New("DisconnectAssetOutput Asset not found")
+		}
 		return assetGuid, err
 	}
 	dBAsset.Transactions--
@@ -570,6 +576,9 @@ func (d *RocksDB) DisconnectAssetAllocationInput(assetGuid uint32, version int32
 	var dBAsset *bchain.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil || dBAsset == nil {
+		if err == nil{
+			return assetGuid, errors.New("DisconnectAssetAllocationInput Asset not found")
+		}
 		return err
 	}
 	dBAsset.Transactions--
@@ -611,6 +620,9 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	assetGuid := mintasset.AssetAllocationTuple.Asset
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil || dBAsset == nil {
+		if err == nil{
+			return assetGuid, errors.New("ConnectMintAssetOutput Asset not found")
+		}
 		return assetGuid, err
 	}
 	dBAsset.Transactions++
