@@ -825,8 +825,9 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 // find assets from cache that contain filter
 func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 	assets := make([]*bchain.Asset, 0)
+	filterLower := filter.ToLower()
 	for _, asset := range AssetCache {
-		if strings.Contains(asset.AssetObj.Symbol, filter) || strings.Contains(hex.EncodeToString(asset.AssetObj.Contract), filter) {
+		if strings.Contains(asset.AssetObj.Symbol.ToLower(), filterLower) || strings.Contains(hex.EncodeToString(asset.AssetObj.Contract).ToLower(), filterLower) {
 			assets = append(assets, &asset)
 		}
 	}
