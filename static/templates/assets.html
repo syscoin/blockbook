@@ -1,9 +1,4 @@
 {{define "specific"}}{{$cs := .CoinShortcut}}{{$assets := .Assets}}{{$data := .}}
-<h1>Assets</h1>
-<div class="alert alert-data ellipsis">
-    <span class="data">{{$assets.Filter}}</span>
-</div>
-<h3>{{$assets.NumAssets}} Results</h3>
 <h1>Assets <small class="text-muted">Filtered by <b>{{$assets.Filter}}</b></small>
 </h1>
 <div class="row h-container">
@@ -12,7 +7,7 @@
 </div>
 <div class="data-div">
     <table class="table table-striped data-table table-hover">
-        <tbody>
+        <thead>
             <tr>
                 <th>Asset</th>
                 <th>Address</th>
@@ -21,6 +16,8 @@
                 <th>Total Supply</th>
                 <th>Description</th>
             </tr>
+        </thead>
+        <tbody>
             {{- range $assetDetails := $assets.AssetDetails -}}{{- if $assetDetails -}}
             <tr>
                 <td class="data">{{$assetDetails.Symbol}} (<a href="/asset/{{$assetDetails.AssetGuid}}">{{$assetDetails.AssetGuid}}</a>)</td>
