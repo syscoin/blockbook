@@ -952,7 +952,8 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	assetDetails := make([]*AssetsSpecific, 0)
 	assets := w.db.FindAssetsFromFilter(filter)
 	
-	var from, to int, pg Paging
+	var from, to int
+	var pg Paging
 	pg, from, to, page = computePaging(len(assets), page, txsOnPage)
 	for i := from; i < to; i++ {
 		asset := assets[i]
