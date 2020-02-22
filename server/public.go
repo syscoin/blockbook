@@ -812,7 +812,7 @@ func (s *PublicServer) explorerAssets(w http.ResponseWriter, r *http.Request) (t
 		return errorTpl, nil, api.NewAPIError("Missing asset", true)
 	}
 	s.metrics.ExplorerViews.With(common.Labels{"action": "asset"}).Inc()
-	page, _, _, filter, filterParam, _ := s.getAssetQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
+	page, _, _, _, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
 	// do not allow details to be changed by query params
 	assets := s.api.FindAssets(assetParam, page, txsOnPage)
 	data := s.newTemplateData()
@@ -1179,7 +1179,7 @@ func (s *PublicServer) apiAssets(r *http.Request, apiVersion int) (interface{}, 
 	}
 	var assets *api.Assets
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-asset"}).Inc()
-	page, pageSize, details, filter, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
+	page, pageSize, _, _, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
 	assets = s.api.FindAssets(assetParam, page, pageSize)
 	return assets, nil
 }
