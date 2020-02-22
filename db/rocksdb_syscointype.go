@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"encoding/hex"
 	"github.com/syscoin/btcd/wire"
+	"time"
 )
 var AssetCache map[uint32]bchain.Asset
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
@@ -828,7 +829,10 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 	assets := make([]*bchain.Asset, 0)
 	filterLower := filter.ToLower()
 	for _, asset := range AssetCache {
-		if strings.Contains(asset.AssetObj.Symbol.ToLower(), filterLower) || strings.Contains(hex.EncodeToString(asset.AssetObj.Contract).ToLower(), filterLower) {
+		symbolLower := strings.ToLower(asset.AssetObj.Symbol)
+		contractStr := hex.EncodeToString(asset.AssetObj.Contract)
+		contractLower := strings.ToLower(contractStr)
+		if strings.Contains(symbolLower, filterLower) || strings.Contains(contractLower, filterLower) {
 			assets = append(assets, &asset)
 		}
 	}
@@ -838,6 +842,7 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []*bchain.Asset {
 func (d *RocksDB) SetupAssetCache() (err error) {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
+	var assetDb bchain.Asset
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		val := it.Value().Data()
 		assetDb, err = d.chainParser.UnpackAsset(val)
