@@ -606,9 +606,10 @@ func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 	transactions, l := p.BaseParser.UnpackVaruint(buf)
 	asset.Transactions = uint32(transactions)
 	auxfees, ll := p.BaseParser.UnpackVaruint(buf[l:])
-	asset.AuxFeesAddr = append([]byte(nil), buf[ll:ll+int(auxfees)]...)
-	ll += int(auxfees)
-	r := bytes.NewReader(buf[ll:])
+	l += ll
+	asset.AuxFeesAddr = append([]byte(nil), buf[l:l+int(auxfees)]...)
+	l += int(auxfees)
+	r := bytes.NewReader(buf[l:])
 	err := asset.AssetObj.Deserialize(r)
 	if err != nil {
 		return nil, err
