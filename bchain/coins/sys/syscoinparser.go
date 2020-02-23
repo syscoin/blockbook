@@ -608,6 +608,6 @@ func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 	if err != nil {
 		return nil, err
 	}
-	asset.AuxFeesAddr = append([]byte(nil), buf[r.Len():]...)
+	asset.AuxFeesAddr = append([]byte(nil), buf[l+r.Len():]...)
 	return &asset, nil
 }
