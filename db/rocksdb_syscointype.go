@@ -838,9 +838,9 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
 	AssetCache = nil;
-	/*if AssetCache == nil {
+	if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
-	}*/
+	}
 	ro := gorocksdb.NewDefaultReadOptions()
 	ro.SetFillCache(false)
 	it := d.db.NewIteratorCF(ro, d.cfh[cfAssets])
