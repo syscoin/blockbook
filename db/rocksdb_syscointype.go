@@ -844,8 +844,10 @@ func (d *RocksDB) SetupAssetCache() error {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
-		val := it.Value()
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
+		glog.Info("SetupAssetCache: UnpackAsset key ", assetKey)
+		continue;
+		val := it.Value()
 		
 		defer val.Free()
 		buf := val.Data()
@@ -866,6 +868,10 @@ func (d *RocksDB) SetupAssetCache() error {
 
 // find assets from cache that contain filter
 func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
+	if err := d.SetupAssetCache(); err != nil {
+		glog.Error("storeAssets SetupAssetCache ", err)
+		return nil
+	}
 	start := time.Now()
 	assets := make([]bchain.Asset, 0)
 	filterLower := strings.ToLower(filter)
@@ -904,10 +910,6 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			}
 			wb.PutCF(d.cfh[cfAssets], key, buf)
 		}
-	}
-	if err := d.SetupAssetCache(); err != nil {
-		glog.Error("storeAssets SetupAssetCache ", err)
-		return nil
 	}
 	return nil
 }
