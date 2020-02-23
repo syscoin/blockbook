@@ -882,8 +882,8 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		if asset.AssetObj.TotalSupply == -1 {
 			delete(AssetCache, guid)
 			wb.DeleteCF(d.cfh[cfAssets], key)
-			// go through all contracts that match this contract and find the guid that matches this one and remove it
-			// do the same with symbol
+			// go through all contracts that match this contract and find the guid that matches this one and remove it from contract index
+			// do the same with symbol index
 			contractStr := hex.EncodeToString(asset.AssetObj.Contract)
 			contractLower := strings.ToLower(contractStr)
 			contractLowerBytes := []byte(contractLower)
@@ -900,7 +900,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 				keyIndex := append(contractLowerBytes, d.chainParser.PackUint(i)...)
 				val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 				if errVal != nil {
-					return assets
+					return errVal
 				}
 				if val.Data() != nil {
 					assetGuid := d.chainParser.UnpackUint(val.Data())
@@ -911,11 +911,11 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			}
 			// if no other assets share this contract remove the contract key itself
 			if index == 0 {
-				wb.DeleteCF(d.cfh[cfAssets],contractLowerBytes)
+				wb.DeleteCF(d.cfh[cfAssets], contractLowerBytes)
 			}
 			symbolLower := strings.ToLower(asset.AssetObj.Symbol)
 			symbolLowerBytes := []byte(symbolLower)
-			val, errVal := d.db.GetCF(d.ro, d.cfh[cfAssets], symbolLowerBytes)
+			val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], symbolLowerBytes)
 			if errVal != nil {
 				return errVal
 			}
@@ -928,7 +928,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 				keyIndex := append(symbolLowerBytes, d.chainParser.PackUint(i)...)
 				val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 				if errVal != nil {
-					return assets
+					return errVal
 				}
 				if val.Data() != nil {
 					assetGuid := d.chainParser.UnpackUint(val.Data())
