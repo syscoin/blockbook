@@ -900,6 +900,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			if err != nil {
 				return err
 			}
+			glog.Error("storeAsset ", guid)
 			wb.PutCF(d.cfh[cfAssets], key, buf)
 		}
 	}
