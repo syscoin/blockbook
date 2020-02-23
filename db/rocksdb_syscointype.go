@@ -890,9 +890,6 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 	if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
 	}
-	if len(assets) > 0 {
-		glog.Info("storeAssets")
-	}
 	for guid, asset := range assets {
 		AssetCache[guid] = *asset
 		key := d.chainParser.PackUint(guid)
@@ -900,13 +897,16 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		if asset.AssetObj.TotalSupply == -1 {
 			delete(AssetCache, guid)
 			wb.DeleteCF(d.cfh[cfAssets], key)
-			glog.Info("storeAssets: deleting asset with key ", guid)
 		} else {
 			buf, err := d.chainParser.PackAsset(asset)
 			if err != nil {
 				return err
 			}
-			glog.Info("storeAssets: storing asset with key ", guid)
+			assetDb, err := d.chainParser.UnpackAsset(buf)
+			if err != nil {
+				glog.Info("storeAssets: UnpackAsset failure ", guid, " err ", err)
+				continue
+			}
 			wb.PutCF(d.cfh[cfAssets], key, buf)
 		}
 	}
