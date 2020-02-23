@@ -848,6 +848,7 @@ func (d *RocksDB) SetupAssetCache() error {
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
 		glog.Info("SetupAssetCache: UnpackAsset key ", assetKey)
+		break
 		assetDb, err := d.chainParser.UnpackAsset(it.Value().Data())
 		if err != nil {
 			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey, " err ", err)
