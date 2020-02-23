@@ -865,7 +865,7 @@ func (d *RocksDB) SetupAssetCache() error {
 		val := it.Value()
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
 		
-		//defer val.Free()
+		defer val.Free()
 		buf := val.Data()
 		if buf == nil || len(buf) == 0 {
 			glog.Info("SetupAssetCache: null asset ", assetKey)
@@ -873,7 +873,7 @@ func (d *RocksDB) SetupAssetCache() error {
 		}
 		assetDb, err := d.chainParser.UnpackAsset(buf)
 		if err != nil {
-			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey)
+			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey, " err ", err)
 			continue
 		}
 		glog.Info("SetupAssetCache: storing with assetKey ", assetKey)
@@ -897,11 +897,13 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		if asset.AssetObj.TotalSupply == -1 {
 			delete(AssetCache, guid)
 			wb.DeleteCF(d.cfh[cfAssets], key)
+			glog.Info("storeAssets: deleting asset with key ", guid)
 		} else {
 			buf, err := d.chainParser.PackAsset(asset)
 			if err != nil {
 				return err
 			}
+			glog.Info("storeAssets: storing asset with key ", guid)
 			wb.PutCF(d.cfh[cfAssets], key, buf)
 		}
 	}
