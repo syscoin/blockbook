@@ -835,25 +835,6 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 	return err
 }
 
-// find assets from cache that contain filter
-func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
-	start := time.Now()
-	assets := make([]bchain.Asset, 0)
-	filterLower := strings.ToLower(filter)
-	for i, assetCached := range AssetCache {
-		glog.Info("i ", i, " assetCached.AssetObj.Symbol ", assetCached.AssetObj.Symbol)
-		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
-		contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
-		contractLower := strings.ToLower(contractStr)
-		if strings.Contains(symbolLower, filterLower) || (len(contractLower) > 0 && strings.Contains(contractLower, filterLower)) {
-			glog.Info("symbolLower ", symbolLower)
-			assets = append(assets, assetCached)
-		}
-	}
-	glog.Info("FindAssetsFromFilter finished in ", time.Since(start))
-	return assets
-}
-
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
 	if AssetCache == nil {
@@ -881,6 +862,31 @@ func (d *RocksDB) SetupAssetCache() error {
 	}
 	glog.Info("SetupAssetCache finished in ", time.Since(start))
 	return nil
+}
+
+// find assets from cache that contain filter
+func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
+	if AssetCache == nil {
+		if err := d.SetupAssetCache(); err != nil {
+			glog.Error("FindAssetsFromFilter SetupAssetCache ", err)
+			return nil
+		}
+	}
+	start := time.Now()
+	assets := make([]bchain.Asset, 0)
+	filterLower := strings.ToLower(filter)
+	for i, assetCached := range AssetCache {
+		glog.Info("i ", i, " assetCached.AssetObj.Symbol ", assetCached.AssetObj.Symbol)
+		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
+		contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
+		contractLower := strings.ToLower(contractStr)
+		if strings.Contains(symbolLower, filterLower) || (len(contractLower) > 0 && strings.Contains(contractLower, filterLower)) {
+			glog.Info("symbolLower ", symbolLower)
+			assets = append(assets, assetCached)
+		}
+	}
+	glog.Info("FindAssetsFromFilter finished in ", time.Since(start))
+	return assets
 }
 
 func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchain.Asset) error {
