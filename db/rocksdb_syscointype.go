@@ -837,9 +837,10 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
-	if AssetCache == nil {
+	AssetCache = nil;
+	/*if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
-	}
+	}*/
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
@@ -857,7 +858,6 @@ func (d *RocksDB) SetupAssetCache() error {
 			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey, " err ", err)
 			continue
 		}
-		glog.Info("SetupAssetCache: storing with assetKey ", assetKey)
 		AssetCache[assetKey] = *assetDb
 	}
 	glog.Info("SetupAssetCache finished in ", time.Since(start))
@@ -866,12 +866,6 @@ func (d *RocksDB) SetupAssetCache() error {
 
 // find assets from cache that contain filter
 func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
-	if AssetCache == nil {
-		if err := d.SetupAssetCache(); err != nil {
-			glog.Error("FindAssetsFromFilter SetupAssetCache ", err)
-			return nil
-		}
-	}
 	start := time.Now()
 	assets := make([]bchain.Asset, 0)
 	filterLower := strings.ToLower(filter)
@@ -910,6 +904,10 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			}
 			wb.PutCF(d.cfh[cfAssets], key, buf)
 		}
+	}
+	if err := d.SetupAssetCache(); err != nil {
+		glog.Error("storeAssets SetupAssetCache ", err)
+		return nil
 	}
 	return nil
 }
