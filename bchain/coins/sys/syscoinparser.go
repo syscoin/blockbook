@@ -589,13 +589,15 @@ func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 	varBuf := make([]byte, vlq.MaxLen64)
 	l := p.BaseParser.PackVaruint(uint(asset.Transactions), varBuf)
 	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackVaruint(uint(len(asset.AuxFeesAddr)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, asset.AuxFeesAddr...)
 	var buffer bytes.Buffer
 	err := asset.AssetObj.Serialize(&buffer)
 	if err != nil {
 		return nil, err
 	}
 	buf = append(buf, buffer.Bytes()...)
-	buf = append(buf, asset.AuxFeesAddr...)
 	return buf, nil
 }
 
@@ -603,11 +605,13 @@ func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 	var asset bchain.Asset
 	transactions, l := p.BaseParser.UnpackVaruint(buf)
 	asset.Transactions = uint32(transactions)
-	r := bytes.NewReader(buf[l:])
+	auxfees, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	asset.AuxFeesAddr = append([]byte(nil), buf[ll:ll+int(auxfees)]...)
+	ll += int(auxfees)
+	r := bytes.NewReader(buf[ll:])
 	err := asset.AssetObj.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
-	asset.AuxFeesAddr = append([]byte(nil), buf[l+r.Len():]...)
 	return &asset, nil
 }
