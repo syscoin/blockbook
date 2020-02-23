@@ -841,21 +841,14 @@ func (d *RocksDB) SetupAssetCache() error {
 	/*if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
 	}*/
-	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
+	ro := gorocksdb.NewDefaultReadOptions()
+	ro.SetFillCache(false)
+	it := d.db.NewIteratorCF(ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
 		glog.Info("SetupAssetCache: UnpackAsset key ", assetKey)
-		continue;
-		val := it.Value()
-		
-		defer val.Free()
-		buf := val.Data()
-		if buf == nil || len(buf) == 0 {
-			glog.Info("SetupAssetCache: null asset ", assetKey)
-			continue
-		}
-		assetDb, err := d.chainParser.UnpackAsset(buf)
+		assetDb, err := d.chainParser.UnpackAsset(it.Value().Data())
 		if err != nil {
 			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey, " err ", err)
 			continue
@@ -876,12 +869,10 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 	assets := make([]bchain.Asset, 0)
 	filterLower := strings.ToLower(filter)
 	for i, assetCached := range AssetCache {
-		glog.Info("i ", i, " assetCached.AssetObj.Symbol ", assetCached.AssetObj.Symbol)
 		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
 		contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
 		contractLower := strings.ToLower(contractStr)
 		if strings.Contains(symbolLower, filterLower) || (len(contractLower) > 0 && strings.Contains(contractLower, filterLower)) {
-			glog.Info("symbolLower ", symbolLower)
 			assets = append(assets, assetCached)
 		}
 	}
