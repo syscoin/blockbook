@@ -846,8 +846,8 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 	
 	if val.Data() != nil {
 		index := d.chainParser.UnpackUint(val.Data())
-		for i := 0, 0; i <= index; i++ {
-			key := append(bFilter, d.chainParser.PackUint(i))
+		for i := 0; i <= index; i++ {
+			key := append(bFilter, d.chainParser.PackUint(i)...)
 			val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 			if errVal != nil {
 				return assets
@@ -886,7 +886,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			if err != nil {
 				return err
 			}
-			var index uint
+			var index uint32
 			wb.PutCF(d.cfh[cfAssets], key, buf)
 			val, errVal := d.db.GetCF(d.ro, d.cfh[cfAssets], asset.AssetObj.Contract)
 			if errVal != nil {
