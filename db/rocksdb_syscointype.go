@@ -4,7 +4,6 @@ import (
 	"blockbook/bchain"
 	"bytes"
 	"strconv"
-	"strings"
 	"math/big"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -842,7 +841,7 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 	bFilter := []byte(filter)
 	val, errVal := d.db.GetCF(d.ro, d.cfh[cfAssets], bFilter)
 	if errVal != nil {
-		return errVal
+		return assets
 	}
 	
 	if val.Data() != nil {
@@ -851,11 +850,11 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 			key := append(bFilter, d.chainParser.PackUint(i))
 			val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 			if errVal != nil {
-				return errVal
+				return assets
 			}
 			if val.Data() != nil {
 				guid := d.chainParser.UnpackUint(val.Data())
-				dBAsset, errDb := d.GetAsset(assetGuid, &assets)
+				dBAsset, errDb := d.GetAsset(guid, nil)
 				if errDb == nil && dBAsset != nil {
 					assets = append(assets, *dBAsset)
 				}
@@ -880,6 +879,8 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 		if asset.AssetObj.TotalSupply == -1 {
 			delete(AssetCache, guid)
 			wb.DeleteCF(d.cfh[cfAssets], key)
+			wb.DeleteCF(d.cfh[cfAssets], asset.AssetObj.Contract)
+			wb.DeleteCF(d.cfh[cfAssets], []byte(asset.AssetObj.Symbol))
 		} else {
 			buf, err := d.chainParser.PackAsset(asset)
 			if err != nil {
@@ -897,12 +898,12 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 				index = 0
 			} else {
 				// increment index by one so it stores in the next offset
-				index = d.chainParser.UnpackUint(val.Data()) + 1
+				index = d.chainParser.UnpackUint(val.Data()) + uint32(1)
 			}
 			// store index of contract to key as number of keys that match the contract along with
 			// the individual keys stored in the index offset
 			packedIndex := d.chainParser.PackUint(index)
-			wb.PutCF(d.cfh[cfAssets], append(asset.AssetObj.Contract, packedIndex), key)
+			wb.PutCF(d.cfh[cfAssets], append(asset.AssetObj.Contract, packedIndex...), key)
 			wb.PutCF(d.cfh[cfAssets], asset.AssetObj.Contract, packedIndex)
 			
 			// same as above but with the symbol
@@ -915,10 +916,10 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			if val.Data() == nil {
 				index = 0
 			} else {
-				index = d.chainParser.UnpackUint(val.Data()) + 1
+				index = d.chainParser.UnpackUint(val.Data()) + uint32(1)
 			}
 			packedIndex = d.chainParser.PackUint(index)
-			wb.PutCF(d.cfh[cfAssets], append([]byte(asset.AssetObj.Symbol), packedIndex), key)
+			wb.PutCF(d.cfh[cfAssets], append([]byte(asset.AssetObj.Symbol), packedIndex...), key)
 			wb.PutCF(d.cfh[cfAssets], []byte(asset.AssetObj.Symbol), packedIndex)
 		}
 	}
