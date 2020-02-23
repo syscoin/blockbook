@@ -884,7 +884,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			wb.DeleteCF(d.cfh[cfAssets], key)
 			// go through all contracts that match this contract and find the guid that matches this one and remove it
 			// do the same with symbol
-			string contractStr := hex.EncodeToString(asset.AssetObj.Contract)
+			contractStr := hex.EncodeToString(asset.AssetObj.Contract)
 			contractLower := strings.ToLower(contractStr)
 			contractLowerBytes := []byte(contractLower)
 			val, errVal := d.db.GetCF(d.ro, d.cfh[cfAssets], contractLowerBytes)
@@ -951,7 +951,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 
 			if asset.AssetObj.Contract != nil && len(asset.AssetObj.Contract) > 0 {
 				// store lowercase for case insensitive queries
-				string contractStr := hex.EncodeToString(asset.AssetObj.Contract)
+				contractStr := hex.EncodeToString(asset.AssetObj.Contract)
 				contractLower := strings.ToLower(contractStr)
 				contractLowerBytes := []byte(contractLower)
 				val, errVal := d.db.GetCF(d.ro, d.cfh[cfAssets], contractLowerBytes)
