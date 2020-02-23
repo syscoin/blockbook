@@ -902,9 +902,9 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			if err != nil {
 				return err
 			}
-			assetDb, err := d.chainParser.UnpackAsset(buf)
-			if err != nil {
-				glog.Info("storeAssets: UnpackAsset failure ", guid, " err ", err)
+			assetDb, err1 := d.chainParser.UnpackAsset(buf)
+			if err1 != nil {
+				glog.Info("storeAssets: UnpackAsset failure ", guid, " err ", err1)
 				continue
 			}
 			wb.PutCF(d.cfh[cfAssets], key, buf)
