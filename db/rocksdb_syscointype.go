@@ -890,6 +890,9 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 	if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
 	}
+	if len(assets) > 0 {
+		glog.Info("storeAssets")
+	}
 	for guid, asset := range assets {
 		AssetCache[guid] = *asset
 		key := d.chainParser.PackUint(guid)
