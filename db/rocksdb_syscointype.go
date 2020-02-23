@@ -903,7 +903,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			// the individual keys stored in the index offset
 			packedIndex := d.chainParser.PackUint(index)
 			wb.PutCF(d.cfh[cfAssets], append(asset.AssetObj.Contract, packedIndex), key)
-			wb.PutCF(d.cfh[cfAssets], asset.AssetObj.Contract, packedIndex))
+			wb.PutCF(d.cfh[cfAssets], asset.AssetObj.Contract, packedIndex)
 			
 			// same as above but with the symbol
 			val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], []byte(asset.AssetObj.Symbol))
@@ -919,7 +919,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			}
 			packedIndex = d.chainParser.PackUint(index)
 			wb.PutCF(d.cfh[cfAssets], append([]byte(asset.AssetObj.Symbol), packedIndex), key)
-			wb.PutCF(d.cfh[cfAssets], []byte(asset.AssetObj.Symbol), packedIndex))
+			wb.PutCF(d.cfh[cfAssets], []byte(asset.AssetObj.Symbol), packedIndex)
 		}
 	}
 	return nil
