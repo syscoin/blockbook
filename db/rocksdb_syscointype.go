@@ -840,7 +840,8 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 	start := time.Now()
 	assets := make([]bchain.Asset, 0)
 	filterLower := strings.ToLower(filter)
-	for _, assetCached := range AssetCache {
+	for i, assetCached := range AssetCache {
+		glog.Info("i ", i, " assetCached.AssetObj.Symbol ", assetCached.AssetObj.Symbol)
 		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
 		contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
 		contractLower := strings.ToLower(contractStr)
