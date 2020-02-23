@@ -846,7 +846,7 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 	
 	if val.Data() != nil {
 		index := d.chainParser.UnpackUint(val.Data())
-		for i := 0; i <= index; i++ {
+		for i := uint32(0); i <= index; i++ {
 			key := append(bFilter, d.chainParser.PackUint(i)...)
 			val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 			if errVal != nil {
