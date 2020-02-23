@@ -865,7 +865,7 @@ func (d *RocksDB) SetupAssetCache() error {
 		val := it.Value()
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
 		
-		defer val.Free()
+		//defer val.Free()
 		buf := val.Data()
 		if buf == nil || len(buf) == 0 {
 			glog.Info("SetupAssetCache: null asset ", assetKey)
@@ -873,6 +873,7 @@ func (d *RocksDB) SetupAssetCache() error {
 		}
 		assetDb, err := d.chainParser.UnpackAsset(buf)
 		if err != nil {
+			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey)
 			continue
 		}
 		glog.Info("SetupAssetCache: storing with assetKey ", assetKey)
