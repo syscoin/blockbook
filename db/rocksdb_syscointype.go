@@ -835,46 +835,31 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 	return err
 }
 
-func (d *RocksDB) SetupAssetCache() error {
-	start := time.Now()
-	AssetCache = nil;
-	if AssetCache == nil {
-		AssetCache = map[uint32]bchain.Asset{}
-	}
-	ro := gorocksdb.NewDefaultReadOptions()
-	ro.SetFillCache(false)
-	it := d.db.NewIteratorCF(ro, d.cfh[cfAssets])
-	defer it.Close()
-	for it.SeekToFirst(); it.Valid(); it.Next() {
-		assetKey := d.chainParser.UnpackUint(it.Key().Data())
-		glog.Info("SetupAssetCache: UnpackAsset key ", assetKey)
-		break
-		assetDb, err := d.chainParser.UnpackAsset(it.Value().Data())
-		if err != nil {
-			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey, " err ", err)
-			continue
-		}
-		AssetCache[assetKey] = *assetDb
-	}
-	glog.Info("SetupAssetCache finished in ", time.Since(start))
-	return nil
-}
-
-// find assets from cache that contain filter
+// find assets from symbol/contract indexes which looks up asset GUID's and then getasset to get each asset
 func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
-	if err := d.SetupAssetCache(); err != nil {
-		glog.Error("storeAssets SetupAssetCache ", err)
-		return nil
-	}
 	start := time.Now()
 	assets := make([]bchain.Asset, 0)
-	filterLower := strings.ToLower(filter)
-	for _, assetCached := range AssetCache {
-		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
-		contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
-		contractLower := strings.ToLower(contractStr)
-		if strings.Contains(symbolLower, filterLower) || (len(contractLower) > 0 && strings.Contains(contractLower, filterLower)) {
-			assets = append(assets, assetCached)
+	bFilter := []byte(filter)
+	val, errVal := d.db.GetCF(d.ro, d.cfh[cfAssets], bFilter)
+	if errVal != nil {
+		return errVal
+	}
+	
+	if val.Data() != nil {
+		index := d.chainParser.UnpackUint(val.Data())
+		for i := 0, 0; i <= index; i++ {
+			key := append(bFilter, d.chainParser.PackUint(i))
+			val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], key)
+			if errVal != nil {
+				return errVal
+			}
+			if val.Data() != nil {
+				guid := d.chainParser.UnpackUint(val.Data())
+				dBAsset, errDb := d.GetAsset(assetGuid, &assets)
+				if errDb == nil && dBAsset != nil {
+					assets = append(assets, *dBAsset)
+				}
+			}
 		}
 	}
 	glog.Info("FindAssetsFromFilter finished in ", time.Since(start))
@@ -900,8 +885,41 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			if err != nil {
 				return err
 			}
-			glog.Error("storeAsset ", guid)
+			var index uint
 			wb.PutCF(d.cfh[cfAssets], key, buf)
+			val, errVal := d.db.GetCF(d.ro, d.cfh[cfAssets], asset.AssetObj.Contract)
+			if errVal != nil {
+				return errVal
+			}
+			
+			// nil data means the key was not found in DB
+			if val.Data() == nil {
+				index = 0
+			} else {
+				// increment index by one so it stores in the next offset
+				index = d.chainParser.UnpackUint(val.Data()) + 1
+			}
+			// store index of contract to key as number of keys that match the contract along with
+			// the individual keys stored in the index offset
+			packedIndex := d.chainParser.PackUint(index)
+			wb.PutCF(d.cfh[cfAssets], append(asset.AssetObj.Contract, packedIndex), key)
+			wb.PutCF(d.cfh[cfAssets], asset.AssetObj.Contract, packedIndex))
+			
+			// same as above but with the symbol
+			val, errVal = d.db.GetCF(d.ro, d.cfh[cfAssets], []byte(asset.AssetObj.Symbol))
+			if errVal != nil {
+				return errVal
+			}
+			
+			// nil data means the key was not found in DB
+			if val.Data() == nil {
+				index = 0
+			} else {
+				index = d.chainParser.UnpackUint(val.Data()) + 1
+			}
+			packedIndex = d.chainParser.PackUint(index)
+			wb.PutCF(d.cfh[cfAssets], append([]byte(asset.AssetObj.Symbol), packedIndex), key)
+			wb.PutCF(d.cfh[cfAssets], []byte(asset.AssetObj.Symbol), packedIndex))
 		}
 	}
 	return nil
