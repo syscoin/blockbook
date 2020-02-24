@@ -16,6 +16,7 @@ import (
 	"time"
 )
 var AssetCache map[uint32]bchain.Asset
+var SetupAssetCacheFirstTime bool = true
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
 type GetTxAssetsCallback func(txids []string) error
 
@@ -837,7 +838,6 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
-	AssetCache = nil;
 	if AssetCache == nil {
 		AssetCache = map[uint32]bchain.Asset{}
 	}
@@ -847,7 +847,6 @@ func (d *RocksDB) SetupAssetCache() error {
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		assetKey := d.chainParser.UnpackUint(it.Key().Data())
-		glog.Info("SetupAssetCache: UnpackAsset key ", assetKey)
 		assetDb, err := d.chainParser.UnpackAsset(it.Value().Data())
 		if err != nil {
 			glog.Info("SetupAssetCache: UnpackAsset failure ", assetKey, " err ", err)
@@ -861,9 +860,12 @@ func (d *RocksDB) SetupAssetCache() error {
 
 // find assets from cache that contain filter
 func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
-	if err := d.SetupAssetCache(); err != nil {
-		glog.Error("storeAssets SetupAssetCache ", err)
-		return nil
+	if d.SetupAssetCacheFirstTime == true {
+		if err := d.SetupAssetCache(); err != nil {
+			glog.Error("storeAssets SetupAssetCache ", err)
+			return nil
+		}
+		d.SetupAssetCacheFirstTime = false;
 	}
 	start := time.Now()
 	assets := make([]bchain.Asset, 0)
