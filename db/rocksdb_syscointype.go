@@ -870,12 +870,18 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 	start := time.Now()
 	assets := make([]bchain.Asset, 0)
 	filterLower := strings.ToLower(filter)
+	filterLowerWithPrefix := strings.ToLower("0x" + filter)
 	for _, assetCached := range AssetCache {
 		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
-		contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
-		contractLower := strings.ToLower(contractStr)
-		if strings.Contains(symbolLower, filterLower) || (len(contractLower) > 0 && strings.Contains(contractLower, filterLower)) {
+		if strings.Contains(symbolLower, filterLower) {
 			assets = append(assets, assetCached)
+		}
+		else if len(contractLower) > 0 {
+			contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
+			contractLower := strings.ToLower(contractStr)
+			if strings.Contains(contractLower, filterLower) || strings.Contains(contractLower, filterLowerWithPrefix) {
+				assets = append(assets, assetCached)
+			}
 		}
 	}
 	glog.Info("FindAssetsFromFilter finished in ", time.Since(start))
