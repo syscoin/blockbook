@@ -96,11 +96,11 @@ const (
 	// BitcoinType
 	cfAddressBalance
 	cfTxAddresses
-	// EthereumType
-	cfAddressContracts = cfAddressBalance
 	// SyscoinType
 	cfAssets
 	cfTxAssets
+	// EthereumType
+	cfAddressContracts = cfAddressBalance
 
 )
 
@@ -109,7 +109,7 @@ var cfNames []string
 var cfBaseNames = []string{"default", "height", "addresses", "blockTxs", "transactions", "fiatRates"}
 
 // type specific columns
-var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "cfAssets", "cfTxAssets"}
+var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "assets", "txAssets"}
 var cfNamesEthereumType = []string{"addressContracts"}
 
 func openDB(path string, c *gorocksdb.Cache, openFiles int) (*gorocksdb.DB, []*gorocksdb.ColumnFamilyHandle, error) {
