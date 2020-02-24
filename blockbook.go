@@ -262,6 +262,11 @@ func mainWithExitCode() int {
 			return exitCodeFatal
 		}
 	}
+
+	if err = index.SetupAssetCache(); err != nil {
+		glog.Error("SetupAssetCache ", err)
+		return exitCodeFatal
+	}
 	
 	if *synchronize {
 		internalState.SyncMode = true
