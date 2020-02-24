@@ -446,15 +446,15 @@ type Assets []Asset
 
 func (a Assets) Len() int           { return len(a) }
 func (a Assets) Swap(i, j int)      { 
-	if t[i] != nil && t[j] != nil {
-		t[i], t[j] = t[j], t[i] 
+	if a[i] != nil && a[j] != nil {
+		a[i], a[j] = a[j], a[i] 
 	}
 }
-func (t Assets) Less(i, j int) bool { 
-	if t[i] == nil || t[j] == nil {
+func (a Assets) Less(i, j int) bool { 
+	if a[i] == nil || a[j] == nil {
 		return false
 	}
-	return t[i].AssetObj.AssetGuid < t[j].AssetObj.AssetGuid
+	return a[i].AssetObj.AssetGuid < a[j].AssetObj.AssetGuid
 }
 
 // Token contains info about tokens held by an address
