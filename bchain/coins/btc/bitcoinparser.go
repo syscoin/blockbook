@@ -622,7 +622,7 @@ func (p *BitcoinParser) PackBlockInfo(block *bchain.DbBlockInfo) ([]byte, error)
 		if len(b) > pl {
 			b = b[:pl]
 		} else {
-			b = append(b, make([]byte, len(b)-pl)...)
+			b = append(b, make([]byte, pl-len(b))...)
 		}
 	}
 	packed = append(packed, b...)
