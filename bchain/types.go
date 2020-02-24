@@ -442,18 +442,13 @@ type Asset struct {
 	AuxFeesAddr 	AddressDescriptor
 }
 // Assets is array of Asset
-type Assets []*Asset
+type Assets []Asset
 
 func (a Assets) Len() int           { return len(a) }
 func (a Assets) Swap(i, j int)      { 
-	if a[i] != nil && a[j] != nil {
-		a[i], a[j] = a[j], a[i] 
-	}
+	a[i], a[j] = a[j], a[i] 
 }
 func (a Assets) Less(i, j int) bool { 
-	if a[i] == nil || a[j] == nil {
-		return false
-	}
 	return a[i].AssetObj.Asset < a[j].AssetObj.Asset
 }
 
