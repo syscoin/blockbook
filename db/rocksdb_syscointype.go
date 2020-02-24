@@ -900,7 +900,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint32]*bchai
 			if err != nil {
 				return err
 			}
-			glog.Info("storeAssets: UnpackAsset key ", assetKey, " guid " + guid)
+			glog.Info("storeAssets: UnpackAsset key ", assetKey, " guid " , guid)
 			wb.PutCF(d.cfh[cfAssets], key, buf)
 		}
 	}
