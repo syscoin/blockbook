@@ -441,6 +441,22 @@ type Asset struct {
 	AssetObj 		wire.AssetType
 	AuxFeesAddr 	AddressDescriptor
 }
+// Assets is array of Asset
+type Assets []Asset
+
+func (a Assets) Len() int           { return len(a) }
+func (a Assets) Swap(i, j int)      { 
+	if t[i] != nil && t[j] != nil {
+		t[i], t[j] = t[j], t[i] 
+	}
+}
+func (t Assets) Less(i, j int) bool { 
+	if t[i] == nil || t[j] == nil {
+		return false
+	}
+	return t[i].AssetObj.AssetGuid < t[j].AssetObj.AssetGuid
+}
+
 // Token contains info about tokens held by an address
 type Token struct {
 	Type             TokenType `json:"type"`
