@@ -875,7 +875,7 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) []bchain.Asset {
 		symbolLower := strings.ToLower(assetCached.AssetObj.Symbol)
 		if strings.Contains(symbolLower, filterLower) {
 			assets = append(assets, assetCached)
-		} else if assetCached.AssetObj.Contract != nil && len(assetCached.AssetObj.Contract) > 0 {
+		} else if len(assetCached.AssetObj.Contract) > 0 {
 			contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
 			contractLower := strings.ToLower(contractStr)
 			if strings.Contains(contractLower, filterLower) || strings.Contains(contractLower, filterLowerWithPrefix) {
