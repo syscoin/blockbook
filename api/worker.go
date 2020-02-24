@@ -949,6 +949,10 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 }
 
 func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
+	page--
+	if page < 0 {
+		page = 0
+	}
 	start := time.Now()
 	assetDetails := make([]*AssetsSpecific, 0)
 	assetsFiltered := w.db.FindAssetsFromFilter(filter)
