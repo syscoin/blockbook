@@ -454,7 +454,7 @@ func (a Assets) Less(i, j int) bool {
 	if a[i] == nil || a[j] == nil {
 		return false
 	}
-	return a[i].AssetObj.AssetGuid < a[j].AssetObj.AssetGuid
+	return a[i].AssetObj.Asset < a[j].AssetObj.Asset
 }
 
 // Token contains info about tokens held by an address
