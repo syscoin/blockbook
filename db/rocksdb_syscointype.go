@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"strconv"
 	"strings"
+	"sort"
 	"math/big"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -868,7 +869,7 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) bchain.Assets {
 		SetupAssetCacheFirstTime = false;
 	}
 	start := time.Now()
-	assets := make([]bchain.Asset, 0)
+	assets := make(bchain.Assets, 0)
 	filterLower := strings.ToLower(filter)
 	filterLower = strings.Replace(filterLower, "0x", "", -1)
 	for _, assetCached := range AssetCache {
