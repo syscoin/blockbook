@@ -861,6 +861,7 @@ func (d *RocksDB) SetupAssetCache() error {
 
 // find assets from cache that contain filter
 func (d *RocksDB) FindAssetsFromFilter(filter string) bchain.Assets {
+	start := time.Now()
 	if SetupAssetCacheFirstTime == true {
 		if err := d.SetupAssetCache(); err != nil {
 			glog.Error("storeAssets SetupAssetCache ", err)
@@ -868,7 +869,6 @@ func (d *RocksDB) FindAssetsFromFilter(filter string) bchain.Assets {
 		}
 		SetupAssetCacheFirstTime = false;
 	}
-	start := time.Now()
 	assets := make(bchain.Assets, 0)
 	filterLower := strings.ToLower(filter)
 	filterLower = strings.Replace(filterLower, "0x", "", -1)
