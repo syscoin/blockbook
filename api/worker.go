@@ -874,7 +874,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalReceived = ba.ReceivedSat()
 		totalSent = &ba.SentSat
 	} 
-	if ba.AssetBalances != nil && option > AccountDetailsBasic {
+	// filter == 0 when called with non-token
+	if ba.AssetBalances != nil && option > AccountDetailsBasic && filter.Vout != 0 {
 		tokens = make(bchain.Tokens, len(ba.AssetBalances)+1)
 		var i int = 0
 		var ownerFound bool = false
