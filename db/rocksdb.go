@@ -1607,7 +1607,7 @@ func (d *RocksDB) FixUtxos(stop chan os.Signal) error {
 				errorsCount++
 				continue
 			}
-			ba, err := bchain.UnpackAddrBalance(buf, d.chainParser.PackedTxidLen(), bchain.AddressBalanceDetailUTXO)
+			ba, err := d.chainParser.UnpackAddrBalance(buf, d.chainParser.PackedTxidLen(), bchain.AddressBalanceDetailUTXO)
 			if err != nil {
 				glog.Error("FixUtxos: row ", row, ", addrDesc ", addrDesc, ", unpackAddrBalance error ", err)
 				errorsCount++
