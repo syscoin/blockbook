@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 	"github.com/martinboehm/btcutil/txscript"
+	"unsafe"
 
 	vlq "github.com/bsm/go-vlq"
 	"github.com/golang/glog"
@@ -1496,7 +1497,7 @@ func (d *RocksDB) fixUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.AddrBala
 		var checksumFromTxs big.Int
 		var utxos []bchain.Utxo
 		err := d.GetAddrDescTransactions(addrDesc, 0, ^uint32(0), func(txid string, height uint32, indexes []int32) error {
-			var ta *TxAddresses
+			var ta *bchain.TxAddresses
 			var err error
 			// sort the indexes so that the utxos are appended in the reverse order
 			sort.Slice(indexes, func(i, j int) bool {
@@ -1544,7 +1545,7 @@ func (d *RocksDB) fixUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.AddrBala
 			}
 			ba.Utxos = utxos
 			wb := gorocksdb.NewWriteBatch()
-			err = d.storeBalances(wb, map[string]*AddrBalance{string(addrDesc): ba})
+			err = d.storeBalances(wb, map[string]*bchain.AddrBalance{string(addrDesc): ba})
 			if err == nil {
 				err = d.db.Write(d.wo, wb)
 			}
@@ -1557,7 +1558,7 @@ func (d *RocksDB) fixUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.AddrBala
 		return fixed, false, errors.Errorf("balance %s, checksum %s, from txa %s, txs %d", ba.BalanceSat.String(), checksum.String(), checksumFromTxs.String(), ba.Txs)
 	} else if reorder {
 		wb := gorocksdb.NewWriteBatch()
-		err := d.storeBalances(wb, map[string]*AddrBalance{string(addrDesc): ba})
+		err := d.storeBalances(wb, map[string]*bchain.AddrBalance{string(addrDesc): ba})
 		if err == nil {
 			err = d.db.Write(d.wo, wb)
 		}
@@ -1606,7 +1607,7 @@ func (d *RocksDB) FixUtxos(stop chan os.Signal) error {
 				errorsCount++
 				continue
 			}
-			ba, err := unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), bchain.AddressBalanceDetailUTXO)
+			ba, err := bchain.UnpackAddrBalance(buf, d.chainParser.PackedTxidLen(), bchain.AddressBalanceDetailUTXO)
 			if err != nil {
 				glog.Error("FixUtxos: row ", row, ", addrDesc ", addrDesc, ", unpackAddrBalance error ", err)
 				errorsCount++
