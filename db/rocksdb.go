@@ -949,7 +949,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 
 // Disconnect blocks
 
-func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []byte, inputs []bchain.Outpoint, txa *bchain.TxAddresses, txAddressesToUpdate map[string]*bchain.TxAddresses,
+func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []byte, inputs []bchain.DbOutpoint, txa *bchain.TxAddresses, txAddressesToUpdate map[string]*bchain.TxAddresses,
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error),
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) error {
 	var err error
@@ -958,7 +958,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []
 		if len(t.AddrDesc) > 0 {
 			input := &inputs[i]
 			exist := addressFoundInTx(t.AddrDesc, btxID)
-			s := string(input.btxID)
+			s := string(input.BtxID)
 			sa, found := txAddressesToUpdate[s]
 			if !found {
 				sa, err = d.getTxAddresses(input.BtxID)
@@ -991,7 +991,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
 					balance.AddUtxoInDisconnect(&bchain.Utxo{
 						BtxID:    input.BtxID,
-						Vout:     input.index,
+						Vout:     input.Index,
 						Height:   inputHeight,
 						ValueSat: t.ValueSat,
 					})
@@ -1058,7 +1058,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 		s := string(addrDesc)
 		b, fb := balances[s]
 		if !fb {
-			b, err = d.GetAddrDescBalance(addrDesc, addressBalanceDetailUTXOIndexed)
+			b, err = d.GetAddrDescBalance(addrDesc, bchain.AddressBalanceDetailUTXOIndexed)
 			if err != nil {
 				return nil, err
 			}
@@ -1117,10 +1117,10 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 		}
 	}
 	for a := range blockAddressesTxs {
-		key := d.chainParser.packAddressKey([]byte(a), height)
+		key := d.chainParser.PackAddressKey([]byte(a), height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
-	key := d.chainParser.packUint(height)
+	key := d.chainParser.PackUint(height)
 	wb.DeleteCF(d.cfh[cfBlockTxs], key)
 	wb.DeleteCF(d.cfh[cfHeight], key)
 	d.storeTxAddresses(wb, txAddressesToUpdate)
