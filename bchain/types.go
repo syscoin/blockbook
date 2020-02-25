@@ -245,7 +245,7 @@ func ReceivedSatFromBalances(balance *big.Int, sent *big.Int) *big.Int {
 
 
 // addUtxo
-func (ab *AddrBalance) addUtxo(u *Utxo) {
+func (ab *AddrBalance) AddUtxo(u *Utxo) {
 	ab.Utxos = append(ab.Utxos, *u)
 	ab.manageUtxoMap(u)
 }
@@ -271,7 +271,7 @@ func (ab *AddrBalance) manageUtxoMap(u *Utxo) {
 }
 
 // on disconnect, the added utxos must be inserted in the right position so that utxosMap index works
-func (ab *AddrBalance) addUtxoInDisconnect(u *Utxo) {
+func (ab *AddrBalance) AddUtxoInDisconnect(u *Utxo) {
 	insert := -1
 	if len(ab.utxosMap) > 0 {
 		if i, e := ab.utxosMap[string(u.BtxID)]; e {

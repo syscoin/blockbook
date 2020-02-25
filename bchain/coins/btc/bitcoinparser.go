@@ -7,7 +7,8 @@ import (
 	"encoding/hex"
 	"math/big"
 	"strconv"
-
+	"github.com/golang/glog"
+	
 	vlq "github.com/bsm/go-vlq"
 	"github.com/juju/errors"
 	"github.com/martinboehm/btcd/blockchain"

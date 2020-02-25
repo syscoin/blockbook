@@ -374,7 +374,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 		if bytes.Compare(key, stopKey) > 0 {
 			break
 		}
-		if len(key) != addrDescLen+packedHeightBytes {
+		if len(key) != addrDescLen+bchain.PackedHeightBytes {
 			if glog.V(2) {
 				glog.Warningf("rocksdb: addrDesc %s - mixed with %s", addrDesc, hex.EncodeToString(key))
 			}
@@ -949,7 +949,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 
 // Disconnect blocks
 
-func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []byte, inputs []outpoint, txa *TxAddresses, txAddressesToUpdate map[string]*bchain.TxAddresses,
+func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []byte, inputs []bchain.outpoint, txa *bchain.TxAddresses, txAddressesToUpdate map[string]*bchain.TxAddresses,
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error),
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) error {
 	var err error
@@ -989,7 +989,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []
 						d.resetValueSatToZero(&balance.SentSat, t.AddrDesc, "sent amount")
 					}
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
-					balance.addUtxoInDisconnect(&bchain.Utxo{
+					balance.AddUtxoInDisconnect(&bchain.Utxo{
 						BtxID:    input.BtxID,
 						Vout:     input.index,
 						Height:   inputHeight,
@@ -1033,7 +1033,7 @@ func (d *RocksDB) disconnectTxAddressesOutputs(wb *gorocksdb.WriteBatch, btxID [
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
 				}
 			} else if isSyscoinTx && t.AddrDesc[0] == txscript.OP_RETURN {
-				err = d.DisconnectSyscoinOutputs(height, btxID, t.AddrDesc, txa.Version, addresses, assets, txAssets, getAddressBalance, addressFoundInTx)
+				err := d.DisconnectSyscoinOutputs(height, btxID, t.AddrDesc, txa.Version, addresses, assets, txAssets, getAddressBalance, addressFoundInTx)
 				if err != nil {
 					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, error %v", height, btxID, err)
 				}
@@ -1043,7 +1043,7 @@ func (d *RocksDB) disconnectTxAddressesOutputs(wb *gorocksdb.WriteBatch, btxID [
 	return nil
 }
 
-func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.blockTxs) error {
+func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) error {
 	wb := gorocksdb.NewWriteBatch()
 	defer wb.Destroy()
 	txAddressesToUpdate := make(map[string]*bchain.TxAddresses)

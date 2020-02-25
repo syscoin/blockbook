@@ -349,9 +349,9 @@ func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte {
 func (p *BaseParser) UnpackAssetTxIndex(buf []byte) []*TxAssetIndex {
 	return nil
 }
-const packedHeightBytes = 4
+const PackedHeightBytes = 4
 func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
-	buf := make([]byte, len(addrDesc)+packedHeightBytes)
+	buf := make([]byte, len(addrDesc)+PackedHeightBytes)
 	copy(buf, addrDesc)
 	// pack height as binary complement to achieve ordering from newest to oldest block
 	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
@@ -359,12 +359,12 @@ func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) [
 }
 
 func (p *BaseParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
-	i := len(key) - packedHeightBytes
+	i := len(key) - PackedHeightBytes
 	if i <= 0 {
 		return nil, 0, errors.New("Invalid address key")
 	}
 	// height is packed in binary complement, convert it
-	return key[:i], ^p.UnpackUint(key[i : i+packedHeightBytes]), nil
+	return key[:i], ^p.UnpackUint(key[i : i+PackedHeightBytes]), nil
 }
 
 func (p *BaseParser) PackUint(i uint32) []byte {

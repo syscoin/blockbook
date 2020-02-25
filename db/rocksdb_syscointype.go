@@ -320,7 +320,7 @@ func (d *RocksDB) ConnectAssetAllocationOutput(sptData []byte, balances map[stri
 	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, balances, addresses, dBAsset, assets)
 }
 
-func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset, btxID []byte, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) (uint32, error) {
+func (d *RocksDB) DisconnectAssetAllocationOutput(sptData []byte, version int32, assets map[uint32]*bchain.Asset, btxID []byte, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var assetAllocation wire.AssetAllocationType
 	err := assetAllocation.Deserialize(r, version)
@@ -440,7 +440,7 @@ func (d *RocksDB) ConnectAssetAllocationInput(btxID []byte, assetGuid uint32, ve
 
 }
 
-func (d *RocksDB) DisconnectAssetOutput(sptData []byte, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset, btxID []byte, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) (uint32, error) {
+func (d *RocksDB) DisconnectAssetOutput(sptData []byte, version int32, assets map[uint32]*bchain.Asset, btxID []byte, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var asset bchain.Asset
 	var dBAsset *bchain.Asset
@@ -655,7 +655,7 @@ func (d *RocksDB) ConnectMintAssetOutput(sptData []byte, balances map[string]*bc
 	return assetGuid, d.ConnectAssetAllocationInput(btxID, assetGuid, version, amount, assetSenderAddrDesc, balances, addresses, dBAsset, assets)
 }
 
-func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset, btxID []byte, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) (uint32, error) {
+func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, version int32, assets map[uint32]*bchain.Asset, btxID []byte, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) (uint32, error) {
 	r := bytes.NewReader(sptData)
 	var mintasset wire.MintSyscoinType
 	err := mintasset.Deserialize(r)
@@ -747,7 +747,7 @@ func (d *RocksDB) ConnectSyscoinOutputs(height uint32, blockHash string, addrDes
 	return err
 }
 
-func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bchain.AddressDescriptor, version int32, addresses map[string]struct{}, assets map[uint32]*bchain.Asset, txAssets []*bchain.TxAsset, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) error {
+func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc bchain.AddressDescriptor, version int32, assets map[uint32]*bchain.Asset, txAssets []*bchain.TxAsset, getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error), addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) error {
 	script, err := d.chainParser.GetScriptFromAddrDesc(addrDesc)
 	if err != nil {
 		return err
@@ -758,11 +758,11 @@ func (d *RocksDB) DisconnectSyscoinOutputs(height uint32, btxID []byte, addrDesc
 	}
 	var assetGuid uint32
 	if d.chainParser.IsAssetAllocationTx(version) {
-		assetGuid, err = d.DisconnectAssetAllocationOutput(sptData, version, addresses, assets, btxID, getAddressBalance, addressFoundInTx)
+		assetGuid, err = d.DisconnectAssetAllocationOutput(sptData, version, assets, btxID, getAddressBalance, addressFoundInTx)
 	} else if d.chainParser.IsAssetTx(version) {
-		assetGuid, err = d.DisconnectAssetOutput(sptData, version, addresses, assets, btxID, getAddressBalance, addressFoundInTx)
+		assetGuid, err = d.DisconnectAssetOutput(sptData, version, assets, btxID, getAddressBalance, addressFoundInTx)
 	} else if d.chainParser.IsSyscoinMintTx(version) {
-		assetGuid, err = d.DisconnectMintAssetOutput(sptData, version, addresses, assets, btxID, getAddressBalance, addressFoundInTx)
+		assetGuid, err = d.DisconnectMintAssetOutput(sptData, version, assets, btxID, getAddressBalance, addressFoundInTx)
 	}
 	if assetGuid > 0 && err == nil {
 		txAssets = append(txAssets, &bchain.TxAsset{AssetGuid: assetGuid, Height: height})

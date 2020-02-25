@@ -1128,20 +1128,20 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 		BalanceSat: *big.NewInt(1000),
 	}
 
-	// addUtxo
-	ab.addUtxo(&bchain.Utxo{
+	// AddUtxo
+	ab.AddUtxo(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     1,
 		Height:   5000,
 		ValueSat: *big.NewInt(100),
 	})
-	ab.addUtxo(&bchain.Utxo{
+	ab.AddUtxo(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     4,
 		Height:   5000,
 		ValueSat: *big.NewInt(100),
 	})
-	ab.addUtxo(&bchain.Utxo{
+	ab.AddUtxo(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T2),
 		Vout:     0,
 		Height:   5001,
@@ -1176,32 +1176,32 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 		t.Errorf("addUtxo, got %+v, want %+v", ab, want)
 	}
 
-	// addUtxoInDisconnect
-	ab.addUtxoInDisconnect(&bchain.Utxo{
+	// AddUtxoInDisconnect
+	ab.AddUtxoInDisconnect(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB2T1),
 		Vout:     0,
 		Height:   5003,
 		ValueSat: *big.NewInt(800),
 	})
-	ab.addUtxoInDisconnect(&bchain.Utxo{
+	ab.AddUtxoInDisconnect(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB2T1),
 		Vout:     1,
 		Height:   5003,
 		ValueSat: *big.NewInt(800),
 	})
-	ab.addUtxoInDisconnect(&bchain.Utxo{
+	ab.AddUtxoInDisconnect(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     10,
 		Height:   5000,
 		ValueSat: *big.NewInt(100),
 	})
-	ab.addUtxoInDisconnect(&bchain.Utxo{
+	ab.AddUtxoInDisconnect(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     2,
 		Height:   5000,
 		ValueSat: *big.NewInt(100),
 	})
-	ab.addUtxoInDisconnect(&bchain.Utxo{
+	ab.AddUtxoInDisconnect(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     0,
 		Height:   5000,
@@ -1263,7 +1263,7 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(ab, want) {
-		t.Errorf("addUtxoInDisconnect, got %+v, want %+v", ab, want)
+		t.Errorf("AddUtxoInDisconnect, got %+v, want %+v", ab, want)
 	}
 
 	// markUtxoAsSpent
@@ -1281,7 +1281,7 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 			Height:   5009,
 			ValueSat: *big.NewInt(800),
 		}
-		ab.addUtxo(&utxo)
+		ab.AddUtxo(&utxo)
 		want.Utxos = append(want.Utxos, utxo)
 	}
 	createUtxoMap(want)
@@ -1296,8 +1296,8 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 		t.Errorf("markUtxoAsSpent with utxosMap, got %+v, want %+v", ab, want)
 	}
 
-	// addUtxoInDisconnect with utxosMap
-	ab.addUtxoInDisconnect(&bchain.Utxo{
+	// AddUtxoInDisconnect with utxosMap
+	ab.AddUtxoInDisconnect(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     3,
 		Height:   5000,
@@ -1313,7 +1313,7 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 	}
 	want.utxosMap = nil
 	if !reflect.DeepEqual(ab, want) {
-		t.Errorf("addUtxoInDisconnect with utxosMap, got %+v, want %+v", ab, want)
+		t.Errorf("AddUtxoInDisconnect with utxosMap, got %+v, want %+v", ab, want)
 	}
 
 }
