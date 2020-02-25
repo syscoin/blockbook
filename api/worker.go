@@ -866,6 +866,10 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				if err != nil {
 					return nil, err
 				}
+				// filter.Vout == 0 when called with non-token
+				if filter.Vout != 0 {
+					tx.TokenTransferSummary = nil
+				}
 				txs = append(txs, tx)
 			}
 		}
@@ -874,8 +878,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalReceived = ba.ReceivedSat()
 		totalSent = &ba.SentSat
 	} 
-	// filter == 0 when called with non-token
-	if ba.AssetBalances != nil && option > AccountDetailsBasic && filter.Vout != 0 {
+	if ba.AssetBalances != nil && option > AccountDetailsBasic {
 		tokens = make(bchain.Tokens, len(ba.AssetBalances)+1)
 		var i int = 0
 		var ownerFound bool = false
