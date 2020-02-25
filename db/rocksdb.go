@@ -949,7 +949,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 
 // Disconnect blocks
 
-func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []byte, inputs []bchain.outpoint, txa *bchain.TxAddresses, txAddressesToUpdate map[string]*bchain.TxAddresses,
+func (d *RocksDB) disconnectTxAddressesInputs(wb *gorocksdb.WriteBatch, btxID []byte, inputs []bchain.Outpoint, txa *bchain.TxAddresses, txAddressesToUpdate map[string]*bchain.TxAddresses,
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error),
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) error {
 	var err error
@@ -1033,7 +1033,7 @@ func (d *RocksDB) disconnectTxAddressesOutputs(wb *gorocksdb.WriteBatch, btxID [
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
 				}
 			} else if isSyscoinTx && t.AddrDesc[0] == txscript.OP_RETURN {
-				err := d.DisconnectSyscoinOutputs(height, btxID, t.AddrDesc, txa.Version, addresses, assets, txAssets, getAddressBalance, addressFoundInTx)
+				err := d.DisconnectSyscoinOutputs(height, btxID, t.AddrDesc, txa.Version, assets, txAssets, getAddressBalance, addressFoundInTx)
 				if err != nil {
 					glog.Warningf("rocksdb: DisconnectSyscoinOutputs: height %d, tx %v, error %v", height, btxID, err)
 				}
@@ -1089,7 +1089,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 	// when connecting block, outputs are processed first
 	// when disconnecting, inputs must be reversed first
 	for i := range blockTxs {
-		btxID := blockTxs[i].btxID
+		btxID := blockTxs[i].BtxID
 		s := string(btxID)
 		txsToDelete[s] = struct{}{}
 		txa, err := d.getTxAddresses(btxID)
@@ -1102,12 +1102,12 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 			continue
 		}
 		txAddresses[i] = txa
-		if err := d.disconnectTxAddressesInputs(wb, btxID, blockTxs[i].inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx); err != nil {
+		if err := d.disconnectTxAddressesInputs(wb, btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx); err != nil {
 			return err
 		}
 	}
 	for i := range blockTxs {
-		btxID := blockTxs[i].btxID
+		btxID := blockTxs[i].BtxID
 		txa := txAddresses[i]
 		if txa == nil {
 			continue
@@ -1117,10 +1117,10 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 		}
 	}
 	for a := range blockAddressesTxs {
-		key := packAddressKey([]byte(a), height)
+		key := d.chainParser.packAddressKey([]byte(a), height)
 		wb.DeleteCF(d.cfh[cfAddresses], key)
 	}
-	key := packUint(height)
+	key := d.chainParser.packUint(height)
 	wb.DeleteCF(d.cfh[cfBlockTxs], key)
 	wb.DeleteCF(d.cfh[cfHeight], key)
 	d.storeTxAddresses(wb, txAddressesToUpdate)
