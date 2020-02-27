@@ -713,7 +713,7 @@ func (s *PublicServer) getAssetQueryParams(r *http.Request, accountDetails api.A
 			assetsMask = bchain.AssetAllocationSendMask
 		} else if filterParam == "non-transfers" {
 			// everything but allocation send
-			assetsMask = bchain.AssetActivateMask | bchain.AssetTransferMask | bchain.AssetSendMask | 
+			assetsMask = bchain.AssetActivateMask | bchain.AssetUpdateMask | bchain.AssetTransferMask | bchain.AssetSendMask | 
 			bchain.AssetSyscoinBurnToAllocationMask | bchain.AssetAllocationBurnToSyscoinMask | bchain.AssetAllocationBurnToEthereumMask | 
 			bchain.AssetAllocationMintMask | bchain.AssetAllocationLockMask
 		} else {
