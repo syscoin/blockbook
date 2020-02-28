@@ -224,7 +224,7 @@ type AddrBalance struct {
 	SentSat    big.Int
 	BalanceSat big.Int
 	Utxos      []Utxo
-	utxosMap   map[string]int
+	UtxosMap   map[string]int
 	AssetBalances map[uint32]*AssetBalance
 }
 
@@ -253,28 +253,28 @@ func (ab *AddrBalance) AddUtxo(u *Utxo) {
 func (ab *AddrBalance) manageUtxoMap(u *Utxo) {
 	l := len(ab.Utxos)
 	if l >= 16 {
-		if len(ab.utxosMap) == 0 {
-			ab.utxosMap = make(map[string]int, 32)
+		if len(ab.UtxosMap) == 0 {
+			ab.UtxosMap = make(map[string]int, 32)
 			for i := 0; i < l; i++ {
 				s := string(ab.Utxos[i].BtxID)
-				if _, e := ab.utxosMap[s]; !e {
-					ab.utxosMap[s] = i
+				if _, e := ab.UtxosMap[s]; !e {
+					ab.UtxosMap[s] = i
 				}
 			}
 		} else {
 			s := string(u.BtxID)
-			if _, e := ab.utxosMap[s]; !e {
-				ab.utxosMap[s] = l - 1
+			if _, e := ab.UtxosMap[s]; !e {
+				ab.UtxosMap[s] = l - 1
 			}
 		}
 	}
 }
 
-// on disconnect, the added utxos must be inserted in the right position so that utxosMap index works
+// on disconnect, the added utxos must be inserted in the right position so that UtxosMap index works
 func (ab *AddrBalance) AddUtxoInDisconnect(u *Utxo) {
 	insert := -1
-	if len(ab.utxosMap) > 0 {
-		if i, e := ab.utxosMap[string(u.BtxID)]; e {
+	if len(ab.UtxosMap) > 0 {
+		if i, e := ab.UtxosMap[string(u.BtxID)]; e {
 			insert = i
 		}
 	} else {
@@ -296,8 +296,8 @@ func (ab *AddrBalance) AddUtxoInDisconnect(u *Utxo) {
 				ab.Utxos = append(ab.Utxos, *u)
 				copy(ab.Utxos[i+1:], ab.Utxos[i:])
 				ab.Utxos[i] = *u
-				// reset utxosMap after insert, the index will have to be rebuilt if needed
-				ab.utxosMap = nil
+				// reset UtxosMap after insert, the index will have to be rebuilt if needed
+				ab.UtxosMap = nil
 				return
 			}
 		}
@@ -310,7 +310,7 @@ func (ab *AddrBalance) AddUtxoInDisconnect(u *Utxo) {
 // for small number of utxos the linear search is done, for larger number there is a hashmap index
 // it is much faster than removing the utxo from the slice as it would cause in memory reallocations
 func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
-	if len(ab.utxosMap) == 0 {
+	if len(ab.UtxosMap) == 0 {
 		for i := range ab.Utxos {
 			utxo := &ab.Utxos[i]
 			if utxo.Vout == vout && *(*int)(unsafe.Pointer(&utxo.BtxID[0])) == *(*int)(unsafe.Pointer(&btxID[0])) && bytes.Equal(utxo.BtxID, btxID) {
@@ -320,7 +320,7 @@ func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 			}
 		}
 	} else {
-		if i, e := ab.utxosMap[string(btxID)]; e {
+		if i, e := ab.UtxosMap[string(btxID)]; e {
 			l := len(ab.Utxos)
 			for ; i < l; i++ {
 				utxo := &ab.Utxos[i]
@@ -335,7 +335,7 @@ func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
 			}
 		}
 	}
-	glog.Errorf("Utxo %s:%d not found, utxosMap size %d", hex.EncodeToString(btxID), vout, len(ab.utxosMap))
+	glog.Errorf("Utxo %s:%d not found, UtxosMap size %d", hex.EncodeToString(btxID), vout, len(ab.UtxosMap))
 }
 
 // AddressBalanceDetail specifies what data are returned by GetAddressBalance

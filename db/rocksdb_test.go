@@ -1113,11 +1113,11 @@ func Test_packAddrBalance_unpackAddrBalance(t *testing.T) {
 
 func createUtxoMap(ab *bchain.AddrBalance) {
 	l := len(ab.Utxos)
-	ab.utxosMap = make(map[string]int, 32)
+	ab.UtxosMap = make(map[string]int, 32)
 	for i := 0; i < l; i++ {
 		s := string(ab.Utxos[i].BtxID)
-		if _, e := ab.utxosMap[s]; !e {
-			ab.utxosMap[s] = i
+		if _, e := ab.UtxosMap[s]; !e {
+			ab.UtxosMap[s] = i
 		}
 	}
 }
@@ -1266,14 +1266,14 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 		t.Errorf("AddUtxoInDisconnect, got %+v, want %+v", ab, want)
 	}
 
-	// markUtxoAsSpent
-	ab.markUtxoAsSpent(hexToBytes(dbtestdata.TxidB2T1), 0)
+	// MarkUtxoAsSpent
+	ab.MarkUtxoAsSpent(hexToBytes(dbtestdata.TxidB2T1), 0)
 	want.Utxos[6].Vout = -1
 	if !reflect.DeepEqual(ab, want) {
-		t.Errorf("markUtxoAsSpent, got %+v, want %+v", ab, want)
+		t.Errorf("MarkUtxoAsSpent, got %+v, want %+v", ab, want)
 	}
 
-	// addUtxo with utxosMap
+	// addUtxo with UtxosMap
 	for i := 0; i < 20; i += 2 {
 		utxo := Utxo{
 			BtxID:    hexToBytes(dbtestdata.TxidB2T2),
@@ -1286,17 +1286,17 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 	}
 	createUtxoMap(want)
 	if !reflect.DeepEqual(ab, want) {
-		t.Errorf("addUtxo with utxosMap, got %+v, want %+v", ab, want)
+		t.Errorf("addUtxo with UtxosMap, got %+v, want %+v", ab, want)
 	}
 
-	// markUtxoAsSpent with utxosMap
-	ab.markUtxoAsSpent(hexToBytes(dbtestdata.TxidB2T1), 1)
+	// MarkUtxoAsSpent with UtxosMap
+	ab.MarkUtxoAsSpent(hexToBytes(dbtestdata.TxidB2T1), 1)
 	want.Utxos[7].Vout = -1
 	if !reflect.DeepEqual(ab, want) {
-		t.Errorf("markUtxoAsSpent with utxosMap, got %+v, want %+v", ab, want)
+		t.Errorf("MarkUtxoAsSpent with UtxosMap, got %+v, want %+v", ab, want)
 	}
 
-	// AddUtxoInDisconnect with utxosMap
+	// AddUtxoInDisconnect with UtxosMap
 	ab.AddUtxoInDisconnect(&bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     3,
@@ -1311,9 +1311,9 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 		Height:   5000,
 		ValueSat: *big.NewInt(100),
 	}
-	want.utxosMap = nil
+	want.UtxosMap = nil
 	if !reflect.DeepEqual(ab, want) {
-		t.Errorf("AddUtxoInDisconnect with utxosMap, got %+v, want %+v", ab, want)
+		t.Errorf("AddUtxoInDisconnect with UtxosMap, got %+v, want %+v", ab, want)
 	}
 
 }

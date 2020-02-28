@@ -439,7 +439,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}
 
 	// try to disconnect both blocks, however only the last one is kept, it is not possible
-	err = d.DisconnectBlockRangeSyscoinType(225493, 225494)
+	err = d.DisconnectBlockRangeBitcoinType(225493, 225494)
 	if err == nil || err.Error() != "Cannot disconnect blocks with height 225493 and lower. It is necessary to rebuild index." {
 		t.Fatal(err)
 	}
@@ -447,7 +447,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 
 	// disconnect the 2nd block, verify that the db contains only data from the 1st block with restored unspentTxs
 	// and that the cached tx is removed
-	err = d.DisconnectBlockRangeSyscoinType(225494, 225494)
+	err = d.DisconnectBlockRangeBitcoinType(225494, 225494)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -471,7 +471,7 @@ func (p *BitcoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	if detail != bchain.AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
 		ab.Utxos = make([]bchain.Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
-		// ab.utxosMap = make(map[string]int, cap(ab.Utxos))
+		// ab.UtxosMap = make(map[string]int, cap(ab.Utxos))
 		for len(buf[l:]) >= txidUnpackedLen+3 {
 			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
 			l += txidUnpackedLen
