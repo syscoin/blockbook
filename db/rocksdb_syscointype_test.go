@@ -72,32 +72,32 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	}
 	if err := checkColumn(d, cfAddressBalance, []keyPair{
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1, d) +
 				dbtestdata.TxidS1T1 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A1, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A2Double, d) +
 			dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A2, d) +
 			dbtestdata.TxidS1T1 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A2, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T2A3, d) +
 				dbtestdata.TxidS1T2 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T2A3, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T2A4, d) +
 				dbtestdata.TxidS1T2 + varuintToHex(1) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T2A4, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T2A5, d) +
 				dbtestdata.TxidS1T2 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T2A5, d),
 			nil,
@@ -234,58 +234,58 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	}
 	if err := checkColumn(d, cfAddressBalance, []keyPair{
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1, d) +
 				dbtestdata.TxidS1T1 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A1, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
 			"02" + bigintToHex(dbtestdata.SatS1T1A2, d) + bigintToHex(dbtestdata.SatS1T1A2, d) +
 			dbtestdata.TxidS1T1 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A2, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
 			"02" + bigintToHex(dbtestdata.SatS1T2A3, d) + bigintToHex(dbtestdata.SatZero, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
 			"02" + bigintToHex(dbtestdata.SatS1T2A4, d) + bigintToHex(dbtestdata.SatZero, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
 			"02" + bigintToHex(dbtestdata.SatS1T2A5, d) + bigintToHex(dbtestdata.SatS2T3A5, d) +
 				dbtestdata.TxidS2T3 + varuintToHex(0) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T3A5, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS6, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS6, d.chainParser),
 			"02" + bigintToHex(dbtestdata.SatS2T1A6, d) + bigintToHex(dbtestdata.SatZero, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS7, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS7, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T1A7, d) +
 				dbtestdata.TxidS2T1 + varuintToHex(1) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T1A7, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS8, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS8, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T2A8, d) +
 				dbtestdata.TxidS2T2 + varuintToHex(0) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T2A8, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrS9, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS9, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T2A9, d) +
 				dbtestdata.TxidS2T2 + varuintToHex(1) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T2A9, d),
 			nil,
 		},
 		{
-			dbtestdata.AddrSessToPubKeyHex(dbtestdata.AddrSA, d.chainParser),
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrSA, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T4AA, d) +
 				dbtestdata.TxidS2T4 + varuintToHex(0) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T4AA, d),
 			nil,
