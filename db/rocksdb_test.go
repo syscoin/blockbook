@@ -199,7 +199,7 @@ func verifyAfterBitcoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	}); err != nil {
 		{
 			t.Fatal(err)
-		}
+		}	
 	}
 	if err := checkColumn(d, cfTxAddresses, []keyPair{
 		{
@@ -208,6 +208,7 @@ func verifyAfterBitcoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 				"00" +
 				"03" +
 				addressToPubKeyHexWithLength(dbtestdata.Addr1, t, d) + bigintToHex(dbtestdata.SatB1T1A1, d) +
+				addressToPubKeyHexWithLength(dbtestdata.Addr2, t, d) + bigintToHex(dbtestdata.SatB1T1A2, d) + 
 				addressToPubKeyHexWithLength(dbtestdata.Addr2, t, d) + bigintToHex(dbtestdata.SatB1T1A2, d),
 			nil,
 		},
