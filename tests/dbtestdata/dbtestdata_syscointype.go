@@ -17,18 +17,16 @@ const (
 	TxidS2T3 = "05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07"
 	TxidS2T4 = "fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db"
 
-	Xpub = "upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q"
-
-	Addr1 = "mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti"  // 76a914010d39800f86122416e28f485029acf77507169288ac
-	Addr2 = "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"  // 76a9148bdf0aa3c567aa5975c2e61321b8bebbe7293df688ac
-	Addr3 = "mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"  // 76a914a08eae93007f22668ab5e4a9c83c8cd1c325e3e088ac
-	Addr4 = "2MzmAKayJmja784jyHvRUW1bXPget1csRRG" // a91452724c5178682f70e0ba31c6ec0633755a3b41d987, xpub m/49'/1'/33'/0/0
-	Addr5 = "2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1" // a914e921fc4912a315078f370d959f2c4f7b6d2a683c87
-	Addr6 = "mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"  // 76a914ccaaaf374e1b06cb83118453d102587b4273d09588ac
-	Addr7 = "mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL"  // 76a9148d802c045445df49613f6a70ddd2e48526f3701f88ac
-	Addr8 = "2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu" // a91495e9fbe306449c991d314afe3c3567d5bf78efd287, xpub m/49'/1'/33'/1/3
-	Addr9 = "mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"  // 76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac
-	AddrA = "mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj"  // 76a914d03c0d863d189b23b061a95ad32940b65837609f88ac
+	AddrS1 = "mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti"  // 76a914010d39800f86122416e28f485029acf77507169288ac
+	AddrS2 = "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"  // 76a9148bdf0aa3c567aa5975c2e61321b8bebbe7293df688ac
+	AddrS3 = "mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"  // 76a914a08eae93007f22668ab5e4a9c83c8cd1c325e3e088ac
+	AddrS4 = "2MzmAKayJmja784jyHvRUW1bXPget1csRRG" // a91452724c5178682f70e0ba31c6ec0633755a3b41d987, xpub m/49'/1'/33'/0/0
+	AddrS5 = "2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1" // a914e921fc4912a315078f370d959f2c4f7b6d2a683c87
+	AddrS6 = "mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"  // 76a914ccaaaf374e1b06cb83118453d102587b4273d09588ac
+	AddrS7 = "mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL"  // 76a9148d802c045445df49613f6a70ddd2e48526f3701f88ac
+	AddrS8 = "2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu" // a91495e9fbe306449c991d314afe3c3567d5bf78efd287, xpub m/49'/1'/33'/1/3
+	AddrS9 = "mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"  // 76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac
+	AddrSA = "mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj"  // 76a914d03c0d863d189b23b061a95ad32940b65837609f88ac
 
 	TxidS2T1Output3OpReturn = "6a072020f1686f6a20"
 )
@@ -80,21 +78,21 @@ func GetTestSyscoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr1, parser),
+							Hex: AddressToPubKeyHex(AddrS1, parser),
 						},
 						ValueSat: *SatS1T1A1,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr2, parser),
+							Hex: AddressToPubKeyHex(AddrS2, parser),
 						},
 						ValueSat: *SatS1T1A2,
 					},
 					{
 						N: 2,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr2, parser),
+							Hex: AddressToPubKeyHex(AddrS2, parser),
 						},
 						ValueSat: *SatS1T1A2,
 					},
@@ -109,21 +107,21 @@ func GetTestSyscoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr3, parser),
+							Hex: AddressToPubKeyHex(AddrS3, parser),
 						},
 						ValueSat: *SatS1T2A3,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr4, parser),
+							Hex: AddressToPubKeyHex(AddrS4, parser),
 						},
 						ValueSat: *SatS1T2A4,
 					},
 					{
 						N: 2,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr5, parser),
+							Hex: AddressToPubKeyHex(AddrS5, parser),
 						},
 						ValueSat: *SatS1T2A5,
 					},
@@ -165,14 +163,14 @@ func GetTestSyscoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr6, parser),
+							Hex: AddressToPubKeyHex(AddrS6, parser),
 						},
 						ValueSat: *SatS2T1A6,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr7, parser),
+							Hex: AddressToPubKeyHex(AddrS7, parser),
 						},
 						ValueSat: *SatS2T1A7,
 					},
@@ -206,14 +204,14 @@ func GetTestSyscoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr8, parser),
+							Hex: AddressToPubKeyHex(AddrS8, parser),
 						},
 						ValueSat: *SatS2T2A8,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr9, parser),
+							Hex: AddressToPubKeyHex(AddrS9, parser),
 						},
 						ValueSat: *SatS2T2A9,
 					},
@@ -236,7 +234,7 @@ func GetTestSyscoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(Addr5, parser),
+							Hex: AddressToPubKeyHex(AddrS5, parser),
 						},
 						ValueSat: *SatS2T3A5,
 					},
@@ -257,7 +255,7 @@ func GetTestSyscoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrA, parser),
+							Hex: AddressToPubKeyHex(AddrSA, parser),
 						},
 						ValueSat: *SatS2T4AA,
 					},
