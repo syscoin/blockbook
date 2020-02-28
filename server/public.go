@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"cors"
 
 	"github.com/golang/glog"
 )
@@ -76,10 +77,11 @@ func NewPublicServer(binding string, certFiles string, db *db.RocksDB, chain bch
 	}
 
 	addr, path := splitBinding(binding)
+	// add CORS support to the API for mobile WebView support
 	serveMux := http.NewServeMux()
 	https := &http.Server{
 		Addr:    addr,
-		Handler: serveMux,
+		Handler: cors.Default().Handler(serveMux),
 	}
 
 	s := &PublicServer{
