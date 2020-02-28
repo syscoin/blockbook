@@ -10,7 +10,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/tecbot/gorocksdb"
-	"encoding/binary"
 	"encoding/json"
 	"encoding/hex"
 	"github.com/syscoin/btcd/wire"

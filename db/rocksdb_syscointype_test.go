@@ -6,7 +6,6 @@ import (
 	"blockbook/bchain"
 	"blockbook/common"
 	"blockbook/bchain/coins/btc"
-	"blockbook/bchain/coins/sys"
 	"blockbook/tests/dbtestdata"
 	"encoding/hex"
 	"reflect"
@@ -325,7 +324,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 // After each step, the content of DB is examined and any difference against expected state is regarded as failure
 func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	d := setupRocksDB(t, &testSyscoinParser{
-		SyscoinParser: syscoinTestnetParser(),
+		BitcoinParser: syscoinTestnetParser(),
 	})
 	defer closeAndDestroyRocksDB(t, d)
 
@@ -550,7 +549,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 
 func Test_BulkConnect_SyscoinType(t *testing.T) {
 	d := setupRocksDB(t, &testSyscoinParser{
-		SyscoinParser: syscoinTestnetParser(),
+		BitcoinParser: syscoinTestnetParser(),
 	})
 	defer closeAndDestroyRocksDB(t, d)
 
