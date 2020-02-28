@@ -4,6 +4,8 @@ package db
 
 import (
 	"blockbook/bchain"
+	"blockbook/common"
+	"blockbook/bchain/coins/btc"
 	"blockbook/bchain/coins/sys"
 	"blockbook/tests/dbtestdata"
 	"encoding/hex"

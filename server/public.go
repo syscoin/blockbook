@@ -944,7 +944,6 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(uint64(findAssets.AssetDetails[0].AssetGuid), 10)), 302)
 				return noTpl, nil, nil
 			} else {
-				glog.Warning("found %d assets matching that criteria", len(findAssets.AssetDetails))
 				http.Redirect(w, r, joinURL("/assets/", q), 302)
 				return noTpl, nil, nil
 			}

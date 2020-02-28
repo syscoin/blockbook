@@ -1275,7 +1275,7 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 
 	// addUtxo with UtxosMap
 	for i := 0; i < 20; i += 2 {
-		utxo := Utxo{
+		utxo := bchain.Utxo{
 			BtxID:    hexToBytes(dbtestdata.TxidB2T2),
 			Vout:     int32(i),
 			Height:   5009,
@@ -1303,9 +1303,9 @@ func TestAddrBalance_utxo_methods(t *testing.T) {
 		Height:   5000,
 		ValueSat: *big.NewInt(100),
 	})
-	want.Utxos = append(want.Utxos, Utxo{})
+	want.Utxos = append(want.Utxos, bchain.Utxo{})
 	copy(want.Utxos[3+1:], want.Utxos[3:])
-	want.Utxos[3] = Utxo{
+	want.Utxos[3] = bchain.Utxo{
 		BtxID:    hexToBytes(dbtestdata.TxidB1T1),
 		Vout:     3,
 		Height:   5000,
