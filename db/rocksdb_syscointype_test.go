@@ -16,11 +16,11 @@ import (
 )
 
 type testSyscoinParser struct {
-	*syscoin.SyscoinParser
+	*btc.BitcoinParser
 }
 
-func syscoinTestnetParser() *syscoin.SyscoinParser {
-	return syscoin.NewSyscoinParser(syscoin.GetChainParams("test"),
+func syscoinTestnetParser() *btc.BitcoinParser {
+	return btc.NewBitcoinParser(btc.GetChainParams("test"),
 	&btc.Configuration{BlockAddressesToKeep: 1})
 }
 
