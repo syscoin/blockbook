@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"cors"
+	"github.com/rs/cors"
 
 	"github.com/golang/glog"
 )
