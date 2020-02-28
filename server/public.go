@@ -77,11 +77,12 @@ func NewPublicServer(binding string, certFiles string, db *db.RocksDB, chain bch
 	}
 
 	addr, path := splitBinding(binding)
-	// add CORS support to the API for mobile WebView support
 	serveMux := http.NewServeMux()
+	// add CORS support to the API for mobile WebView support
+	handler := cors.Default().Handler(serveMux)
 	https := &http.Server{
 		Addr:    addr,
-		Handler: cors.Default().Handler(serveMux),
+		Handler: handler,
 	}
 
 	s := &PublicServer{
