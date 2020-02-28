@@ -922,9 +922,6 @@ func (d *RocksDB) GetTxAssets(assetGuid uint32, lower uint32, higher uint32, ass
 		if bytes.Compare(key, stopKey) > 0 {
 			break
 		}
-		if glog.V(2) {
-			glog.Infof("rocksdb: assets %s: %s", binary.BigEndian.Uint32(key), string(val))
-		}
 		txIndexes := d.chainParser.UnpackAssetTxIndex(val)
 		if txIndexes != nil {
 			txids := []string{}
