@@ -18,7 +18,8 @@ type testSyscoinParser struct {
 }
 
 func syscoinTestnetParser() *syscoin.SyscoinParser {
-	return syscoin.NewSyscoinParser(1)
+	return syscoin.NewSyscoinParser(syscoin.GetChainParams("test"),
+	&btc.Configuration{BlockAddressesToKeep: 1})
 }
 
 func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool) {
