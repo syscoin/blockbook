@@ -33,7 +33,6 @@ const (
 
 // Amounts in satoshis
 var (
-	SatZero         = big.NewInt(0)
 	SatS1T1A1       = big.NewInt(100000000)
 	SatS1T1A2       = big.NewInt(12345)
 	SatS1T1A2Double = big.NewInt(12345 * 2)
@@ -47,18 +46,6 @@ var (
 	SatS2T3A5       = big.NewInt(9000)
 	SatS2T4AA       = big.NewInt(1360030331)
 )
-
-// AddressToPubKeyHex is a utility conversion function
-func AddressToPubKeyHex(addr string, parser bchain.BlockChainParser) string {
-	if addr == "" {
-		return ""
-	}
-	b, err := parser.GetAddrDescFromAddress(addr)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	return hex.EncodeToString(b)
-}
 
 // GetTestSyscoinTypeBlock1 returns block #1
 func GetTestSyscoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
