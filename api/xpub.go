@@ -244,7 +244,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				TotalSentSat:     (*bchain.Amount)(&ad.balance.SentSat),
 				Transfers:        ad.balance.Txs,
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-			}
+			})
 			// for asset tokens
 			var ownerFound bool = false
 			for k, v := range ad.balance.AssetBalances {
@@ -274,7 +274,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 							Contract:		  assetGuid,
 							Transfers:		  v.Transfers,
 							ContractIndex:    assetGuid,
-						}
+						})
 						ownerFound = true
 					}
 				}
@@ -293,7 +293,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Contract:		  assetGuid,
 					Transfers:		  v.Transfers,
 					ContractIndex:    assetGuid,
-				}
+				})
 			}
 			sort.Sort(tokens)
 		}

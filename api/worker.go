@@ -914,7 +914,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 						Contract:		  assetGuid,
 						Transfers:		  v.Transfers,
 						ContractIndex: 	  assetGuid,
-					}
+					})
 					ownerFound = true
 				}
 			}
@@ -931,7 +931,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				Contract:		  assetGuid,
 				Transfers:		  v.Transfers,
 				ContractIndex:    assetGuid,
-			}
+			})
 		}
 		sort.Sort(tokens)
 	}
