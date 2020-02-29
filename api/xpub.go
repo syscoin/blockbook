@@ -222,28 +222,25 @@ func (w *Worker) xpubScanAddresses(xpub string, data *xpubData, addresses []xpub
 
 func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails) (bchain.Tokens, error) {
 	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
-	var tokens bchain.Tokens
+	numAssetBalances := 0
+	if ad.balance != nil {
+		// + 1 for owner asset for unallocated token
+		numAssetBalances = 1 + len(ad.balance.AssetBalances)
+	}
+	// +1 for base token always appended
+	tokens := make(bchain.Tokens, 0, 1+numAssetBalances)
 	var address string
 	if len(a) > 0 {
 		address = a[0]
 	}
-
+	var balance, totalReceived, totalSent *big.Int
+	var transfers int
 	if ad.balance != nil {
+		transfers = int(ad.balance.Txs)
 		if option >= AccountDetailsTokenBalances {
-			// + 1 for base plus any assets in AssetBalances, + 1 for owner asset for unallocated token
-			tokens = make(bchain.Tokens, 0, 2 + len(ad.balance.AssetBalances))
-			totalReceived := ad.balance.ReceivedSat()
-			// for base token
-			tokens = append(tokens, &bchain.Token{
-				Type:             bchain.XPUBAddressTokenType,
-				Name:             address,
-				Decimals:         w.chainParser.AmountDecimals(),
-				BalanceSat:       (*bchain.Amount)(&ad.balance.BalanceSat),
-				TotalReceivedSat: (*bchain.Amount)(totalReceived),
-				TotalSentSat:     (*bchain.Amount)(&ad.balance.SentSat),
-				Transfers:        ad.balance.Txs,
-				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-			})
+			balance = &ad.balance.BalanceSat
+			totalSent = &ad.balance.SentSat
+			totalReceived = ad.balance.ReceivedSat()
 			// for asset tokens
 			var ownerFound bool = false
 			for k, v := range ad.balance.AssetBalances {
@@ -298,6 +295,17 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			sort.Sort(tokens)
 		}
 	}
+	// for base token
+	tokens = append(tokens, &bchain.Token{
+		Type:             bchain.XPUBAddressTokenType,
+		Name:             address,
+		Decimals:         w.chainParser.AmountDecimals(),
+		BalanceSat:       (*Amount)(balance),
+		TotalReceivedSat: (*Amount)(totalReceived),
+		TotalSentSat:     (*Amount)(totalSent),
+		Transfers:        transfers,
+		Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
+	})
 	return tokens, nil
 }
 
