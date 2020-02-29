@@ -229,7 +229,6 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 	}
 
 	if ad.balance != nil {
-		var i int = 0
 		if option >= AccountDetailsTokenBalances {
 			// + 1 for base plus any assets in AssetBalances, + 1 for owner asset for unallocated token
 			tokens = make(bchain.Tokens, 0, 2 + len(ad.balance.AssetBalances))
@@ -265,12 +264,13 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 						assetGuid := strconv.FormatUint(uint64(k), 10)
 						tokens = append(tokens, &bchain.Token{
 							Type:             bchain.SPTUnallocatedTokenType,
-							Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
+							Name:             address,
 							Decimals:         int(dbAsset.AssetObj.Precision),
 							Symbol:			  string(dbAsset.AssetObj.Symbol),
 							BalanceSat:       (*bchain.Amount)(ownerBalance),
 							TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
 							TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
+							Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 							Contract:		  assetGuid,
 							Transfers:		  v.Transfers,
 							ContractIndex:    assetGuid,
@@ -283,7 +283,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				assetGuid := strconv.FormatUint(uint64(k), 10)
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
-					Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
+					Name:             address,
 					Decimals:         int(dbAsset.AssetObj.Precision),
 					Symbol:			  string(dbAsset.AssetObj.Symbol),
 					BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
