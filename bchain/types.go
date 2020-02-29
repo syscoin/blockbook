@@ -517,12 +517,12 @@ type Token struct {
 type Tokens []*Token
 func (t Tokens) Len() int           { return len(t) }
 func (t Tokens) Swap(i, j int)      { 
-	if t[i] != nil && t[j] != nil {
+	if t[i] != nil && t[j] != nil && t[i].Type != XPUBAddressTokenType && t[j].Type != XPUBAddressTokenType {
 		t[i], t[j] = t[j], t[i] 
 	}
 }
 func (t Tokens) Less(i, j int) bool { 
-	if t[i] == nil || t[j] == nil {
+	if t[i] == nil || t[j] == nil || t[i].Type == XPUBAddressTokenType || t[j].Type == XPUBAddressTokenType {
 		return false
 	}
 	return t[i].Contract < t[j].Contract

@@ -232,10 +232,10 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 		var i int = 0
 		if option >= AccountDetailsTokenBalances {
 			// + 1 for base plus any assets in AssetBalances, + 1 for owner asset for unallocated token
-			tokens = make(bchain.Tokens, 2 + len(ad.balance.AssetBalances))
+			tokens = make(bchain.Tokens, 0, 2 + len(ad.balance.AssetBalances))
 			totalReceived := ad.balance.ReceivedSat()
 			// for base token
-			tokens[i] = &bchain.Token{
+			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.XPUBAddressTokenType,
 				Name:             address,
 				Decimals:         w.chainParser.AmountDecimals(),
@@ -245,7 +245,6 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				Transfers:        ad.balance.Txs,
 				Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 			}
-			i++
 			// for asset tokens
 			var ownerFound bool = false
 			for k, v := range ad.balance.AssetBalances {
@@ -264,7 +263,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 						ownerBalance := big.NewInt(dbAsset.AssetObj.Balance)
 						totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
 						assetGuid := strconv.FormatUint(uint64(k), 10)
-						tokens[i] = &bchain.Token{
+						tokens = append(tokens, &bchain.Token{
 							Type:             bchain.SPTUnallocatedTokenType,
 							Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
 							Decimals:         int(dbAsset.AssetObj.Precision),
@@ -277,13 +276,12 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 							ContractIndex:    assetGuid,
 						}
 						ownerFound = true
-						i++
 					}
 				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
 				// add token as unallocated if address matches asset owner address other wise its allocated
 				assetGuid := strconv.FormatUint(uint64(k), 10)
-				tokens[i] = &bchain.Token{
+				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             assetGuid + " (" + string(dbAsset.AssetObj.Symbol) + ")",
 					Decimals:         int(dbAsset.AssetObj.Precision),
@@ -296,7 +294,6 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Transfers:		  v.Transfers,
 					ContractIndex:    assetGuid,
 				}
-				i++
 			}
 			sort.Sort(tokens)
 		}
