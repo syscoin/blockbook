@@ -569,12 +569,14 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		txCount = int(data.txCountEstimate)
 	}
 	usedTokens := 0
+	usedAssetTokens := 0
 	var tokens bchain.Tokens
 	var xpubAddresses map[string]struct{}
 	if option > AccountDetailsBasic {
 		tokens = make(bchain.Tokens, 0, 4)
 		xpubAddresses = make(map[string]struct{})
 	}
+
 	for ci, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
 		for i := range da {
 			ad := &da[i]
@@ -589,10 +591,21 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				if len(tokensXPub) > 0 {
 					for _, token := range tokensXPub {
 						if token != nil {
-							if filter.TokensToReturn == TokensToReturnDerived ||
-								filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
-								filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
-								tokens = append(tokens, token)
+							if token.Type != bchain.XPUBAddressTokenType {
+								if token.balance != nil {
+									usedAssetTokens++
+								}
+								if filter.TokensToReturn == TokensToReturnDerived ||
+									filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
+									filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
+									tokens = append(tokens, token)
+								}
+							} else {
+								if filter.TokensToReturn == TokensToReturnDerived ||
+									filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
+									filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0  {
+									tokens = append(tokens, token)
+								}
 							}
 							xpubAddresses[token.Name] = struct{}{}
 						}
@@ -600,6 +613,12 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				}
 			}
 		}
+	}
+	// if more than 1 asset token is found add to usedTokens
+	// we want minus 1 because ad.balance is assumed to be nil for asset token to exist, so usedToken will already be incremented by 1
+	// we just need to increment for each token above the size of 1 to account for all other assets
+	if usedAssetTokens > 1 {
+		usedTokens += usedAssetTokens-1
 	}
 	var totalReceived big.Int
 	totalReceived.Add(&data.balanceSat, &data.sentSat)
