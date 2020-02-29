@@ -578,13 +578,15 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				if errXpub != nil {
 					return nil, errXpub
 				}
-				for _, token := range tokensXPub {
-					if filter.TokensToReturn == TokensToReturnDerived ||
-						filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
-						filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
-						tokens = append(tokens, token)
+				if len(tokensXPub) > 0 {
+					for _, token := range tokensXPub {
+						if filter.TokensToReturn == TokensToReturnDerived ||
+							filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
+							filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
+							tokens = append(tokens, token)
+						}
+						xpubAddresses[token.Name] = struct{}{}
 					}
-					xpubAddresses[token.Name] = struct{}{}
 				}
 			}
 		}
@@ -640,11 +642,13 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 				if errXpub != nil {
 					return nil, errXpub
 				}
-				for _ , t := range txs {
-					for j := range utxos {
-						a := &utxos[j]
-						a.Address = t.Name
-						a.Path = t.Path
+				if len(txs) > 0 {
+					for _ , t := range txs {
+						for j := range utxos {
+							a := &utxos[j]
+							a.Address = t.Name
+							a.Path = t.Path
+						}
 					}
 				}
 				r = append(r, utxos...)
