@@ -300,10 +300,10 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 		Type:             bchain.XPUBAddressTokenType,
 		Name:             address,
 		Decimals:         w.chainParser.AmountDecimals(),
-		BalanceSat:       (*Amount)(balance),
-		TotalReceivedSat: (*Amount)(totalReceived),
-		TotalSentSat:     (*Amount)(totalSent),
-		Transfers:        transfers,
+		BalanceSat:       (*bchain.Amount)(balance),
+		TotalReceivedSat: (*bchain.Amount)(totalReceived),
+		TotalSentSat:     (*bchain.Amount)(totalSent),
+		Transfers:        uint32(transfers),
 		Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 	})
 	return tokens, nil
