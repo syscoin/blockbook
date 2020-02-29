@@ -527,6 +527,18 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 	if feesSat.Sign() == -1 {
 		feesSat.SetUint64(0)
 	}
+	r := &Tx{
+		Blockhash:     bi.Hash,
+		Blockheight:   int(ta.Height),
+		Blocktime:     bi.Time,
+		Confirmations: bestheight - ta.Height + 1,
+		FeesSat:       (*bchain.Amount)(&feesSat),
+		Txid:          txid,
+		ValueInSat:    (*bchain.Amount)(&valInSat),
+		ValueOutSat:   (*bchain.Amount)(&valOutSat),
+		Vin:           vins,
+		Vout:          vouts,
+	}
 	if ta.TokenTransferSummary != nil {
 		// fill in unspent-ness on recipients
 		for i := range ta.TokenTransferSummary.Recipients {
@@ -550,19 +562,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 				}
 			}
 		}
-	}
-	r := &Tx{
-		Blockhash:     bi.Hash,
-		Blockheight:   int(ta.Height),
-		Blocktime:     bi.Time,
-		Confirmations: bestheight - ta.Height + 1,
-		FeesSat:       (*bchain.Amount)(&feesSat),
-		Txid:          txid,
-		ValueInSat:    (*bchain.Amount)(&valInSat),
-		ValueOutSat:   (*bchain.Amount)(&valOutSat),
-		Vin:           vins,
-		Vout:          vouts,
-		TokenTransferSummary:  []*bchain.TokenTransferSummary{ta.TokenTransferSummary},
+		r.TokenTransferSummary = []*bchain.TokenTransferSummary{ta.TokenTransferSummary}
 	}
 	return r
 }
