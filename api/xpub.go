@@ -293,10 +293,10 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				})
 			}
 			sort.Sort(tokens)
-		} else {
-			// ensures balance won't be nil and thus seen as "used" in calling functions (no need to check for ad.Balances != nil but check for tokens.BalanceSat is nil (not used, or 0 if it is used but option < AccountDetailsTokenBalances)
-			balance = big.NewInt(0)
 		}
+	} else {
+		// ensures balance won't be nil and thus seen as "used" in calling functions (no need to check for ad.Balances is nil but check for tokens.BalanceSat is nil (not used, or 0 if it is used but option < AccountDetailsTokenBalances)
+		balance = big.NewInt(0)
 	}
 	// for base token
 	tokens = append(tokens, &bchain.Token{
