@@ -994,7 +994,7 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 func (w *Worker) AssetAllocationSend(asset string, sender string, reciever string, amount string) (string, error) {
 	var err error
 	var assetGuidInt int
-	allocationSendTx interface{}
+	var allocationSendTx interface{}
 	assetGuidInt, err = strconv.Atoi(asset)
 	if err != nil {
 		return "", err
