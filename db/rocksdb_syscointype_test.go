@@ -11,7 +11,7 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
-
+	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/juju/errors"
 )
 
@@ -508,4 +508,5 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 	if len(d.is.BlockTimes) != 347315 {
 		t.Fatal("Expecting is.BlockTimes 347315, got ", len(d.is.BlockTimes))
 	}
+	chaincfg.ResetParams()
 }
