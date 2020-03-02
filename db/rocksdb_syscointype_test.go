@@ -79,7 +79,7 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		blockTxsKp = []keyPair{
 			{
 				"0003cf7f",
-				dbtestdata.TxidS1T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00",
+				dbtestdata.TxidS1T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
 				dbtestdata.TxidS1T1 + "01" + dbtestdata.TxidS1T1INPUT0 + "02",
 				nil,
 			},
@@ -171,7 +171,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	if err := checkColumn(d, cfBlockTxs, []keyPair{
 		{
 			"00054cb2",
-			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00",
+			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
 			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
 			nil,
 		},
