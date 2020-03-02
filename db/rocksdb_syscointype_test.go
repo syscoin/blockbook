@@ -178,6 +178,12 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
 			nil,
 		},
+		{
+			"0003cf7f",
+			dbtestdata.TxidS1T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
+			dbtestdata.TxidS1T1 + "01" + dbtestdata.TxidS1T1INPUT0 + "02",
+			nil,
+		},
 	}); err != nil {
 		{
 			t.Fatal(err)
