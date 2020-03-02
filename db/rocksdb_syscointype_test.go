@@ -22,7 +22,7 @@ type testSyscoinParser struct {
 
 func syscoinTestParser() *syscoin.SyscoinParser {
 	return syscoin.NewSyscoinParser(syscoin.GetChainParams("main"),
-	&btc.Configuration{BlockAddressesToKeep: 1})
+	&btc.Configuration{BlockAddressesToKeep: 347314 - 249727})
 }
 
 func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool) {
@@ -178,12 +178,6 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
 			nil,
 		},
-		{
-			"0003cf7f",
-			dbtestdata.TxidS1T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS1T1 + "01" + dbtestdata.TxidS1T1INPUT0 + "02",
-			nil,
-		},
 	}); err != nil {
 		{
 			t.Fatal(err)
@@ -229,7 +223,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	verifyAfterSyscoinTypeBlock2(t, d)
 
 	if len(d.is.BlockTimes) != 2 {
-		t.Fatal("Expecting is.BlockTimes 1, got ", len(d.is.BlockTimes))
+		t.Fatal("Expecting is.BlockTimes 2, got ", len(d.is.BlockTimes))
 	}
 
 	// get transactions for various addresses / low-high ranges
@@ -349,7 +343,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	verifyAfterSyscoinTypeBlock2(t, d)
 
 	if len(d.is.BlockTimes) != 2 {
-		t.Fatal("Expecting is.BlockTimes 1, got ", len(d.is.BlockTimes))
+		t.Fatal("Expecting is.BlockTimes 2, got ", len(d.is.BlockTimes))
 	}
 
 	// test public methods for address balance and tx addresses
@@ -479,6 +473,7 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	verifyAfterSyscoinTypeBlock1(t, d, false)
 
 	if err := bc.ConnectBlock(dbtestdata.GetTestSyscoinTypeBlock2(d.chainParser), true); err != nil {
 		t.Fatal(err)
