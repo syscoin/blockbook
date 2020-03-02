@@ -52,8 +52,8 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 			varuintToHex(249727) +
 				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
 				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A0, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) + 
+				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A2, d) + 
 				"00",
 			nil,
 		},
@@ -77,7 +77,7 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.add(dbtestdata.SatS2T1A1), d) +
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.Add(dbtestdata.SatS2T1A1), d) +
 				varuintToHex(1045909988) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatZero, d) + varuintToHex(1) +
 				dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T1A1, d),
 			nil,
@@ -144,8 +144,8 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 			varuintToHex(249727) +
 				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
 				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A0, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) + 
+				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A2, d) + 
 				"00",
 			nil,
 		},
@@ -154,8 +154,8 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 			varuintToHex(347314) +
 				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
 				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS4, t, d) + bigintToHex(dbtestdata.SatS2T0A0, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS2T0A1, d) + 
+				addressToPubKeyHexWithLength(dbtestdata.AddrS4, t, d) + bigintToHex(dbtestdata.SatS2T0A1, d) +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS2T0A2, d) + 
 				"00",
 			nil,
 		},
@@ -201,7 +201,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS6, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatZero, d) +
-			varuintToHex(1045909988) + bigintToHex(dbtestdata.SatAssetSent, d) + bigintToHex(dbtestdata.SatZero, d) + varuintToHex(1) +
+			varuintToHex(1045909988) + bigintToHex(dbtestdata.SatAssetSent, d) + bigintToHex(dbtestdata.SatZero, d) + varuintToHex(1),
 			nil,
 		},
 	}); err != nil {
@@ -407,7 +407,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 				ValueSat: *dbtestdata.SatS2T1A1,
 			},
 		},
-		AssetBalances: map[uint32]*AssetBalance {
+		AssetBalances: map[uint32]*bchain.AssetBalance {
 			1045909988: &bchain.AssetBalance{
 				SentAssetSat: 	dbtestdata.SatAssetSent,
 				BalanceAssetSat: dbtestdata.SatZero,
@@ -419,12 +419,12 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		t.Errorf("GetAddressBalance() = %+v, want %+v", ab, abw)
 	}
 	rs := ab.ReceivedSat()
-	rsw := dbtestdata.SatS1T2A5.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1)
+	rsw := dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1)
 	if rs.Cmp(rsw) != 0 {
 		t.Errorf("GetAddressBalance().ReceivedSat() = %v, want %v", rs, rsw)
 	}
 
-	rsa := ab.ReceivedSatFromBalances(dbtestdata.SatZero, dbtestdata.SatAssetSent)
+	rsa := bchain.ReceivedSatFromBalances(dbtestdata.SatZero, dbtestdata.SatAssetSent)
 	rswa := dbtestdata.SatAssetSent
 	if rsa.Cmp(rswa) != 0 {
 		t.Errorf("GetAddressBalance().ReceivedSatFromBalances() = %v, want %v", rsa, rswa)
