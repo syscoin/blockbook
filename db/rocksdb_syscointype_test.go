@@ -116,7 +116,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{^1045909988, 1}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS4, 347314, d), txIndexesHex(dbtestdata.TxidS2T0, []int32{0}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS5, 347314, d), txIndexesHex(dbtestdata.TxidS2T0, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{^1, ^1045909988, 1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS3, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{^1045909988, 1}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS6, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{1045909988}, d), nil},
 	}); err != nil {
 		{
@@ -213,7 +213,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		{
 			"00054cb2",
 			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS1T1 + "02",
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
 			nil,
 		},
 		{
@@ -234,7 +234,6 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 
 	// get transactions for various addresses / low-high ranges
 	verifyGetTransactions(t, d, dbtestdata.AddrS3, 0, 1000000, []txidIndex{
-		{dbtestdata.TxidS1T1, ^1},
 		{dbtestdata.TxidS2T1, ^1045909988}, // asset is used as input to send to addr6 (burn)
 		{dbtestdata.TxidS2T1, 1},
 		{dbtestdata.TxidS1T1, ^1045909988}, // asset is used as input to update asset
@@ -245,7 +244,6 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		{dbtestdata.TxidS1T1, 1},
 	}, nil)
 	verifyGetTransactions(t, d, dbtestdata.AddrS3, 347314, 1000000, []txidIndex{
-		{dbtestdata.TxidS1T1, ^1},
 		{dbtestdata.TxidS2T1, ^1045909988},
 		{dbtestdata.TxidS2T1, 1},
 	}, nil)
@@ -338,7 +336,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		{
 			"00054cb2",
 			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS1T1 + "02",
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
 			nil,
 		},
 		{
@@ -418,8 +416,8 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		Height: 347314,
 		Inputs: []bchain.TxInput{
 			{
-				AddrDesc: addressToAddrDesc(dbtestdata.AddrS3, d.chainParser),
-				ValueSat: *dbtestdata.SatS1T1A1,
+				AddrDesc: "", // input won't be found because there is many transactions within the range of blocks we chose to isolate asset data for this test
+				ValueSat: *dbtestdata.SatZero,
 			},
 		},
 		Outputs: []bchain.TxOutput{
@@ -503,7 +501,7 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 		{
 			"00054cb2",
 			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS1T1 + "02",
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
 			nil,
 		},
 	}); err != nil {
