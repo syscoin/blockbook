@@ -1160,7 +1160,6 @@ func (s *PublicServer) apiAssetAllocationSend(r *http.Request, apiVersion int) (
 	if len(assetParam) == 0 {
 		return nil, api.NewAPIError("Missing asset", true)
 	}
-	var err error
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
 	amount := r.URL.Query().Get("amount")
