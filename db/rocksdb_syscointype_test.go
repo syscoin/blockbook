@@ -10,6 +10,7 @@ import (
 	"blockbook/tests/dbtestdata"
 	"math/big"
 	"reflect"
+	"encoding/hex"
 	"testing"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/juju/errors"
