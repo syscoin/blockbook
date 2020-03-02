@@ -173,12 +173,6 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	}
 	if err := checkColumn(d, cfBlockTxs, []keyPair{
 		{
-			"0003cf7f",
-			dbtestdata.TxidS1T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS1T1 + "01" + dbtestdata.TxidS1T1INPUT0 + "02",
-			nil,
-		},
-		{
 			"00054cb2",
 			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
 			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
@@ -234,11 +228,10 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 
 	// get transactions for various addresses / low-high ranges
 	verifyGetTransactions(t, d, dbtestdata.AddrS3, 0, 1000000, []txidIndex{
-		{dbtestdata.TxidS1T1, ^1045909988}, // asset is used as input to update asset
-		{dbtestdata.TxidS1T1, 1},
 		{dbtestdata.TxidS2T1, ^1045909988}, // asset is used as input to send to addr6 (burn)
 		{dbtestdata.TxidS2T1, 1},
-		
+		{dbtestdata.TxidS1T1, ^1045909988}, // asset is used as input to update asset
+		{dbtestdata.TxidS1T1, 1},
 	}, nil)
 	verifyGetTransactions(t, d, dbtestdata.AddrS3, 249727, 249727, []txidIndex{
 		{dbtestdata.TxidS1T1, ^1045909988},
@@ -250,7 +243,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}, nil)
 	verifyGetTransactions(t, d, dbtestdata.AddrS3, 500000, 1000000, []txidIndex{}, nil)
 	verifyGetTransactions(t, d, dbtestdata.AddrS4, 0, 1000000, []txidIndex{
-		{dbtestdata.TxidS2T1, 0},
+		{dbtestdata.TxidS2T0, 0},
 	}, nil)
 	verifyGetTransactions(t, d, dbtestdata.AddrS6, 0, 1000000, []txidIndex{
 		{dbtestdata.TxidS2T1, 1045909988}, // sent to addr6 burn as asset
