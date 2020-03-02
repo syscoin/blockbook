@@ -51,6 +51,8 @@ func (c *TxCache) GetTransaction(txid string) (*bchain.Tx, int, error) {
 			tx.Confirmations = bestheight - h + 1
 			c.metrics.TxCacheEfficiency.With(common.Labels{"status": "hit"}).Inc()
 			return tx, int(h), nil
+		} else {
+			glog.Info("cache: miss")
 		}
 	}
 	tx, err = c.chain.GetTransaction(txid)
