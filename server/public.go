@@ -1160,6 +1160,7 @@ func (s *PublicServer) apiAssetAllocationSend(r *http.Request, apiVersion int) (
 	if len(assetParam) == 0 {
 		return nil, api.NewAPIError("Missing asset", true)
 	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "api-assetallocationsend"}).Inc()
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
 	amount := r.URL.Query().Get("amount")
@@ -1193,7 +1194,7 @@ func (s *PublicServer) apiAssets(r *http.Request, apiVersion int) (interface{}, 
 		return nil, api.NewAPIError("Missing asset", true)
 	}
 	var assets *api.Assets
-	s.metrics.ExplorerViews.With(common.Labels{"action": "api-asset"}).Inc()
+	s.metrics.ExplorerViews.With(common.Labels{"action": "api-assets"}).Inc()
 	page, pageSize, _, _, _, _ := s.getAssetQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
 	assets = s.api.FindAssets(assetParam, page, pageSize)
 	return assets, nil
