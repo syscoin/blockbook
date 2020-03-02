@@ -150,13 +150,13 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A1, d) +
-			"00" + dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A1, d),
+			"00" + dbtestdata.TxidS2T0 + varuintToHex(0) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A2, d) +
-			"00" + dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A2, d),
+			"00" + dbtestdata.TxidS2T0 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A2, d),
 			nil,
 		},
 		// burn should have a address balance as asset output from S2T1
