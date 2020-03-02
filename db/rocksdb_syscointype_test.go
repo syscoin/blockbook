@@ -40,23 +40,7 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	if err := checkColumn(d, cfAddresses, []keyPair{
 		{addressKeyHex(dbtestdata.AddrS1, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{0}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS2, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{1, 1045909988}, d), nil},
-	}); err != nil {
-		{
-			t.Fatal(err)
-		}
-	}
-	if err := checkColumn(d, cfTxAddresses, []keyPair{
-		{
-			dbtestdata.TxidS1T0,
-			varuintToHex(249727) +
-				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
-				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A2, d) + 
-				"00",
-			nil,
-		},
+		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{^1045909988, 1}, d), nil},
 	}); err != nil {
 		{
 			t.Fatal(err)
@@ -134,32 +118,6 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{addressKeyHex(dbtestdata.AddrS5, 347314, d), txIndexesHex(dbtestdata.TxidS2T0, []int32{1}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS3, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{^1045909988, 1}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS6, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{1045909988}, d), nil},
-	}); err != nil {
-		{
-			t.Fatal(err)
-		}
-	}
-	if err := checkColumn(d, cfTxAddresses, []keyPair{
-		{
-			dbtestdata.TxidS1T0,
-			varuintToHex(249727) +
-				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
-				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A2, d) + 
-				"00",
-			nil,
-		},
-		{
-			dbtestdata.TxidS2T0,
-			varuintToHex(347314) +
-				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
-				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS4, t, d) + bigintToHex(dbtestdata.SatS2T0A1, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS2T0A2, d) + 
-				"00",
-			nil,
-		},
 	}); err != nil {
 		{
 			t.Fatal(err)
