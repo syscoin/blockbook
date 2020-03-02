@@ -9,6 +9,7 @@ import (
 	"blockbook/bchain/coins/sys"
 	"blockbook/tests/dbtestdata"
 	"encoding/hex"
+	"math/big"
 	"reflect"
 	"testing"
 
