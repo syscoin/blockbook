@@ -446,8 +446,8 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	if !reflect.DeepEqual(ta, taw) {
 		t.Errorf("GetTxAddresses() = %+v, want %+v", ta, taw)
 	}
-	if !reflect.DeepEqual(ta.TokenTransferSummary, taw.TokenTransferSummary) {
-		t.Errorf("GetTxAddresses() = %+v, want %+v", ta.TokenTransferSummary, taw.TokenTransferSummary)
+	if !reflect.DeepEqual(*ta.TokenTransferSummary, *taw.TokenTransferSummary) {
+		t.Errorf("GetTxAddresses() = %+v, want %+v", *ta.TokenTransferSummary, *taw.TokenTransferSummary)
 	}
 
 }
