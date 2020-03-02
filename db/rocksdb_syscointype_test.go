@@ -22,7 +22,7 @@ type testSyscoinParser struct {
 
 func syscoinTestParser() *syscoin.SyscoinParser {
 	return syscoin.NewSyscoinParser(syscoin.GetChainParams("main"),
-	&btc.Configuration{BlockAddressesToKeep: 347314 - 249727})
+	&btc.Configuration{BlockAddressesToKeep: 1})
 }
 
 func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool) {
@@ -222,6 +222,19 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}
 	verifyAfterSyscoinTypeBlock2(t, d)
 
+	if err := checkColumn(d, cfBlockTxs, []keyPair{
+		{
+			"00054cb2",
+			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
+			nil,
+		},
+	}); err != nil {
+		{
+			t.Fatal(err)
+		}
+	}
+
 	if len(d.is.BlockTimes) != 2 {
 		t.Fatal("Expecting is.BlockTimes 2, got ", len(d.is.BlockTimes))
 	}
@@ -342,6 +355,25 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}
 	verifyAfterSyscoinTypeBlock2(t, d)
 
+	if err := checkColumn(d, cfBlockTxs, []keyPair{
+		{
+			"00054cb2",
+			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
+			nil,
+		},
+		{
+			"0003cf7f",
+			dbtestdata.TxidS1T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
+			dbtestdata.TxidS1T1 + "01" + dbtestdata.TxidS1T1INPUT0 + "02",
+			nil,
+		},
+	}); err != nil {
+		{
+			t.Fatal(err)
+		}
+	}
+	
 	if len(d.is.BlockTimes) != 2 {
 		t.Fatal("Expecting is.BlockTimes 2, got ", len(d.is.BlockTimes))
 	}
@@ -488,7 +520,18 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 	}
 
 	verifyAfterSyscoinTypeBlock2(t, d)
-
+	if err := checkColumn(d, cfBlockTxs, []keyPair{
+		{
+			"00054cb2",
+			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
+			nil,
+		},
+	}); err != nil {
+		{
+			t.Fatal(err)
+		}
+	}
 	if len(d.is.BlockTimes) != 347315 {
 		t.Fatal("Expecting is.BlockTimes 347315, got ", len(d.is.BlockTimes))
 	}
