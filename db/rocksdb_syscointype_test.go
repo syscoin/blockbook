@@ -302,6 +302,22 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		t.Errorf("GetBlockInfo() = %+v, want %+v", info, iw)
 	}
 
+	// Test tx caching functionality, leave one tx in db to test cleanup in DisconnectBlock
+	testTxCache(t, d, block1, &block1.Txs[0])
+	testTxCache(t, d, block2, &block2.Txs[0])
+	if err = d.PutTx(&block2.Txs[1], block2.Height, block2.Txs[1].Blocktime); err != nil {
+		t.Fatal(err)
+	}
+	// check that there is only the last tx in the cache
+	packedTx, err := d.chainParser.PackTx(&block2.Txs[1], block2.Height, block2.Txs[1].Blocktime)
+	if err := checkColumn(d, cfTransactions, []keyPair{
+		{block2.Txs[1].Txid, hex.EncodeToString(packedTx), nil},
+	}); err != nil {
+		{
+			t.Fatal(err)
+		}
+	}
+
 	// try to disconnect both blocks, however only the last one is kept, it is not possible
 	err = d.DisconnectBlockRangeBitcoinType(249727, 347314)
 	if err == nil || err.Error() != "Cannot disconnect blocks with height 249728 and lower. It is necessary to rebuild index." {
