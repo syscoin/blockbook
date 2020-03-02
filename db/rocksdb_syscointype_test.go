@@ -499,7 +499,6 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	verifyAfterSyscoinTypeBlock1(t, d, false)
 
 	if err := bc.ConnectBlock(dbtestdata.GetTestSyscoinTypeBlock2(d.chainParser), true); err != nil {
 		t.Fatal(err)
