@@ -996,7 +996,7 @@ func (w *Worker) AssetAllocationSend(asset string, sender string, reciever strin
 	var assetGuidInt int
 	assetGuidInt, err = strconv.Atoi(asset)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return w.chain.AssetAllocationSend(assetGuidInt, sender, reciever, amount)
 }
