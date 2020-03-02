@@ -40,7 +40,7 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	if err := checkColumn(d, cfAddresses, []keyPair{
 		{addressKeyHex(dbtestdata.AddrS1, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{0}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS2, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{1, 1045909988}, d), nil},
 	}); err != nil {
 		{
 			t.Fatal(err)
@@ -180,7 +180,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
 			"02" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1), d) +
-				varuintToHex(1045909989) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatAssetSent, d) + varuintToHex(2) +
+				varuintToHex(1045909988) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatAssetSent, d) + varuintToHex(2) +
 				dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T1A1, d) +
 				dbtestdata.TxidS2T1 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T1A1, d),
 			nil,
