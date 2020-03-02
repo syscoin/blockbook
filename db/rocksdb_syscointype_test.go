@@ -77,7 +77,7 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.Add(dbtestdata.SatS2T1A1), d) +
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1), d) +
 				varuintToHex(1045909988) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatZero, d) + varuintToHex(1) +
 				dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T1A1, d),
 			nil,
@@ -179,7 +179,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
-			"02" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.add(dbtestdata.SatS2T1A1), d) +
+			"02" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1), d) +
 				varuintToHex(1045909988) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatAssetSent, d) + varuintToHex(2) +
 				dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T1A1, d) +
 				dbtestdata.TxidS2T1 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T1A1, d),
@@ -460,8 +460,8 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 			Token:  "1045909988", 
 			Symbol: "SYSX",
 			Decimals: 8,
-			Value	 (*bchain.Amount)(dbtestdata.SatAssetSent),
-			Fee      (*bchain.Amount)(dbtestdata.SatZero),
+			Value:	 (*bchain.Amount)(dbtestdata.SatAssetSent),
+			Fee:     (*bchain.Amount)(dbtestdata.SatZero),
 			Recipients: []*bchain.TokenTransferRecipient{
 				To: dbtestdata.AddrS6,
 				Value: (*bchain.Amount)(dbtestdata.SatAssetSent),
