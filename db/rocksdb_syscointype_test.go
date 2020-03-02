@@ -416,7 +416,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		Height: 347314,
 		Inputs: []bchain.TxInput{
 			{
-				AddrDesc: "", // input won't be found because there is many transactions within the range of blocks we chose to isolate asset data for this test
+				// input won't be found because there is many transactions within the range of blocks we chose to isolate asset data for this test
 				ValueSat: *dbtestdata.SatZero,
 			},
 		},
