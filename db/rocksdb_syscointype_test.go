@@ -19,16 +19,16 @@ type testSyscoinParser struct {
 	*syscoin.SyscoinParser
 }
 
-func syscoinTestnetParser() *syscoin.SyscoinParser {
-	return syscoin.NewSyscoinParser(syscoin.GetChainParams("test"),
+func syscoinTestParser() *syscoin.SyscoinParser {
+	return syscoin.NewSyscoinParser(syscoin.GetChainParams("main"),
 	&btc.Configuration{BlockAddressesToKeep: 1})
 }
 
 func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool) {
 	if err := checkColumn(d, cfHeight, []keyPair{
 		{
-			"000370d5",
-			"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997" + uintToHex(1521515026) + varuintToHex(2) + varuintToHex(1234567),
+			"0003cf7f",
+			"78ae6476a514897c8a6984032e5d0e4a44424055f0c2d7b5cf664ae8c8c20487" + uintToHex(1574279564) + varuintToHex(2) + varuintToHex(1551),
 			nil,
 		},
 	}); err != nil {
@@ -38,11 +38,9 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	}
 	// the vout is encoded as signed varint, i.e. value * 2 for non negative values
 	if err := checkColumn(d, cfAddresses, []keyPair{
-		{addressKeyHex(dbtestdata.AddrS1, 225493, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS2, 225493, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{1, 2}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 225493, d), txIndexesHex(dbtestdata.TxidS1T2, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS4, 225493, d), txIndexesHex(dbtestdata.TxidS1T2, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS5, 225493, d), txIndexesHex(dbtestdata.TxidS1T2, []int32{2}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS1, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{0}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS2, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{1}, d), nil},
 	}); err != nil {
 		{
 			t.Fatal(err)
@@ -50,22 +48,13 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	}
 	if err := checkColumn(d, cfTxAddresses, []keyPair{
 		{
-			dbtestdata.TxidS1T1,
-			varuintToHex(225493) +
-				"00" +
-				"03" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T1A1, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T1A2, d),
-			nil,
-		},
-		{
-			dbtestdata.TxidS1T2,
-			varuintToHex(225493) +
-				"00" +
-				"03" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS3, t, d) + bigintToHex(dbtestdata.SatS1T2A3, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS4, t, d) + bigintToHex(dbtestdata.SatS1T2A4, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS1T2A5, d),
+			dbtestdata.TxidS1T0,
+			varuintToHex(249727) +
+				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
+				"02" +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A0, d) +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) + 
+				"00",
 			nil,
 		},
 	}); err != nil {
@@ -76,33 +65,21 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	if err := checkColumn(d, cfAddressBalance, []keyPair{
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1, d) +
-				dbtestdata.TxidS1T1 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A1, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
+				dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A2Double, d) +
-			dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A2, d) +
-			dbtestdata.TxidS1T1 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A2, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A2, d) +
+			dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A2, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T2A3, d) +
-				dbtestdata.TxidS1T2 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T2A3, d),
-			nil,
-		},
-		{
-			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T2A4, d) +
-				dbtestdata.TxidS1T2 + varuintToHex(1) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T2A4, d),
-			nil,
-		},
-		{
-			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T2A5, d) +
-				dbtestdata.TxidS1T2 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T2A5, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.add(dbtestdata.SatS2T1A1), d) +
+				varuintToHex(1045909988) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatZero, d) + varuintToHex(1) +
+				dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T1A1, d)
 			nil,
 		},
 	}); err != nil {
@@ -117,8 +94,9 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	} else {
 		blockTxsKp = []keyPair{
 			{
-				"000370d5",
-				dbtestdata.TxidS1T1 + "00" + dbtestdata.TxidS1T2 + "00",
+				"0003cf7f",
+				dbtestdata.TxidS1T0 + "00" +
+				dbtestdata.TxidS1T1 + "01" + dbtestdata.TxidS1T1INPUT0 + "02",
 				nil,
 			},
 		}
@@ -134,13 +112,13 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	if err := checkColumn(d, cfHeight, []keyPair{
 		{
-			"000370d5",
-			"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997" + uintToHex(1521515026) + varuintToHex(2) + varuintToHex(1234567),
+			"0003cf7f",
+			"78ae6476a514897c8a6984032e5d0e4a44424055f0c2d7b5cf664ae8c8c20487" + uintToHex(1574279564) + varuintToHex(2) + varuintToHex(1551),
 			nil,
 		},
 		{
-			"000370d6",
-			"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6" + uintToHex(1521595678) + varuintToHex(4) + varuintToHex(2345678),
+			"00054cb2",
+			"6609d44688868613991b0cd5ed981a76526caed6b0f7b1be242f5a93311636c6" + uintToHex(1580142055) + varuintToHex(4) + varuintToHex(1611),
 			nil,
 		},
 	}); err != nil {
@@ -149,20 +127,12 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		}
 	}
 	if err := checkColumn(d, cfAddresses, []keyPair{
-		{addressKeyHex(dbtestdata.AddrS1, 225493, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS2, 225493, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{1, 2}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 225493, d), txIndexesHex(dbtestdata.TxidS1T2, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS4, 225493, d), txIndexesHex(dbtestdata.TxidS1T2, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS5, 225493, d), txIndexesHex(dbtestdata.TxidS1T2, []int32{2}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS6, 225494, d), txIndexesHex(dbtestdata.TxidS2T2, []int32{^0}, d) + txIndexesHex(dbtestdata.TxidS2T1, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS7, 225494, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS8, 225494, d), txIndexesHex(dbtestdata.TxidS2T2, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS9, 225494, d), txIndexesHex(dbtestdata.TxidS2T2, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 225494, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{^0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS2, 225494, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{^1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS5, 225494, d), txIndexesHex(dbtestdata.TxidS2T3, []int32{0, ^0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrSA, 225494, d), txIndexesHex(dbtestdata.TxidS2T4, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS4, 225494, d), txIndexesHex(dbtestdata.TxidS2T2, []int32{^1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS1, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{0}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS2, 249727, d), txIndexesHex(dbtestdata.TxidS1T0, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS4, 347314, d), txIndexesHex(dbtestdata.TxidS2T0, []int32{0}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS5, 347314, d), txIndexesHex(dbtestdata.TxidS2T0, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS3, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{1}, d), nil},
 	}); err != nil {
 		{
 			t.Fatal(err)
@@ -170,64 +140,23 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	}
 	if err := checkColumn(d, cfTxAddresses, []keyPair{
 		{
-			dbtestdata.TxidS1T1,
-			varuintToHex(225493) +
-				"00" +
-				"03" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T1A1, d) +
-				spentAddressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T1A2, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T1A2, d),
-			nil,
-		},
-		{
-			dbtestdata.TxidS1T2,
-			varuintToHex(225493) +
-				"00" +
-				"03" +
-				spentAddressToPubKeyHexWithLength(dbtestdata.AddrS3, t, d) + bigintToHex(dbtestdata.SatS1T2A3, d) +
-				spentAddressToPubKeyHexWithLength(dbtestdata.AddrS4, t, d) + bigintToHex(dbtestdata.SatS1T2A4, d) +
-				spentAddressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS1T2A5, d),
-			nil,
-		},
-		{
-			dbtestdata.TxidS2T1,
-			varuintToHex(225494) +
-				"02" +
-				inputAddressToPubKeyHexWithLength(dbtestdata.AddrS3, t, d) + bigintToHex(dbtestdata.SatS1T2A3, d) +
-				inputAddressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T1A2, d) +
-				"03" +
-				spentAddressToPubKeyHexWithLength(dbtestdata.AddrS6, t, d) + bigintToHex(dbtestdata.SatS2T1A6, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS7, t, d) + bigintToHex(dbtestdata.SatS2T1A7, d) +
-				hex.EncodeToString([]byte{byte(len(dbtestdata.TxidS2T1Output3OpReturn))}) + dbtestdata.TxidS2T1Output3OpReturn + bigintToHex(dbtestdata.SatZero, d),
-			nil,
-		},
-		{
-			dbtestdata.TxidS2T2,
-			varuintToHex(225494) +
-				"02" +
-				inputAddressToPubKeyHexWithLength(dbtestdata.AddrS6, t, d) + bigintToHex(dbtestdata.SatS2T1A6, d) +
-				inputAddressToPubKeyHexWithLength(dbtestdata.AddrS4, t, d) + bigintToHex(dbtestdata.SatS1T2A4, d) +
-				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS8, t, d) + bigintToHex(dbtestdata.SatS2T2A8, d) +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS9, t, d) + bigintToHex(dbtestdata.SatS2T2A9, d),
-			nil,
-		},
-		{
-			dbtestdata.TxidS2T3,
-			varuintToHex(225494) +
-				"01" +
-				inputAddressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS1T2A5, d) +
-				"01" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS2T3A5, d),
-			nil,
-		},
-		{
-			dbtestdata.TxidS2T4,
-			varuintToHex(225494) +
+			dbtestdata.TxidS1T0,
+			varuintToHex(249727) +
 				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
 				"02" +
-				addressToPubKeyHexWithLength(dbtestdata.AddrSA, t, d) + bigintToHex(dbtestdata.SatS2T4AA, d) +
-				addressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d),
+				addressToPubKeyHexWithLength(dbtestdata.AddrS1, t, d) + bigintToHex(dbtestdata.SatS1T0A0, d) +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS2, t, d) + bigintToHex(dbtestdata.SatS1T0A1, d) + 
+				"00",
+			nil,
+		},
+		{
+			dbtestdata.TxidS2T0,
+			varuintToHex(347314) +
+				"01" + inputAddressToPubKeyHexWithLength("", t, d) + bigintToHex(dbtestdata.SatZero, d) +
+				"02" +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS4, t, d) + bigintToHex(dbtestdata.SatS2T0A0, d) +
+				addressToPubKeyHexWithLength(dbtestdata.AddrS5, t, d) + bigintToHex(dbtestdata.SatS2T0A1, d) + 
+				"00",
 			nil,
 		},
 	}); err != nil {
@@ -238,59 +167,41 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	if err := checkColumn(d, cfAddressBalance, []keyPair{
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1, d) +
-				dbtestdata.TxidS1T1 + varuintToHex(0) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A1, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
+				dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
-			"02" + bigintToHex(dbtestdata.SatS1T1A2, d) + bigintToHex(dbtestdata.SatS1T1A2, d) +
-			dbtestdata.TxidS1T1 + varuintToHex(2) + varuintToHex(225493) + bigintToHex(dbtestdata.SatS1T1A2, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A2, d) +
+			dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A2, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
-			"02" + bigintToHex(dbtestdata.SatS1T2A3, d) + bigintToHex(dbtestdata.SatZero, d),
+			"02" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.add(dbtestdata.SatS2T1A1), d) +
+				varuintToHex(1045909988) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatAssetSent, d) + varuintToHex(2) +
+				dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T1A1, d) +
+				dbtestdata.TxidS2T1 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T1A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
-			"02" + bigintToHex(dbtestdata.SatS1T2A4, d) + bigintToHex(dbtestdata.SatZero, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A1, d) +
+				dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
-			"02" + bigintToHex(dbtestdata.SatS1T2A5, d) + bigintToHex(dbtestdata.SatS2T3A5, d) +
-				dbtestdata.TxidS2T3 + varuintToHex(0) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T3A5, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A2, d) +
+			dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A2, d),
 			nil,
 		},
+		// burn should have a address balance as asset output from S2T1
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS6, d.chainParser),
-			"02" + bigintToHex(dbtestdata.SatS2T1A6, d) + bigintToHex(dbtestdata.SatZero, d),
-			nil,
-		},
-		{
-			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS7, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T1A7, d) +
-				dbtestdata.TxidS2T1 + varuintToHex(1) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T1A7, d),
-			nil,
-		},
-		{
-			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS8, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T2A8, d) +
-				dbtestdata.TxidS2T2 + varuintToHex(0) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T2A8, d),
-			nil,
-		},
-		{
-			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS9, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T2A9, d) +
-				dbtestdata.TxidS2T2 + varuintToHex(1) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T2A9, d),
-			nil,
-		},
-		{
-			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrSA, d.chainParser),
-			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T4AA, d) +
-				dbtestdata.TxidS2T4 + varuintToHex(0) + varuintToHex(225494) + bigintToHex(dbtestdata.SatS2T4AA, d),
+			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatZero, d) +
+			varuintToHex(1045909988) + bigintToHex(dbtestdata.SatAssetSent, d) + bigintToHex(dbtestdata.SatZero, d) + varuintToHex(1) +
 			nil,
 		},
 	}); err != nil {
@@ -300,11 +211,9 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	}
 	if err := checkColumn(d, cfBlockTxs, []keyPair{
 		{
-			"000370d6",
-			dbtestdata.TxidS2T1 + "02" + dbtestdata.TxidS1T2 + "00" + dbtestdata.TxidS1T1 + "02" +
-				dbtestdata.TxidS2T2 + "02" + dbtestdata.TxidS2T1 + "00" + dbtestdata.TxidS1T2 + "02" +
-				dbtestdata.TxidS2T3 + "01" + dbtestdata.TxidS1T2 + "04" +
-				dbtestdata.TxidS2T4 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00",
+			"00054cb2",
+			dbtestdata.TxidS2T0 + "00" +
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
 			nil,
 		},
 	}); err != nil {
@@ -325,7 +234,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 // After each step, the content of DB is examined and any difference against expected state is regarded as failure
 func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	d := setupRocksDB(t, &testSyscoinParser{
-		SyscoinParser: syscoinTestnetParser(),
+		SyscoinParser: syscoinTestParser(),
 	})
 	defer closeAndDestroyRocksDB(t, d)
 
@@ -356,51 +265,52 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}
 
 	// get transactions for various addresses / low-high ranges
-	verifyGetTransactions(t, d, dbtestdata.AddrS2, 0, 1000000, []txidIndex{
-		{dbtestdata.TxidS2T1, ^1},
+	verifyGetTransactions(t, d, dbtestdata.AddrS3, 0, 1000000, []txidIndex{
 		{dbtestdata.TxidS1T1, 1},
-		{dbtestdata.TxidS1T1, 2},
+		{dbtestdata.TxidS1T1, ^1045909988}, // asset is used as input to update asset
+		{dbtestdata.TxidS2T1, 1},
+		{dbtestdata.TxidS2T1, ^1045909988}, // asset is used as input to send to addr6 (burn)
 	}, nil)
-	verifyGetTransactions(t, d, dbtestdata.AddrS2, 225493, 225493, []txidIndex{
+	verifyGetTransactions(t, d, dbtestdata.AddrS3, 249727, 249727, []txidIndex{
 		{dbtestdata.TxidS1T1, 1},
-		{dbtestdata.TxidS1T1, 2},
+		{dbtestdata.TxidS1T1, ^1045909988},
 	}, nil)
-	verifyGetTransactions(t, d, dbtestdata.AddrS2, 225494, 1000000, []txidIndex{
-		{dbtestdata.TxidS2T1, ^1},
+	verifyGetTransactions(t, d, dbtestdata.AddrS3, 347314, 1000000, []txidIndex{
+		{dbtestdata.TxidS2T1, 1},
+		{dbtestdata.TxidS2T1, ^1045909988},
 	}, nil)
-	verifyGetTransactions(t, d, dbtestdata.AddrS2, 500000, 1000000, []txidIndex{}, nil)
-	verifyGetTransactions(t, d, dbtestdata.AddrS8, 0, 1000000, []txidIndex{
-		{dbtestdata.TxidS2T2, 0},
-	}, nil)
-	verifyGetTransactions(t, d, dbtestdata.AddrS6, 0, 1000000, []txidIndex{
-		{dbtestdata.TxidS2T2, ^0},
+	verifyGetTransactions(t, d, dbtestdata.AddrS3, 500000, 1000000, []txidIndex{}, nil)
+	verifyGetTransactions(t, d, dbtestdata.AddrS4, 0, 1000000, []txidIndex{
 		{dbtestdata.TxidS2T1, 0},
 	}, nil)
-	verifyGetTransactions(t, d, "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eBad", 500000, 1000000, []txidIndex{}, errors.New("checksum mismatch"))
+	verifyGetTransactions(t, d, dbtestdata.AddrS6, 0, 1000000, []txidIndex{
+		{dbtestdata.TxidS2T1, 1045909988}, // sent to addr6 burn as asset
+	}, nil)
+	verifyGetTransactions(t, d, "SgBVZhGLjqRz8ufXFwLhZvXpUMKqoduBad", 500000, 1000000, []txidIndex{}, errors.New("checksum mismatch"))
 
 	// GetBestBlock
 	height, hash, err := d.GetBestBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if height != 225494 {
-		t.Fatalf("GetBestBlock: got height %v, expected %v", height, 225494)
+	if height != 347314 {
+		t.Fatalf("GetBestBlock: got height %v, expected %v", height, 347314)
 	}
-	if hash != "00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6" {
-		t.Fatalf("GetBestBlock: got hash %v, expected %v", hash, "00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6")
+	if hash != "6609d44688868613991b0cd5ed981a76526caed6b0f7b1be242f5a93311636c6" {
+		t.Fatalf("GetBestBlock: got hash %v, expected %v", hash, "6609d44688868613991b0cd5ed981a76526caed6b0f7b1be242f5a93311636c6")
 	}
 
 	// GetBlockHash
-	hash, err = d.GetBlockHash(225493)
+	hash, err = d.GetBlockHash(249727)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hash != "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997" {
-		t.Fatalf("GetBlockHash: got hash %v, expected %v", hash, "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997")
+	if hash != "78ae6476a514897c8a6984032e5d0e4a44424055f0c2d7b5cf664ae8c8c20487" {
+		t.Fatalf("GetBlockHash: got hash %v, expected %v", hash, "78ae6476a514897c8a6984032e5d0e4a44424055f0c2d7b5cf664ae8c8c20487")
 	}
 
 	// Not connected block
-	hash, err = d.GetBlockHash(225495)
+	hash, err = d.GetBlockHash(347315)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,16 +319,16 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}
 
 	// GetBlockHash
-	info, err := d.GetBlockInfo(225494)
+	info, err := d.GetBlockInfo(347314)
 	if err != nil {
 		t.Fatal(err)
 	}
 	iw := &bchain.DbBlockInfo{
-		Hash:   "00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6",
-		Txs:    4,
-		Size:   2345678,
-		Time:   1521595678,
-		Height: 225494,
+		Hash:   "6609d44688868613991b0cd5ed981a76526caed6b0f7b1be242f5a93311636c6",
+		Txs:    2,
+		Size:   1611,
+		Time:   1580142055,
+		Height: 347314,
 	}
 	if !reflect.DeepEqual(info, iw) {
 		t.Errorf("GetBlockInfo() = %+v, want %+v", info, iw)
@@ -441,15 +351,15 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}
 
 	// try to disconnect both blocks, however only the last one is kept, it is not possible
-	err = d.DisconnectBlockRangeBitcoinType(225493, 225494)
-	if err == nil || err.Error() != "Cannot disconnect blocks with height 225493 and lower. It is necessary to rebuild index." {
+	err = d.DisconnectBlockRangeBitcoinType(249727, 347314)
+	if err == nil || err.Error() != "Cannot disconnect blocks with height 249727 and lower. It is necessary to rebuild index." {
 		t.Fatal(err)
 	}
 	verifyAfterSyscoinTypeBlock2(t, d)
 
 	// disconnect the 2nd block, verify that the db contains only data from the 1st block with restored unspentTxs
 	// and that the cached tx is removed
-	err = d.DisconnectBlockRangeBitcoinType(225494, 225494)
+	err = d.DisconnectBlockRangeBitcoinType(347314, 347314)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -475,30 +385,49 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	}
 
 	// test public methods for address balance and tx addresses
-	ab, err := d.GetAddressBalance(dbtestdata.AddrS5, bchain.AddressBalanceDetailUTXO)
+	ab, err := d.GetAddressBalance(dbtestdata.AddrS3, bchain.AddressBalanceDetailUTXO)
 	if err != nil {
 		t.Fatal(err)
 	}
 	abw := &bchain.AddrBalance{
 		Txs:        2,
-		SentSat:    *dbtestdata.SatS1T2A5,
-		BalanceSat: *dbtestdata.SatS2T3A5,
+		SentSat:    *dbtestdata.SatZero,
+		BalanceSat: *dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1),
 		Utxos: []bchain.Utxo{
 			{
-				BtxID:    hexToBytes(dbtestdata.TxidS2T3),
-				Vout:     0,
-				Height:   225494,
-				ValueSat: *dbtestdata.SatS2T3A5,
+				BtxID:    hexToBytes(dbtestdata.TxidS1T1),
+				Vout:     1,
+				Height:   249727,
+				ValueSat: *dbtestdata.SatS1T1A1,
 			},
+			{
+				BtxID:    hexToBytes(dbtestdata.TxidS2T1),
+				Vout:     1,
+				Height:   347314,
+				ValueSat: *dbtestdata.SatS2T1A1,
+			},
+		},
+		AssetBalances: map[uint32]*AssetBalance {
+			1045909988: &bchain.AssetBalance{
+				SentAssetSat: 	dbtestdata.SatAssetSent,
+				BalanceAssetSat: dbtestdata.SatZero,
+				Transfers:	2,
+			}
 		},
 	}
 	if !reflect.DeepEqual(ab, abw) {
 		t.Errorf("GetAddressBalance() = %+v, want %+v", ab, abw)
 	}
 	rs := ab.ReceivedSat()
-	rsw := dbtestdata.SatS1T2A5.Add(dbtestdata.SatS1T2A5, dbtestdata.SatS2T3A5)
+	rsw := dbtestdata.SatS1T2A5.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1)
 	if rs.Cmp(rsw) != 0 {
 		t.Errorf("GetAddressBalance().ReceivedSat() = %v, want %v", rs, rsw)
+	}
+
+	rsa := ab.ReceivedSatFromBalances(dbtestdata.SatZero, dbtestdata.SatAssetSent)
+	rswa := dbtestdata.SatAssetSent
+	if rsa.Cmp(rswa) != 0 {
+		t.Errorf("GetAddressBalance().ReceivedSatFromBalances() = %v, want %v", rsa, rswa)
 	}
 
 	ta, err := d.GetTxAddresses(dbtestdata.TxidS2T1)
@@ -506,32 +435,36 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		t.Fatal(err)
 	}
 	taw := &bchain.TxAddresses{
-		Height: 225494,
+		Height: 347314,
 		Inputs: []bchain.TxInput{
 			{
-				AddrDesc: addressToAddrDesc(dbtestdata.AddrS3, d.chainParser),
-				ValueSat: *dbtestdata.SatS1T2A3,
-			},
-			{
-				AddrDesc: addressToAddrDesc(dbtestdata.AddrS2, d.chainParser),
-				ValueSat: *dbtestdata.SatS1T1A2,
+				AddrDesc: addressToAddrDesc(dbtestdata.TxidS2T1INPUT0, d.chainParser),
+				ValueSat: *dbtestdata.SatS2T1INPUT0,
 			},
 		},
 		Outputs: []bchain.TxOutput{
 			{
-				AddrDesc: addressToAddrDesc(dbtestdata.AddrS6, d.chainParser),
-				Spent:    true,
-				ValueSat: *dbtestdata.SatS2T1A6,
-			},
-			{
-				AddrDesc: addressToAddrDesc(dbtestdata.AddrS7, d.chainParser),
-				Spent:    false,
-				ValueSat: *dbtestdata.SatS2T1A7,
-			},
-			{
-				AddrDesc: hexToBytes(dbtestdata.TxidS2T1Output3OpReturn),
+				AddrDesc: hexToBytes(dbtestdata.TxidS2T1OutputReturn),
 				Spent:    false,
 				ValueSat: *dbtestdata.SatZero,
+			},
+			{
+				AddrDesc: addressToAddrDesc(dbtestdata.AddrS3, d.chainParser),
+				Spent:    false,
+				ValueSat: *dbtestdata.SatS2T1A1,
+			},
+		},
+		TokenTransferSummary: &bchain.TokenTransferSummary {
+			Type:   bchain.SPTAssetSendType,
+			From:	dbtestdata.AddrS3,
+			Token:  "1045909988", 
+			Symbol: "SYSX",
+			Decimals: 8,
+			Value	 (*bchain.Amount)(dbtestdata.SatAssetSent),
+			Fee      (*bchain.Amount)(dbtestdata.SatZero),
+			Recipients: []*bchain.TokenTransferRecipient{
+				To: dbtestdata.AddrS6,
+				Value: (*bchain.Amount)(dbtestdata.SatAssetSent),
 			},
 		},
 	}
@@ -550,7 +483,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 
 func Test_BulkConnect_SyscoinType(t *testing.T) {
 	d := setupRocksDB(t, &testSyscoinParser{
-		SyscoinParser: syscoinTestnetParser(),
+		SyscoinParser: syscoinTestParser(),
 	})
 	defer closeAndDestroyRocksDB(t, d)
 
@@ -590,7 +523,7 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 
 	verifyAfterSyscoinTypeBlock2(t, d)
 
-	if len(d.is.BlockTimes) != 225495 {
-		t.Fatal("Expecting is.BlockTimes 225495, got ", len(d.is.BlockTimes))
+	if len(d.is.BlockTimes) != 347315 {
+		t.Fatal("Expecting is.BlockTimes 347315, got ", len(d.is.BlockTimes))
 	}
 }

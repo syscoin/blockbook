@@ -5,113 +5,115 @@ import (
 	"math/big"
 )
 
-// Txids, Xpubs and Addresses
+// Txids, Addresses
 const (
-	TxidS1T1 = "00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840"
-	TxidS1T2 = "effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"
-	TxidS2T1 = "7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25"
-	TxidS2T2 = "3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71"
-	TxidS2T3 = "05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07"
-	TxidS2T4 = "fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db"
+	TxidS1T1INPUT0 = "a41fd0ffa372b62e0735fa64e8e57e4ef42f414c2d494fd4b3d0be587533dd10"
+	TxidS1T0 = "badaa3550f9d1a5336cc7c6f4c236a9ef4099389247341759e83580a9785dea3"
+	TxidS1T1 = "0813f4bb8684b3dc8065a097e8e980de9b22c575bcba710635e997ba2d20eb2d"
+	TxidS2T1INPUT0 = "004838c94651832d77166eb9806d062566bdcf9981c3ed339b5e5bb50e36949d"
+	TxidS2T0 = "5a76290ed05bb4d178acf6e1809f46c41cf3c079c4c0810f9c6be3b1c1a7a2e6"
+	TxidS2T1 = "bae2d8c36c6b8975fe888516ab9523c33c688dcb2210a759008a5cfcbe9b7e2f"
 
-	AddrS1 = "mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti"  // 76a914010d39800f86122416e28f485029acf77507169288ac
-	AddrS2 = "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"  // 76a9148bdf0aa3c567aa5975c2e61321b8bebbe7293df688ac
-	AddrS3 = "mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"  // 76a914a08eae93007f22668ab5e4a9c83c8cd1c325e3e088ac
-	AddrS4 = "2MzmAKayJmja784jyHvRUW1bXPget1csRRG" // a91452724c5178682f70e0ba31c6ec0633755a3b41d987, xpub m/49'/1'/33'/0/0
-	AddrS5 = "2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1" // a914e921fc4912a315078f370d959f2c4f7b6d2a683c87
-	AddrS6 = "mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"  // 76a914ccaaaf374e1b06cb83118453d102587b4273d09588ac
-	AddrS7 = "mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL"  // 76a9148d802c045445df49613f6a70ddd2e48526f3701f88ac
-	AddrS8 = "2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu" // a91495e9fbe306449c991d314afe3c3567d5bf78efd287, xpub m/49'/1'/33'/1/3
-	AddrS9 = "mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"  // 76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac
-	AddrSA = "mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj"  // 76a914d03c0d863d189b23b061a95ad32940b65837609f88ac
 
-	TxidS2T1Output3OpReturn = "6a072020f1686f6a20"
+	AddrS1 = "SgzDCepk4G9xyme2i1G1bVtSkb6VxQ5UaJ"
+	AddrS2 = "SgBVZhGLjqRz8ufXFwLhZvXpUMKqoduNG8"  
+	AddrS3 = "sys1qw8k5920xgy746mcs95c6p0tpyqwas27z8af9qe"
+	AddrS4 = "SdzKyvhD2Y3xJvGVSfx96NXszq6x9BZX34"
+	AddrS5 = "SaTan8om5wtJJbxxBHQkwzZi3uk3zBsoZg"
+	AddrS6 = "burn"
+	TxidS1T0OutputReturn = "6a24aa21a9ed84a6a51555ea291dd3ac3603c575bba8da6a26b7efc8b7c279ee457369df369c" // auxpow commitment in coinbase
+	TxidS1T1OutputReturn = "6a4c85237b226465736372697074696f6e223a224f6666696369616c205359535820535054227d0000000000000000000000000000000000000000000000000000000000000000e451573e0453595358001471ed42a9e6413d5d6f102d31a0bd61201dd82bc2000000000e28217b3b0100000e28217b3b0100000e28217b3b01000000001f080000"
+	TxidS2T0OutputReturn = "6a24aa21a9ed278ee076da765fd1d17ffe4b2c2adfb7a7af71e8bf20228148a71fead16872ec" // auxpow commitment in coinbase
+	TxidS2T1OutputReturn = "6a4c55e451573e001471ed42a9e6413d5d6f102d31a0bd61201dd82bc20100046275726e00000e28217b3b0100000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffff"
+	
 )
 
 // Amounts in satoshis
 var (
-	SatS1T1A1       = big.NewInt(100000000)
-	SatS1T1A2       = big.NewInt(12345)
-	SatS1T1A2Double = big.NewInt(12345 * 2)
-	SatS1T2A3       = big.NewInt(1234567890123)
-	SatS1T2A4       = big.NewInt(1)
-	SatS1T2A5       = big.NewInt(9876)
-	SatS2T1A6       = big.NewInt(317283951061)
-	SatS2T1A7       = big.NewInt(917283951061)
-	SatS2T2A8       = big.NewInt(118641975500)
-	SatS2T2A9       = big.NewInt(198641975500)
-	SatS2T3A5       = big.NewInt(9000)
-	SatS2T4AA       = big.NewInt(1360030331)
+	SatS1T0A1       = big.NewInt(866253670)
+	SatS1T0A2       = big.NewInt(2598753670)
+	SatS1T1A1       = big.NewInt(9999266)
+	SatS2T0A1       = big.NewInt(866253190)
+	SatS2T0A2       = big.NewInt(2598753190)
+	SatS2T1A1       = big.NewInt(99958120)
+	SatAssetSent	= big.NewInt(88800000000000000)
+	SatS1T1INPUT0   = big.NewInt(100000000)
+	SatS2T1INPUT0   = big.NewInt(99964500)
 )
 
 // GetTestSyscoinTypeBlock1 returns block #1
 func GetTestSyscoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
 	return &bchain.Block{
 		BlockHeader: bchain.BlockHeader{
-			Height:        225493,
-			Hash:          "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997",
-			Size:          1234567,
-			Time:          1521515026,
+			Height:        249727,
+			Hash:          "78ae6476a514897c8a6984032e5d0e4a44424055f0c2d7b5cf664ae8c8c20487",
+			Size:          1551,
+			Time:          1574279564,
 			Confirmations: 2,
 		},
 		Txs: []bchain.Tx{
+			// mining transaction
 			{
-				Txid: TxidS1T1,
-				Vin:  []bchain.Vin{},
+				Txid: TxidS1T0,
+				Vin: []bchain.Vin{
+					{
+						Coinbase: "037fcf030101",
+					},
+				},
 				Vout: []bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
 							Hex: AddressToPubKeyHex(AddrS1, parser),
 						},
-						ValueSat: *SatS1T1A1,
+						ValueSat: *SatS1T0A1,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
 							Hex: AddressToPubKeyHex(AddrS2, parser),
 						},
-						ValueSat: *SatS1T1A2,
+						ValueSat: *SatS1T0A2,
 					},
 					{
 						N: 2,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS2, parser),
+							Hex: TxidS1T0OutputReturn, // OP_RETURN script
 						},
-						ValueSat: *SatS1T1A2,
+						ValueSat:     *SatZero,
 					},
 				},
-				Blocktime:     1521515026,
-				Time:          1521515026,
+				Blocktime:     1574279564,
+				Time:          1574279564,
 				Confirmations: 2,
 			},
 			{
-				Txid: TxidS1T2,
+				Version: 29698, // asset activate coloured coin tx
+				Txid: TxidS1T1,
+				Vin: []bchain.Vin{
+					{
+						Txid: TxidS1T1INPUT0,
+						Vout: 1,
+					},
+				},
 				Vout: []bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS3, parser),
+							Hex: TxidS1T1OutputReturn, // OP_RETURN script
 						},
-						ValueSat: *SatS1T2A3,
+						ValueSat: *SatZero,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS4, parser),
+							Hex: AddressToPubKeyHex(AddrS3, parser),
 						},
-						ValueSat: *SatS1T2A4,
-					},
-					{
-						N: 2,
-						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS5, parser),
-						},
-						ValueSat: *SatS1T2A5,
+						ValueSat: *SatS1T1A1,
 					},
 				},
-				Blocktime:     1521515026,
-				Time:          1521515026,
+				Blocktime:     1574279564,
+				Time:          1574279564,
 				Confirmations: 2,
 			},
 		},
@@ -122,65 +124,54 @@ func GetTestSyscoinTypeBlock1(parser bchain.BlockChainParser) *bchain.Block {
 func GetTestSyscoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 	return &bchain.Block{
 		BlockHeader: bchain.BlockHeader{
-			Height:        225494,
-			Hash:          "00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6",
-			Size:          2345678,
-			Time:          1521595678,
+			Height:        347314,
+			Hash:          "6609d44688868613991b0cd5ed981a76526caed6b0f7b1be242f5a93311636c6",
+			Size:          1611,
+			Time:          1580142055,
 			Confirmations: 1,
 		},
 		Txs: []bchain.Tx{
+			// mining transaction
 			{
-				Txid: TxidS2T1,
+				Txid: TxidS2T0,
 				Vin: []bchain.Vin{
-					// addr3
 					{
-						Txid: TxidS1T2,
-						Vout: 0,
-					},
-					// addr2
-					{
-						Txid: TxidS1T1,
-						Vout: 1,
+						Coinbase: "03b24c0501020fe4b883e5bda9e7a59ee4bb99e9b1bc205b323032302d30312d32375431363a32303a35352e3035343134373631385a5d",
 					},
 				},
 				Vout: []bchain.Vout{
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS6, parser),
+							Hex: AddressToPubKeyHex(AddrS4, parser),
 						},
-						ValueSat: *SatS2T1A6,
+						ValueSat: *SatS2T0A1,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS7, parser),
+							Hex: AddressToPubKeyHex(AddrS5, parser),
 						},
-						ValueSat: *SatS2T1A7,
+						ValueSat: *SatS2T0A2,
 					},
 					{
 						N: 2,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: TxidS2T1Output3OpReturn, // OP_RETURN script
+							Hex: TxidS2T0OutputReturn, // OP_RETURN script
 						},
-						ValueSat: *SatZero,
+						ValueSat:     *SatZero,
 					},
 				},
-				Blocktime:     1521595678,
-				Time:          1521595678,
-				Confirmations: 1,
+				Blocktime:     1574279564,
+				Time:          1574279564,
+				Confirmations: 2,
 			},
 			{
-				Txid: TxidS2T2,
+				Version: 29701, // asset send coloured coin tx
+				Txid: TxidS2T1,
 				Vin: []bchain.Vin{
-					// spending an output in the same block - addr6
 					{
-						Txid: TxidS2T1,
-						Vout: 0,
-					},
-					// spending an output in the previous block - addr4
-					{
-						Txid: TxidS1T2,
+						Txid: TxidS2T1INPUT0,
 						Vout: 1,
 					},
 				},
@@ -188,69 +179,20 @@ func GetTestSyscoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 					{
 						N: 0,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS8, parser),
+							Hex: TxidS2T1OutputReturn, // OP_RETURN script
 						},
-						ValueSat: *SatS2T2A8,
+						ValueSat: *SatZero,
 					},
 					{
 						N: 1,
 						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS9, parser),
+							Hex: AddressToPubKeyHex(AddrS3, parser),
 						},
-						ValueSat: *SatS2T2A9,
+						ValueSat: *SatS2T1A1,
 					},
 				},
-				Blocktime:     1521595678,
-				Time:          1521595678,
-				Confirmations: 1,
-			},
-			// transaction from the same address in the previous block
-			{
-				Txid: TxidS2T3,
-				Vin: []bchain.Vin{
-					// addr5
-					{
-						Txid: TxidS1T2,
-						Vout: 2,
-					},
-				},
-				Vout: []bchain.Vout{
-					{
-						N: 0,
-						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrS5, parser),
-						},
-						ValueSat: *SatS2T3A5,
-					},
-				},
-				Blocktime:     1521595678,
-				Time:          1521595678,
-				Confirmations: 1,
-			},
-			// mining transaction
-			{
-				Txid: TxidS2T4,
-				Vin: []bchain.Vin{
-					{
-						Coinbase: "03bf1e1504aede765b726567696f6e312f50726f6a65637420425443506f6f6c2f01000001bf7e000000000000",
-					},
-				},
-				Vout: []bchain.Vout{
-					{
-						N: 0,
-						ScriptPubKey: bchain.ScriptPubKey{
-							Hex: AddressToPubKeyHex(AddrSA, parser),
-						},
-						ValueSat: *SatS2T4AA,
-					},
-					{
-						N:            1,
-						ScriptPubKey: bchain.ScriptPubKey{},
-						ValueSat:     *SatZero,
-					},
-				},
-				Blocktime:     1521595678,
-				Time:          1521595678,
+				Blocktime:     1580142055,
+				Time:          1580142055,
 				Confirmations: 1,
 			},
 		},
