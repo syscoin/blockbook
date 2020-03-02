@@ -4,7 +4,7 @@ import (
 	"blockbook/bchain"
 	"blockbook/bchain/coins/btc"
 	"encoding/json"
-
+	"github.com/juju/errors"
 	"github.com/golang/glog"
 )
 
