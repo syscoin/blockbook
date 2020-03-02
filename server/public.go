@@ -184,6 +184,7 @@ func (s *PublicServer) ConnectFullPublicInterface() {
 	serveMux.HandleFunc(path+"api/v2/tx/", s.jsonHandler(s.apiTx, apiV2))
 	serveMux.HandleFunc(path+"api/v2/address/", s.jsonHandler(s.apiAddress, apiV2))
 	serveMux.HandleFunc(path+"api/v2/asset/", s.jsonHandler(s.apiAsset, apiV2))
+	serveMux.HandleFunc(path+"api/v2/assetallocationsend/", s.jsonHandler(s.apiAssetAllocationSend, apiV2)) // temporary will be removed in future
 	serveMux.HandleFunc(path+"api/v2/assets/", s.jsonHandler(s.apiAssets, apiV2))
 	serveMux.HandleFunc(path+"api/v2/xpub/", s.jsonHandler(s.apiXpub, apiV2))
 	serveMux.HandleFunc(path+"api/v2/utxo/", s.jsonHandler(s.apiUtxo, apiV2))
@@ -1148,6 +1149,22 @@ func (s *PublicServer) apiAddress(r *http.Request, apiVersion int) (interface{},
 		return s.api.AddressToV1(address), nil
 	}
 	return address, err
+}
+
+func (s *PublicServer) apiAssetAllocationSend(r *http.Request, apiVersion int) (interface{}, error) {
+	var assetParam string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		assetParam = r.URL.Path[i+1:]
+	}
+	if len(assetParam) == 0 {
+		return nil, api.NewAPIError("Missing asset", true)
+	}
+	var err error
+	from := r.URL.Query().Get("from")
+	to := r.URL.Query().Get("to")
+	amount := r.URL.Query().Get("amount")
+	return s.api.AssetAllocationSend(assetParam, from, to, amount)
 }
 
 func (s *PublicServer) apiAsset(r *http.Request, apiVersion int) (interface{}, error) {

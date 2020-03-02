@@ -991,6 +991,16 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 	return r
 }
 
+func (w *Worker) AssetAllocationSend(asset string, sender string, reciever string, amount string) (string, error) {
+	var err error
+	var assetGuidInt int
+	assetGuidInt, err = strconv.Atoi(asset)
+	if err != nil {
+		return nil, err
+	}
+	return w.chain.AssetAllocationSend(assetGuidInt, sender, reciever, amount)
+}
+
 // GetAsset gets transactions for given asset
 func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AssetFilter) (*Asset, error) {
 	start := time.Now()
