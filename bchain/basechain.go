@@ -60,6 +60,6 @@ func (b *BaseChain) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc A
 }
 
 func (b *BaseChain) AssetAllocationSend(asset int, sender string, receiver string, amount string) (string, error) {
-	return nil, errors.New("Not supported")
+	return "", errors.New("Not supported")
 }
 
