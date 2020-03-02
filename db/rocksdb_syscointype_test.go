@@ -382,7 +382,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		t.Errorf("GetAddressBalance() = %+v, want %+v", ab, abw)
 	}
 	rs := ab.ReceivedSat()
-	rsw := dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1)
+	rsw := addedAmount
 	if rs.Cmp(rsw) != 0 {
 		t.Errorf("GetAddressBalance().ReceivedSat() = %v, want %v", rs, rsw)
 	}
