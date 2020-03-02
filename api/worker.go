@@ -994,11 +994,14 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 func (w *Worker) AssetAllocationSend(asset string, sender string, reciever string, amount string) (string, error) {
 	var err error
 	var assetGuidInt int
+	allocationSendTx interface{}
 	assetGuidInt, err = strconv.Atoi(asset)
 	if err != nil {
 		return "", err
 	}
-	return w.chain.AssetAllocationSend(assetGuidInt, sender, reciever, amount)
+	allocationSendTx, err = w.chain.AssetAllocationSend(assetGuidInt, sender, reciever, amount)
+	str := fmt.Sprintf("%#v", allocationSendTx)
+	return str, err
 }
 
 // GetAsset gets transactions for given asset

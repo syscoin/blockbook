@@ -1150,7 +1150,7 @@ func (s *PublicServer) apiAddress(r *http.Request, apiVersion int) (interface{},
 	}
 	return address, err
 }
-
+// will be removed once syscoinjs is updated to do client side create tx
 func (s *PublicServer) apiAssetAllocationSend(r *http.Request, apiVersion int) (interface{}, error) {
 	var assetParam string
 	i := strings.LastIndexByte(r.URL.Path, '/')

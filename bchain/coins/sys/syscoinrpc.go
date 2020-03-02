@@ -83,10 +83,10 @@ type CmdAssetAllocationSend struct {
 }
 type ResAssetAllocationSend struct {
 	Error  *bchain.RPCError `json:"error"`
-	Result string           `json:"result"`
+	Result interface{}      `json:"result"`
 }
 
-func (b *SyscoinRPC) AssetAllocationSend(asset int, sender string, receiver string, amount string) (string, error) {
+func (b *SyscoinRPC) AssetAllocationSend(asset int, sender string, receiver string, amount string) (interface{}, error) {
 	glog.V(1).Info("rpc: assetallocationsend ", asset)
 
 	res := ResAssetAllocationSend{}
