@@ -434,6 +434,10 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	tokenRecipient := &bchain.TokenTransferRecipient{
+		To: dbtestdata.AddrS6,
+		Value: (*bchain.Amount)(dbtestdata.SatAssetSent),
+	}
 	taw := &bchain.TxAddresses{
 		Height: 347314,
 		Inputs: []bchain.TxInput{
@@ -462,10 +466,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 			Decimals: 8,
 			Value:	 (*bchain.Amount)(dbtestdata.SatAssetSent),
 			Fee:     (*bchain.Amount)(dbtestdata.SatZero),
-			Recipients: []*bchain.TokenTransferRecipient{
-				To: dbtestdata.AddrS6,
-				Value: (*bchain.Amount)(dbtestdata.SatAssetSent),
-			},
+			Recipients: []*bchain.TokenTransferRecipient{tokenRecipient}
 		},
 	}
 	if !reflect.DeepEqual(ta, taw) {
