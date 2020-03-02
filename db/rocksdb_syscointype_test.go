@@ -50,13 +50,13 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
-				dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A1, d),
+			"00" +	dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A2, d) +
-			dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A2, d),
+			"00" + dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A2, d),
 			nil,
 		},
 		{
@@ -127,13 +127,13 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
-				dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A1, d),
+			"00" + dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A2, d) +
-			dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A2, d),
+			"00" + dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T0A2, d),
 			nil,
 		},
 		{
@@ -147,13 +147,13 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS4, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A1, d) +
-				dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A1, d),
+			"00" + dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A1, d),
 			nil,
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS5, d.chainParser),
 			"01" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A2, d) +
-			dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A2, d),
+			"00" + dbtestdata.TxidS1T0 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T0A2, d),
 			nil,
 		},
 		// burn should have a address balance as asset output from S2T1
