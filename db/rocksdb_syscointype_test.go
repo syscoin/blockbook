@@ -124,7 +124,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 			t.Fatal(err)
 		}
 	}
-	addedAmount := big.NewInt(dbtestdata.SatS1T1A1)
+	addedAmount := new(big.Int).Set(dbtestdata.SatS1T1A1)
 	addedAmount.Add(addedAmount, dbtestdata.SatS2T1A1)
 	if err := checkColumn(d, cfAddressBalance, []keyPair{
 		{
@@ -351,7 +351,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	addedAmount := big.NewInt(dbtestdata.SatS1T1A1)
+	addedAmount := new(big.Int).Set(dbtestdata.SatS1T1A1)
 	addedAmount.Add(addedAmount, dbtestdata.SatS2T1A1)
 	abw := &bchain.AddrBalance{
 		Txs:        2,
