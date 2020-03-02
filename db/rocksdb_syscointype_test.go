@@ -171,18 +171,6 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 			t.Fatal(err)
 		}
 	}
-	if err := checkColumn(d, cfBlockTxs, []keyPair{
-		{
-			"00054cb2",
-			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
-			nil,
-		},
-	}); err != nil {
-		{
-			t.Fatal(err)
-		}
-	}
 }
 
 // TestRocksDB_Index_SyscoinType is an integration test probing the whole indexing functionality for Syscoin which is a BitcoinType chain
