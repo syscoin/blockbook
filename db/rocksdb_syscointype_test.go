@@ -116,7 +116,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		{addressKeyHex(dbtestdata.AddrS3, 249727, d), txIndexesHex(dbtestdata.TxidS1T1, []int32{^1045909988, 1}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS4, 347314, d), txIndexesHex(dbtestdata.TxidS2T0, []int32{0}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS5, 347314, d), txIndexesHex(dbtestdata.TxidS2T0, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{^1045909988, 1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS3, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{^1, ^1045909988, 1}, d), nil},
 		{addressKeyHex(dbtestdata.AddrS6, 347314, d), txIndexesHex(dbtestdata.TxidS2T1, []int32{1045909988}, d), nil},
 	}); err != nil {
 		{
@@ -234,6 +234,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 
 	// get transactions for various addresses / low-high ranges
 	verifyGetTransactions(t, d, dbtestdata.AddrS3, 0, 1000000, []txidIndex{
+		{dbtestdata.TxidS1T1, ^1},
 		{dbtestdata.TxidS2T1, ^1045909988}, // asset is used as input to send to addr6 (burn)
 		{dbtestdata.TxidS2T1, 1},
 		{dbtestdata.TxidS1T1, ^1045909988}, // asset is used as input to update asset
@@ -244,6 +245,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		{dbtestdata.TxidS1T1, 1},
 	}, nil)
 	verifyGetTransactions(t, d, dbtestdata.AddrS3, 347314, 1000000, []txidIndex{
+		{dbtestdata.TxidS1T1, ^1},
 		{dbtestdata.TxidS2T1, ^1045909988},
 		{dbtestdata.TxidS2T1, 1},
 	}, nil)
