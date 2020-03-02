@@ -123,6 +123,8 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 			t.Fatal(err)
 		}
 	}
+	addedAmount := dbtestdata.SatS1T1A1
+	addedAmount.Add(addedAmount, dbtestdata.SatS2T1A1)
 	if err := checkColumn(d, cfAddressBalance, []keyPair{
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
@@ -138,7 +140,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		},
 		{
 			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS3, d.chainParser),
-			"02" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1), d) +
+			"02" + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(addedAmount, d) +
 			"01" + varuintToHex(1045909988) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatAssetSent, d) + varuintToHex(2) +
 				dbtestdata.TxidS1T1 + varuintToHex(1) + varuintToHex(249727) + bigintToHex(dbtestdata.SatS1T1A1, d) +
 				dbtestdata.TxidS2T1 + varuintToHex(1) + varuintToHex(347314) + bigintToHex(dbtestdata.SatS2T1A1, d),
@@ -348,10 +350,12 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	addedAmount := dbtestdata.SatS1T1A1
+	addedAmount.Add(addedAmount, dbtestdata.SatS2T1A1)
 	abw := &bchain.AddrBalance{
 		Txs:        2,
 		SentSat:    *dbtestdata.SatZero,
-		BalanceSat: *dbtestdata.SatS1T1A1.Add(dbtestdata.SatS1T1A1, dbtestdata.SatS2T1A1),
+		BalanceSat: *addedAmount,
 		Utxos: []bchain.Utxo{
 			{
 				BtxID:    hexToBytes(dbtestdata.TxidS1T1),
