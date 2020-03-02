@@ -466,7 +466,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 			Decimals: 8,
 			Value:	 (*bchain.Amount)(dbtestdata.SatAssetSent),
 			Fee:     (*bchain.Amount)(dbtestdata.SatZero),
-			Recipients: []*bchain.TokenTransferRecipient{tokenRecipient}
+			Recipients: []*bchain.TokenTransferRecipient{tokenRecipient},
 		},
 	}
 	if !reflect.DeepEqual(ta, taw) {
