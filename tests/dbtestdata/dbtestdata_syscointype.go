@@ -10,7 +10,6 @@ const (
 	TxidS1T1INPUT0 = "a41fd0ffa372b62e0735fa64e8e57e4ef42f414c2d494fd4b3d0be587533dd10"
 	TxidS1T0 = "badaa3550f9d1a5336cc7c6f4c236a9ef4099389247341759e83580a9785dea3"
 	TxidS1T1 = "0813f4bb8684b3dc8065a097e8e980de9b22c575bcba710635e997ba2d20eb2d"
-	TxidS2T1INPUT0 = "004838c94651832d77166eb9806d062566bdcf9981c3ed339b5e5bb50e36949d"
 	TxidS2T0 = "5a76290ed05bb4d178acf6e1809f46c41cf3c079c4c0810f9c6be3b1c1a7a2e6"
 	TxidS2T1 = "bae2d8c36c6b8975fe888516ab9523c33c688dcb2210a759008a5cfcbe9b7e2f"
 
@@ -37,8 +36,6 @@ var (
 	SatS2T0A2       = big.NewInt(2598753190)
 	SatS2T1A1       = big.NewInt(99958120)
 	SatAssetSent	= big.NewInt(88800000000000000)
-	SatS1T1INPUT0   = big.NewInt(100000000)
-	SatS2T1INPUT0   = big.NewInt(99964500)
 )
 
 // GetTestSyscoinTypeBlock1 returns block #1
@@ -171,7 +168,7 @@ func GetTestSyscoinTypeBlock2(parser bchain.BlockChainParser) *bchain.Block {
 				Txid: TxidS2T1,
 				Vin: []bchain.Vin{
 					{
-						Txid: TxidS2T1INPUT0,
+						Txid: TxidS1T1,
 						Vout: 1,
 					},
 				},

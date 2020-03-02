@@ -213,7 +213,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		{
 			"00054cb2",
 			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS1T1 + "02",
 			nil,
 		},
 		{
@@ -336,7 +336,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		{
 			"00054cb2",
 			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS1T1 + "02",
 			nil,
 		},
 		{
@@ -412,11 +412,12 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		Value: (*bchain.Amount)(dbtestdata.SatAssetSent),
 	}
 	taw := &bchain.TxAddresses{
+		Version: 29701,
 		Height: 347314,
 		Inputs: []bchain.TxInput{
 			{
 				AddrDesc: addressToAddrDesc(dbtestdata.AddrS3, d.chainParser),
-				ValueSat: *dbtestdata.SatS2T1INPUT0,
+				ValueSat: *dbtestdata.SatS1T1A1,
 			},
 		},
 		Outputs: []bchain.TxOutput{
@@ -500,7 +501,7 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 		{
 			"00054cb2",
 			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00" +
-			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS2T1INPUT0 + "02",
+			dbtestdata.TxidS2T1 + "01" + dbtestdata.TxidS1T1 + "02",
 			nil,
 		},
 	}); err != nil {
