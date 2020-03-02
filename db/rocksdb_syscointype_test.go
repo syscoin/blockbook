@@ -415,7 +415,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 		Height: 347314,
 		Inputs: []bchain.TxInput{
 			{
-				AddrDesc: addressToAddrDesc(dbtestdata.TxidS2T1INPUT0, d.chainParser),
+				AddrDesc: addressToAddrDesc(dbtestdata.AddrS3, d.chainParser),
 				ValueSat: *dbtestdata.SatS2T1INPUT0,
 			},
 		},
