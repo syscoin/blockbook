@@ -91,13 +91,11 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				inputOutput |= txOutput
 			}
 			if filterTxOut == true {
-				
 				vout := index
 				if vout < 0 {
-					glog.Warning("xpubGetAddressTxids filterTxOut vout negative %v", vout)
 					vout = ^vout
 				}
-				glog.Warning("xpubGetAddressTxids filterTxOut vout check %v", vout)
+				glog.Warning("xpubGetAddressTxids filterTxOut vout check ", vout , " against int32(filter.Vout) ", int32(filter.Vout))
 				if vout == int32(filter.Vout) {
 					glog.Warning("xpubGetAddressTxids set bit")
 					inputOutput |= txVout
@@ -485,7 +483,6 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
 					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 || 
 					txid.inputOutput&txVout == 0 {
-						glog.Warning("GetXpubAddress filter false %v", txid.inputOutput)
 					return false
 				}
 			}
