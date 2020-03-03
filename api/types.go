@@ -185,7 +185,7 @@ const (
 
 // AddressFilter is used to filter data returned from GetAddress api method
 type AddressFilter struct {
-	Vout           int64
+	Vout           int
 	Contract       string
 	FromHeight     uint32
 	ToHeight       uint32
