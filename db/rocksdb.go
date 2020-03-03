@@ -404,7 +404,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 				indexes = append(indexes, index>>1)
 				val = val[l:]
 				if index&1 == 1 {
-					glog.Warningf("GetAddrDescTransactions break")
+					glog.Warningf("GetAddrDescTransactions break ", index)
 					break
 				} else if len(val) == 0 {
 					glog.Warningf("rocksdb: addresses contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
