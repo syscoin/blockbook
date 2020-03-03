@@ -74,6 +74,9 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 	complete := true
 	txs := make([]xpubTxid, 0, 4)
 	var callback db.GetTransactionsCallback
+	filterTxOut := filter.Vout != AddressFilterVoutOff && 
+		filter.Vout != AddressFilterVoutInputs &&
+		filter.Vout != AddressFilterVoutOutputs
 	callback = func(txid string, height uint32, indexes []int32) error {
 		// take all txs in the last found block even if it exceeds maxResults
 		if len(txs) >= maxResults && txs[len(txs)-1].height != height {
@@ -87,14 +90,16 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 			} else {
 				inputOutput |= txOutput
 			}
-			if filter.Vout != AddressFilterVoutOff && 
-			filter.Vout != AddressFilterVoutInputs &&
-			filter.Vout != AddressFilterVoutOutputs {
+			if filterTxOut == true {
+				
 				vout := index
 				if vout < 0 {
+					glog.Warning("xpubGetAddressTxids filterTxOut vout negative %v", vout)
 					vout = ^vout
 				}
+				glog.Warning("xpubGetAddressTxids filterTxOut vout check %v", vout)
 				if vout == int32(filter.Vout) {
+					glog.Warning("xpubGetAddressTxids set bit")
 					inputOutput |= txVout
 				}
 			}
@@ -122,9 +127,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				} else {
 					txs[l].inputOutput |= txOutput
 				}
-				if filter.Vout != AddressFilterVoutOff && 
-				filter.Vout != AddressFilterVoutInputs &&
-				filter.Vout != AddressFilterVoutOutputs {
+				if filterTxOut == true {
 					vout := m.Vout
 					if vout < 0 {
 						vout = ^vout
@@ -482,6 +485,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
 					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 || 
 					txid.inputOutput&txVout == 0 {
+						glog.Warning("GetXpubAddress filter false %v", txid.inputOutput)
 					return false
 				}
 			}
