@@ -95,9 +95,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				if vout < 0 {
 					vout = ^vout
 				}
-				glog.Warning("xpubGetAddressTxids filterTxOut vout check ", vout , " against int32(filter.Vout) ", int32(filter.Vout))
 				if vout == int32(filter.Vout) {
-					glog.Warning("xpubGetAddressTxids set bit")
 					inputOutput |= txVout
 				}
 			}
@@ -374,7 +372,7 @@ func (w *Worker) getXpubData(xpub string, page int, txsOnPage int, option Accoun
 	// gap is increased one as there must be gap of empty addresses before the derivation is stopped
 	gap++
 	var processedHash string
-	voutStr := strconv.FormatInt(int64(filter.Vout), 10)
+	voutStr := strconv.FormatInt(filter.Vout, 10)
 	cachedXpubsMux.Lock()
 	data, found := cachedXpubs[xpub + voutStr]
 	cachedXpubsMux.Unlock()
