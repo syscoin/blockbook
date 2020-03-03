@@ -651,7 +651,7 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 		} else if filterParam == "outputs" {
 			voutFilter = api.AddressFilterVoutOutputs
 		} else {
-			voutFilter, ec = strconv.Atoi(filterParam)
+			voutFilter, ec = strconv.ParseInt(filterParam, 10, 64)
 			if ec != nil || voutFilter < 0 {
 				voutFilter = api.AddressFilterVoutOff
 			}
@@ -683,7 +683,7 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 		gap = 0
 	}
 	return page, pageSize, accountDetails, &api.AddressFilter{
-		Vout:           int64(voutFilter),
+		Vout:           voutFilter,
 		TokensToReturn: tokensToReturn,
 		FromHeight:     uint32(from),
 		ToHeight:       uint32(to),
@@ -1289,13 +1289,13 @@ func (s *PublicServer) apiBalanceHistory(r *http.Request, apiVersion int) (inter
 		voutFilter := api.AddressFilterVoutOff
 		filterParam := r.URL.Query().Get("filter")
 		if len(filterParam) > 0 {
-			voutFilter, ec = strconv.Atoi(filterParam)
+			voutFilter, ec = strconv.ParseInt(filterParam, 10, 64)
 			if ec != nil || voutFilter < 0 {
 				voutFilter = api.AddressFilterVoutOff
 			}
 		}
 
-		history, err = s.api.GetXpubBalanceHistory(r.URL.Path[i+1:], fromTimestamp, toTimestamp, fiatArray, gap, uint32(groupBy), int64(voutFilter))
+		history, err = s.api.GetXpubBalanceHistory(r.URL.Path[i+1:], fromTimestamp, toTimestamp, fiatArray, gap, uint32(groupBy), voutFilter)
 		if err == nil {
 			s.metrics.ExplorerViews.With(common.Labels{"action": "api-xpub-balancehistory"}).Inc()
 		} else {

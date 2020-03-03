@@ -169,12 +169,14 @@ type TokensToReturn int
 
 const (
 	// AddressFilterVoutOff disables filtering of transactions by vout
-	AddressFilterVoutOff = -1
+	AddressFilterVoutOff int64 = -1
 	// AddressFilterVoutInputs specifies that only txs where the address is as input are returned
-	AddressFilterVoutInputs = -2
+	AddressFilterVoutInputs int64 = -2
 	// AddressFilterVoutOutputs specifies that only txs where the address is as output are returned
-	AddressFilterVoutOutputs = -3
+	AddressFilterVoutOutputs int64 = -3
+)
 
+const (
 	// TokensToReturnNonzeroBalance - return only tokens with nonzero balance
 	TokensToReturnNonzeroBalance TokensToReturn = 0
 	// TokensToReturnUsed - return tokens with some transfers (even if they have zero balance now)
