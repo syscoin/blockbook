@@ -376,7 +376,9 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 			for _, index := range indexes {
 				vout := index
 				if vout < 0 {
+					glog.Warningf("getAddressTxids vout < 0 %v ", vout)
 					vout = ^vout
+					glog.Warningf("getAddressTxids ^vout %v ", vout)
 				}
 				if (filter.Vout == AddressFilterVoutInputs && index < 0) ||
 					(filter.Vout == AddressFilterVoutOutputs && index >= 0) ||
