@@ -290,7 +290,7 @@ Example response:
 Returns balances and transactions of an address. The returned transactions are sorted by block height, newest blocks first.
 
 ```
-GET /api/v2/address/<address>[?page=<page>&pageSize=<size>&from=<block height>&to=<block height>&details=<basic|tokens|tokenBalances|txids|txs>]
+GET /api/v2/address/<address>[?page=<page>&pageSize=<size>&from=<block height>&to=<block height>&details=<basic|tokens|tokenBalances|txids|txs>&contract=<contract address>]
 ```
 
 The optional query parameters:
@@ -303,7 +303,8 @@ The optional query parameters:
     - *tokenBalances*: *basic* + tokens with balances + belonging to the address (applicable only to some coins)
     - *txids*: *tokenBalances* + list of txids, subject to  *from*, *to* filter and paging
     - *txs*:  *tokenBalances* + list of transaction with details, subject to  *from*, *to* filter and paging
-- *filter*: filter tokens by their GUID or 0 for non-token transfers. Set to the Asset GUID (uint32) for coin types such as Syscoin, to filter transactions by that asset, or contract index in Ethereum. Set to 0 to show only non-token related transactions.
+- *filter*: filter tokens by their GUID or 0 for non-token transfers. Set to the Asset GUID (uint32) for coin types such as Syscoin, to filter transactions by that asset, or contract index in Ethereum. Set to 0 to show only non-token related transactions (applicable only to coins which support tokens)
+- *contract*: return only transactions which affect specified contract (applicable only to coins which support contracts)
 
 Response:
 
