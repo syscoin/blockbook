@@ -82,17 +82,21 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 		}
 		inputOutput := byte(0)
 		for _, index := range indexes {
-			vout := index
-			if vout < 0 {
-				vout = ^vout
-			}
 			if index < 0 {
 				inputOutput |= txInput
 			} else {
 				inputOutput |= txOutput
 			}
-			if vout == int32(filter.Vout) {
-				inputOutput |= txVout
+			if filter.Vout != AddressFilterVoutOff && 
+			filter.Vout != AddressFilterVoutInputs &&
+			filter.Vout != AddressFilterVoutOutputs {
+				vout := index
+				if vout < 0 {
+					vout = ^vout
+				}
+				if vout == int32(filter.Vout) {
+					txs[l].inputOutput |= txVout
+				}
 			}
 
 		}
@@ -113,19 +117,22 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 					uniqueTxs[m.Txid] = l
 				}
 			} else {
-				vout := m.Vout
-				if vout < 0 {
-					vout = ^vout
-				}
 				if m.Vout < 0 {
 					txs[l].inputOutput |= txInput
 				} else {
 					txs[l].inputOutput |= txOutput
 				}
-				if vout == int32(filter.Vout) {
-					txs[l].inputOutput |= txVout
+				if filter.Vout != AddressFilterVoutOff && 
+				filter.Vout != AddressFilterVoutInputs &&
+				filter.Vout != AddressFilterVoutOutputs {
+					vout := m.Vout
+					if vout < 0 {
+						vout = ^vout
+					}
+					if vout == int32(filter.Vout) {
+						txs[l].inputOutput |= txVout
+					}
 				}
-			}
 		}
 	} else {
 		err = w.db.GetAddrDescTransactions(addrDesc, fromHeight, toHeight, callback)

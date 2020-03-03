@@ -1286,7 +1286,7 @@ func (s *PublicServer) apiBalanceHistory(r *http.Request, apiVersion int) (inter
 		if fiat != "" {
 			fiatArray = []string{fiat}
 		}
-
+		voutFilter := api.AddressFilterVoutOff
 		filterParam := r.URL.Query().Get("filter")
 		if len(filterParam) > 0 {
 			voutFilter, ec = strconv.Atoi(filterParam)
