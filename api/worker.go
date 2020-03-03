@@ -633,7 +633,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 						continue
 					}
 					// filter only transactions of this contract
-					filter.Vout = int64(i) + 1
+					filter.Vout = i + 1
 				}
 				validContract := true
 				ci, err := w.chain.EthereumTypeGetErc20ContractInfo(c.Contract)
@@ -683,7 +683,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 				totalResults = int(ca.TotalTxs)
 			} else if filter.Vout == 0 {
 				totalResults = int(ca.NonContractTxs)
-			} else if filter.Vout > 0 && filter.Vout-1 < int64(len(ca.Contracts)) {
+			} else if filter.Vout > 0 && filter.Vout-1 < len(ca.Contracts) {
 				totalResults = int(ca.Contracts[filter.Vout-1].Txs)
 			}
 		}
