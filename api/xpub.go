@@ -471,7 +471,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			}
 			if filter.Vout != AddressFilterVoutOff && txid.inputOutput&txVout == 0 {
 				if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
-					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0) {
+					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 {
 					return false
 				}
 			}
