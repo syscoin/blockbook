@@ -374,8 +374,9 @@ func (w *Worker) getXpubData(xpub string, page int, txsOnPage int, option Accoun
 	// gap is increased one as there must be gap of empty addresses before the derivation is stopped
 	gap++
 	var processedHash string
+	voutStr := strconv.FormatInt(filter.Vout, 10)
 	cachedXpubsMux.Lock()
-	data, found := cachedXpubs[xpub]
+	data, found := cachedXpubs[xpub + voutStr]
 	cachedXpubsMux.Unlock()
 	// to load all data for xpub may take some time, do it in a loop to process a possible new block
 	for {
@@ -435,7 +436,7 @@ func (w *Worker) getXpubData(xpub string, page int, txsOnPage int, option Accoun
 	if len(cachedXpubs) >= xpubCacheSize {
 		evictXpubCacheItems()
 	}
-	cachedXpubs[xpub] = data
+	cachedXpubs[xpub+voutStr] = data
 	cachedXpubsMux.Unlock()
 	return &data, bestheight, nil
 }
