@@ -1286,7 +1286,16 @@ func (s *PublicServer) apiBalanceHistory(r *http.Request, apiVersion int) (inter
 		if fiat != "" {
 			fiatArray = []string{fiat}
 		}
-		history, err = s.api.GetXpubBalanceHistory(r.URL.Path[i+1:], fromTimestamp, toTimestamp, fiatArray, gap, uint32(groupBy))
+
+		filterParam := r.URL.Query().Get("filter")
+		if len(filterParam) > 0 {
+			voutFilter, ec = strconv.Atoi(filterParam)
+			if ec != nil || voutFilter < 0 {
+				voutFilter = api.AddressFilterVoutOff
+			}
+		}
+
+		history, err = s.api.GetXpubBalanceHistory(r.URL.Path[i+1:], fromTimestamp, toTimestamp, fiatArray, gap, uint32(groupBy), voutFilter)
 		if err == nil {
 			s.metrics.ExplorerViews.With(common.Labels{"action": "api-xpub-balancehistory"}).Inc()
 		} else {

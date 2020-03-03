@@ -19,6 +19,7 @@ const maxAddressesGap = 10000
 
 const txInput = 1
 const txOutput = 2
+const txVout = 4
 
 const xpubCacheSize = 512
 const xpubCacheExpirationSeconds = 7200
@@ -68,7 +69,7 @@ type xpubData struct {
 	changeAddresses []xpubAddress
 }
 
-func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, maxResults int) ([]xpubTxid, bool, error) {
+func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, filter *AddressFilter, maxResults int) ([]xpubTxid, bool, error) {
 	var err error
 	complete := true
 	txs := make([]xpubTxid, 0, 4)
@@ -81,11 +82,19 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 		}
 		inputOutput := byte(0)
 		for _, index := range indexes {
+			vout := index
+			if vout < 0 {
+				vout = ^vout
+			}
 			if index < 0 {
 				inputOutput |= txInput
 			} else {
 				inputOutput |= txOutput
 			}
+			if vout == int32(filter.Vout) {
+				inputOutput |= txVout
+			}
+
 		}
 		txs = append(txs, xpubTxid{txid, height, inputOutput})
 		return nil
@@ -104,10 +113,17 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 					uniqueTxs[m.Txid] = l
 				}
 			} else {
+				vout := m.Vout
+				if vout < 0 {
+					vout = ^vout
+				}
 				if m.Vout < 0 {
 					txs[l].inputOutput |= txInput
 				} else {
 					txs[l].inputOutput |= txOutput
+				}
+				if vout == int32(filter.Vout) {
+					txs[l].inputOutput |= txVout
 				}
 			}
 		}
@@ -128,7 +144,7 @@ func (w *Worker) xpubCheckAndLoadTxids(ad *xpubAddress, filter *AddressFilter, m
 	// if completely loaded, check if there are not some new txs and load if necessary
 	if ad.complete {
 		if ad.balance.Txs != ad.txs {
-			newTxids, _, err := w.xpubGetAddressTxids(ad.addrDesc, false, ad.maxHeight+1, maxHeight, maxInt)
+			newTxids, _, err := w.xpubGetAddressTxids(ad.addrDesc, false, ad.maxHeight+1, maxHeight, filter, maxInt)
 			if err == nil {
 				ad.txids = append(newTxids, ad.txids...)
 				ad.maxHeight = maxHeight
@@ -142,7 +158,7 @@ func (w *Worker) xpubCheckAndLoadTxids(ad *xpubAddress, filter *AddressFilter, m
 		return nil
 	}
 	// load all txids to get paging correctly
-	newTxids, complete, err := w.xpubGetAddressTxids(ad.addrDesc, false, 0, maxHeight, maxInt)
+	newTxids, complete, err := w.xpubGetAddressTxids(ad.addrDesc, false, 0, maxHeight, filter, maxInt)
 	if err != nil {
 		return err
 	}
@@ -453,9 +469,9 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			if txid.height < filter.FromHeight || txid.height > toHeight {
 				return false
 			}
-			if filter.Vout != AddressFilterVoutOff {
+			if filter.Vout != AddressFilterVoutOff && txid.inputOutput&txVout == 0 {
 				if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
-					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 {
+					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0) {
 					return false
 				}
 			}
@@ -470,7 +486,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		for _, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
 			for i := range da {
 				ad := &da[i]
-				newTxids, _, err := w.xpubGetAddressTxids(ad.addrDesc, true, 0, 0, maxInt)
+				newTxids, _, err := w.xpubGetAddressTxids(ad.addrDesc, true, 0, 0, filter, maxInt)
 				if err != nil {
 					return nil, err
 				}
@@ -687,7 +703,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 }
 
 // GetXpubBalanceHistory returns history of balance for given xpub
-func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp int64, currencies []string, gap int, groupBy uint32) (BalanceHistories, error) {
+func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp int64, currencies []string, gap int, groupBy uint32, AddressFilterVout int) (BalanceHistories, error) {
 	bhs := make(BalanceHistories, 0)
 	start := time.Now()
 	fromUnix, fromHeight, toUnix, toHeight := w.balanceHistoryHeightsFromTo(fromTimestamp, toTimestamp)
@@ -695,7 +711,7 @@ func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp i
 		return bhs, nil
 	}
 	data, _, err := w.getXpubData(xpub, 0, 1, AccountDetailsTxidHistory, &AddressFilter{
-		Vout:          AddressFilterVoutOff,
+		Vout:          AddressFilterVout,
 		OnlyConfirmed: true,
 		FromHeight:    fromHeight,
 		ToHeight:      toHeight,
