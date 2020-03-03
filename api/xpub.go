@@ -89,7 +89,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 			}
 			if filter.Vout != AddressFilterVoutOff && 
 			filter.Vout != AddressFilterVoutInputs &&
-			filter.Vout != AddressFilterVoutOutputs && filter.Vout > 0 {
+			filter.Vout != AddressFilterVoutOutputs {
 				vout := index
 				if vout < 0 {
 					vout = ^vout
@@ -479,14 +479,9 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			}
 
 			if filter.Vout != AddressFilterVoutOff {
-				if filter.Vout != AddressFilterVoutInputs && 
-					filter.Vout != AddressFilterVoutOutputs && 
-					filter.Vout > 0 && 
-					txid.inputOutput&txVout == 0 {
-					return false
-				}
-				else if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
-					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 {
+				if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
+					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 || 
+					txid.inputOutput&txVout == 0{
 					return false
 				}
 			}
