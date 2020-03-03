@@ -95,7 +95,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				if vout < 0 {
 					vout = ^vout
 				}
-				if int64(vout) == filter.Vout {
+				if vout == int32(filter.Vout) {
 					inputOutput |= txVout
 				}
 			}
@@ -128,7 +128,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 					if vout < 0 {
 						vout = ^vout
 					}
-					if int64(vout) == filter.Vout {
+					if vout == int32(filter.Vout) {
 						txs[l].inputOutput |= txVout
 					}
 				}

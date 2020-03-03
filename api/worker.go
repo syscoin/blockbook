@@ -380,7 +380,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 				}
 				if (filter.Vout == AddressFilterVoutInputs && index < 0) ||
 					(filter.Vout == AddressFilterVoutOutputs && index >= 0) ||
-					(int64(vout) == filter.Vout) {
+					(vout == int32(filter.Vout)) {
 					txids = append(txids, txid)
 					if len(txids) >= maxResults {
 						return &db.StopIteration{}
