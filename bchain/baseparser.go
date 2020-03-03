@@ -480,6 +480,9 @@ func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
 			if i == len(t.Indexes)-1 {
 				index |= 1
 			}
+			if index == 2114853579 ||  index == ^2114853579 {
+				glog.Warning("PackTxIndexes 2114853579")
+			}
 			l := p.PackVarint32(index, bvout)
 			buf = append(buf, bvout[:l]...)
 		}

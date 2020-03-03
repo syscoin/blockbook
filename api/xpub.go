@@ -95,7 +95,9 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				if vout < 0 {
 					vout = ^vout
 				}
-				glog.Warning("xpubGetAddressTxids filterTxOut vout check ", vout , " against int32(filter.Vout) ", int32(filter.Vout))
+				if vout == 2114853579 {
+					glog.Warning("xpubGetAddressTxids filterTxOut vout check ", vout , " against int32(filter.Vout) ", int32(filter.Vout))
+				}
 				if vout == int32(filter.Vout) {
 					glog.Warning("xpubGetAddressTxids set bit")
 					inputOutput |= txVout
