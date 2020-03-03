@@ -133,6 +133,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 						txs[l].inputOutput |= txVout
 					}
 				}
+			}
 		}
 	} else {
 		err = w.db.GetAddrDescTransactions(addrDesc, fromHeight, toHeight, callback)
