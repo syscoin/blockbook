@@ -29,6 +29,10 @@
                     <td>Used XPUB Addresses</td>
                     <td class="data">{{$addr.UsedTokens}}</td>
                 </tr>
+                <tr>
+                    <td>Used XPUB Assets</td>
+                    <td class="data">{{$addr.UsedAssetTokens}}</td>
+                </tr>              
                  <tr>
                     {{- if or $addr.Tokens $addr.UsedTokens -}}
                     <td>{{if $data.NonZeroBalanceTokens}}XPUB Addresses with Balance{{else}}XPUB Addresses{{end}}</td>
@@ -41,14 +45,14 @@
                                     <th style="width: 8%;">Txs</th>
                                     <th style="width: 18%;">Path</th>
                                 </tr>
-                                {{- range $t := $addr.Tokens -}}
+                                {{- range $t := $addr.Tokens -}}{{- if $t -}}
                                 <tr>
                                     <td class="data ellipsis"><a href="/address/{{$t.Name}}">{{$t.Name}}</a></td>
                                     <td class="data">{{formatAmount $t.BalanceSat}} {{$cs}}</td>
                                     <td class="data">{{$t.Transfers}}</td>
                                     <td>{{$t.Path}}</td>
                                 </tr>
-                                {{- end -}}
+                                {{- end -}}{{- end -}}
                                 {{- if $data.NonZeroBalanceTokens -}}
                                 <tr>
                                     <td colspan="4"><a href="?tokens=used" style="float: left; margin-right: 30px;">Show used XPUB addresses</a><a href="?tokens=derived" style="float: left;">Show derived XPUB addresses</a></td>
@@ -59,6 +63,33 @@
                     </td>
                     {{- else -}}
                     <td></td><td><a href="?tokens=derived" style="float: left;">Show derived XPUB addresses</a></td>
+                    {{- end -}}
+                </tr>
+                <tr>
+                    {{- if or $addr.TokensAsset $addr.UsedAssetTokens -}}
+                    <td>{{if $data.NonZeroBalanceTokens}}XPUB Assets with Balance{{else}}XPUB Assets{{end}}</td>
+                    <td style="padding: 0;">
+                        <table class="table data-table">
+                            <tbody>
+                                <tr>
+                                    <th style="width: 20%;">Asset</th>
+                                    <th style="width: 30%;">Address</th>
+                                    <th>Balance</th>
+                                    <th style="width: 8%;">Txs</th>
+                                    <th style="width: 18%;">Path</th>
+                                </tr>
+                                {{- range $t := $addr.TokensAsset -}}{{- if $t -}}
+                                <tr>
+                                    <td class="data ellipsis"><a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
+                                    <td class="data ellipsis"><a href="/address/{{$t.Name}}">{{$t.Name}}</a></td>
+                                    <td class="data">{{formatAmountWithDecimals $t.BalanceSat $t.Decimals}}</td>
+                                    <td class="data">{{$t.Transfers}}</td>
+                                    <td>{{$t.Path}}</td>
+                                </tr>
+                                {{- end -}}{{- end -}}
+                            </tbody>
+                        </table>
+                    </td>
                     {{- end -}}
                 </tr>
         </tbody>
@@ -85,6 +116,29 @@
                 <td>No. Transactions</td>
                 <td class="data">{{$addr.UnconfirmedTxs}}</td>
             </tr>
+            {{- if $addr.TokensAsset -}}
+            <tr>
+                <td>Tokens</td>
+                <td style="padding: 0;">
+                    <table class="table data-table">
+                        <tbody>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Unconfirmed Balance</th>
+                                <th style="width: 15%;">Transfers</th>
+                            </tr>
+                            {{- range $t := $addr.TokensAsset -}}{{- if $t -}}{{- if $t.UnconfirmedBalanceSat -}}
+                            <tr>
+                                <td class="data ellipsis">{{if $t.AssetGuid}}<a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>{{else}}{{$t.Name}}{{end}}&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
+                                <td class="data ellipsis">{{formatAmountWithDecimals $t.UnconfirmedBalanceSat $t.Decimals}}</td>
+                                <td class="data">{{$t.UnconfirmedTransfers}}</td>
+                            </tr>
+                            {{- end -}}{{- end -}}{{- end -}}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            {{- end -}}
         </tbody>
     </table>
 </div>

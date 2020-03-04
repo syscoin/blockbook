@@ -4,12 +4,13 @@ import (
 	"encoding/hex"
 	"math/big"
 	"strconv"
-
+	
+	vlq "github.com/bsm/go-vlq"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/protobuf/proto"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/bchain"
 	"golang.org/x/crypto/sha3"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // EthereumTypeAddressDescriptorLen - in case of EthereumType, the AddressDescriptor has fixed length
@@ -522,4 +523,43 @@ func GetEthereumTxDataFromSpecificData(coinSpecificData interface{}) *EthereumTx
 		}
 	}
 	return &etd
+}
+
+// Block index
+
+func (p *EthereumParser) PackBlockInfo(block *bchain.DbBlockInfo) ([]byte, error) {
+	packed := make([]byte, 0, 64)
+	varBuf := make([]byte, vlq.MaxLen64)
+	b, err := p.PackBlockHash(block.Hash)
+	if err != nil {
+		return nil, err
+	}
+	packed = append(packed, b...)
+	packed = append(packed, p.BaseParser.PackUint(uint32(block.Time))...)
+	l := p.BaseParser.PackVaruint(uint(block.Txs), varBuf)
+	packed = append(packed, varBuf[:l]...)
+	l = p.BaseParser.PackVaruint(uint(block.Size), varBuf)
+	packed = append(packed, varBuf[:l]...)
+	return packed, nil
+}
+
+func (p *EthereumParser) UnpackBlockInfo(buf []byte) (*bchain.DbBlockInfo, error) {
+	pl := p.PackedTxidLen()
+	// minimum length is PackedTxidLen + 4 bytes time + 1 byte txs + 1 byte size
+	if len(buf) < pl+4+2 {
+		return nil, nil
+	}
+	txid, err := p.UnpackBlockHash(buf[:pl])
+	if err != nil {
+		return nil, err
+	}
+	t := p.BaseParser.UnpackUint(buf[pl:])
+	txs, l := p.BaseParser.UnpackVaruint(buf[pl+4:])
+	size, _ := p.BaseParser.UnpackVaruint(buf[pl+4+l:])
+	return &bchain.DbBlockInfo{
+		Hash: txid,
+		Time: int64(t),
+		Txs:  uint32(txs),
+		Size: uint32(size),
+	}, nil
 }

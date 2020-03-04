@@ -63,3 +63,10 @@ func (b *BaseChain) EthereumTypeGetErc20ContractInfo(contractDesc AddressDescrip
 func (b *BaseChain) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error) {
 	return nil, errors.New("Not supported")
 }
+
+func (b *BaseChain) GetChainTips() (string, error) {
+	return "", errors.New("Not supported")
+}
+func (b *BaseChain) GetSPVProof(hash string) (string, error) {
+	return "", errors.New("Not supported")
+}

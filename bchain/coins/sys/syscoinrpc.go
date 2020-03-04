@@ -1,11 +1,11 @@
 package syscoin
 
 import (
-	"blockbook/bchain"
-	"blockbook/bchain/coins/btc"
 	"encoding/json"
-
+	
 	"github.com/golang/glog"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
 )
 
 // SyscoinRPC is an interface to JSON-RPC bitcoind service
@@ -70,4 +70,53 @@ func (b *SyscoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error)
 		return b.GetBlockFull(hash)
 	}
 	return b.GetBlockWithoutHeader(hash, height)
+}
+
+func (b *SyscoinRPC) GetChainTips() (string, error) {
+	glog.V(1).Info("rpc: getchaintips")
+
+	res := btc.ResGetChainTips{}
+	req := btc.CmdGetChainTips{Method: "getchaintips"}
+	err := b.Call(&req, &res)
+
+	if err != nil {
+		return "", err
+	}
+	if res.Error != nil {
+		return "", err
+	}
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return "", err
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
+}
+
+func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
+	glog.V(1).Info("rpc: getspvproof", hash)
+
+	res := btc.ResGetSPVProof{}
+	req := btc.CmdGetSPVProof{Method: "syscoingetspvproof"}
+	req.Params.Txid = hash
+	err := b.Call(&req, &res)
+
+	if err != nil {
+		return "", err
+	}
+	if res.Error != nil {
+		return "", err
+	}
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return "", err
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
+}
+
+// GetTransactionForMempool returns a transaction by the transaction ID.
+// It could be optimized for mempool, i.e. without block time and confirmations
+func (b *SyscoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
+	return b.GetTransaction(txid)
 }

@@ -3,7 +3,7 @@ package api
 import (
 	"math/big"
 
-	"github.com/trezor/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // ScriptSigV1 is used for legacy api v1
@@ -195,9 +195,9 @@ func (w *Worker) AddressToV1(a *Address) *AddressV1 {
 // AddressUtxoToV1 converts []AddressUtxo to []AddressUtxoV1
 func (w *Worker) AddressUtxoToV1(au Utxos) []AddressUtxoV1 {
 	d := w.chainParser.AmountDecimals()
-	v1 := make([]AddressUtxoV1, len(au))
-	for i := range au {
-		utxo := &au[i]
+	v1 := make([]AddressUtxoV1, len(au.Utxos))
+	for i := range au.Utxos {
+		utxo := &au.Utxos[i]
 		v1[i] = AddressUtxoV1{
 			AmountSat:     utxo.AmountSat.AsBigInt(),
 			Amount:        utxo.AmountSat.DecimalString(d),

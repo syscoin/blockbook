@@ -170,7 +170,7 @@ Response for Bitcoin-type coins:
 }
 ```
 
-Response for Ethereum-type coins. There is always only one *vin*, only one *vout*, possibly an array of *tokenTransfers* and *ethereumSpecific* part. Missing is *hex* field:
+Response for Ethereum-type coins. There is always only one *vin*, only one *vout*, possibly an array of *tokenTransfers* and *ethereumSpecific* part. Note that *tokenTransfers* will also exist for any coins exposing a token interface including Ethereum and Syscoin. Missing is *hex* field:
 
 ```javascript
 {
@@ -291,7 +291,7 @@ Example response:
 Returns balances and transactions of an address. The returned transactions are sorted by block height, newest blocks first.
 
 ```
-GET /api/v2/address/<address>[?page=<page>&pageSize=<size>&from=<block height>&to=<block height>&details=<basic|tokens|tokenBalances|txids|txs>&contract=<contract address>]
+GET /api/v2/address/<address>[?page=<page>&pageSize=<size>&from=<block height>&to=<block height>&details=<basic|tokens|tokenBalances|txids|txs>&filter=<inputs|outputs|tokens|0|uint32>&contract=<contract address>]
 ```
 
 The optional query parameters:
@@ -305,7 +305,27 @@ The optional query parameters:
     - *txids*: *tokenBalances* + list of txids, subject to  *from*, *to* filter and paging
     - *txslight*:  *tokenBalances* + list of transaction with limited details (only data from index), subject to  *from*, *to* filter and paging
     - *txs*:  *tokenBalances* + list of transaction with details, subject to  *from*, *to* filter and paging
-- *contract*: return only transactions which affect specified contract (applicable only to coins which support contracts)
+- *filter*: specifies what tokens (xpub addresses/tokens) are returned by the request (default *nonzero*)
+    - *inputs*: Return transactions sending inputs to this xpub
+    - *outputs*: Return transactions sending outputs to this xpub
+    - *=*: Return specific numerical vout index
+- *assetMask*: What type of transactions to return (default *all*)
+  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *=* for the masks.
+  - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
+  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntonevm* | *assetallocationmint* | *assetallocationsend*.
+  - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
+  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
+  - *=*: Apply a custom numerical mask which is a bitmask of the following values:
+    - *basecoin*: 1
+    - *assetallocationsend*: 2
+    - *syscoinburntoallocation*: 4
+    - *assetallocationburntosyscoin*: 8
+    - *assetallocationburntonevm*: 16
+    - *assetallocationmint*: 32
+    - *assetupdate*: 64
+    - *assetsend*: 128
+    - *assetactivate*: 256
+- *contract*: return only transactions which affect specified contract or asset (applicable only to Ethereum and Syscoin)
 
 Response:
 
@@ -359,23 +379,44 @@ Blockbook supports BIP44, BIP49, BIP84 and BIP86 (Taproot) derivation schemes, u
 The returned transactions are sorted by block height, newest blocks first.
 
 ```
-GET /api/v2/xpub/<xpub|descriptor>[?page=<page>&pageSize=<size>&from=<block height>&to=<block height>&details=<basic|tokens|tokenBalances|txids|txs>&tokens=<nonzero|used|derived>]
+GET /api/v2/xpub/<xpub|descriptor>[?page=<page>&pageSize=<size>&from=<block height>&to=<block height>&details=<basic|tokens|tokenBalances|txids|txs>&tokens=<nonzero|used|derived>&filter=<inputs|outputs|tokens|0|uint32>]
 ```
 
 The optional query parameters:
-- *page*: specifies page of returned transactions, starting from 1. If out of range, Blockbook returns the closest possible page.
+- *page*: specifies page of returned transactions, starting from 1. If out of range, Blockbook returns the closest possible page. Tokens are only returned for coins that have token platforms (Syscoin).
 - *pageSize*: number of transactions returned by call (default and maximum 1000)
 - *from*, *to*: filter of the returned transactions *from* block height *to* block height (default no filter)
 - *details*: specifies level of details returned by request (default *txids*)
     - *basic*: return only xpub balances, without any derived addresses and transactions
-    - *tokens*: *basic* + tokens (addresses) derived from the xpub, subject to *tokens* parameter
-    - *tokenBalances*: *basic* + tokens (addresses) derived from the xpub with balances, subject to *tokens* parameter
+    - *tokens*: *basic* + tokens (addresses/tokens) derived from the xpub, subject to *tokens* parameter
+    - *tokenBalances*: *basic* + tokens (addresses/tokens) derived from the xpub with balances, subject to *tokens* parameter
     - *txids*: *tokenBalances* + list of txids, subject to  *from*, *to* filter and paging
     - *txs*:  *tokenBalances* + list of transaction with details, subject to  *from*, *to* filter and paging
-- *tokens*: specifies what tokens (xpub addresses) are returned by the request (default *nonzero*)
-    - *nonzero*: return only addresses with nonzero balance
-    - *used*: return addresses with at least one transaction
-    - *derived*: return all derived addresses
+- *tokens*: specifies what tokens (xpub addresses/tokens) are returned by the request (default *nonzero*)
+    - *nonzero*: return only addresses/tokens with nonzero balance
+    - *used*: return addresses/tokens with at least one transaction
+    - *derived*: return all derived addresses/tokens
+- *filter*: specifies what tokens (xpub addresses/tokens) are returned by the request (default *nonzero*)
+    - *inputs*: Return transactions sending inputs to this xpub
+    - *outputs*: Return transactions sending outputs to this xpub
+    - *=*: Return specific numerical vout index
+- *assetMask*: What type of transactions to return (default *all*)
+  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *=* for the masks.
+  - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
+  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntonevm* | *assetallocationmint* | *assetallocationsend*.
+  - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
+  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
+  - *=*: Apply a custom numerical mask which is a bitmask of the following values:
+    - *basecoin*: 1
+    - *assetallocationsend*: 2
+    - *syscoinburntoallocation*: 4
+    - *assetallocationburntosyscoin*: 8
+    - *assetallocationburntonevm*: 16
+    - *assetallocationmint*: 32
+    - *assetupdate*: 64
+    - *assetsend*: 128
+    - *assetactivate*: 256
+- *contract*: return only transactions which affect specified contract or asset (applicable only to Ethereum and Syscoin)
 
 Response:
 
@@ -674,7 +715,7 @@ Example error response (e.g. rate unavailable, incorrect currency...):
 Returns a balance history for the specified XPUB or address.
 
 ```
-GET /api/v2/balancehistory/<XPUB | address>?from=<dateFrom>&to=<dateTo>[&fiatcurrency=<currency>&groupBy=<groupBySeconds>]
+GET /api/v2/balancehistory/<XPUB | address>?from=<dateFrom>&to=<dateTo>[&fiatcurrency=<currency>&groupBy=<groupBySeconds>
 ```
 
 Query parameters:
@@ -684,6 +725,34 @@ Query parameters:
 The optional query parameters:
 - *fiatcurrency*: if specified, the response will contain fiat rate at the time of transaction. If not, all available currencies will be returned.
 - *groupBy*: an interval in seconds, to group results by. Default is 3600 seconds.
+
+Example response (fiatcurrency not specified):
+```javascript
+[
+  {
+    "time": 1578391200,
+    "txs": 5,
+    "received": "5000000",
+    "sent": "0",
+    "rates": {
+      "usd": 7855.9,
+      "eur": 6838.13,
+      ...
+    }
+  },
+  {
+    "time": 1578488400,
+    "txs": 1,
+    "received": "0",
+    "sent": "5000000",
+    "rates": {
+      "usd": 8283.11,
+      "eur": 7464.45,
+      ...
+    }
+  }
+]
+```
 
 Example response (fiatcurrency not specified):
 ```javascript

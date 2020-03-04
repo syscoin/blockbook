@@ -19,7 +19,7 @@
                     <td class="data">{{$addr.Txs}}</td>
                 </tr>
                 <tr>
-                    <td>Non-contract Transactions</td>
+                    <td>Non-token Transactions</td>
                     <td class="data">{{$addr.NonTokenTxs}}</td>
                 </tr>
                 <tr>
@@ -37,13 +37,13 @@
                                     <th>Tokens</th>
                                     <th style="width: 15%;">Transfers</th>
                                 </tr>
-                                {{- range $t := $addr.Tokens -}}
+                                {{- range $t := $addr.Tokens -}}{{- if $t -}}
                                 <tr>
                                     <td class="data ellipsis">{{if $t.Contract}}<a href="/address/{{$t.Contract}}">{{$t.Name}}</a>{{else}}{{$t.Name}}{{end}}</td>
-                                    <td class="data">{{formatAmountWithDecimals $t.BalanceSat $t.Decimals}} {{$t.Symbol}}</td>
+                                    <td class="data">{{formatAmountWithDecimals $t.BalanceSat $t.Decimals}} {{formatDecodeBase64 $t.Symbol}}</td>
                                     <td class="data">{{$t.Transfers}}</td>
                                 </tr>
-                                {{- end -}}
+                                {{- end -}}{{- end -}}
                             </tbody>
                         </table>
                     </td>
@@ -67,6 +67,33 @@
                     <td>No. Transactions</td>
                     <td class="data">{{$addr.Txs}}</td>
                 </tr>
+                {{- if $addr.Tokens -}}
+                <tr>
+                    <td>Tokens</td>
+                    <td style="padding: 0;">
+                        <table class="table data-table">
+                            <tbody>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>Total Received</th>
+                                    <th>Total Sent</th>
+                                    <th>Final Balance</th>
+                                    <th style="width: 15%;">Transfers</th>
+                                </tr>
+                                {{- range $t := $addr.Tokens -}}{{- if $t -}}
+                                <tr>
+                                    <td class="data ellipsis">{{if $t.AssetGuid}}<a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>{{else}}{{$t.Name}}{{end}}&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
+                                    <td class="data ellipsis">{{formatAmountWithDecimals $t.TotalReceivedSat $t.Decimals}}</td>
+                                    <td class="data ellipsis">{{formatAmountWithDecimals $t.TotalSentSat $t.Decimals}}</td>
+                                    <td class="data ellipsis">{{formatAmountWithDecimals $t.BalanceSat $t.Decimals}}</td>
+                                    <td class="data">{{$t.Transfers}}</td>
+                                </tr>
+                                {{- end -}}{{- end -}}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {{- end -}}
                 {{- end -}}
             </tbody>
         </table>
@@ -92,21 +119,47 @@
                 <td>No. Transactions</td>
                 <td class="data">{{$addr.UnconfirmedTxs}}</td>
             </tr>
+            {{- if $addr.Tokens -}}
+            <tr>
+                <td>Tokens</td>
+                <td style="padding: 0;">
+                    <table class="table data-table">
+                        <tbody>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Unconfirmed Balance</th>
+                                <th style="width: 15%;">Transfers</th>
+                            </tr>
+                            {{- range $t := $addr.Tokens -}}{{- if $t -}}{{- if $t.UnconfirmedBalanceSat -}}
+                            <tr>
+                                <td class="data ellipsis">{{if $t.AssetGuid}}<a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>{{else}}{{$t.Name}}{{end}}&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
+                                <td class="data ellipsis">{{formatAmountWithDecimals $t.UnconfirmedBalanceSat $t.Decimals}}</td>
+                                <td class="data">{{$t.UnconfirmedTransfers}}</td>
+                            </tr>
+                            {{- end -}}{{- end -}}{{- end -}}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            {{- end -}}
         </tbody>
     </table>
 </div>
 {{- end}}{{if or $addr.Transactions $addr.Filter -}}
 <div class="row h-container">
     <h3 class="col-md-3">Transactions</h3>
-    <select class="col-md-2" style="background-color: #eaeaea;" onchange="self.location='?filter='+options[selectedIndex].value">
+    <select class="col-md-2" style="background-color: #eaeaea;" onchange="self.location='?assetMask='+options[selectedIndex].value + '&filter='+options[selectedIndex].value">
         <option>All</option>
         <option {{if eq $addr.Filter "inputs" -}} selected{{end}} value="inputs">Address on input side</option>
         <option {{if eq $addr.Filter "outputs" -}} selected{{end}} value="outputs">Address on output side</option>
         {{- if $addr.Tokens -}}
-        <option {{if eq $addr.Filter "0" -}} selected{{end}} value="0">Non-contract</option>
-        {{- range $t := $addr.Tokens -}}
+        <option {{if eq $addr.Filter "token-only" -}} selected{{end}} value="token-only">Tokens only</option>
+        <option {{if eq $addr.Filter "non-tokens" -}} selected{{end}} value="non-tokens">Non-token</option>
+        <option {{if eq $addr.Filter "token-transfers" -}} selected{{end}} value="token-transfers">Token transfers</option>
+        <option {{if eq $addr.Filter "non-token-transfers" -}} selected{{end}} value="non-token-transfers">Token non-transfers</option>
+        {{- range $t := $addr.Tokens -}}{{- if $t -}}{{- if eq $t.Type "ERC20" -}}
         <option {{if eq $addr.Filter $t.ContractIndex -}} selected{{end}} value="{{$t.ContractIndex}}">{{$t.Name}}</option>
-        {{- end -}}
+        {{- end -}}{{- end -}}{{- end -}}
         {{- end -}}
     </select>
     <div class="col-md-7">

@@ -14,10 +14,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/gorilla/websocket"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/api"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/common"
-	"github.com/trezor/blockbook/db"
+	"github.com/syscoin/blockbook/api"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/common"
+	"github.com/syscoin/blockbook/db"
 )
 
 const upgradeFailed = "Upgrade failed: "
@@ -522,6 +522,7 @@ func (s *WebsocketServer) getAccountInfo(req *accountInfoReq) (res *api.Address,
 		Contract:       req.ContractFilter,
 		Vout:           api.AddressFilterVoutOff,
 		TokensToReturn: tokensToReturn,
+		AssetsMask:		bchain.AllMask,
 	}
 	if req.PageSize == 0 {
 		req.PageSize = txsOnPage
@@ -534,9 +535,13 @@ func (s *WebsocketServer) getAccountInfo(req *accountInfoReq) (res *api.Address,
 }
 
 func (s *WebsocketServer) getAccountUtxo(descriptor string) (interface{}, error) {
+	var utxo api.Utxos
 	utxo, err := s.api.GetXpubUtxo(descriptor, false, 0)
 	if err != nil {
-		return s.api.GetAddressUtxo(descriptor, false)
+		utxo, err = s.api.GetAddressUtxo(descriptor, false)
+		if(err != nil) {
+			return utxo, err
+		}
 	}
 	return utxo, nil
 }

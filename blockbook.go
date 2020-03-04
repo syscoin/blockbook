@@ -19,13 +19,13 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/api"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins"
-	"github.com/trezor/blockbook/common"
-	"github.com/trezor/blockbook/db"
-	"github.com/trezor/blockbook/fiat"
-	"github.com/trezor/blockbook/server"
+	"github.com/syscoin/blockbook/api"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins"
+	"github.com/syscoin/blockbook/common"
+	"github.com/syscoin/blockbook/db"
+	"github.com/syscoin/blockbook/fiat"
+	"github.com/syscoin/blockbook/server"
 )
 
 // debounce too close requests for resync
@@ -713,7 +713,7 @@ func computeFeeStats(stopCompute chan os.Signal, blockFrom, blockTo int, db *db.
 		return err
 	}
 	err = api.ComputeFeeStats(blockFrom, blockTo, stopCompute)
-	glog.Info("computeFeeStats finished in ", time.Since(start))
+	glog.Info("computeFeeStats, ", time.Since(start))
 	return err
 }
 

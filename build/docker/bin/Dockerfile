@@ -6,7 +6,7 @@ ARG PORTABLE_ROCKSDB
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y build-essential git wget pkg-config lxc-dev libzmq3-dev \
+    apt-get install -y -f build-essential git wget pkg-config lxc-dev libzmq3-dev \
                        libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev \
                        liblz4-dev graphviz && \
     apt-get clean
@@ -45,11 +45,11 @@ RUN strip /opt/rocksdb/ldb /opt/rocksdb/sst_dump && \
 
 # pre-load depencencies
 RUN \
-    cleanup() { rm -rf $GOPATH/src/github.com/trezor ; } && \
+    cleanup() { rm -rf $GOPATH/src/github.com/syscoin ; } && \
     trap cleanup EXIT && \
-    mkdir -p $GOPATH/src/github.com/trezor && \
-    cd $GOPATH/src/github.com/trezor && \
-    git clone https://github.com/trezor/blockbook.git && \
+    mkdir -p $GOPATH/src/github.com/syscoin && \
+    cd $GOPATH/src/github.com/syscoin && \
+    git clone https://github.com/syscoin/blockbook.git && \
     cd blockbook && \
     go mod download
 

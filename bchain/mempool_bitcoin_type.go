@@ -3,7 +3,7 @@ package bchain
 import (
 	"math/big"
 	"time"
-
+	
 	"github.com/golang/glog"
 )
 
@@ -59,6 +59,7 @@ func NewMempoolBitcoinType(chain BlockChain, workers int, subworkers int) *Mempo
 
 func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrIndex {
 	var addrDesc AddressDescriptor
+	var assetInfo *AssetInfo = nil
 	var value *big.Int
 	vin := &payload.tx.Vin[payload.index]
 	if m.AddrDescForOutpoint != nil {
@@ -79,11 +80,12 @@ func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrInd
 			glog.Error("error in addrDesc in ", vin.Txid, " ", vin.Vout, ": ", err)
 			return nil
 		}
+		assetInfo = itx.Vout[vin.Vout].AssetInfo
 		value = &itx.Vout[vin.Vout].ValueSat
 	}
 	vin.AddrDesc = addrDesc
 	vin.ValueSat = *value
-	return &addrIndex{string(addrDesc), ^int32(vin.Vout)}
+	return &addrIndex{string(addrDesc), ^int32(vin.Vout), assetInfo}
 
 }
 
@@ -103,7 +105,7 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, chanInput chan chanInputPay
 			continue
 		}
 		if len(addrDesc) > 0 {
-			io = append(io, addrIndex{string(addrDesc), int32(output.N)})
+			io = append(io, addrIndex{string(addrDesc), int32(output.N), output.AssetInfo})
 		}
 		if m.OnNewTxAddr != nil {
 			m.OnNewTxAddr(tx, addrDesc)
@@ -200,6 +202,6 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 			m.mux.Unlock()
 		}
 	}
-	glog.Info("mempool: resync finished in ", time.Since(start), ", ", len(m.txEntries), " transactions in mempool")
+	glog.Info("mempool: resync, ", time.Since(start), ", ", len(m.txEntries), " transactions in mempool")
 	return len(m.txEntries), nil
 }

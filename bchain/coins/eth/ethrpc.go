@@ -17,8 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/common"
 )
 
 // EthereumNet type specifies the type of ethereum network
@@ -29,8 +29,6 @@ const (
 	MainNet EthereumNet = 1
 	// TestNet is Ropsten test network
 	TestNet EthereumNet = 3
-	// TestNetGoerli is Goerli test network
-	TestNetGoerli EthereumNet = 5
 )
 
 // Configuration represents json config file
@@ -162,9 +160,6 @@ func (b *EthereumRPC) Initialize() error {
 		b.Testnet = true
 		b.Network = "testnet"
 		break
-	case TestNetGoerli:
-		b.Testnet = true
-		b.Network = "goerli"
 	default:
 		return errors.Errorf("Unknown network id %v", id)
 	}
@@ -340,15 +335,19 @@ func (b *EthereumRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	var ver string
+	var ver, protocol string
 	if err := b.rpc.CallContext(ctx, &ver, "web3_clientVersion"); err != nil {
 		return nil, err
 	}
+	if err := b.rpc.CallContext(ctx, &protocol, "eth_protocolVersion"); err != nil {
+		return nil, err
+	}
 	rv := &bchain.ChainInfo{
-		Blocks:        int(h.Number.Int64()),
-		Bestblockhash: h.Hash().Hex(),
-		Difficulty:    h.Difficulty.String(),
-		Version:       ver,
+		Blocks:          int(h.Number.Int64()),
+		Bestblockhash:   h.Hash().Hex(),
+		Difficulty:      h.Difficulty.String(),
+		Version:         ver,
+		ProtocolVersion: protocol,
 	}
 	idi := int(id.Uint64())
 	if idi == 1 {

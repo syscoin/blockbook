@@ -1,45 +1,6 @@
 package coins
 
 import (
-	"blockbook/bchain"
-	"blockbook/bchain/coins/bch"
-	"blockbook/bchain/coins/bellcoin"
-	"blockbook/bchain/coins/bitcore"
-	"blockbook/bchain/coins/btc"
-	"blockbook/bchain/coins/btg"
-	"blockbook/bchain/coins/cpuchain"
-	"blockbook/bchain/coins/dash"
-	"blockbook/bchain/coins/dcr"
-	"blockbook/bchain/coins/deeponion"
-	"blockbook/bchain/coins/digibyte"
-	"blockbook/bchain/coins/divi"
-	"blockbook/bchain/coins/dogecoin"
-	"blockbook/bchain/coins/eth"
-	"blockbook/bchain/coins/flo"
-	"blockbook/bchain/coins/fujicoin"
-	"blockbook/bchain/coins/gamecredits"
-	"blockbook/bchain/coins/grs"
-	"blockbook/bchain/coins/koto"
-	"blockbook/bchain/coins/liquid"
-	"blockbook/bchain/coins/litecoin"
-	"blockbook/bchain/coins/monacoin"
-	"blockbook/bchain/coins/monetaryunit"
-	"blockbook/bchain/coins/myriad"
-	"blockbook/bchain/coins/namecoin"
-	"blockbook/bchain/coins/nuls"
-	"blockbook/bchain/coins/pivx"
-	"blockbook/bchain/coins/polis"
-	"blockbook/bchain/coins/qtum"
-	"blockbook/bchain/coins/ravencoin"
-	"blockbook/bchain/coins/ritocoin"
-	"blockbook/bchain/coins/unobtanium"
-	"blockbook/bchain/coins/vertcoin"
-	"blockbook/bchain/coins/viacoin"
-	"blockbook/bchain/coins/vipstarcoin"
-	"blockbook/bchain/coins/xzc"
-	"blockbook/bchain/coins/zec"
-	"blockbook/bchain/coins/sys"
-	"blockbook/common"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -49,49 +10,46 @@ import (
 	"time"
 
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins/bch"
-	"github.com/trezor/blockbook/bchain/coins/bellcoin"
-	"github.com/trezor/blockbook/bchain/coins/bitcore"
-	"github.com/trezor/blockbook/bchain/coins/bitzeny"
-	"github.com/trezor/blockbook/bchain/coins/btc"
-	"github.com/trezor/blockbook/bchain/coins/btg"
-	"github.com/trezor/blockbook/bchain/coins/cpuchain"
-	"github.com/trezor/blockbook/bchain/coins/dash"
-	"github.com/trezor/blockbook/bchain/coins/dcr"
-	"github.com/trezor/blockbook/bchain/coins/deeponion"
-	"github.com/trezor/blockbook/bchain/coins/digibyte"
-	"github.com/trezor/blockbook/bchain/coins/divi"
-	"github.com/trezor/blockbook/bchain/coins/dogecoin"
-	"github.com/trezor/blockbook/bchain/coins/ecash"
-	"github.com/trezor/blockbook/bchain/coins/eth"
-	"github.com/trezor/blockbook/bchain/coins/firo"
-	"github.com/trezor/blockbook/bchain/coins/flo"
-	"github.com/trezor/blockbook/bchain/coins/fujicoin"
-	"github.com/trezor/blockbook/bchain/coins/gamecredits"
-	"github.com/trezor/blockbook/bchain/coins/grs"
-	"github.com/trezor/blockbook/bchain/coins/koto"
-	"github.com/trezor/blockbook/bchain/coins/liquid"
-	"github.com/trezor/blockbook/bchain/coins/litecoin"
-	"github.com/trezor/blockbook/bchain/coins/monacoin"
-	"github.com/trezor/blockbook/bchain/coins/monetaryunit"
-	"github.com/trezor/blockbook/bchain/coins/myriad"
-	"github.com/trezor/blockbook/bchain/coins/namecoin"
-	"github.com/trezor/blockbook/bchain/coins/nuls"
-	"github.com/trezor/blockbook/bchain/coins/omotenashicoin"
-	"github.com/trezor/blockbook/bchain/coins/pivx"
-	"github.com/trezor/blockbook/bchain/coins/polis"
-	"github.com/trezor/blockbook/bchain/coins/qtum"
-	"github.com/trezor/blockbook/bchain/coins/ravencoin"
-	"github.com/trezor/blockbook/bchain/coins/ritocoin"
-	"github.com/trezor/blockbook/bchain/coins/snowgem"
-	"github.com/trezor/blockbook/bchain/coins/trezarcoin"
-	"github.com/trezor/blockbook/bchain/coins/unobtanium"
-	"github.com/trezor/blockbook/bchain/coins/vertcoin"
-	"github.com/trezor/blockbook/bchain/coins/viacoin"
-	"github.com/trezor/blockbook/bchain/coins/vipstarcoin"
-	"github.com/trezor/blockbook/bchain/coins/zec"
-	"github.com/trezor/blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/bch"
+	"github.com/syscoin/blockbook/bchain/coins/bellcoin"
+	"github.com/syscoin/blockbook/bchain/coins/bitcore"
+	"github.com/syscoin/blockbook/bchain/coins/bitzeny"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain/coins/btg"
+	"github.com/syscoin/blockbook/bchain/coins/cpuchain"
+	"github.com/syscoin/blockbook/bchain/coins/dash"
+	"github.com/syscoin/blockbook/bchain/coins/dcr"
+	"github.com/syscoin/blockbook/bchain/coins/deeponion"
+	"github.com/syscoin/blockbook/bchain/coins/digibyte"
+	"github.com/syscoin/blockbook/bchain/coins/divi"
+	"github.com/syscoin/blockbook/bchain/coins/dogecoin"
+	"github.com/syscoin/blockbook/bchain/coins/eth"
+	"github.com/syscoin/blockbook/bchain/coins/flo"
+	"github.com/syscoin/blockbook/bchain/coins/fujicoin"
+	"github.com/syscoin/blockbook/bchain/coins/gamecredits"
+	"github.com/syscoin/blockbook/bchain/coins/grs"
+	"github.com/syscoin/blockbook/bchain/coins/koto"
+	"github.com/syscoin/blockbook/bchain/coins/liquid"
+	"github.com/syscoin/blockbook/bchain/coins/litecoin"
+	"github.com/syscoin/blockbook/bchain/coins/monacoin"
+	"github.com/syscoin/blockbook/bchain/coins/monetaryunit"
+	"github.com/syscoin/blockbook/bchain/coins/myriad"
+	"github.com/syscoin/blockbook/bchain/coins/namecoin"
+	"github.com/syscoin/blockbook/bchain/coins/nuls"
+	"github.com/syscoin/blockbook/bchain/coins/omotenashicoin"
+	"github.com/syscoin/blockbook/bchain/coins/pivx"
+	"github.com/syscoin/blockbook/bchain/coins/polis"
+	"github.com/syscoin/blockbook/bchain/coins/qtum"
+	"github.com/syscoin/blockbook/bchain/coins/ravencoin"
+	"github.com/syscoin/blockbook/bchain/coins/ritocoin"
+	"github.com/syscoin/blockbook/bchain/coins/sys"
+	"github.com/syscoin/blockbook/bchain/coins/unobtanium"
+	"github.com/syscoin/blockbook/bchain/coins/vertcoin"
+	"github.com/syscoin/blockbook/bchain/coins/viacoin"
+	"github.com/syscoin/blockbook/bchain/coins/vipstarcoin"
+	"github.com/syscoin/blockbook/bchain/coins/zec"
+	"github.com/syscoin/blockbook/common"
 )
 
 type blockChainFactory func(config json.RawMessage, pushHandler func(bchain.NotificationType)) (bchain.BlockChain, error)
@@ -102,18 +60,14 @@ var BlockChainFactories = make(map[string]blockChainFactory)
 func init() {
 	BlockChainFactories["Bitcoin"] = btc.NewBitcoinRPC
 	BlockChainFactories["Testnet"] = btc.NewBitcoinRPC
-	BlockChainFactories["Signet"] = btc.NewBitcoinRPC
-	BlockChainFactories["Regtest"] = btc.NewBitcoinRPC
 	BlockChainFactories["Zcash"] = zec.NewZCashRPC
 	BlockChainFactories["Zcash Testnet"] = zec.NewZCashRPC
 	BlockChainFactories["Ethereum"] = eth.NewEthereumRPC
 	BlockChainFactories["Ethereum Classic"] = eth.NewEthereumRPC
 	BlockChainFactories["Ethereum Testnet Ropsten"] = eth.NewEthereumRPC
-	BlockChainFactories["Ethereum Testnet Goerli"] = eth.NewEthereumRPC
 	BlockChainFactories["Bcash"] = bch.NewBCashRPC
 	BlockChainFactories["Bcash Testnet"] = bch.NewBCashRPC
 	BlockChainFactories["Bgold"] = btg.NewBGoldRPC
-	BlockChainFactories["Bgold Testnet"] = btg.NewBGoldRPC
 	BlockChainFactories["Dash"] = dash.NewDashRPC
 	BlockChainFactories["Dash Testnet"] = dash.NewDashRPC
 	BlockChainFactories["Decred"] = dcr.NewDecredRPC
@@ -124,7 +78,6 @@ func init() {
 	BlockChainFactories["Litecoin"] = litecoin.NewLitecoinRPC
 	BlockChainFactories["Litecoin Testnet"] = litecoin.NewLitecoinRPC
 	BlockChainFactories["Dogecoin"] = dogecoin.NewDogecoinRPC
-	BlockChainFactories["Dogecoin Testnet"] = dogecoin.NewDogecoinRPC
 	BlockChainFactories["Vertcoin"] = vertcoin.NewVertcoinRPC
 	BlockChainFactories["Vertcoin Testnet"] = vertcoin.NewVertcoinRPC
 	BlockChainFactories["Namecoin"] = namecoin.NewNamecoinRPC
@@ -132,17 +85,13 @@ func init() {
 	BlockChainFactories["Monacoin Testnet"] = monacoin.NewMonacoinRPC
 	BlockChainFactories["MonetaryUnit"] = monetaryunit.NewMonetaryUnitRPC
 	BlockChainFactories["DigiByte"] = digibyte.NewDigiByteRPC
-	BlockChainFactories["DigiByte Testnet"] = digibyte.NewDigiByteRPC
 	BlockChainFactories["Myriad"] = myriad.NewMyriadRPC
 	BlockChainFactories["Liquid"] = liquid.NewLiquidRPC
 	BlockChainFactories["Groestlcoin"] = grs.NewGroestlcoinRPC
 	BlockChainFactories["Groestlcoin Testnet"] = grs.NewGroestlcoinRPC
-	BlockChainFactories["Groestlcoin Signet"] = grs.NewGroestlcoinRPC
-	BlockChainFactories["Groestlcoin Regtest"] = grs.NewGroestlcoinRPC
 	BlockChainFactories["PIVX"] = pivx.NewPivXRPC
 	BlockChainFactories["PIVX Testnet"] = pivx.NewPivXRPC
 	BlockChainFactories["Polis"] = polis.NewPolisRPC
-	BlockChainFactories["Firo"] = firo.NewFiroRPC
 	BlockChainFactories["Fujicoin"] = fujicoin.NewFujicoinRPC
 	BlockChainFactories["Flo"] = flo.NewFloRPC
 	BlockChainFactories["Bellcoin"] = bellcoin.NewBellcoinRPC
@@ -151,17 +100,19 @@ func init() {
 	BlockChainFactories["Qtum Testnet"] = qtum.NewQtumRPC
 	BlockChainFactories["NULS"] = nuls.NewNulsRPC
 	BlockChainFactories["VIPSTARCOIN"] = vipstarcoin.NewVIPSTARCOINRPC
-	BlockChainFactories["Flux"] = zec.NewZCashRPC
+	BlockChainFactories["ZelCash"] = zec.NewZCashRPC
 	BlockChainFactories["Ravencoin"] = ravencoin.NewRavencoinRPC
 	BlockChainFactories["Ritocoin"] = ritocoin.NewRitocoinRPC
 	BlockChainFactories["Divi"] = divi.NewDiviRPC
 	BlockChainFactories["CPUchain"] = cpuchain.NewCPUchainRPC
 	BlockChainFactories["Unobtanium"] = unobtanium.NewUnobtaniumRPC
 	BlockChainFactories["DeepOnion"] = deeponion.NewDeepOnionRPC
-	BlockChainFactories["SnowGem"] = snowgem.NewSnowGemRPC
 	BlockChainFactories["Bitcore"] = bitcore.NewBitcoreRPC
 	BlockChainFactories["Syscoin"] = syscoin.NewSyscoinRPC
 	BlockChainFactories["Syscoin Testnet"] = syscoin.NewSyscoinRPC
+	BlockChainFactories["Omotenashicoin"] = omotenashicoin.NewOmotenashiCoinRPC
+	BlockChainFactories["Omotenashicoin Testnet"] = omotenashicoin.NewOmotenashiCoinRPC
+	BlockChainFactories["BitZeny"] = bitzeny.NewBitZenyRPC
 }
 
 // GetCoinNameFromConfig gets coin name and coin shortcut from config file
@@ -366,6 +317,17 @@ func (c *blockChainWithMetrics) EthereumTypeGetErc20ContractBalance(addrDesc, co
 	return c.b.EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc)
 }
 
+func (c *blockChainWithMetrics) GetChainTips() (result string, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("GetChainTips", s, err) }(time.Now())
+	result, err = c.b.GetChainTips()
+	return result, err
+}
+
+func (c *blockChainWithMetrics) GetSPVProof(hash string) (result string, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("GetSPVProof", s, err) }(time.Now())
+	result, err = c.b.GetSPVProof(hash)
+	return result, err
+}
 type mempoolWithMetrics struct {
 	mempool bchain.Mempool
 	m       *common.Metrics
@@ -405,4 +367,9 @@ func (c *mempoolWithMetrics) GetAllEntries() (v bchain.MempoolTxidEntries) {
 
 func (c *mempoolWithMetrics) GetTransactionTime(txid string) uint32 {
 	return c.mempool.GetTransactionTime(txid)
+}
+
+func (c *mempoolWithMetrics) GetTxAssets(assetGuid uint64) bchain.MempoolTxidEntries {
+	defer func(s time.Time) { c.observeRPCLatency("GetTxAssets", s, nil) }(time.Now())
+	return c.mempool.GetTxAssets(assetGuid)
 }

@@ -86,8 +86,6 @@ command: `make NO_CACHE=true all-bitcoin`.
 
 `TCMALLOC`: RocksDB, the storage engine used by Blockbook, allows to use alternative memory allocators. Use the `TCMALLOC` variable to specify Google's TCMalloc allocator `make TCMALLOC=true all-bitcoin`. To run Blockbook built with TCMalloc, the library must be installed on the target server, for example by `sudo apt-get install google-perftools`.
 
-`PORTABLE`: By default, the RocksDB binaries shipped with Blockbook are optimized for the platform you're compiling on (-march=native or the equivalent). If you want to build a portable binary, use `make PORTABLE=1 all-bitcoin`.
-
 ### Naming conventions and versioning
 
 All configuration keys described below are in coin definition file in *configs/coins*.
@@ -201,8 +199,7 @@ export PATH=$PATH:$GOPATH/bin
 ```
 
 Install RocksDB: https://github.com/facebook/rocksdb/blob/master/INSTALL.md
-and compile the static_lib and tools. Optionally, consider adding `PORTABLE=1` before the 
-make command to create a portable binary.
+and compile the static_lib and tools
 
 ```
 sudo apt-get update && sudo apt-get install -y \
@@ -235,7 +232,7 @@ Get blockbook sources, install dependencies, build:
 
 ```
 cd $GOPATH/src
-git clone https://github.com/trezor/blockbook.git
+git clone https://github.com/syscoin/blockbook.git
 cd blockbook
 go build -tags rocksdb_6_16
 ```

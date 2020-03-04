@@ -3,7 +3,7 @@ package dbtestdata
 import (
 	"encoding/hex"
 
-	"github.com/trezor/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // Addresses

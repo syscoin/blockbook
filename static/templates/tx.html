@@ -65,6 +65,34 @@
                 <td>Fees</td>
                 <td class="data">{{formatAmount $tx.FeesSat}} {{$cs}}</td>
             </tr>{{end -}}
+            {{if gt (len $tx.Memo) 0}}
+            <tr>
+                <td>Memo</td>
+                <td class="data">{{formatEncodeBase64 $tx.Memo}}</td>
+            </tr>{{end}}
+            {{- if $tx.TokenTransferSummary -}}
+            <tr>
+                <td>Tokens</td>
+                <td style="padding: 0;">
+                    <table class="table data-table">
+                        <tbody>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Total</th>
+                                <th>Fee</th>
+                            </tr>
+                            {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
+                            <tr>
+                                <td class="data ellipsis"><a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a>&nbsp;<span class="text-muted">{{formatDecodeBase64 $tokenTransfer.Symbol}}</span></td>
+                                <td class="data ellipsis">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</td>
+                                <td class="data ellipsis">{{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</td>
+                            </tr>
+                            {{- end -}}{{- end -}}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            {{- end -}}
             {{- if not $tx.Confirmations}}
             <tr>
                 <td><span title="Replace by fee">RBF</span></td>

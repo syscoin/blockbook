@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/common"
 )
 
 // SyncWorker is handle to SyncWorker
@@ -88,7 +88,7 @@ func (w *SyncWorker) ResyncIndex(onNewBlock bchain.OnNewBlockFunc, initialSync b
 	switch err {
 	case nil:
 		d := time.Since(start)
-		glog.Info("resync: finished in ", d)
+		glog.Info("resync: ", d)
 		w.metrics.IndexResyncDuration.Observe(float64(d) / 1e6) // in milliseconds
 		w.metrics.IndexDBSize.Set(float64(w.db.DatabaseSizeOnDisk()))
 		bh, _, err := w.db.GetBestBlock()
@@ -104,7 +104,7 @@ func (w *SyncWorker) ResyncIndex(onNewBlock bchain.OnNewBlockFunc, initialSync b
 		w.metrics.IndexDBSize.Set(float64(w.db.DatabaseSizeOnDisk()))
 		if initialSync {
 			d := time.Since(start)
-			glog.Info("resync: finished in ", d)
+			glog.Info("resync: ", d)
 		}
 		return nil
 	}
