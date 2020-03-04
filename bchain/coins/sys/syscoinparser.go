@@ -524,7 +524,7 @@ func (p *SyscoinParser) AppendTokenTransferRecipient(ttr *bchain.TokenTransferRe
 	return buf
 }
 // same as base but packs additional varint for length of indexes array (base uses bitshifting and takes up lowest bit which we need for asset guid which uses up entire int32 range)
-func (p *SyscoinParser) PackTxIndexes(txi []TxIndexes) []byte {
+func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
 	// store the txs in reverse order for ordering from newest to oldest
