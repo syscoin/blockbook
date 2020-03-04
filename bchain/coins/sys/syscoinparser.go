@@ -574,10 +574,13 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 // same as base but unpacks additional varint for length of indexes array (base uses bitshifting and takes up lowest bit which we need for asset guid which uses up entire int32 range)
 func (p *SyscoinParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
 	indexes, l := p.BaseParser.UnpackVaruint(*buf)
-	*buf = *buf[l:]
+	*buf = (*buf)[l:]
 	for i := uint(0); i < indexes; i++ {
 		index, ll := d.chainParser.UnpackVarint32(*buf)
-		*buf = *buf[ll:]
+		*buf = (*buf)[ll:]
+		if len(*buf) == 0 {
+			return errors.New("rocksdb: index buffer length is zero")
+		}
 		*txindexes = append(*txindex, index)
 	}
 	return nil

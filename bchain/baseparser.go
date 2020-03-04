@@ -491,7 +491,7 @@ func (p *BaseParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
 	for {
 		index, l := p.UnpackVarint32(*buf)
 		*txindexes = append(*txindexes, index>>1)
-		*buf = *buf[l:]
+		*buf = (*buf)[l:]
 		if index&1 == 1 {
 			return nil
 		} else if len(*buf) == 0 {
