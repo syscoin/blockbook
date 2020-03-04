@@ -31,7 +31,7 @@ func txIndexesHexSyscoin(tx string, indexes []int32, d *RocksDB) string {
 	buf := make([]byte, vlq.MaxLen32)
 	l := d.chainParser.PackVaruint(uint(len(indexes)), buf)
 	tx += hex.EncodeToString(buf[:l])
-	for i, index := range indexes {
+	for _, index := range indexes {
 		l = d.chainParser.PackVarint32(index, buf)
 		tx += hex.EncodeToString(buf[:l])
 	}
