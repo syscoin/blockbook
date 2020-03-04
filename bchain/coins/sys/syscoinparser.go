@@ -524,7 +524,7 @@ func (p *SyscoinParser) AppendTokenTransferRecipient(ttr *bchain.TokenTransferRe
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
-// same as base but packs additional varint for length of indexes array (base uses bitshifting and takes up lowest bit which we need for asset guid which uses up entire int32 range)
+// same as base but packs/unpacks additional varint for length of indexes array (base uses bitshifting and takes up lowest bit which we need for asset guid which uses up entire int32 range)
 func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 	buf := make([]byte, 0, 32)
 	bvout := make([]byte, vlq.MaxLen32)
@@ -542,6 +542,19 @@ func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 	return buf
 }
 
+func (p *SyscoinParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
+	indexes, l := p.BaseParser.UnpackVaruint(*buf)
+	*buf = (*buf)[l:]
+	for i := uint(0); i < indexes; i++ {
+		if len(*buf) == 0 {
+			return errors.New("rocksdb: index buffer length is zero")
+		}
+		index, ll := p.BaseParser.UnpackVarint32(*buf)
+		*buf = (*buf)[ll:]
+		*txindexes = append(*txindexes, index)
+	}
+	return nil
+}
 
 func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
@@ -571,20 +584,6 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 		buf = append(buf, varBuf[:l]...)	
 	}
 	return buf
-}
-// same as base but unpacks additional varint for length of indexes array (base uses bitshifting and takes up lowest bit which we need for asset guid which uses up entire int32 range)
-func (p *SyscoinParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
-	indexes, l := p.BaseParser.UnpackVaruint(*buf)
-	*buf = (*buf)[l:]
-	for i := uint(0); i < indexes; i++ {
-		index, ll := p.BaseParser.UnpackVarint32(*buf)
-		*buf = (*buf)[ll:]
-		if len(*buf) == 0 {
-			return errors.New("rocksdb: index buffer length is zero")
-		}
-		*txindexes = append(*txindexes, index)
-	}
-	return nil
 }
 
 
