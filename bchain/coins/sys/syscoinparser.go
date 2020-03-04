@@ -550,8 +550,8 @@ func (p *SyscoinParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
 			return errors.New("rocksdb: index buffer length is zero")
 		}
 		index, ll := p.BaseParser.UnpackVarint32(*buf)
-		*buf = (*buf)[ll:]
 		*txindexes = append(*txindexes, index)
+		*buf = (*buf)[ll:]
 	}
 	return nil
 }
