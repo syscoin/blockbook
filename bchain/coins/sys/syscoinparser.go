@@ -11,6 +11,7 @@ import (
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/martinboehm/btcutil"
 	vlq "github.com/bsm/go-vlq"
+	"github.com/juju/errors"
 )
 
 // magic numbers
@@ -531,7 +532,7 @@ func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 	for j := len(txi) - 1; j >= 0; j-- {
 		t := &txi[j]
 		buf = append(buf, []byte(t.BtxID)...)
-		l := p.BaseParser.PackVarint32(uint(len(t.Indexes)), bvout)
+		l := p.BaseParser.PackVaruint(uint(len(t.Indexes)), bvout)
 		buf = append(buf, bvout[:l]...)
 		for i, index := range t.Indexes {
 			l := p.BaseParser.PackVarint32(index, bvout)
@@ -576,12 +577,12 @@ func (p *SyscoinParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
 	indexes, l := p.BaseParser.UnpackVaruint(*buf)
 	*buf = (*buf)[l:]
 	for i := uint(0); i < indexes; i++ {
-		index, ll := d.chainParser.UnpackVarint32(*buf)
+		index, ll := p.BaseParser.UnpackVarint32(*buf)
 		*buf = (*buf)[ll:]
 		if len(*buf) == 0 {
 			return errors.New("rocksdb: index buffer length is zero")
 		}
-		*txindexes = append(*txindex, index)
+		*txindexes = append(*txindexes, index)
 	}
 	return nil
 }
