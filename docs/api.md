@@ -170,7 +170,7 @@ Response for Bitcoin-type coins:
 }
 ```
 
-Response for Ethereum-type coins. There is always only one *vin*, only one *vout*, possibly an array of *tokenTransfers* and *ethereumSpecific* part. Missing is *hex* field:
+Response for Ethereum-type coins. There is always only one *vin*, only one *vout*, possibly an array of *tokenTransfers* and *ethereumSpecific* part. Note that *tokenTransfers* will also exist for any coins exposing an asset interface including Ethereum and Syscoin. Missing is *hex* field:
 
 ```javascript
 {
@@ -303,6 +303,7 @@ The optional query parameters:
     - *tokenBalances*: *basic* + tokens with balances + belonging to the address (applicable only to some coins)
     - *txids*: *tokenBalances* + list of txids, subject to  *from*, *to* filter and paging
     - *txs*:  *tokenBalances* + list of transaction with details, subject to  *from*, *to* filter and paging
+- *filter*: filter tokens by their GUID or 0 for non-token transfers. Set to the Asset GUID (uint32) for coin types such as Syscoin, to filter transactions by that asset, or contract index in Ethereum. Set to 0 to show only non-token related transactions.
 
 Response:
 
@@ -341,19 +342,20 @@ GET /api/v2/xpub/<xpub>[?page=<page>&pageSize=<size>&from=<block height>&to=<blo
 ```
 
 The optional query parameters:
-- *page*: specifies page of returned transactions, starting from 1. If out of range, Blockbook returns the closest possible page.
+- *page*: specifies page of returned transactions, starting from 1. If out of range, Blockbook returns the closest possible page. Assets are only returned for coins that have assets (Syscoin).
 - *pageSize*: number of transactions returned by call (default and maximum 1000)
 - *from*, *to*: filter of the returned transactions *from* block height *to* block height (default no filter)
 - *details*: specifies level of details returned by request (default *txids*)
     - *basic*: return only xpub balances, without any derived addresses and transactions
-    - *tokens*: *basic* + tokens (addresses) derived from the xpub, subject to *tokens* parameter
-    - *tokenBalances*: *basic* + tokens (addresses) derived from the xpub with balances, subject to *tokens* parameter
+    - *tokens*: *basic* + tokens (addresses/assets) derived from the xpub, subject to *tokens* parameter
+    - *tokenBalances*: *basic* + tokens (addresses/assets) derived from the xpub with balances, subject to *tokens* parameter
     - *txids*: *tokenBalances* + list of txids, subject to  *from*, *to* filter and paging
     - *txs*:  *tokenBalances* + list of transaction with details, subject to  *from*, *to* filter and paging
-- *tokens*: specifies what tokens (xpub addresses) are returned by the request (default *nonzero*)
-    - *nonzero*: return only addresses with nonzero balance
-    - *used*: return addresses with at least one transaction
-    - *derived*: return all derived addresses
+- *tokens*: specifies what tokens (xpub addresses/assets) are returned by the request (default *nonzero*)
+    - *nonzero*: return only addresses/assets with nonzero balance
+    - *used*: return addresses/assets with at least one transaction
+    - *derived*: return all derived addresses/assets
+- *filter*: filter tokens by their GUID or 0 for non-token transfers. Set to the Asset GUID (uint32) for coin types such as Syscoin, to filter transactions by that asset. Set to 0 to show only non-token related transactions.
 
 Response:
 
@@ -662,6 +664,7 @@ Query parameters:
 The optional query parameters:
 - *fiatcurrency*: if specified, the response will contain fiat rate at the time of transaction. If not, all available currencies will be returned.
 - *groupBy*: an interval in seconds, to group results by. Default is 3600 seconds.
+- *filter*: if specified, filter tokens by their GUID or 0 for non-token transfers. Set to the Asset GUID (uint32) for coin types such as Syscoin, to filter transactions by that asset. Set to 0 to show only non-token related transactions.
 
 Example response (fiatcurrency not specified):
 ```javascript
