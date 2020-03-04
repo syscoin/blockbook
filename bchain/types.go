@@ -677,6 +677,7 @@ type BlockChainParser interface {
 	UnpackTxInput(ti *TxInput, buf []byte) int
 	UnpackTxOutput(to *TxOutput, buf []byte) int
 	PackTxIndexes(txi []TxIndexes) []byte
+	UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error
 	PackOutpoints(outpoints []DbOutpoint) []byte
 	UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error)
 	PackBlockInfo(block *DbBlockInfo) ([]byte, error)

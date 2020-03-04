@@ -523,6 +523,24 @@ func (p *SyscoinParser) AppendTokenTransferRecipient(ttr *bchain.TokenTransferRe
 	buf = append(buf, varBuf[:l]...)
 	return buf
 }
+// same as base but packs additional varint for length of indexes array (base uses bitshifting and takes up lowest bit which we need for asset guid which uses up entire int32 range)
+func (p *SyscoinParser) PackTxIndexes(txi []TxIndexes) []byte {
+	buf := make([]byte, 0, 32)
+	bvout := make([]byte, vlq.MaxLen32)
+	// store the txs in reverse order for ordering from newest to oldest
+	for j := len(txi) - 1; j >= 0; j-- {
+		t := &txi[j]
+		buf = append(buf, []byte(t.BtxID)...)
+		l := p.BaseParser.PackVarint32(uint(len(t.Indexes)), bvout)
+		buf = append(buf, bvout[:l]...)
+		for i, index := range t.Indexes {
+			l := p.BaseParser.PackVarint32(index, bvout)
+			buf = append(buf, bvout[:l]...)
+		}
+	}
+	return buf
+}
+
 
 func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
@@ -553,6 +571,18 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	}
 	return buf
 }
+// same as base but unpacks additional varint for length of indexes array (base uses bitshifting and takes up lowest bit which we need for asset guid which uses up entire int32 range)
+func (p *SyscoinParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
+	indexes, l := p.BaseParser.UnpackVaruint(*buf)
+	*buf = *buf[l:]
+	for i := uint(0); i < indexes; i++ {
+		index, ll := d.chainParser.UnpackVarint32(*buf)
+		*buf = *buf[ll:]
+		*txindexes = append(*txindex, index)
+	}
+	return nil
+}
+
 
 func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
 	ta := bchain.TxAddresses{}

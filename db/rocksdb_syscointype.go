@@ -50,9 +50,6 @@ func (d *RocksDB) ConnectAssetOutput(sptData []byte, balances map[string]*bchain
 		return 0, err
 	}
 	assetGuid := asset.AssetObj.Asset
-	if assetGuid == 2114853579 {
-		glog.Warningf("assetnew 2114853579")
-	}
 	dBAsset, err = d.GetAsset(assetGuid, &assets)
 	if err != nil || dBAsset == nil {
 		if !d.chainParser.IsAssetActivateTx(version) {

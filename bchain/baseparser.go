@@ -480,14 +480,25 @@ func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
 			if i == len(t.Indexes)-1 {
 				index |= 1
 			}
-			if index == 2114853579 ||  index == ^2114853579 {
-				glog.Warning("PackTxIndexes 2114853579")
-			}
 			l := p.PackVarint32(index, bvout)
 			buf = append(buf, bvout[:l]...)
 		}
 	}
 	return buf
+}
+
+func (p *BaseParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
+	for {
+		index, l := p.UnpackVarint32(*buf)
+		*txindexes = append(*txindexes, index>>1)
+		*buf = *buf[l:]
+		if index&1 == 1 {
+			return nil
+		} else if len(*buf) == 0 {
+			return errors.New("rocksdb: index buffer length is zero")
+		}
+	}
+	return nil
 }
 
 func (p *BaseParser) PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {

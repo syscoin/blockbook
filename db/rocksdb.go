@@ -396,20 +396,10 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			}
 			indexes = indexes[:0]
 			val = val[txidUnpackedLen:]
-			for {
-				index, l := d.chainParser.UnpackVarint32(val)
-				if index == 2114853579 || index == ^2114853579 {
-					glog.Warningf("GetAddrDescTransactions found index 2114853579: ", index, " shifted index >> 1 ", index >> 1)
-				}
-				indexes = append(indexes, index>>1)
-				val = val[l:]
-				if index&1 == 1 {
-					glog.Warningf("GetAddrDescTransactions break ", index)
-					break
-				} else if len(val) == 0 {
-					glog.Warningf("rocksdb: addresses contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
-					break
-				}
+			indexes, err := d.chainParser.UnpackTxIndexes(&indexes, &val)
+			if err != nil {
+				glog.Warningf("rocksdb: addresses contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
+				return err
 			}
 			if err := fn(tx, height, indexes); err != nil {
 				if _, ok := err.(*StopIteration); ok {
@@ -679,9 +669,6 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 				return true
 			}
 		}
-	}
-	if index == 2114853579 || index == ^2114853579 {
-		glog.Warning("adding 2114853579 to addToAddressesMap ", index)
 	}
 
 	addresses[strAddrDesc] = append(at, bchain.TxIndexes{
