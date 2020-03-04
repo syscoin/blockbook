@@ -396,7 +396,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			}
 			indexes = indexes[:0]
 			val = val[txidUnpackedLen:]
-			err := d.chainParser.UnpackTxIndexes(&indexes, &val)
+			err = d.chainParser.UnpackTxIndexes(&indexes, &val)
 			if err != nil {
 				glog.Warningf("rocksdb: addresses contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
 				return err
