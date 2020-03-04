@@ -302,6 +302,7 @@ The optional query parameters:
     - *tokens*: *basic* + tokens belonging to the address (applicable only to some coins)
     - *tokenBalances*: *basic* + tokens with balances + belonging to the address (applicable only to some coins)
     - *txids*: *tokenBalances* + list of txids, subject to  *from*, *to* filter and paging
+    - *txslight*:  *tokenBalances* + list of transaction with limited details (only data from index), subject to  *from*, *to* filter and paging
     - *txs*:  *tokenBalances* + list of transaction with details, subject to  *from*, *to* filter and paging
 - *filter*: filter tokens by their GUID or 0 for non-token transfers. Set to the Asset GUID (uint32) for coin types such as Syscoin, to filter transactions by that asset, or contract index in Ethereum. Set to 0 to show only non-token related transactions (applicable only to coins which support tokens)
 - *contract*: return only transactions which affect specified contract (applicable only to coins which support contracts)
