@@ -12,7 +12,9 @@ import (
 	"reflect"
 	"testing"
 	"github.com/martinboehm/btcutil/chaincfg"
+	"encoding/hex"
 	"github.com/juju/errors"
+	vlq "github.com/bsm/go-vlq"
 )
 
 type testSyscoinParser struct {
@@ -25,9 +27,9 @@ func syscoinTestParser() *syscoin.SyscoinParser {
 }
 
 // pack varint for size of index and not do bitshifting approach because we need entire int32 range for asset guid's
-func txIndexesHexSyscoinSyscoin(tx string, indexes []int32, d *RocksDB) string {
+func txIndexesHexSyscoin(tx string, indexes []int32, d *RocksDB) string {
 	buf := make([]byte, vlq.MaxLen32)
-	l := p.BaseParser.PackVaruint(uint(len(indexes)), buf)
+	l := d.chainParser.PackVaruint(uint(len(indexes)), buf)
 	tx += hex.EncodeToString(buf[:l])
 	for i, index := range indexes {
 		l = d.chainParser.PackVarint32(index, buf)
