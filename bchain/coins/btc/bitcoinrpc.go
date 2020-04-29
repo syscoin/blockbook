@@ -794,7 +794,7 @@ func (b *BitcoinRPC) DecodeRawTransaction(hex string) (string, error) {
 	}
 	rawMarshal, err := json.Marshal(&res.Result)
     if err != nil {
-        return nil, "", errors.Annotatef(err, "decoderawtransaction marshal %v", result)
+        return "", errors.Annotatef(err, "decoderawtransaction marshal %v", result)
     }
 	decodedRawString := string(rawMarshal)
 	return decodedRawString, nil
@@ -817,7 +817,7 @@ func (b *BitcoinRPC) GetChainTips() (string, error) {
 	}
 	rawMarshal, err := json.Marshal(&res.Result)
     if err != nil {
-        return nil, "", errors.Annotatef(err, "getchaintips marshal %v", result)
+        return "", errors.Annotatef(err, "getchaintips marshal %v", result)
     }
 	decodedRawString := string(rawMarshal)
 	return decodedRawString, nil
