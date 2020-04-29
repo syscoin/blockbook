@@ -104,12 +104,7 @@ func (b *SyscoinRPC) GetChainTips() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	rawMarshal, err := json.Marshal(&result)
-    if err != nil {
-        return nil, "", errors.Annotatef(err, "getchaintips decode marshal %v", result)
-    }
-	decodedRawString := string(rawMarshal)
-	return decodedRawString, nil
+	return result, nil
 }
 func (b *SyscoinRPC) AssetAllocationSend(asset int, sender string, receiver string, amount string) (*bchain.Tx, string, error) {
 	glog.V(1).Info("rpc: assetallocationsend ", asset)
@@ -142,15 +137,10 @@ func (b *SyscoinRPC) AssetAllocationSend(asset int, sender string, receiver stri
 	if err != nil {
 		return nil, "", errors.Annotatef(err, "asset %v", asset)
 	}
-	result, err := b.DecodeRawTransaction(resHex.Hex);
+	decodedRawString, err := b.DecodeRawTransaction(resHex.Hex);
 	if err != nil {
 		return nil, "", errors.Annotatef(err, "asset decode %v", resHex.Hex)
 	}
-	rawMarshal, err := json.Marshal(&result)
-    if err != nil {
-        return nil, "", errors.Annotatef(err, "asset decode marshal %v", asset)
-    }
-	decodedRawString := string(rawMarshal)
 	return tx, decodedRawString, nil
 }
 func (b *SyscoinRPC) SendFrom(sender string, receiver string, amount string) (*bchain.Tx, error) {

@@ -778,7 +778,7 @@ func (b *BitcoinRPC) getRawTransaction(txid string) (json.RawMessage, error) {
 }
 
 // getRawTransaction returns json as returned by backend, with all coin specific data
-func (b *BitcoinRPC) DecodeRawTransaction(hex string) (json.RawMessage, error) {
+func (b *BitcoinRPC) DecodeRawTransaction(hex string) (string, error) {
 	glog.V(1).Info("rpc: decodeRawTransaction ", hex)
 
 	res := ResDecodeRawTransaction{}
@@ -787,17 +787,22 @@ func (b *BitcoinRPC) DecodeRawTransaction(hex string) (json.RawMessage, error) {
 	err := b.Call(&req, &res)
 
 	if err != nil {
-		return nil, errors.Annotatef(err, "hex %v", hex)
+		return "", errors.Annotatef(err, "hex %v", hex)
 	}
 	if res.Error != nil {
-		return nil, errors.Annotatef(res.Error, "hex %v", hex)
+		return "", errors.Annotatef(res.Error, "hex %v", hex)
 	}
-	return res.Result, nil
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return nil, "", errors.Annotatef(err, "decoderawtransaction marshal %v", result)
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
 }
 
 
 // getRawTransaction returns json as returned by backend, with all coin specific data
-func (b *BitcoinRPC) GetChainTips() (json.RawMessage, error) {
+func (b *BitcoinRPC) GetChainTips() (string, error) {
 	glog.V(1).Info("rpc: getChainTips")
 
 	res := ResGetChainTips{}
@@ -805,12 +810,17 @@ func (b *BitcoinRPC) GetChainTips() (json.RawMessage, error) {
 	err := b.Call(&req, &res)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if res.Error != nil {
-		return nil, err
+		return "", err
 	}
-	return res.Result, nil
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return nil, "", errors.Annotatef(err, "getchaintips marshal %v", result)
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
 }
 
 // EstimateSmartFee returns fee estimation
