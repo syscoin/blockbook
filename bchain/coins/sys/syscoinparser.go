@@ -266,7 +266,7 @@ func (p *SyscoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescript
 // TryGetOPReturn tries to process OP_RETURN script and return data
 func (p *SyscoinParser) TryGetOPReturn(script []byte, nVersion int32) []byte {
 	if len(script) > 1 && script[0] == txscript.OP_RETURN {
-		// special case for burn to eth which has different style than the rest
+	// special case for burn to eth which has different style than the rest
 		if nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM {
 			return script[1:]
 		}
@@ -274,13 +274,13 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte, nVersion int32) []byte {
 		// 1) OP_RETURN <datalen> <data>
 		// 2) OP_RETURN OP_PUSHDATA1 <datalen in 1 byte> <data>
 		// 3) OP_RETURN OP_PUSHDATA2 <datalen in 2 bytes> <data>
-		
+		op := script[1]
 		var data []byte
-		if len(script) < txscript.OP_PUSHDATA1 {
+		if op < txscript.OP_PUSHDATA1 {
 			data = script[2:]
-		} else if script[1] == txscript.OP_PUSHDATA1 && len(script) <= 0xff {
+		} else if op == txscript.OP_PUSHDATA1 {
 			data = script[3:]
-		} else if script[1] == txscript.OP_PUSHDATA2 && len(script) <= 0xffff {
+		} else if op == txscript.OP_PUSHDATA2 {
 			data = script[4:]
 		}
 		return data
