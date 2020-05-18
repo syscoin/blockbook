@@ -706,7 +706,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, version int32, asset
 	if balance.AssetBalances != nil{
 		balanceAsset := balance.AssetBalances[assetGuid]
 		balanceAsset.Transfers--
-		totalAssetSentValue := big.NewInt(mintasset.ValueAsset)
+		totalAssetSentValue = big.NewInt(mintasset.ValueAsset)
 		balanceAsset.BalanceAssetSat.Sub(balanceAsset.BalanceAssetSat, totalAssetSentValue)
 		if balanceAsset.BalanceAssetSat.Sign() < 0 {
 			d.resetValueSatToZero(balanceAsset.BalanceAssetSat, addrDesc, "balance")
@@ -714,6 +714,7 @@ func (d *RocksDB) DisconnectMintAssetOutput(sptData []byte, version int32, asset
 	} else {
 		ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(addrDesc)
 		glog.Warningf("DisconnectMintAssetOutput Asset Balance for asset address %v (%v) not found", ad, addrDesc)
+		return assetGuid, nil;
 	}
 	return assetGuid, d.DisconnectAssetAllocationInput(assetGuid, version, totalAssetSentValue, assetSenderAddrDesc, assets, getAddressBalance)
 }
