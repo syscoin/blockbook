@@ -2,6 +2,8 @@
 #!/usr/bin/make -f
 
 DH_VERBOSE = 1
+# nostrip is needed for pkg-compiled binary to work
+DEB_BUILD_OPTIONS="debug nostrip noopt"
 
 %:
 	dh $@ --with=systemd
