@@ -6,8 +6,8 @@ After=network.target
 [Service]
 ExecStart={{template "Backend.ExecCommandTemplate" .}}
 User={{.Backend.SystemUser}}
-Restart=on-failure
-TimeoutStopSec=300
+# Restart=on-failure
+# TimeoutStopSec=300
 WorkingDirectory={{.Env.BackendInstallPath}}/{{.Coin.Alias}}
 {{if eq .Backend.ServiceType "forking" -}}
 Type=forking
@@ -18,6 +18,7 @@ Type=simple
 {{end}}
 {{template "Backend.ServiceAdditionalParamsTemplate" .}}
 
+
 # Resource limits
 LimitNOFILE=500000
 
@@ -25,22 +26,22 @@ LimitNOFILE=500000
 ####################
 
 # Provide a private /tmp and /var/tmp.
-PrivateTmp=true
+# PrivateTmp=true
 
 # Mount /usr, /boot/ and /etc read-only for the process.
-ProtectSystem=full
+# ProtectSystem=full
 
 # Disallow the process and all of its children to gain
 # new privileges through execve().
-NoNewPrivileges=true
+# NoNewPrivileges=true
 
 # Use a new /dev namespace only populated with API pseudo devices
 # such as /dev/null, /dev/zero and /dev/random.
-PrivateDevices=true
+# PrivateDevices=true
 
 {{if .Backend.ProtectMemory -}}
 # Deny the creation of writable and executable memory mappings.
-MemoryDenyWriteExecute=true
+# MemoryDenyWriteExecute=true
 {{end}}
 
 [Install]
