@@ -462,6 +462,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"setTxToTemplateData":      setTxToTemplateData,
 		"isOwnAddress":             isOwnAddress,
 		"isOwnAddresses":           isOwnAddresses,
+		"formatKeyID":              s.formatKeyID,
 		"formatDecodeBase64": 		formatDecodeBase64,
 		"formatDecodeBase64ValueStr": formatDecodeBase64ValueStr,
 	}
@@ -596,6 +597,15 @@ func formatDecodeBase64ValueStr(valueStr interface{}) string {
 func formatPercentage(a uint16) string {
 	f := float64(a) / 1000.0
 	return fmt.Sprintf("%.3f%%", f)
+}
+
+func (s *PublicServer) formatKeyID(addrBytes []byte) string {
+	addr, err := s.chainParser.WitnessPubKeyHashFromKeyID(addrBytes)
+	if err != nil {
+		glog.Error(err)
+		return ""
+	}
+	return addr
 }
 
 func isAssetUpdateCapabilityFlagSet(td *TemplateData, f string, mask uint8) bool {

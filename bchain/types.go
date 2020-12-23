@@ -572,10 +572,7 @@ type TokenTransferSummary struct {
 	Decimals int       `json:"decimals"`
 	Value	 *Amount   `json:"valueOut"`
 	Fee	 	 *Amount   `json:"fee,omitempty"`
-	AuxFeeAddress	string   `json:"auxFeeAddress,omitempty"`
-	NotaryAddress	string   `json:"notaryAddress,omitempty"`
 	AuxFeeDetails	*AuxFeeDetails 
-	NotaryKeyID 	[]byte
 }
 
 // used to store all txids related to an asset for asset history
