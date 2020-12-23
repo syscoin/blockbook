@@ -298,7 +298,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				} else {
 					for _, address := range vout.Addresses {
 						if address == auxFeeAddress {
-							tts.Fee = tts.Value
+							tts.Fee = vout.AssetInfo.ValueSat
 							break
 						}
 					}
@@ -505,7 +505,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 				} else {
 					for _, address := range vout.Addresses {
 						if address == auxFeeAddress {
-							tts.Fee = tts.Value
+							tts.Fee = vout.AssetInfo.ValueSat
 							break
 						}
 					}
@@ -821,7 +821,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 				} else {
 					for _, address := range vout.Addresses {
 						if address == auxFeeAddress {
-							tts.Fee = tts.Value
+							tts.Fee = vout.AssetInfo.ValueSa
 							break
 						}
 					}
