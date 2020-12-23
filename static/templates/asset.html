@@ -72,7 +72,7 @@
                                 </tr>
                                 {{- range $f := $asset.AssetDetails.AuxFeeDetails.AuxFees -}}{{- if $f -}}
                                 <tr>
-                                    <td class="data ellipsis"><a href="/address/{{$asset.AssetDetails.AuxFeeDetails.AuxFeeAddress}}">{{$asset.AssetDetails.AuxFeeDetails.AuxFeeAddress}}</a></td>
+                                    <td class="data ellipsis"><a href="/address/{{$asset.AssetDetails.AuxFeeAddress}}">{{$asset.AssetDetails.AuxFeeAddress}}</a></td>
                                     <td class="data">{{formatInt64WithDecimals $f.Bound $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
                                     <td class="data">{{formatPercentage ($f.Percent)}}</td>
                                 </tr>

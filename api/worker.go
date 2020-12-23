@@ -291,7 +291,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
 			// get aux fee if applicable
-			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeDetails.AuxFeeAddress) == 0 {
+			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeAddress) == 0 {
 				// save aux fee address and check against it on vout to see if this is an aux fee
 				tts.AuxFeeAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
 				if err != nil {
@@ -506,7 +506,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
 			// get aux fee if applicable
-			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeDetails.AuxFeeAddress) == 0 {
+			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeAddress) == 0 {
 				// save aux fee address and check against it on vout to see if this is an aux fee
 				tts.AuxFeeAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
 				if err != nil {
@@ -830,7 +830,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
 			// get aux fee if applicable
-			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeDetails.AuxFeeAddress) == 0 {
+			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeAddress) == 0 {
 				// save aux fee address and check against it on vout to see if this is an aux fee
 				tts.AuxFeeAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
 				if err != nil {
