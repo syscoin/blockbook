@@ -297,11 +297,11 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				if err != nil {
 					glog.Error(err)
 				} else {
-					auxFeeAddrDesc, err := w.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
-					if err != nil {
-						glog.Error(err)
-					} else if vout.AddrDesc == auxFeeAddrDesc {
-						tts.Fee = tts.Value
+					for _, address := range vout.Addresses {
+						if address == tts.AuxFeeAddress {
+							tts.Fee = tts.Value
+							break
+						}
 					}
 				}
 			}
@@ -512,11 +512,11 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 				if err != nil {
 					glog.Error(err)
 				} else {
-					auxFeeAddrDesc, err := w.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
-					if err != nil {
-						glog.Error(err)
-					} else if vout.AddrDesc == auxFeeAddrDesc {
-						tts.Fee = tts.Value
+					for _, address := range vout.Addresses {
+						if address == tts.AuxFeeAddress {
+							tts.Fee = tts.Value
+							break
+						}
 					}
 				}
 			}
@@ -836,11 +836,11 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 				if err != nil {
 					glog.Error(err)
 				} else {
-					auxFeeAddrDesc, err := w.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
-					if err != nil {
-						glog.Error(err)
-					} else if vout.AddrDesc == auxFeeAddrDesc {
-						tts.Fee = tts.Value
+					for _, address := range vout.Addresses {
+						if address == tts.AuxFeeAddress {
+							tts.Fee = tts.Value
+							break
+						}
 					}
 				}
 			}
