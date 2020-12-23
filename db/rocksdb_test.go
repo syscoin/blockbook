@@ -3,10 +3,10 @@
 package db
 
 import (
-	"blockbook/bchain"
-	"blockbook/bchain/coins/btc"
-	"blockbook/common"
-	"blockbook/tests/dbtestdata"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/common"
+	"github.com/syscoin/blockbook/tests/dbtestdata"
 	"encoding/binary"
 	"encoding/hex"
 	"io/ioutil"
@@ -88,11 +88,18 @@ func bigintToHex(i *big.Int, d *RocksDB) string {
 	return hex.EncodeToString(b[:l])
 }
 
+func varintToHex(i int32) string {
+	b := make([]byte, vlq.MaxLen32)
+	l := vlq.PutInt(b, int64(i))
+	return hex.EncodeToString(b[:l])
+}
+
 func varuintToHex(i uint) string {
 	b := make([]byte, vlq.MaxLen64)
 	l := vlq.PutUint(b, uint64(i))
 	return hex.EncodeToString(b[:l])
 }
+
 
 func uintToHex(i uint32) string {
 	buf := make([]byte, 4)
@@ -272,7 +279,7 @@ func verifyAfterBitcoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 		blockTxsKp = []keyPair{
 			{
 				"000370d5",
-				dbtestdata.TxidB1T1 + "00" + dbtestdata.TxidB1T2 + "00",
+				dbtestdata.TxidB1T1 + "00" + dbtestdata.TxidB1T2 + varintToHex(0),
 				nil,
 			},
 		}
@@ -455,10 +462,10 @@ func verifyAfterBitcoinTypeBlock2(t *testing.T, d *RocksDB) {
 	if err := checkColumn(d, cfBlockTxs, []keyPair{
 		{
 			"000370d6",
-			dbtestdata.TxidB2T1 + "02" + dbtestdata.TxidB1T2 + "00" + dbtestdata.TxidB1T1 + "02" +
-				dbtestdata.TxidB2T2 + "02" + dbtestdata.TxidB2T1 + "00" + dbtestdata.TxidB1T2 + "02" +
-				dbtestdata.TxidB2T3 + "01" + dbtestdata.TxidB1T2 + "04" +
-				dbtestdata.TxidB2T4 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + "00",
+			dbtestdata.TxidB2T1 + "02" + dbtestdata.TxidB1T2 + "00" + dbtestdata.TxidB1T1 + varintToHex(1) +
+				dbtestdata.TxidB2T2 + "02" + dbtestdata.TxidB2T1 + "00" + dbtestdata.TxidB1T2 + varintToHex(1) +
+				dbtestdata.TxidB2T3 + "01" + dbtestdata.TxidB1T2 + varintToHex(2) +
+				dbtestdata.TxidB2T4 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
 			nil,
 		},
 	}); err != nil {
@@ -583,6 +590,11 @@ func TestRocksDB_Index_BitcoinType(t *testing.T) {
 	verifyGetTransactions(t, d, dbtestdata.Addr6, 0, 1000000, []txidIndex{
 		{dbtestdata.TxidB2T2, ^0},
 		{dbtestdata.TxidB2T1, 0},
+	}, nil)
+	verifyGetTransactions(t, d, dbtestdata.Addr5, 0, 1000000, []txidIndex{
+		{dbtestdata.TxidB2T3, 0},
+		{dbtestdata.TxidB2T3, ^0},
+		{dbtestdata.TxidB1T2, 2},
 	}, nil)
 	verifyGetTransactions(t, d, "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eBad", 500000, 1000000, []txidIndex{}, errors.New("checksum mismatch"))
 

@@ -1,9 +1,9 @@
 package db
 
 import (
-	"blockbook/bchain"
-	"blockbook/bchain/coins/eth"
-	"blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/eth"
+	"github.com/syscoin/blockbook/common"
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -93,7 +93,7 @@ func (c *TxCache) GetTransaction(txid string) (*bchain.Tx, int, error) {
 			err = c.db.PutTx(tx, h, tx.Blocktime)
 			// do not return caching error, only log it
 			if err != nil {
-				glog.Error("PutTx error ", err)
+				glog.Warning("PutTx ", tx.Txid, ",error ", err)
 			}
 		}
 	} else {

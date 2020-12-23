@@ -10,7 +10,6 @@
         <thead>
             <tr>
                 <th>Asset</th>
-                <th>Address</th>
                 <th>Transactions</th>
                 <th>Contract</th>
                 <th>Total Supply</th>
@@ -20,12 +19,11 @@
         <tbody>
             {{- range $assetDetails := $assets.AssetDetails -}}{{- if $assetDetails -}}
             <tr>
-                <td class="data">{{$assetDetails.Symbol}} (<a href="/asset/{{$assetDetails.AssetGuid}}">{{$assetDetails.AssetGuid}}</a>)</td>
-                <td class="data ellipsis">{{$assetDetails.WitnessAddress}}</td>
+                <td class="data"><a href="/asset/{{$assetDetails.AssetGuid}}">{{$assetDetails.AssetGuid}}</a>&nbsp;<span class="text-muted">{{formatDecodeBase64 $assetDetails.Symbol}}</span></td>
                 <td class="data">{{$assetDetails.Txs}}</td>
                 <td class="data ellipsis"><a href="https://etherscan.io/address/{{$assetDetails.Contract}}">{{$assetDetails.Contract}}</a></td>
-                <td class="data">{{formatAmountWithDecimals $assetDetails.TotalSupply $assetDetails.Decimals}} {{$assetDetails.Symbol}}</td>
-                <td class="data ellipsis">{{- if $assetDetails.PubData.description}}{{$assetDetails.PubData.description}}{{else}}{{- end -}}</td>
+                <td class="data">{{formatAmountWithDecimals $assetDetails.TotalSupply $assetDetails.Decimals}} {{formatDecodeBase64 $assetDetails.Symbol}}</td>
+                <td class="data ellipsis">{{- if $assetDetails.PubData.desc}}{{formatDecodeBase64 $assetDetails.PubData.desc}}{{else}}{{- end -}}</td>
             </tr>
             {{- end -}}{{- end -}}
         </tbody>

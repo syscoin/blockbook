@@ -6,11 +6,11 @@ import (
 	"encoding/binary"
 	"math/big"
 	"strings"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	vlq "github.com/bsm/go-vlq"
+	"github.com/syscoin/blockbook/common"
 )
 
 // BaseParser implements data parsing/handling functionality base for all other parsers
@@ -41,9 +41,9 @@ func (p *BaseParser) GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescri
 
 const zeros = "0000000000000000000000000000000000000000"
 
-// AmountToBigInt converts amount in json.Number (string) to big.Int
+// AmountToBigInt converts amount in common.JSONNumber (string) to big.Int
 // it uses string operations to avoid problems with rounding
-func (p *BaseParser) AmountToBigInt(n json.Number) (big.Int, error) {
+func (p *BaseParser) AmountToBigInt(n common.JSONNumber) (big.Int, error) {
 	var r big.Int
 	s := string(n)
 	i := strings.IndexByte(s, '.')
@@ -128,6 +128,10 @@ func (p *BaseParser) ParseTxFromJson(msg json.RawMessage) (*Tx, error) {
 // PackedTxidLen returns length in bytes of packed txid
 func (p *BaseParser) PackedTxidLen() int {
 	return 32
+}
+
+func (p *BaseParser) PackedTxIndexLen() int {
+	return p.PackedTxidLen()
 }
 
 // KeepBlockAddresses returns number of blocks which are to be kept in blockaddresses column
@@ -304,9 +308,6 @@ func (p *BaseParser) EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 func (p *BaseParser) IsSyscoinTx(nVersion int32) bool {
 	return false
 }
-func (p *BaseParser) IsTxIndexAsset(txIndex int32) bool {
-	return false
-}
 func (p *BaseParser) IsSyscoinMintTx(nVersion int32) bool {
 	return false
 }
@@ -323,12 +324,12 @@ func (p *BaseParser) IsAssetActivateTx(nVersion int32) bool {
 	return false
 }
 func (p *BaseParser) GetAssetsMaskFromVersion(nVersion int32) AssetsMask {
-	return AssetAllMask
+	return BaseCoinMask
 }
-func (p *BaseParser) GetAssetTypeFromVersion(nVersion int32) TokenType {
-	return SPTUnknownType
+func (p *BaseParser) GetAssetTypeFromVersion(nVersion int32) *TokenType {
+	return nil
 }
-func (p *BaseParser) TryGetOPReturn(script []byte, nVersion int32) []byte {
+func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 func (p *BaseParser) GetMaxAddrLength() int {
@@ -351,6 +352,33 @@ func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte {
 }
 func (p *BaseParser) UnpackAssetTxIndex(buf []byte) []*TxAssetIndex {
 	return nil
+}
+func (p *BaseParser) GetAssetFromData(sptData []byte) (*Asset, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetAllocationFromData(sptData []byte) (*AssetAllocation, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor) (*AssetAllocation, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAllocationFromTx(tx *Tx) (*AssetAllocation, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) LoadAssets(tx *Tx) error {
+	return errors.New("Not supported")
+}
+func (p *BaseParser) WitnessPubKeyHashFromKeyID(keyId []byte) (string, error) {
+	return "", errors.New("Not supported")
+}
+func (p *BaseParser) AppendAssetInfo(assetInfo *AssetInfo, buf []byte, varBuf []byte) []byte  {
+	return nil
+}
+func (p *BaseParser) UnpackAssetInfo(assetInfo *AssetInfo, buf []byte) int  {
+	return 0
 }
 const PackedHeightBytes = 4
 func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
@@ -405,6 +433,19 @@ func (p *BaseParser) UnpackVarint(buf []byte) (int, int) {
 func (p *BaseParser) UnpackVaruint(buf []byte) (uint, int) {
 	i, ofs := vlq.Uint(buf)
 	return uint(i), ofs
+}
+
+func (p *BaseParser) UnpackVarBytes(buf []byte) ([]byte, int) {
+	txvalue, l := p.UnpackVaruint(buf)
+	bufValue := append([]byte(nil), buf[l:l+int(txvalue)]...)
+	return bufValue, (l+int(txvalue))
+}
+
+func (p *BaseParser) PackVarBytes(bufValue []byte, buf []byte, varBuf []byte) []byte {
+	l := p.PackVaruint(uint(len(bufValue)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, bufValue...)
+	return buf
 }
 
 const (
@@ -545,10 +586,13 @@ func (p *BaseParser) UnpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
 }
 
 func (p *BaseParser) UnpackAsset(buf []byte) (*Asset, error) {
-	return nil, errors.New("Not supported")
+	return nil, nil
 }
 
 func (p *BaseParser) PackAsset(asset *Asset) ([]byte, error) {
-	return nil, errors.New("Not supported")
+	return nil, nil
+}
+func (p *BaseParser) UnpackTxIndexType(buf []byte) (AssetsMask, int) {
+	return AllMask, 0
 }
 

@@ -1,13 +1,14 @@
 package api
 
 import (
-	"blockbook/bchain"
-	"blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/common"
 	"encoding/json"
 	"errors"
 	"math/big"
 	"sort"
 	"time"
+	"github.com/syscoin/blockbook/bchain/coins/eth"
 )
 
 const maxUint32 = ^uint32(0)
@@ -59,6 +60,12 @@ func IsZeroBigInt(b *big.Int) bool {
 	return len(b.Bits()) == 0
 }
 
+type AssetInfo struct {
+	AssetGuid uint32  `json:"assetGuid,omitempty"`
+	ValueSat *bchain.Amount `json:"value,omitempty"`
+	ValueStr string   `json:"valueStr,omitempty"`
+}
+
 
 // Vin contains information about single transaction input
 type Vin struct {
@@ -73,6 +80,7 @@ type Vin struct {
 	Hex       string                   `json:"hex,omitempty"`
 	Asm       string                   `json:"asm,omitempty"`
 	Coinbase  string                   `json:"coinbase,omitempty"`
+	AssetInfo *AssetInfo		   `json:"assetInfo,omitempty"`
 }
 
 // Vout contains information about single transaction output
@@ -89,41 +97,43 @@ type Vout struct {
 	Addresses   []string                 `json:"addresses"`
 	IsAddress   bool                     `json:"isAddress"`
 	Type        string                   `json:"type,omitempty"`
+	AssetInfo 	*AssetInfo		 `json:"assetInfo,omitempty"`
 }
 
 // Contains SyscoinSpecific asset information hex decoded and pertinent to API display
 type AssetSpecific struct {
-	AssetGuid 		uint32
-	WitnessAddress 	string
-	Contract 		string
-	Symbol 			string
-	PubData 		map[string]interface{}
-	Balance 		*bchain.Amount
-	TotalSupply 	*bchain.Amount
-	MaxSupply 		*bchain.Amount
-	Decimals 		int
-	UpdateFlags 	uint8
+	AssetGuid 		uint32 `json:"assetGuid"`
+	Contract 		string `json:"contract,omitempty"`
+	Symbol 			string `json:"symbol"`
+	PubData 		map[string]interface{} `json:"pubData"`
+	NotaryKeyID		[]byte `json:"notaryKeyID,omitempty"`
+	NotaryDetails	*bchain.NotaryDetails `json:"notaryDetails,omitempty"`
+	AuxFeeDetails	*bchain.AuxFeeDetails `json:"auxFeeDetails,omitempty"`
+	TotalSupply 	*bchain.Amount `json:"totalSupply"`
+	MaxSupply 		*bchain.Amount `json:"maxSupply"`
+	Decimals 		int `json:"decimals"`
+	UpdateCapabilityFlags 	uint8 `json:"updateCapabilityFlags"`
 }
 
 // Contains SyscoinSpecific assets information when searching for assets
 type AssetsSpecific struct {
-	AssetGuid 		uint32
-	WitnessAddress 	string
-	Contract 		string
-	Symbol 			string
-	PubData 		map[string]interface{}
-	TotalSupply 	*bchain.Amount
-	Decimals 		int
+	AssetGuid 		uint32 `json:"assetGuid"`
+	Contract 		string `json:"contract"`
+	Symbol 			string `json:"symbol"`
+	PubData 		map[string]interface{} `json:"pubData"`
+	TotalSupply 	*bchain.Amount `json:"totalSupply"`
+	Decimals 		int `json:"precision"`
 	Txs				int
 }
 
 // EthereumSpecific contains ethereum specific transaction data
 type EthereumSpecific struct {
-	Status   int      `json:"status"` // 1 OK, 0 Fail, -1 pending
-	Nonce    uint64   `json:"nonce"`
-	GasLimit *big.Int `json:"gasLimit"`
-	GasUsed  *big.Int `json:"gasUsed"`
-	GasPrice *bchain.Amount  `json:"gasPrice"`
+	Status   eth.TxStatus `json:"status"` // 1 OK, 0 Fail, -1 pending
+	Nonce    uint64       `json:"nonce"`
+	GasLimit *big.Int     `json:"gasLimit"`
+	GasUsed  *big.Int     `json:"gasUsed"`
+	GasPrice *bchain.Amount      `json:"gasPrice"`
+	Data     string       `json:"data,omitempty"`
 }
 
 // Tx holds information about a transaction
@@ -143,9 +153,9 @@ type Tx struct {
 	FeesSat          *bchain.Amount           `json:"fees,omitempty"`
 	Hex              string            `json:"hex,omitempty"`
 	Rbf              bool              `json:"rbf,omitempty"`
-	CoinSpecificData interface{}       `json:"-"`
-	CoinSpecificJSON json.RawMessage   `json:"-"`
+	CoinSpecificData json.RawMessage   `json:"coinSpecificData,omitempty"`
 	TokenTransferSummary   []*bchain.TokenTransferSummary   `json:"tokenTransfers,omitempty"`
+	TokenType		 *bchain.TokenType	`json:"tokenType,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
 }
 
@@ -174,8 +184,8 @@ const (
 	AddressFilterVoutInputs = -2
 	// AddressFilterVoutOutputs specifies that only txs where the address is as output are returned
 	AddressFilterVoutOutputs = -3
-	// AddressFilterVoutTokens specifies that only txs where the tokens are transferred are returned
-	AddressFilterVoutTokens = -4
+	// AddressFilterVoutQueryNotNecessary signals that query for transactions is not necessary as there are no transactions for specified contract filter
+	AddressFilterVoutQueryNotNecessary = -4
 
 	// TokensToReturnNonzeroBalance - return only tokens with nonzero balance
 	TokensToReturnNonzeroBalance TokensToReturn = 0
@@ -194,19 +204,12 @@ type AddressFilter struct {
 	TokensToReturn TokensToReturn
 	// OnlyConfirmed set to true will ignore mempool transactions; mempool is also ignored if FromHeight/ToHeight filter is specified
 	OnlyConfirmed bool
-}
-// AssetFilter is used to filter data returned from GetAsset api method
-type AssetFilter struct {
-	FromHeight     uint32
-	ToHeight       uint32
 	AssetsMask 	   bchain.AssetsMask
-	// OnlyConfirmed set to true will ignore mempool transactions; mempool is also ignored if FromHeight/ToHeight filter is specified
-	OnlyConfirmed bool
 }
 // Address holds information about address and its transactions
 type Address struct {
 	Paging
-	AddrStr               string                `json:"address"`
+	AddrStr               string                `json:"address,omitempty"`
 	BalanceSat            *bchain.Amount               `json:"balance"`
 	TotalReceivedSat      *bchain.Amount               `json:"totalReceived,omitempty"`
 	TotalSentSat          *bchain.Amount               `json:"totalSent,omitempty"`
@@ -218,7 +221,9 @@ type Address struct {
 	Txids                 []string              `json:"txids,omitempty"`
 	Nonce                 string                `json:"nonce,omitempty"`
 	UsedTokens            int                   `json:"usedTokens,omitempty"`
+	UsedAssetTokens       int               	`json:"usedAssetTokens,omitempty"`
 	Tokens                bchain.Tokens         `json:"tokens,omitempty"`
+	TokensAsset           bchain.Tokens         `json:"tokensAsset,omitempty"`
 	Erc20Contract         *bchain.Erc20Contract `json:"erc20Contract,omitempty"`
 	// helpers for explorer
 	Filter        string              `json:"-"`
@@ -257,17 +262,22 @@ type Utxo struct {
 	Path          string  `json:"path,omitempty"`
 	Locktime      uint32  `json:"lockTime,omitempty"`
 	Coinbase      bool    `json:"coinbase,omitempty"`
+	AssetInfo	  *AssetInfo  `json:"assetInfo,omitempty"`
 }
 
-// Utxos is array of Utxo
-type Utxos []Utxo
+// Utxos result for API
+type Utxos struct {
+	Utxos       []Utxo  `json:"utxos"`
+	Assets      []*AssetSpecific  `json:"assets,omitempty"`
+}
+	
 
-func (a Utxos) Len() int      { return len(a) }
-func (a Utxos) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a Utxos) Len() int      { return len(a.Utxos) }
+func (a Utxos) Swap(i, j int) { a.Utxos[i], a.Utxos[j] = a.Utxos[j], a.Utxos[i] }
 func (a Utxos) Less(i, j int) bool {
 	// sort in reverse order, unconfirmed (height==0) utxos on top
-	hi := a[i].Height
-	hj := a[j].Height
+	hi := a.Utxos[i].Height
+	hj := a.Utxos[j].Height
 	if hi == 0 {
 		hi = maxInt
 	}
@@ -279,7 +289,6 @@ func (a Utxos) Less(i, j int) bool {
 
 // history of tokens mapped to uint32 asset guid's in BalanceHistory obj
 type TokenBalanceHistory struct {
-	AssetGuid   uint32 `json:"assetGuid,omitempty"`
 	ReceivedSat *bchain.Amount `json:"received,omitempty"`
 	SentSat     *bchain.Amount `json:"sent,omitempty"`
 }
@@ -290,9 +299,10 @@ type BalanceHistory struct {
 	Txs         uint32             `json:"txs"`
 	ReceivedSat *bchain.Amount     `json:"received"`
 	SentSat     *bchain.Amount     `json:"sent"`
+	SentToSelfSat *bchain.Amount            `json:"sentToSelf"`
 	FiatRates   map[string]float64 `json:"rates,omitempty"`
 	Txid        string             `json:"txid,omitempty"`
-	Tokens	    []*TokenBalanceHistory `json:"tokens,omitempty"`	
+	Tokens	    map[uint32]*TokenBalanceHistory `json:"tokens,omitempty"`	
 }
 
 // BalanceHistories is array of BalanceHistory
@@ -312,11 +322,11 @@ func (a BalanceHistories) Less(i, j int) bool {
 // SortAndAggregate sums BalanceHistories to groups defined by parameter groupByTime
 func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories {
 	bhs := make(BalanceHistories, 0)
-	var tokens map[uint32]*TokenBalanceHistory
 	if len(a) > 0 {
 		bha := BalanceHistory{
 			SentSat:     &bchain.Amount{},
 			ReceivedSat: &bchain.Amount{},
+			SentToSelfSat: &bchain.Amount{},
 		}
 		sort.Sort(a)
 		for i := range a {
@@ -326,20 +336,13 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 				if bha.Time != 0 {
 					// in aggregate, do not return txid as it could multiple of them
 					bha.Txid = ""
-					if tokens != nil {
-						bha.Tokens = []*TokenBalanceHistory{}
-						// then flatten to array of token balances from the map
-						for _, token := range tokens {
-							bha.Tokens = append(bha.Tokens, token)
-						}
-						tokens = map[uint32]*TokenBalanceHistory{}
-					}
 					bhs = append(bhs, bha)
 				}
 				bha = BalanceHistory{
 					Time:        time,
 					SentSat:     &bchain.Amount{},
 					ReceivedSat: &bchain.Amount{},
+					SentToSelfSat: &bchain.Amount{},
 				}
 			}
 			if bha.Txid != bh.Txid {
@@ -347,32 +350,26 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 				bha.Txid = bh.Txid
 			}
 			if len(bh.Tokens) > 0 {
-				if tokens == nil {
-					tokens = map[uint32]*TokenBalanceHistory{}
+				if bha.Tokens == nil {
+					bha.Tokens = map[uint32]*TokenBalanceHistory{}
 				}
 				// fill up map of balances for each asset guid
-				for _, token := range bh.Tokens {
-					bhaToken, ok := tokens[token.AssetGuid];
+				for assetGuid, token := range bh.Tokens {
+					bhaToken, ok := bha.Tokens[assetGuid];
 					if !ok {
-						bhaToken = &TokenBalanceHistory{AssetGuid: token.AssetGuid, SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
-						tokens[token.AssetGuid] = bhaToken
+						bhaToken = &TokenBalanceHistory{SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
+						bha.Tokens[assetGuid] = bhaToken
 					}
 					(*big.Int)(bhaToken.SentSat).Add((*big.Int)(bhaToken.SentSat), (*big.Int)(token.SentSat))
 					(*big.Int)(bhaToken.ReceivedSat).Add((*big.Int)(bhaToken.ReceivedSat), (*big.Int)(token.ReceivedSat))
 				}
 			}
-			(*big.Int)(bha.SentSat).Add((*big.Int)(bha.SentSat), (*big.Int)(bh.SentSat))
 			(*big.Int)(bha.ReceivedSat).Add((*big.Int)(bha.ReceivedSat), (*big.Int)(bh.ReceivedSat))
+			(*big.Int)(bha.SentSat).Add((*big.Int)(bha.SentSat), (*big.Int)(bh.SentSat))
+			(*big.Int)(bha.SentToSelfSat).Add((*big.Int)(bha.SentToSelfSat), (*big.Int)(bh.SentToSelfSat))
 		}
 		if bha.Txs > 0 {
 			bha.Txid = ""
-			if tokens != nil {
-				bha.Tokens = []*TokenBalanceHistory{}
-				// then flatten to array of token balances from the map
-				for _, token := range tokens {
-					bha.Tokens = append(bha.Tokens, token)
-				}
-			}
 			bhs = append(bhs, bha)
 		}
 	}
@@ -387,19 +384,19 @@ type Blocks struct {
 
 // BlockInfo contains extended block header data and a list of block txids
 type BlockInfo struct {
-	Hash          string      `json:"hash"`
-	Prev          string      `json:"previousBlockHash,omitempty"`
-	Next          string      `json:"nextBlockHash,omitempty"`
-	Height        uint32      `json:"height"`
-	Confirmations int         `json:"confirmations"`
-	Size          int         `json:"size"`
-	Time          int64       `json:"time,omitempty"`
-	Version       json.Number `json:"version"`
-	MerkleRoot    string      `json:"merkleRoot"`
-	Nonce         string      `json:"nonce"`
-	Bits          string      `json:"bits"`
-	Difficulty    string      `json:"difficulty"`
-	Txids         []string    `json:"tx,omitempty"`
+	Hash          string            `json:"hash"`
+	Prev          string            `json:"previousBlockHash,omitempty"`
+	Next          string            `json:"nextBlockHash,omitempty"`
+	Height        uint32            `json:"height"`
+	Confirmations int               `json:"confirmations"`
+	Size          int               `json:"size"`
+	Time          int64             `json:"time,omitempty"`
+	Version       common.JSONNumber `json:"version"`
+	MerkleRoot    string            `json:"merkleRoot"`
+	Nonce         string            `json:"nonce"`
+	Bits          string            `json:"bits"`
+	Difficulty    string            `json:"difficulty"`
+	Txids         []string          `json:"tx,omitempty"`
 }
 
 // Block contains information about block

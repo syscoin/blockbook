@@ -1,7 +1,7 @@
 package dbtestdata
 
 import (
-	"blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,7 +25,7 @@ func (c *fakeBlockChain) Initialize() error {
 	return nil
 }
 
-func (c *fakeBlockChain) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc) error {
+func (c *fakeBlockChain) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc, onNewTx bchain.OnNewTxFunc) error {
 	return nil
 }
 

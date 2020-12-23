@@ -1,47 +1,47 @@
 package coins
 
 import (
-	"blockbook/bchain"
-	"blockbook/bchain/coins/bch"
-	"blockbook/bchain/coins/bellcoin"
-	"blockbook/bchain/coins/bitcore"
-	"blockbook/bchain/coins/bitzeny"
-	"blockbook/bchain/coins/btc"
-	"blockbook/bchain/coins/btg"
-	"blockbook/bchain/coins/cpuchain"
-	"blockbook/bchain/coins/dash"
-	"blockbook/bchain/coins/dcr"
-	"blockbook/bchain/coins/deeponion"
-	"blockbook/bchain/coins/digibyte"
-	"blockbook/bchain/coins/divi"
-	"blockbook/bchain/coins/dogecoin"
-	"blockbook/bchain/coins/eth"
-	"blockbook/bchain/coins/flo"
-	"blockbook/bchain/coins/fujicoin"
-	"blockbook/bchain/coins/gamecredits"
-	"blockbook/bchain/coins/grs"
-	"blockbook/bchain/coins/koto"
-	"blockbook/bchain/coins/liquid"
-	"blockbook/bchain/coins/litecoin"
-	"blockbook/bchain/coins/monacoin"
-	"blockbook/bchain/coins/monetaryunit"
-	"blockbook/bchain/coins/myriad"
-	"blockbook/bchain/coins/namecoin"
-	"blockbook/bchain/coins/nuls"
-	"blockbook/bchain/coins/omotenashicoin"
-	"blockbook/bchain/coins/pivx"
-	"blockbook/bchain/coins/polis"
-	"blockbook/bchain/coins/qtum"
-	"blockbook/bchain/coins/ravencoin"
-	"blockbook/bchain/coins/ritocoin"
-	"blockbook/bchain/coins/sys"
-	"blockbook/bchain/coins/unobtanium"
-	"blockbook/bchain/coins/vertcoin"
-	"blockbook/bchain/coins/viacoin"
-	"blockbook/bchain/coins/vipstarcoin"
-	"blockbook/bchain/coins/xzc"
-	"blockbook/bchain/coins/zec"
-	"blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/bch"
+	"github.com/syscoin/blockbook/bchain/coins/bellcoin"
+	"github.com/syscoin/blockbook/bchain/coins/bitcore"
+	"github.com/syscoin/blockbook/bchain/coins/bitzeny"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain/coins/btg"
+	"github.com/syscoin/blockbook/bchain/coins/cpuchain"
+	"github.com/syscoin/blockbook/bchain/coins/dash"
+	"github.com/syscoin/blockbook/bchain/coins/dcr"
+	"github.com/syscoin/blockbook/bchain/coins/deeponion"
+	"github.com/syscoin/blockbook/bchain/coins/digibyte"
+	"github.com/syscoin/blockbook/bchain/coins/divi"
+	"github.com/syscoin/blockbook/bchain/coins/dogecoin"
+	"github.com/syscoin/blockbook/bchain/coins/eth"
+	"github.com/syscoin/blockbook/bchain/coins/flo"
+	"github.com/syscoin/blockbook/bchain/coins/fujicoin"
+	"github.com/syscoin/blockbook/bchain/coins/gamecredits"
+	"github.com/syscoin/blockbook/bchain/coins/grs"
+	"github.com/syscoin/blockbook/bchain/coins/koto"
+	"github.com/syscoin/blockbook/bchain/coins/liquid"
+	"github.com/syscoin/blockbook/bchain/coins/litecoin"
+	"github.com/syscoin/blockbook/bchain/coins/monacoin"
+	"github.com/syscoin/blockbook/bchain/coins/monetaryunit"
+	"github.com/syscoin/blockbook/bchain/coins/myriad"
+	"github.com/syscoin/blockbook/bchain/coins/namecoin"
+	"github.com/syscoin/blockbook/bchain/coins/nuls"
+	"github.com/syscoin/blockbook/bchain/coins/omotenashicoin"
+	"github.com/syscoin/blockbook/bchain/coins/pivx"
+	"github.com/syscoin/blockbook/bchain/coins/polis"
+	"github.com/syscoin/blockbook/bchain/coins/qtum"
+	"github.com/syscoin/blockbook/bchain/coins/ravencoin"
+	"github.com/syscoin/blockbook/bchain/coins/ritocoin"
+	"github.com/syscoin/blockbook/bchain/coins/sys"
+	"github.com/syscoin/blockbook/bchain/coins/unobtanium"
+	"github.com/syscoin/blockbook/bchain/coins/vertcoin"
+	"github.com/syscoin/blockbook/bchain/coins/viacoin"
+	"github.com/syscoin/blockbook/bchain/coins/vipstarcoin"
+	"github.com/syscoin/blockbook/bchain/coins/xzc"
+	"github.com/syscoin/blockbook/bchain/coins/zec"
+	"github.com/syscoin/blockbook/common"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -186,8 +186,8 @@ func (c *blockChainWithMetrics) CreateMempool(chain bchain.BlockChain) (bchain.M
 	return c.b.CreateMempool(chain)
 }
 
-func (c *blockChainWithMetrics) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc) error {
-	return c.b.InitializeMempool(addrDescForOutpoint, onNewTxAddr)
+func (c *blockChainWithMetrics) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc, onNewTx bchain.OnNewTxFunc) error {
+	return c.b.InitializeMempool(addrDescForOutpoint, onNewTxAddr, onNewTx)
 }
 
 func (c *blockChainWithMetrics) Shutdown(ctx context.Context) error {
@@ -314,24 +314,11 @@ func (c *blockChainWithMetrics) EthereumTypeGetErc20ContractBalance(addrDesc, co
 	return c.b.EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc)
 }
 
-func (c *blockChainWithMetrics) AssetAllocationSend(asset int, sender string, receiver string, amount string) (tx *bchain.Tx, decoded string, err error) {
-	defer func(s time.Time) { c.observeRPCLatency("AssetAllocationSend", s, err) }(time.Now())
-	tx, decoded, err = c.b.AssetAllocationSend(asset, sender, receiver, amount)
-	return tx, decoded, err
-}
-
 func (c *blockChainWithMetrics) GetChainTips() (result string, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetChainTips", s, err) }(time.Now())
 	result, err = c.b.GetChainTips()
 	return result, err
 }
-
-func (c *blockChainWithMetrics) SendFrom(sender string, receiver string, amount string) (tx *bchain.Tx, err error) {
-	defer func(s time.Time) { c.observeRPCLatency("SendFrom", s, err) }(time.Now())
-	tx, err = c.b.SendFrom(sender, receiver, amount)
-	return tx, err
-}
-
 type mempoolWithMetrics struct {
 	mempool bchain.Mempool
 	m       *common.Metrics
@@ -371,4 +358,9 @@ func (c *mempoolWithMetrics) GetAllEntries() (v bchain.MempoolTxidEntries) {
 
 func (c *mempoolWithMetrics) GetTransactionTime(txid string) uint32 {
 	return c.mempool.GetTransactionTime(txid)
+}
+
+func (c *mempoolWithMetrics) GetTxAssets(assetGuid uint32) bchain.MempoolTxidEntries {
+	defer func(s time.Time) { c.observeRPCLatency("GetTxAssets", s, nil) }(time.Now())
+	return c.mempool.GetTxAssets(assetGuid)
 }

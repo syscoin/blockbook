@@ -1,10 +1,10 @@
-// build unittest
+// +build unittest
 
 package dash
 
 import (
-	"blockbook/bchain"
-	"blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
 	"bytes"
 	"encoding/hex"
 	"fmt"

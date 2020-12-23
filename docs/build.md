@@ -81,7 +81,7 @@ In general, build of Blockbook binary require some dependencies. They are downlo
 but if you need to build binary repeatedly it consumes a lot of time. Here comes variable *UPDATE_VENDOR* that if is
 unset says that build process uses *vendor* (i.e. dependencies) from your local repository. For example:
 `make deb-bitcoin UPDATE_VENDOR=0`. But before the command is executed there must be *vendor* directory populated,
-you can do it by calling `dep ensure --vendor-only`. See [Manual build](#manual-build) instructions below.
+you can do it by calling `go mod vendor`. See [Manual build](#manual-build) instructions below.
 
 All build targets allow pass additional parameters to underlying command inside container. It is possible via ARGS
 variable. For example if you want run only subset of unit-tests, you will perform it by calling:
@@ -194,7 +194,7 @@ like macOS or Windows, please read instructions specific for each project.
 Setup go environment:
 
 ```
-wget https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz && tar xf go1.10.3.linux-amd64.tar.gz
+wget https://golang.org/dl/go1.15.5.linux-amd64.tar.gz && tar xf go1.15.5.linux-amd64.tar.gz
 sudo mv go /opt/go
 sudo ln -s /opt/go/bin/go /usr/bin/go
 # see `go help gopath` for details
@@ -211,6 +211,7 @@ sudo apt-get update && sudo apt-get install -y \
     build-essential git wget pkg-config libzmq3-dev libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev liblz4-dev
 git clone https://github.com/facebook/rocksdb.git
 cd rocksdb
+git checkout v6.13.3
 CFLAGS=-fPIC CXXFLAGS=-fPIC make release
 ```
 
@@ -218,14 +219,18 @@ Setup variables for gorocksdb: https://github.com/tecbot/gorocksdb
 
 ```
 export CGO_CFLAGS="-I/path/to/rocksdb/include"
-export CGO_LDFLAGS="-L/path/to/rocksdb -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4"
+export CGO_LDFLAGS="-L/path/to/rocksdb -lrocksdb -lstdc++ -lm -lz -ldl -lbz2 -lsnappy -llz4"
 ```
 
 Install ZeroMQ: https://github.com/zeromq/libzmq
 
-Install go-dep tool:
 ```
-go get github.com/golang/dep/cmd/dep
+git clone https://github.com/zeromq/libzmq
+cd libzmq
+./autogen.sh
+./configure
+make
+sudo make install
 ```
 
 Get blockbook sources, install dependencies, build:
@@ -234,7 +239,6 @@ Get blockbook sources, install dependencies, build:
 cd $GOPATH/src
 git clone https://github.com/syscoin/blockbook.git
 cd blockbook
-dep ensure -vendor-only
 go build
 ```
 
@@ -248,9 +252,11 @@ When you have running back-end daemon you can start Blockbook. It is highly reco
 for both Blockbook and back-end daemon. You can use *contrib/scripts/build-blockchaincfg.sh* that will generate
 Blockbook's blockchain configuration from our coin definition files.
 
+Also, check that your operating system open files limit is set to high enough value - recommended is at least 20000.
+
 Example for Bitcoin:
 ```
-contrib/scripts/build-blockchaincfg.sh
+./contrib/scripts/build-blockchaincfg.sh <coin>
 ./blockbook -sync -blockchaincfg=build/blockchaincfg.json -internal=:9030 -public=:9130 -certfile=server/testcert -logtostderr
 ```
 

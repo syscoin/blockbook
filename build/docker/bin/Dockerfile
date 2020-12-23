@@ -1,6 +1,6 @@
 # initialize from the image
 
-FROM debian:9
+FROM ubuntu:18.04
 
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -9,17 +9,17 @@ RUN apt-get update && \
                        liblz4-dev graphviz && \
     apt-get clean
 
-ENV GOLANG_VERSION=go1.12.4.linux-amd64
-ENV ROCKSDB_VERSION=v5.18.3
+ENV GOLANG_VERSION=go1.15.5.linux-amd64
+ENV ROCKSDB_VERSION=v6.13.3
 ENV GOPATH=/go
 ENV PATH=$PATH:$GOPATH/bin
 ENV CGO_CFLAGS="-I/opt/rocksdb/include"
-ENV CGO_LDFLAGS="-L/opt/rocksdb -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4"
+ENV CGO_LDFLAGS="-L/opt/rocksdb -ldl -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4"
 
 RUN mkdir /build
 
 # install and configure go
-RUN cd /opt && wget https://storage.googleapis.com/golang/$GOLANG_VERSION.tar.gz && \
+RUN cd /opt && wget https://dl.google.com/go/$GOLANG_VERSION.tar.gz && \
     tar xf $GOLANG_VERSION.tar.gz
 RUN ln -s /opt/go/bin/go /usr/bin/go
 RUN mkdir -p $GOPATH
@@ -36,15 +36,14 @@ RUN strip /opt/rocksdb/ldb /opt/rocksdb/sst_dump && \
 RUN go get github.com/golang/dep/cmd/dep
 RUN go get github.com/gobuffalo/packr/...
 
-# download pre-loaded depencencies
+# pre-load depencencies
 RUN \
     cleanup() { rm -rf $GOPATH/src/blockbook; } && \
     trap cleanup EXIT && \
     cd $GOPATH/src && \
-    git clone https://github.com/syscoin/blockbook.git && \
+    git clone https://github.com/syscoin/blockbook.git -b dev-4.2.0 && \
     cd blockbook && \
-    dep ensure -vendor-only && \
-    cp -r vendor /build/vendor
+    go mod download
 
 ADD Makefile /build/Makefile
 

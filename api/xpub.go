@@ -1,17 +1,18 @@
 package api
 
 import (
-	"blockbook/bchain"
-	"blockbook/db"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/db"
 	"fmt"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
 	"strconv"
-	"bytes"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
+	"encoding/hex"
+	"encoding/json"
 )
 
 const defaultAddressesGap = 20
@@ -19,8 +20,6 @@ const maxAddressesGap = 10000
 
 const txInput = 1
 const txOutput = 2
-const txVout = 4
-const txToken = 8
 
 const xpubCacheSize = 512
 const xpubCacheExpirationSeconds = 7200
@@ -68,6 +67,7 @@ type xpubData struct {
 	balanceSat      big.Int
 	addresses       []xpubAddress
 	changeAddresses []xpubAddress
+	Tokens	    map[uint32]*bchain.AssetBalance `json:"tokens,omitempty"`
 }
 
 func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, filter *AddressFilter, maxResults int) ([]xpubTxid, bool, error) {
@@ -75,9 +75,6 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 	complete := true
 	txs := make([]xpubTxid, 0, 4)
 	var callback db.GetTransactionsCallback
-	filterTxOut := filter.Vout != AddressFilterVoutOff && 
-		filter.Vout != AddressFilterVoutInputs &&
-		filter.Vout != AddressFilterVoutOutputs
 	callback = func(txid string, height uint32, indexes []int32) error {
 		// take all txs in the last found block even if it exceeds maxResults
 		if len(txs) >= maxResults && txs[len(txs)-1].height != height {
@@ -91,22 +88,8 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 			} else {
 				inputOutput |= txOutput
 			}
-			if filterTxOut == true {
-				vout := index
-				if vout < 0 {
-					vout = ^vout
-				}
-				if vout == int32(filter.Vout) {
-					inputOutput |= txVout
-				} else if filter.Vout == AddressFilterVoutTokens && w.chainParser.IsTxIndexAsset(vout) {
-					inputOutput |= txToken
-				}
-			}
 		}
-		// if filtering only tokens we only care about those txs, this is to ensure totalPages works
-		if filter.Vout != AddressFilterVoutTokens || ((inputOutput&txToken) > 0) {
-			txs = append(txs, xpubTxid{txid, height, inputOutput})
-		}
+		txs = append(txs, xpubTxid{txid, height, inputOutput})
 		return nil
 	}
 	if mempool {
@@ -128,21 +111,10 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				} else {
 					txs[l].inputOutput |= txOutput
 				}
-				if filterTxOut == true {
-					vout := m.Vout
-					if vout < 0 {
-						vout = ^vout
-					}
-					if vout == int32(filter.Vout) {
-						txs[l].inputOutput |= txVout
-					} else if filter.Vout == AddressFilterVoutTokens && w.chainParser.IsTxIndexAsset(vout) {
-						txs[l].inputOutput |= txToken
-					}
-				}
 			}
 		}
 	} else {
-		err = w.db.GetAddrDescTransactions(addrDesc, fromHeight, toHeight, callback)
+		err = w.db.GetAddrDescTransactions(addrDesc, fromHeight, toHeight, filter.AssetsMask, callback)
 		if err != nil {
 			return nil, false, err
 		}
@@ -197,6 +169,21 @@ func (w *Worker) xpubDerivedAddressBalance(data *xpubData, ad *xpubAddress) (boo
 		data.txCountEstimate += ad.balance.Txs
 		data.sentSat.Add(&data.sentSat, &ad.balance.SentSat)
 		data.balanceSat.Add(&data.balanceSat, &ad.balance.BalanceSat)
+		if ad.balance.AssetBalances != nil {
+			if data.Tokens == nil {
+				data.Tokens = map[uint32]*bchain.AssetBalance{}
+			}
+			for assetGuid, assetBalance := range ad.balance.AssetBalances {
+				bhaToken, ok := data.Tokens[assetGuid];
+				if !ok {
+					bhaToken = &bchain.AssetBalance{Transfers: 0, SentSat: big.NewInt(0), BalanceSat: big.NewInt(0)}
+					data.Tokens[assetGuid] = bhaToken
+				}
+				bhaToken.Transfers += assetBalance.Transfers
+				bhaToken.SentSat.Add(bhaToken.SentSat, assetBalance.SentSat)
+				bhaToken.BalanceSat.Add(bhaToken.BalanceSat, assetBalance.BalanceSat)
+			}
+		}
 		return true, nil
 	}
 	return false, nil
@@ -254,11 +241,9 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
 	numAssetBalances := 0
 	if ad.balance != nil {
-		// + 1 for owner asset for unallocated token
-		numAssetBalances = 1 + len(ad.balance.AssetBalances)
+		numAssetBalances = len(ad.balance.AssetBalances)
 	}
-	// +1 for base token always appended
-	tokens := make(bchain.Tokens, 0, 1+numAssetBalances)
+	tokens := make(bchain.Tokens, 0, numAssetBalances)
 	var address string
 	if len(a) > 0 {
 		address = a[0]
@@ -271,55 +256,24 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			balance = &ad.balance.BalanceSat
 			totalSent = &ad.balance.SentSat
 			totalReceived = ad.balance.ReceivedSat()
-			// for asset tokens
-			var ownerFound bool = false
 			for k, v := range ad.balance.AssetBalances {
-				dbAsset, errAsset := w.db.GetAsset(uint32(k), nil)
+				dbAsset, errAsset := w.db.GetAsset(k, nil)
 				if errAsset != nil || dbAsset == nil {
 					return nil, errAsset
 				}
-				if !ownerFound {
-					// add token as unallocated if address matches asset owner address
-					ownerAddress := dbAsset.AssetObj.WitnessAddress.ToString("sys")
-					ownerAddrDesc, e := w.chainParser.GetAddrDescFromAddress(ownerAddress)
-					if e != nil {
-						return nil, e
-					}
-					if bytes.Equal(ad.addrDesc, ownerAddrDesc) {
-						ownerBalance := big.NewInt(dbAsset.AssetObj.Balance)
-						totalOwnerAssetReceived := bchain.ReceivedSatFromBalances(ownerBalance, v.SentAssetSat)
-						assetGuid := strconv.FormatUint(uint64(k), 10)
-						tokens = append(tokens, &bchain.Token{
-							Type:             bchain.SPTUnallocatedTokenType,
-							Name:             address,
-							Decimals:         int(dbAsset.AssetObj.Precision),
-							Symbol:			  string(dbAsset.AssetObj.Symbol),
-							BalanceSat:       (*bchain.Amount)(ownerBalance),
-							TotalReceivedSat: (*bchain.Amount)(totalOwnerAssetReceived),
-							TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
-							Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-							Contract:		  assetGuid,
-							Transfers:		  v.Transfers,
-							ContractIndex:    assetGuid,
-						})
-						ownerFound = true
-					}
-				}
-				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceAssetSat, v.SentAssetSat)
-				// add token as unallocated if address matches asset owner address other wise its allocated
+				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 				assetGuid := strconv.FormatUint(uint64(k), 10)
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             address,
 					Decimals:         int(dbAsset.AssetObj.Precision),
 					Symbol:			  string(dbAsset.AssetObj.Symbol),
-					BalanceSat:       (*bchain.Amount)(v.BalanceAssetSat),
+					BalanceSat:       (*bchain.Amount)(v.BalanceSat),
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
-					TotalSentSat:     (*bchain.Amount)(v.SentAssetSat),
+					TotalSentSat:     (*bchain.Amount)(v.SentSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					Contract:		  assetGuid,
 					Transfers:		  v.Transfers,
-					ContractIndex:    assetGuid,
 				})
 			}
 			sort.Sort(tokens)
@@ -379,9 +333,8 @@ func (w *Worker) getXpubData(xpub string, page int, txsOnPage int, option Accoun
 	// gap is increased one as there must be gap of empty addresses before the derivation is stopped
 	gap++
 	var processedHash string
-	voutStr := strconv.FormatInt(int64(filter.Vout), 10)
 	cachedXpubsMux.Lock()
-	data, found := cachedXpubs[xpub + voutStr]
+	data, found := cachedXpubs[xpub]
 	cachedXpubsMux.Unlock()
 	// to load all data for xpub may take some time, do it in a loop to process a possible new block
 	for {
@@ -416,6 +369,7 @@ func (w *Worker) getXpubData(xpub string, page int, txsOnPage int, option Accoun
 			data.balanceSat = *new(big.Int)
 			data.sentSat = *new(big.Int)
 			data.txCountEstimate = 0
+			data.Tokens = nil
 			var lastUsedIndex int
 			lastUsedIndex, data.addresses, err = w.xpubScanAddresses(xpub, &data, data.addresses, gap, 0, 0, fork)
 			if err != nil {
@@ -441,7 +395,7 @@ func (w *Worker) getXpubData(xpub string, page int, txsOnPage int, option Accoun
 	if len(cachedXpubs) >= xpubCacheSize {
 		evictXpubCacheItems()
 	}
-	cachedXpubs[xpub+voutStr] = data
+	cachedXpubs[xpub] = data
 	cachedXpubsMux.Unlock()
 	return &data, bestheight, nil
 }
@@ -484,22 +438,15 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			if txid.height < filter.FromHeight || txid.height > toHeight {
 				return false
 			}
-
 			if filter.Vout != AddressFilterVoutOff {
-				if (filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput != 0) ||
-					(filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput != 0) ||
-					(filter.Vout == AddressFilterVoutTokens && txid.inputOutput&txToken != 0) || 
-					(txid.inputOutput&txVout != 0) {
-					return true
+				if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
+					filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 {
+					return false
 				}
-				return false
 			}
 			return true
 		}
-		// paging should work for AddressFilterVoutTokens
-		if filter.Vout != AddressFilterVoutTokens {
-			filtered = true
-		}
+		filtered = true
 	}
 	// process mempool, only if ToHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
@@ -516,7 +463,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 					// the same tx can have multiple addresses from the same xpub, get it from backend it only once
 					tx, foundTx := txmMap[txid.txid]
 					if !foundTx {
-						tx, err = w.GetTransaction(txid.txid, false, false)
+						tx, err = w.GetTransaction(txid.txid, false, true)
 						// mempool transaction may fail
 						if err != nil || tx == nil {
 							glog.Warning("GetTransaction in mempool: ", err)
@@ -556,7 +503,11 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			for i := range da {
 				ad := &da[i]
 				for _, txid := range ad.txids {
-					added, _ := txcMap[txid.txid]
+					added, foundTx := txcMap[txid.txid]
+					// count txs regardless of filter but only once
+					if !foundTx {
+						txCount++
+					}
 					// add tx only once
 					if !added {
 						add := txidFilter == nil || txidFilter(&txid, ad)
@@ -602,16 +553,20 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	usedTokens := 0
 	usedAssetTokens := 0
 	var tokens bchain.Tokens
+	var tokensAsset bchain.Tokens
 	var xpubAddresses map[string]struct{}
 	if option > AccountDetailsBasic {
 		tokens = make(bchain.Tokens, 0, 4)
+		tokensAsset = make(bchain.Tokens, 0, 4)
 		xpubAddresses = make(map[string]struct{})
 	}
-
 	for ci, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
 		for i := range da {
 			ad := &da[i]
-			if ad.balance != nil {
+			if ad.balance != nil && ad.balance.Txs > 0 {
+				if ad.balance.AssetBalances != nil && len(ad.balance.AssetBalances) > 0 {
+					usedAssetTokens++
+				}
 				usedTokens++
 			}
 			if option > AccountDetailsBasic {
@@ -622,21 +577,14 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				if len(tokensXPub) > 0 {
 					for _, token := range tokensXPub {
 						if token != nil {
-							if token.Type != bchain.XPUBAddressTokenType {
-								if token.BalanceSat != nil {
-									usedAssetTokens++
-								}
-								if filter.TokensToReturn == TokensToReturnDerived ||
-									filter.TokensToReturn == TokensToReturnUsed && token.BalanceSat != nil ||
-									filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
-									tokens = append(tokens, token)
-								}
-							} else {
-								if filter.TokensToReturn == TokensToReturnDerived ||
-									filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
-									filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0  {
-									tokens = append(tokens, token)
-								}
+							if filter.TokensToReturn == TokensToReturnDerived ||
+								filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
+								filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
+									if token.Type != bchain.XPUBAddressTokenType {
+										tokensAsset = append(tokensAsset, token)
+									} else {
+										tokens = append(tokens, token)
+									}
 							}
 							xpubAddresses[token.Name] = struct{}{}
 						}
@@ -645,12 +593,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			}
 		}
 	}
-	// if more than 1 asset token is found add to usedTokens
-	// we want minus 1 because ad.balance is assumed to be nil for asset token to exist, so usedToken will already be incremented by 1
-	// we just need to increment for each token above the size of 1 to account for all other assets
-	if usedAssetTokens > 1 {
-		usedTokens += usedAssetTokens-1
-	}
+
 	var totalReceived big.Int
 	totalReceived.Add(&data.balanceSat, &data.sentSat)
 	addr := Address{
@@ -668,6 +611,12 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		Tokens:                tokens,
 		XPubAddresses:         xpubAddresses,
 	}
+	if usedAssetTokens > 0 {
+		addr.UsedAssetTokens = usedAssetTokens
+	}
+	if len(tokensAsset) > 0 {
+		addr.TokensAsset = tokensAsset
+	}
 	glog.Info("GetXpubAddress ", xpub[:16], ", ", len(data.addresses)+len(data.changeAddresses), " derived addresses, ", txCount, " confirmed txs, finished in ", time.Since(start))
 	return &addr, nil
 }
@@ -678,11 +627,16 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 	data, _, err := w.getXpubData(xpub, 0, 1, AccountDetailsBasic, &AddressFilter{
 		Vout:          AddressFilterVoutOff,
 		OnlyConfirmed: onlyConfirmed,
+		AssetsMask:	   bchain.AllMask,
 	}, gap)
+	var utxoRes Utxos
 	if err != nil {
-		return nil, err
+		return utxoRes, err
 	}
-	r := make(Utxos, 0, 8)
+	
+	utxoRes.Utxos = make([]Utxo, 0, 8)
+	assets := make([]*AssetSpecific, 0, 0)
+	assetsMap := make(map[uint32]bool, 0)
 	for ci, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
 		for i := range da {
 			ad := &da[i]
@@ -695,12 +649,12 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 			}
 			utxos, err := w.getAddrDescUtxo(ad.addrDesc, ad.balance, onlyConfirmed, onlyMempool)
 			if err != nil {
-				return nil, err
+				return utxoRes, err
 			}
 			if len(utxos) > 0 {
 				txs, errXpub := w.tokenFromXpubAddress(data, ad, ci, i, AccountDetailsTokens)
 				if errXpub != nil {
-					return nil, errXpub
+					return utxoRes, errXpub
 				}
 				if len(txs) > 0 {
 					for _ , t := range txs {
@@ -710,18 +664,57 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 							a.Path = t.Path
 						}
 					}
+					// add applicable assets to UTXO so spending based on mutable auxfees/notarization fields can be done by SDK's
+					for j := range utxos {
+						a := &utxos[j]
+						if a.AssetInfo != nil {
+							dbAsset, errAsset := w.db.GetAsset(a.AssetInfo.AssetGuid, nil)
+							if errAsset != nil || dbAsset == nil {
+								return utxoRes, errAsset
+							}
+							// add unique assets
+							var _, ok = assetsMap[a.AssetInfo.AssetGuid]
+							if ok {
+								continue
+							}
+							assetsMap[a.AssetInfo.AssetGuid] = true
+							assetDetails :=	&AssetSpecific{
+								AssetGuid:		a.AssetInfo.AssetGuid,
+								Symbol:			string(dbAsset.AssetObj.Symbol),
+								Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
+								TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
+								MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
+								Decimals:		int(dbAsset.AssetObj.Precision),
+								UpdateCapabilityFlags:	dbAsset.AssetObj.UpdateCapabilityFlags,
+								NotaryKeyID: 	dbAsset.AssetObj.NotaryKeyID,
+							}
+							if len(dbAsset.AssetObj.PubData) > 0 {
+								json.Unmarshal(dbAsset.AssetObj.PubData, &assetDetails.PubData)
+							}
+							if len(dbAsset.AssetObj.AuxFeeDetails.AuxFeeKeyID) > 0 {
+								assetDetails.AuxFeeDetails = &dbAsset.AssetObj.AuxFeeDetails
+							}
+							if len(dbAsset.AssetObj.NotaryKeyID) > 0 {
+								assetDetails.NotaryDetails = &dbAsset.AssetObj.NotaryDetails
+							}
+							assets = append(assets, assetDetails)
+						}
+					}
 				}
-				r = append(r, utxos...)
+				utxoRes.Utxos = append(utxoRes.Utxos, utxos...)
 			}
 		}
 	}
-	sort.Stable(r)
-	glog.Info("GetXpubUtxo ", xpub[:16], ", ", len(r), " utxos, finished in ", time.Since(start))
-	return r, nil
+	sort.Stable(utxoRes)
+	if len(assets) > 0 {
+		utxoRes.Assets = assets
+	}
+	glog.Info("GetXpubUtxo ", xpub[:16], ", ", len(utxoRes.Utxos), " utxos, ", len(assets), " assets, finished in ", time.Since(start))
+	return utxoRes, nil
 }
 
 // GetXpubBalanceHistory returns history of balance for given xpub
-func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp int64, currencies []string, gap int, groupBy uint32, AddressFilterVout int) (BalanceHistories, error) {
+func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp int64, currencies []string, gap int, groupBy uint32) (BalanceHistories, error) {
 	bhs := make(BalanceHistories, 0)
 	start := time.Now()
 	fromUnix, fromHeight, toUnix, toHeight := w.balanceHistoryHeightsFromTo(fromTimestamp, toTimestamp)
@@ -729,20 +722,27 @@ func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp i
 		return bhs, nil
 	}
 	data, _, err := w.getXpubData(xpub, 0, 1, AccountDetailsTxidHistory, &AddressFilter{
-		Vout:          AddressFilterVout,
+		Vout:          AddressFilterVoutOff,
 		OnlyConfirmed: true,
 		FromHeight:    fromHeight,
 		ToHeight:      toHeight,
+		AssetsMask:	   bchain.AllMask,
 	}, gap)
 	if err != nil {
 		return nil, err
+	}
+	selfAddrDesc := make(map[string]struct{})
+	for _, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
+		for i := range da {
+			selfAddrDesc[string(da[i].addrDesc)] = struct{}{}
+		}
 	}
 	for _, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
 		for i := range da {
 			ad := &da[i]
 			txids := ad.txids
 			for txi := len(txids) - 1; txi >= 0; txi-- {
-				bh, err := w.balanceHistoryForTxid(ad.addrDesc, txids[txi].txid, fromUnix, toUnix)
+				bh, err := w.balanceHistoryForTxid(ad.addrDesc, txids[txi].txid, fromUnix, toUnix, selfAddrDesc)
 				if err != nil {
 					return nil, err
 				}
