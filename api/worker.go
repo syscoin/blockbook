@@ -401,6 +401,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		Rbf:              rbf,
 		Vin:              vins,
 		Vout:             vouts,
+		CoinSpecificData: sj,
 		TokenTransferSummary:   tokens,
 		TokenType: txVersionAsset,
 		EthereumSpecific: ethSpecific,
