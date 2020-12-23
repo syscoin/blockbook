@@ -293,11 +293,11 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			// get aux fee if applicable
 			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 && len(tts.AuxFeeAddress) == 0 {
 				// save aux fee address and check against it on vout to see if this is an aux fee
-				tts.AuxFeeAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
+				tts.AuxFeeAddress, err = w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
 				if err != nil {
 					glog.Error(err)
 				} else {
-					auxFeeAddrDesc, err := d.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
+					auxFeeAddrDesc, err := w.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
 					if err != nil {
 						glog.Error(err)
 					} else if vout.AddrDesc == auxFeeAddrDesc {
@@ -307,7 +307,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			}
 			// save notary address
 			if len(tts.NotaryKeyID) > 0 && len(tts.NotaryAddress) == 0 {
-				tts.NotaryAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
+				tts.NotaryAddress, err = w.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
 				if err != nil {
 					glog.Error(err)
 				}
@@ -508,11 +508,11 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			// get aux fee if applicable
 			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 && len(tts.AuxFeeAddress) == 0 {
 				// save aux fee address and check against it on vout to see if this is an aux fee
-				tts.AuxFeeAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
+				tts.AuxFeeAddress, err = w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
 				if err != nil {
 					glog.Error(err)
 				} else {
-					auxFeeAddrDesc, err := d.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
+					auxFeeAddrDesc, err := w.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
 					if err != nil {
 						glog.Error(err)
 					} else if vout.AddrDesc == auxFeeAddrDesc {
@@ -522,7 +522,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			}
 			// save notary address
 			if len(tts.NotaryKeyID) > 0 && len(tts.NotaryAddress) == 0 {
-				tts.NotaryAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
+				tts.NotaryAddress, err = w.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
 				if err != nil {
 					glog.Error(err)
 				}
@@ -832,11 +832,11 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			// get aux fee if applicable
 			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 && len(tts.AuxFeeAddress) == 0 {
 				// save aux fee address and check against it on vout to see if this is an aux fee
-				tts.AuxFeeAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
+				tts.AuxFeeAddress, err = w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
 				if err != nil {
 					glog.Error(err)
 				} else {
-					auxFeeAddrDesc, err := d.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
+					auxFeeAddrDesc, err := w.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
 					if err != nil {
 						glog.Error(err)
 					} else if vout.AddrDesc == auxFeeAddrDesc {
@@ -846,7 +846,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			}
 			// save notary address
 			if len(tts.NotaryKeyID) > 0 && len(tts.NotaryAddress) == 0 {
-				tts.NotaryAddress, err = s.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
+				tts.NotaryAddress, err = w.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
 				if err != nil {
 					glog.Error(err)
 				}
