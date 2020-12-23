@@ -821,7 +821,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 				} else {
 					for _, address := range vout.Addresses {
 						if address == auxFeeAddress {
-							tts.Fee = vout.AssetInfo.ValueSa
+							tts.Fee = vout.AssetInfo.ValueSat
 							break
 						}
 					}
