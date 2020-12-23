@@ -122,36 +122,7 @@ func (w *Worker) GetTransaction(txid string, spendingTxs bool, specificJSON bool
 	}
 	return w.GetTransactionFromBchainTx(bchainTx, height, spendingTxs, specificJSON)
 }
-func (w *Worker) getAuxFee(auxFeeDetails *bchain.AuxFeeDetails, nAmount int64) *bchain.Amount {
-	nValue := int64(0)
-	nAccumulatedFee := int64(0)
-	nRate := float64(0)
-	nBoundAmount := int64(0)
-	for i := range auxFeeDetails.AuxFees {
-		fee := &auxFeeDetails.AuxFees[i]
-		feeNext := &auxFeeDetails.AuxFees[i]
-		if i < len(auxFeeDetails.AuxFees)-1 {
-			feeNext = &auxFeeDetails.AuxFees[i+1]
-		}
-        nBoundAmount = fee.Bound
-        nNextBoundAmount := feeNext.Bound
-        // max uint16 (65535 = 0.65535 = 65.5535%)
-        nRate := float64(fee.Percent) / 100000.0;
-        // case where amount is in between the bounds
-        if nAmount >= nBoundAmount && nAmount < nNextBoundAmount {
-            break;    
-        }
-        nBoundAmount = nNextBoundAmount - nBoundAmount
-        // must be last bound
-        if(nBoundAmount <= 0){
-            nValue = int64(float64(nAmount - nBoundAmount) * nRate + float64(nAccumulatedFee)) 
-            return (*bchain.Amount)(big.NewInt(nValue))
-        }
-        nAccumulatedFee += int64((float64(nBoundAmount) * nRate))
-    }
-    nValue = int64(float64(nAmount - nBoundAmount) * nRate + float64(nAccumulatedFee)) 
-	return (*bchain.Amount)(big.NewInt(nValue))
-}
+
 // GetTransactionFromBchainTx reads transaction data from txid
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool) (*Tx, error) {
 	var err error
@@ -291,6 +262,11 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		valOutSat.Add(&valOutSat, &bchainVout.ValueSat)
 		if bchainVout.AssetInfo != nil {
 			vout.AssetInfo = &AssetInfo{AssetGuid: bchainVout.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(bchainVout.AssetInfo.ValueSat)}
+		}		
+		vout.Hex = bchainVout.ScriptPubKey.Hex
+		vout.AddrDesc, vout.Addresses, vout.IsAddress, err = w.getAddressesFromVout(bchainVout)
+		if err != nil {
+			glog.V(2).Infof("getAddressesFromVout error %v, %v, output %v", err, bchainTx.Txid, bchainVout.N)
 		}
 		if vout.AssetInfo != nil {
 			if mapTTS == nil {
@@ -308,17 +284,34 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
 					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
+					NotaryKeyID: dbAsset.AssetObj.NotaryKeyID,
 				}
 				mapTTS[vout.AssetInfo.AssetGuid] = tts
 			}
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
-		}
-		
-		vout.Hex = bchainVout.ScriptPubKey.Hex
-		vout.AddrDesc, vout.Addresses, vout.IsAddress, err = w.getAddressesFromVout(bchainVout)
-		if err != nil {
-			glog.V(2).Infof("getAddressesFromVout error %v, %v, output %v", err, bchainTx.Txid, bchainVout.N)
+			// get aux fee if applicable
+			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeDetails.AuxFeeAddress) == 0 {
+				// save aux fee address and check against it on vout to see if this is an aux fee
+				tts.AuxFeeAddress, err := s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					auxFeeAddrDesc, err := d.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
+					if err != nil {
+						glog.Error(err)
+					} else if vout.AddrDesc == auxFeeAddrDesc {
+						tts.Fee = tts.Value
+					}
+				}
+			}
+			// save notary address
+			if len(tts.NotaryKeyID) > 0 and len(tts.NotaryAddress) == 0 {
+				tts.NotaryAddress, err := s.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
+				if err != nil {
+					glog.Error(err)
+				}
+			}
 		}
 		if ta != nil {
 			vout.Spent = ta.Outputs[i].Spent
@@ -341,10 +334,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		if mapTTS != nil && len(mapTTS) > 0 {
 			tokens = make([]*bchain.TokenTransferSummary, 0, len(mapTTS))
 			for _, token := range mapTTS {
-				// get aux fee if applicable
-				if len(token.AuxFeeDetails.AuxFeeKeyID) > 0 {
-					token.Fee = w.getAuxFee(token.AuxFeeDetails, token.Value.AsInt64())
-				}
 				tokens = append(tokens, token)
 			}
 		}
@@ -510,11 +499,34 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
 					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
+					NotaryKeyID: dbAsset.AssetObj.NotaryKeyID,
 				}
 				mapTTS[vout.AssetInfo.AssetGuid] = tts
 			}
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
+			// get aux fee if applicable
+			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeDetails.AuxFeeAddress) == 0 {
+				// save aux fee address and check against it on vout to see if this is an aux fee
+				tts.AuxFeeAddress, err := s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					auxFeeAddrDesc, err := d.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
+					if err != nil {
+						glog.Error(err)
+					} else if vout.AddrDesc == auxFeeAddrDesc {
+						tts.Fee = tts.Value
+					}
+				}
+			}
+			// save notary address
+			if len(tts.NotaryKeyID) > 0 and len(tts.NotaryAddress) == 0 {
+				tts.NotaryAddress, err := s.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
+				if err != nil {
+					glog.Error(err)
+				}
+			}
 		}
 	}
 	if w.chainType == bchain.ChainBitcoinType {
@@ -528,10 +540,6 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 		if mapTTS != nil && len(mapTTS) > 0 {
 			tokens = make([]*bchain.TokenTransferSummary, 0, len(mapTTS))
 			for _, token := range mapTTS {
-				// get aux fee if applicable
-				if len(token.AuxFeeDetails.AuxFeeKeyID) > 0 {
-					token.Fee = w.getAuxFee(token.AuxFeeDetails, token.Value.AsInt64())
-				}
 				tokens = append(tokens, token)
 			}
 		}
@@ -815,21 +823,40 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
 					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
+					NotaryKeyID: dbAsset.AssetObj.NotaryKeyID,
 				}
 				mapTTS[vout.AssetInfo.AssetGuid] = tts
 			}
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
+			// get aux fee if applicable
+			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 and len(tts.AuxFeeDetails.AuxFeeAddress) == 0 {
+				// save aux fee address and check against it on vout to see if this is an aux fee
+				tts.AuxFeeAddress, err := s.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					auxFeeAddrDesc, err := d.chainParser.GetAddrDescFromAddress(tts.AuxFeeAddress)
+					if err != nil {
+						glog.Error(err)
+					} else if vout.AddrDesc == auxFeeAddrDesc {
+						tts.Fee = tts.Value
+					}
+				}
+			}
+			// save notary address
+			if len(tts.NotaryKeyID) > 0 and len(tts.NotaryAddress) == 0 {
+				tts.NotaryAddress, err := s.chainParser.WitnessPubKeyHashFromKeyID(tts.NotaryKeyID)
+				if err != nil {
+					glog.Error(err)
+				}
+			}
 		}
 	}
 	// flatten TTS Map
 	if mapTTS != nil && len(mapTTS) > 0 {
 		tokens = make([]*bchain.TokenTransferSummary, 0, len(mapTTS))
 		for _, token := range mapTTS {
-			// get aux fee if applicable
-			if len(token.AuxFeeDetails.AuxFeeKeyID) > 0 {
-				token.Fee = w.getAuxFee(token.AuxFeeDetails, token.Value.AsInt64())
-			}
 			tokens = append(tokens, token)
 		}
 	}

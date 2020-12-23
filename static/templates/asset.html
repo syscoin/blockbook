@@ -72,7 +72,7 @@
                                 </tr>
                                 {{- range $f := $asset.AssetDetails.AuxFeeDetails.AuxFees -}}{{- if $f -}}
                                 <tr>
-                                    <td class="data ellipsis"><a href="/address/{{formatKeyID $asset.AssetDetails.AuxFeeDetails.AuxFeeKeyID}}">{{formatKeyID $asset.AssetDetails.AuxFeeDetails.AuxFeeKeyID}}</a></td>
+                                    <td class="data ellipsis"><a href="/address/{{$asset.AssetDetails.AuxFeeDetails.AuxFeeAddress}}">{{$asset.AssetDetails.AuxFeeDetails.AuxFeeAddress}}</a></td>
                                     <td class="data">{{formatInt64WithDecimals $f.Bound $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
                                     <td class="data">{{formatPercentage ($f.Percent)}}</td>
                                 </tr>
@@ -95,7 +95,7 @@
                                     <th>HD Required</th>
                                 </tr>
                                 <tr>
-                                    <td class="data ellipsis"><a href="/address/{{formatKeyID $asset.AssetDetails.NotaryKeyID}}">{{formatKeyID $asset.AssetDetails.NotaryKeyID}}</a></td>
+                                    <td class="data ellipsis"><a href="/address/{{$asset.AssetDetails.NotaryAddress}}">{{$asset.AssetDetails.NotaryAddress}}</a></td>
                                     <td class="data ellipsis">{{formatDecodeBase64 $asset.AssetDetails.NotaryDetails.EndPoint}}</td>
                                     <td class="data">
                                             {{if $asset.AssetDetails.NotaryDetails.InstantTransfers}}
