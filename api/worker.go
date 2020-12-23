@@ -491,7 +491,6 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
 					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
-					NotaryKeyID: dbAsset.AssetObj.NotaryKeyID,
 				}
 				mapTTS[vout.AssetInfo.AssetGuid] = tts
 			}
@@ -808,7 +807,6 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
 					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
-					NotaryKeyID: dbAsset.AssetObj.NotaryKeyID,
 				}
 				mapTTS[vout.AssetInfo.AssetGuid] = tts
 			}
@@ -817,7 +815,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			// get aux fee if applicable
 			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 && tts.Fee == nil {
 				// save aux fee address and check against it on vout to see if this is an aux fee
-				auxFeeAddress, err = w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
+				auxFeeAddress, err := w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
 				if err != nil {
 					glog.Error(err)
 				} else {
