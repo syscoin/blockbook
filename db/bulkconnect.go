@@ -1,11 +1,11 @@
 package db
 
 import (
-	"github.com/syscoin/blockbook/bchain"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/tecbot/gorocksdb"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // bulk connect

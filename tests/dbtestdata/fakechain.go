@@ -1,11 +1,12 @@
 package dbtestdata
 
 import (
-	"github.com/syscoin/blockbook/bchain"
 	"context"
 	"encoding/json"
 	"errors"
 	"math/big"
+
+	"github.com/syscoin/blockbook/bchain"
 )
 
 type fakeBlockChain struct {

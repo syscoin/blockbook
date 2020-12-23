@@ -3,11 +3,12 @@
 package api
 
 import (
-	"github.com/syscoin/blockbook/bchain"
 	"encoding/json"
 	"math/big"
 	"reflect"
 	"testing"
+
+	"github.com/syscoin/blockbook/bchain"
 )
 
 func TestAmount_MarshalJSON(t *testing.T) {

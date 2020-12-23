@@ -1,14 +1,16 @@
 package db
 
 import (
-	"github.com/syscoin/blockbook/bchain"
+	
 	"bytes"
-	"github.com/golang/glog"
-	"github.com/juju/errors"
-	"github.com/tecbot/gorocksdb"
 	"encoding/hex"
 	"time"
 	"fmt"
+	
+	"github.com/golang/glog"
+	"github.com/juju/errors"
+	"github.com/tecbot/gorocksdb"
+	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/btcd/wire"
 )
 var AssetCache map[uint32]bchain.Asset

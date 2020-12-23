@@ -1,16 +1,16 @@
 package eth
 
 import (
-	"github.com/syscoin/blockbook/bchain"
 	"encoding/hex"
 	"math/big"
 	"strconv"
-
+	
+	vlq "github.com/bsm/go-vlq"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/protobuf/proto"
 	"github.com/juju/errors"
 	"golang.org/x/crypto/sha3"
-	vlq "github.com/bsm/go-vlq"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // EthereumTypeAddressDescriptorLen - in case of EthereumType, the AddressDescriptor has fixed length

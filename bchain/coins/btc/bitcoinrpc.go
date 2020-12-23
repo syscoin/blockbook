@@ -1,7 +1,6 @@
 package btc
 
 import (
-	"github.com/syscoin/blockbook/bchain"
 	"bytes"
 	"context"
 	"encoding/hex"
@@ -17,6 +16,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/martinboehm/btcd/wire"
+	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/common"
 )
 

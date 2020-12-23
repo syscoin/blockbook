@@ -1,10 +1,6 @@
 package api
 
 import (
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/eth"
-	"github.com/syscoin/blockbook/common"
-	"github.com/syscoin/blockbook/db"
 	"bytes"
 	"encoding/json"
 	"encoding/hex"
@@ -20,6 +16,10 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/eth"
+	"github.com/syscoin/blockbook/common"
+	"github.com/syscoin/blockbook/db"
 )
 
 // Worker is handle to api worker
@@ -2341,6 +2341,7 @@ func (w *Worker) GetSystemInfo(internal bool) (*SystemInfo, error) {
 		Timeoffset:      ci.Timeoffset,
 		Version:         ci.Version,
 		Warnings:        ci.Warnings,
+		Consensus:       ci.Consensus,
 	}
 	glog.Info("GetSystemInfo finished in ", time.Since(start))
 	return &SystemInfo{blockbookInfo, backendInfo}, nil

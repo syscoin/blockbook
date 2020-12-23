@@ -1,8 +1,9 @@
 package api
 
 import (
-	"github.com/syscoin/blockbook/bchain"
 	"math/big"
+
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // ScriptSigV1 is used for legacy api v1

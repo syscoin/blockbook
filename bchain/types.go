@@ -9,9 +9,9 @@ import (
 	"math/big"
 	"unsafe"
 	"bytes"
+
 	"github.com/golang/glog"
 	"github.com/syscoin/btcd/wire"
-
 	"github.com/syscoin/blockbook/common"
 )
 
@@ -184,6 +184,7 @@ type ChainInfo struct {
 	ProtocolVersion string  `json:"protocolversion"`
 	Timeoffset      float64 `json:"timeoffset"`
 	Warnings        string  `json:"warnings"`
+	Consensus       interface{} `json:"consensus,omitempty"`
 }
 
 // RPCError defines rpc error returned by backend

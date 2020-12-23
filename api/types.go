@@ -1,14 +1,15 @@
 package api
 
 import (
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/common"
 	"encoding/json"
 	"errors"
 	"math/big"
 	"sort"
 	"time"
+	
+	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/bchain/coins/eth"
+	"github.com/syscoin/blockbook/common"
 )
 
 const maxUint32 = ^uint32(0)
@@ -443,6 +444,7 @@ type BackendInfo struct {
 	ProtocolVersion string  `json:"protocolVersion,omitempty"`
 	Timeoffset      float64 `json:"timeOffset,omitempty"`
 	Warnings        string  `json:"warnings,omitempty"`
+	Consensus       interface{} `json:"consensus,omitempty"`
 }
 
 // SystemInfo contains information about the running blockbook and backend instance

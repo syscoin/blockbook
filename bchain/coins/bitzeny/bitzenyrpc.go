@@ -1,9 +1,10 @@
 package bitzeny
 
 import (
+	"encoding/json"
+
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/bchain/coins/btc"
-	"encoding/json"
 
 	"github.com/golang/glog"
 )

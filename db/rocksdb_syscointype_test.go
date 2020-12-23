@@ -3,20 +3,21 @@
 package db
 
 import (
+	"reflect"
+	"fmt"
+	"bytes"
+	"testing"
+	"encoding/hex"
+	"encoding/base64"
+	
+	"github.com/martinboehm/btcutil/chaincfg"
+	"github.com/juju/errors"
+	vlq "github.com/bsm/go-vlq"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/common"
 	"github.com/syscoin/blockbook/bchain/coins/btc"
 	"github.com/syscoin/blockbook/bchain/coins/sys"
 	"github.com/syscoin/blockbook/tests/dbtestdata"
-	"reflect"
-	"fmt"
-	"bytes"
-	"testing"
-	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/juju/errors"
-	"encoding/hex"
-	"encoding/base64"
-	vlq "github.com/bsm/go-vlq"
 )
 
 type testSyscoinParser struct {

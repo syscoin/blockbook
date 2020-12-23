@@ -1,10 +1,6 @@
 package server
 
 import (
-	"github.com/syscoin/blockbook/api"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/common"
-	"github.com/syscoin/blockbook/db"
 	"encoding/json"
 	"math/big"
 	"net/http"
@@ -18,6 +14,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/gorilla/websocket"
 	"github.com/juju/errors"
+	"github.com/syscoin/blockbook/api"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/common"
+	"github.com/syscoin/blockbook/db"
 )
 
 const upgradeFailed = "Upgrade failed: "

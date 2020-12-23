@@ -1,12 +1,11 @@
 package db
 
 import (
+	"github.com/golang/glog"
+	"github.com/juju/errors"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/bchain/coins/eth"
 	"github.com/syscoin/blockbook/common"
-
-	"github.com/golang/glog"
-	"github.com/juju/errors"
 )
 
 // TxCache is handle to TxCacheServer

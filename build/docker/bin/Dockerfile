@@ -33,14 +33,14 @@ RUN strip /opt/rocksdb/ldb /opt/rocksdb/sst_dump && \
     cp /opt/rocksdb/ldb /opt/rocksdb/sst_dump /build
 
 # install build tools
-RUN go get github.com/golang/dep/cmd/dep
 RUN go get github.com/gobuffalo/packr/...
 
 # pre-load depencencies
 RUN \
-    cleanup() { rm -rf $GOPATH/src/blockbook; } && \
+    cleanup() { rm -rf $GOPATH/src/github.com/syscoin ; } && \
     trap cleanup EXIT && \
-    cd $GOPATH/src && \
+    mkdir -p $GOPATH/src/github.com/syscoin && \
+    cd $GOPATH/src/github.com/syscoin && \
     git clone https://github.com/syscoin/blockbook.git && \
     cd blockbook && \
     go mod download

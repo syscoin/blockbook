@@ -1,6 +1,15 @@
 package coins
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"math/big"
+	"reflect"
+	"time"
+
+	"github.com/juju/errors"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/bchain/coins/bch"
 	"github.com/syscoin/blockbook/bchain/coins/bellcoin"
@@ -42,15 +51,6 @@ import (
 	"github.com/syscoin/blockbook/bchain/coins/xzc"
 	"github.com/syscoin/blockbook/bchain/coins/zec"
 	"github.com/syscoin/blockbook/common"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"math/big"
-	"reflect"
-	"time"
-
-	"github.com/juju/errors"
 )
 
 type blockChainFactory func(config json.RawMessage, pushHandler func(bchain.NotificationType)) (bchain.BlockChain, error)

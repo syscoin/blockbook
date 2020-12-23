@@ -13,6 +13,9 @@ import (
 	"github.com/juju/errors"
 	"encoding/hex"
 	"encoding/json"
+
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/db"
 )
 
 const defaultAddressesGap = 20

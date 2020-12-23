@@ -1,11 +1,11 @@
 package gamecredits
 
 import (
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
 	"encoding/json"
 
 	"github.com/golang/glog"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
 )
 
 // GameCreditsRPC is an interface to JSON-RPC bitcoind service.

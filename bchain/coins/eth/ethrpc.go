@@ -1,7 +1,6 @@
 package eth
 
 import (
-	"github.com/syscoin/blockbook/bchain"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
+	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/common"
 )
 
