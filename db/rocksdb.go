@@ -628,7 +628,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 						balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceSat: big.NewInt(0), SentSat: big.NewInt(0)}
 						balance.AssetBalances[tao.AssetInfo.AssetGuid] = balanceAsset
 					}
-					err = d.ConnectAllocationOutput(&addrDesc, block.Height, balanceAsset, isActivate, tx.Version, btxID, tao.AssetInfo, assets, txAssets, blockTxAssetAddresses)
+					err = d.ConnectAllocationOutput(&addrDesc, block.Height, balanceAsset, isActivate, tx.Version, btxID, tao.AssetInfo, blockTxAssetAddresses, assets, txAssets)
 					if err != nil {
 						return err
 					}
@@ -746,7 +746,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 						balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceSat: big.NewInt(0), SentSat: big.NewInt(0)}
 						balance.AssetBalances[spentOutput.AssetInfo.AssetGuid] = balanceAsset
 					}
-					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, balanceAsset, btxID, spentOutput.AssetInfo, blockTxAssetAddresses)
+					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, btxID, spentOutput.AssetInfo, blockTxAssetAddresses, assets)
 					if err != nil {
 						return err
 					}
@@ -1215,7 +1215,7 @@ func (d *RocksDB) disconnectTxAddressesOutputs(btxID []byte, txa *bchain.TxAddre
 						if !ok {
 							return errors.New("DisconnectSyscoinOutput asset balance not found")
 						}
-						err := d.DisconnectAllocationOutput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses)
+						err := d.DisconnectAllocationOutput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses, assets, assetFoundInTx)
 						if err != nil {
 							return err
 						}
