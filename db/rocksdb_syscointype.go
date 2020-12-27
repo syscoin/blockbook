@@ -147,10 +147,8 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
-		if dBAsset != nil {
-			dBAsset.Transactions++
-			assets[assetInfo.AssetGuid] = dBAsset
-		}
+		dBAsset.Transactions++
+		assets[assetInfo.AssetGuid] = dBAsset
 	}
 	counted = d.addToAssetAddressMap(blockTxAssetAddresses, assetInfo.AssetGuid, btxID, addrDesc)
 	if !counted {

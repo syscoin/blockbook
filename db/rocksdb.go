@@ -661,9 +661,13 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 		ta := blockTxAddresses[txi]
 		logged := false
 		assetsMask := d.chainParser.GetAssetsMaskFromVersion(tx.Version)
+		btxID, err := d.chainParser.PackTxid(tx.Txid)
+		if err != nil {
+			return err
+		}
 		for i, input := range tx.Vin {
 			tai := &ta.Inputs[i]
-			btxID, err := d.chainParser.PackTxid(input.Txid)
+			btxIDIn, err := d.chainParser.PackTxid(input.Txid)
 			if err != nil {
 				// do not process inputs without input txid
 				if err == bchain.ErrTxidMissing {
@@ -671,10 +675,10 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				}
 				return err
 			}
-			stxID := string(btxID)
+			stxID := string(btxIDIn)
 			ita, e := txAddressesMap[stxID]
 			if !e {
-				ita, err = d.getTxAddresses(btxID)
+				ita, err = d.getTxAddresses(btxIDIn)
 				if err != nil {
 					return err
 				}
@@ -732,7 +736,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 					balance.Txs++
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
-				balance.MarkUtxoAsSpent(btxID, int32(input.Vout))
+				balance.MarkUtxoAsSpent(btxIDIn, int32(input.Vout))
 				if balance.BalanceSat.Sign() < 0 {
 					d.resetValueSatToZero(&balance.BalanceSat, spentOutput.AddrDesc, "balance")
 				}
