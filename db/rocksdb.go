@@ -661,13 +661,9 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 		ta := blockTxAddresses[txi]
 		logged := false
 		assetsMask := d.chainParser.GetAssetsMaskFromVersion(tx.Version)
-		btxID, err := d.chainParser.PackTxid(tx.Txid)
-		if err != nil {
-			return err
-		}
 		for i, input := range tx.Vin {
 			tai := &ta.Inputs[i]
-			btxIDIn, err := d.chainParser.PackTxid(input.Txid)
+			btxID, err := d.chainParser.PackTxid(input.Txid)
 			if err != nil {
 				// do not process inputs without input txid
 				if err == bchain.ErrTxidMissing {
@@ -675,10 +671,10 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				}
 				return err
 			}
-			stxID := string(btxIDIn)
+			stxID := string(btxID)
 			ita, e := txAddressesMap[stxID]
 			if !e {
-				ita, err = d.getTxAddresses(btxIDIn)
+				ita, err = d.getTxAddresses(btxID)
 				if err != nil {
 					return err
 				}
@@ -736,7 +732,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 					balance.Txs++
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
-				balance.MarkUtxoAsSpent(btxIDIn, int32(input.Vout))
+				balance.MarkUtxoAsSpent(btxID, int32(input.Vout))
 				if balance.BalanceSat.Sign() < 0 {
 					d.resetValueSatToZero(&balance.BalanceSat, spentOutput.AddrDesc, "balance")
 				}
@@ -750,7 +746,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 						balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceSat: big.NewInt(0), SentSat: big.NewInt(0)}
 						balance.AssetBalances[spentOutput.AssetInfo.AssetGuid] = balanceAsset
 					}
-					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, btxID, spentOutput.AssetInfo, blockTxAssetAddresses, assets, txAssets)
+					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, spendingTxid, spentOutput.AssetInfo, blockTxAssetAddresses, assets, txAssets)
 					if err != nil {
 						return err
 					}
