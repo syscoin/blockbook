@@ -1188,7 +1188,9 @@ func (d *RocksDB) disconnectTxAssetOutputs(txa *bchain.TxAddresses,
 func (d *RocksDB) disconnectTxAddressesOutputs(btxID []byte, txa *bchain.TxAddresses,
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error),
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
-	blockTxAssetAddresses bchain.TxAssetAddressMap) error {
+	blockTxAssetAddresses bchain.TxAssetAddressMap,
+	assetFoundInTx func(asset uint32, btxID []byte) bool,
+	assets map[uint32]*bchain.Asset) error {
 	for i, t := range txa.Outputs {
 		if len(t.AddrDesc) > 0 {
 			exist := addressFoundInTx(t.AddrDesc, btxID)
@@ -1313,7 +1315,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 		if txa == nil {
 			continue
 		}
-		if err := d.disconnectTxAddressesOutputs(btxID, txa, getAddressBalance, addressFoundInTx, blockTxAssetAddresses); err != nil {
+		if err := d.disconnectTxAddressesOutputs(btxID, txa, getAddressBalance, addressFoundInTx, blockTxAssetAddresses, assetFoundInTx, assets); err != nil {
 			return err
 		}
 		if err := d.disconnectTxAssetOutputs(txa, assets, mapAssetsIn); err != nil {
