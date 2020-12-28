@@ -88,7 +88,7 @@
                 </td>
             </tr>
             {{- end -}}
-            {{- if $tx.Rbf}}
+            {{- if not $tx.Confirmations}}
             <tr>
                 <td><span title="Replace by fee">RBF</span></td>
                 <td class="data">
