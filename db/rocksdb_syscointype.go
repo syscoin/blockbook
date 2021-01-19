@@ -356,7 +356,7 @@ func (d *RocksDB) SetupAssetCache() error {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
-		assetKey := d.chainParser.UnpackUint(it.Key().Data())
+		assetKey, l := d.chainParser.UnpackVaruint64(it.Key().Data())
 		assetDb, err := d.chainParser.UnpackAsset(it.Value().Data())
 		if err != nil {
 			return err
@@ -377,7 +377,9 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint64]*bchai
 	}
 	for guid, asset := range assets {
 		AssetCache[guid] = *asset
-		key := d.chainParser.PackUint(guid)
+		key := make([]byte, vlq.MaxLen64)
+		l := p.BaseParser.PackVaruint64(guid, key)
+		key = key[:l]
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.AssetObj.TotalSupply == -1 {
 			delete(AssetCache, guid)
@@ -428,7 +430,9 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 			return &assetDbCache, nil
 		}
 	}
-	key := d.chainParser.PackUint(guid)
+	key := make([]byte, vlq.MaxLen64)
+	l := p.BaseParser.PackVaruint64(guid, key)
+	key = key[:l]
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 	if err != nil {
 		return nil, err
