@@ -398,7 +398,8 @@ func (p *SyscoinParser) AppendAssetInfo(assetInfo *bchain.AssetInfo, buf []byte,
 }
 
 func (p *SyscoinParser) UnpackAssetInfo(assetInfo *bchain.AssetInfo, buf []byte) int {
-	assetInfo.AssetGuid, l := p.BaseParser.UnpackVaruint64(buf)
+	var l int
+	assetInfo.AssetGuid, l = p.BaseParser.UnpackVaruint64(buf)
 	valueSat, al := p.BaseParser.UnpackBigint(buf[l:])
 	assetInfo.ValueSat = &valueSat
 	l += al
