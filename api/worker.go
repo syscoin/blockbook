@@ -172,6 +172,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				if err != nil {
 					return nil, errors.Annotatef(err, "GetTxAddresses %v", bchainVin.Txid)
 				}
+				assetGuid := uint64(0)
 				if tas == nil {
 					// try to load from backend
 					otx, _, err := w.txCache.GetTransaction(bchainVin.Txid)
@@ -200,6 +201,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 							glog.Errorf("getAddressesFromVout error %v, vout %+v", err, vout)
 						}
 						if vout.AssetInfo != nil {
+							assetGuid = vout.AssetInfo.AssetGuid
 							vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(vout.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(vout.AssetInfo.ValueSat)}
 						}
 					}
@@ -213,6 +215,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 							glog.Errorf("output.Addresses error %v, tx %v, output %v", err, bchainVin.Txid, i)
 						}
 						if output.AssetInfo != nil {
+							assetGuid = output.AssetInfo.AssetGuid
 							vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(output.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(output.AssetInfo.ValueSat)}
 						}
 					}
@@ -225,7 +228,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 						}
 						tts, ok := mapTTS[vin.AssetInfo.AssetGuid]
 						if !ok {
-							dbAsset, errAsset := w.db.GetAsset(vin.AssetInfo.AssetGuid, nil)
+							dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 							if errAsset != nil || dbAsset == nil {
 								return nil, errAsset
 							}
@@ -274,7 +277,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			}
 			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(vout.AssetInfo.AssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset(bchainVout.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
 					return nil, errAsset
 				}
@@ -433,7 +436,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 					}
 					tts, ok := mapTTS[vin.AssetInfo.AssetGuid]
 					if !ok {
-						dbAsset, errAsset := w.db.GetAsset(vin.AssetInfo.AssetGuid, nil)
+						dbAsset, errAsset := w.db.GetAsset(bchainVin.AssetInfo.AssetGuid, nil)
 						if errAsset != nil || dbAsset == nil {
 							return nil, errAsset
 						}
@@ -481,7 +484,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			}
 			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(vout.AssetInfo.AssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset(bchainVout.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
 					return nil, errAsset
 				}
@@ -760,7 +763,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			}
 			tts, ok := mapTTS[vin.AssetInfo.AssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(vin.AssetInfo.AssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset(tai.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
 					return nil
 				}
@@ -797,7 +800,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			}
 			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(vout.AssetInfo.AssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset(tao.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
 					return nil
 				}

@@ -566,7 +566,7 @@ func (t Tokens) Less(i, j int) bool {
 type TokenTransferSummary struct {
 	From     string    `json:"from"`
 	To       string    `json:"to"`
-	Token    uint32    `json:"token"`
+	Token    string    `json:"token"`
 	Name     string    `json:"name"`
 	Symbol   string    `json:"symbol"`
 	Decimals int       `json:"decimals"`
