@@ -1068,7 +1068,7 @@ func (d *RocksDB) writeHeight(wb *gorocksdb.WriteBatch, height uint32, bi *bchai
 func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOutpoint, txa *bchain.TxAddresses, txAddressesToUpdate map[string]*bchain.TxAddresses,
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error),
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
-	assetFoundInTx func(asset uint32, btxID []byte) bool,
+	assetFoundInTx func(asset uint64, btxID []byte) bool,
 	assets map[uint64]*bchain.Asset, 
 	blockTxAssetAddresses bchain.TxAssetAddressMap,
 	mapAssetsIn bchain.AssetsMap) error {
@@ -1189,7 +1189,7 @@ func (d *RocksDB) disconnectTxAddressesOutputs(btxID []byte, txa *bchain.TxAddre
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error),
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
 	blockTxAssetAddresses bchain.TxAssetAddressMap,
-	assetFoundInTx func(asset uint32, btxID []byte) bool,
+	assetFoundInTx func(asset uint64, btxID []byte) bool,
 	assets map[uint64]*bchain.Asset) error {
 	for i, t := range txa.Outputs {
 		if len(t.AddrDesc) > 0 {
