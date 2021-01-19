@@ -969,7 +969,7 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 		findAssets = s.api.FindAssets(q, 0, 2)
 		if len(findAssets.AssetDetails) > 0 {
 			if len(findAssets.AssetDetails) == 1 {
-				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(findAssets.AssetDetails[0].AssetGuid) 10)), 302)
+				http.Redirect(w, r, joinURL("/asset/", strconv.FormatUint(findAssets.AssetDetails[0].AssetGuid), 302)
 				return noTpl, nil, nil
 			} else {
 				http.Redirect(w, r, joinURL("/assets/", q), 302)
