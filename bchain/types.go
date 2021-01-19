@@ -54,7 +54,7 @@ type ScriptSig struct {
 }
 
 type AssetInfo struct {
-	AssetGuid uint32  `json:"assetGuid,omitempty"`
+	AssetGuid uint64  `json:"assetGuid,omitempty"`
 	ValueSat *big.Int `json:"valueSat,omitempty"`
 }
 
@@ -724,9 +724,11 @@ type BlockChainParser interface {
 	PackVarint32(i int32, buf []byte) int
 	PackVarint(i int, buf []byte) int
 	PackVaruint(i uint, buf []byte) int
+	PackVaruint64(i uint64, buf []byte) int
 	UnpackVarint32(buf []byte) (int32, int)
 	UnpackVarint(buf []byte) (int, int)
 	UnpackVaruint(buf []byte) (uint, int)
+	UnpackVaruint64(buf []byte) (uint64, int)
 	PackBigint(bi *big.Int, buf []byte) int
 	UnpackBigint(buf []byte) (big.Int, int)
 	MaxPackedBigintBytes() int
@@ -753,8 +755,8 @@ type BlockChainParser interface {
 	TryGetOPReturn(script []byte) []byte
 	GetAssetsMaskFromVersion(nVersion int32) AssetsMask
 	GetAssetTypeFromVersion(nVersion int32) *TokenType
-	PackAssetKey(assetGuid uint32, height uint32) []byte
-	UnpackAssetKey(key []byte) (uint32, uint32)
+	PackAssetKey(assetGuid uint64, height uint32) []byte
+	UnpackAssetKey(key []byte) (uint64, uint32)
 	PackAssetTxIndex(txAsset *TxAsset) []byte
 	UnpackAssetTxIndex(buf []byte) []*TxAssetIndex
 	PackAsset(asset *Asset) ([]byte, error)
@@ -778,5 +780,5 @@ type Mempool interface {
 	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
 	GetTransactionTime(txid string) uint32
-	GetTxAssets(assetGuid uint32) MempoolTxidEntries
+	GetTxAssets(assetGuid uint64) MempoolTxidEntries
 }

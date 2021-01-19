@@ -162,7 +162,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		vin.Hex = bchainVin.ScriptSig.Hex
 		vin.Coinbase = bchainVin.Coinbase
 		if bchainVin.AssetInfo != nil {
-			vin.AssetInfo = &AssetInfo{AssetGuid: bchainVin.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(bchainVin.AssetInfo.ValueSat)}
+			vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(bchainVin.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(bchainVin.AssetInfo.ValueSat)}
 		}
 		if w.chainType == bchain.ChainBitcoinType {
 			//  bchainVin.Txid=="" is coinbase transaction
@@ -200,7 +200,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 							glog.Errorf("getAddressesFromVout error %v, vout %+v", err, vout)
 						}
 						if vout.AssetInfo != nil {
-							vin.AssetInfo = &AssetInfo{AssetGuid: vout.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(vout.AssetInfo.ValueSat)}
+							vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(vout.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(vout.AssetInfo.ValueSat)}
 						}
 					}
 				} else {
@@ -213,7 +213,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 							glog.Errorf("output.Addresses error %v, tx %v, output %v", err, bchainVin.Txid, i)
 						}
 						if output.AssetInfo != nil {
-							vin.AssetInfo = &AssetInfo{AssetGuid: output.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(output.AssetInfo.ValueSat)}
+							vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(output.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(output.AssetInfo.ValueSat)}
 						}
 					}
 				}
@@ -261,7 +261,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		vout.ValueSat = (*bchain.Amount)(&bchainVout.ValueSat)
 		valOutSat.Add(&valOutSat, &bchainVout.ValueSat)
 		if bchainVout.AssetInfo != nil {
-			vout.AssetInfo = &AssetInfo{AssetGuid: bchainVout.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(bchainVout.AssetInfo.ValueSat)}
+			vout.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(bchainVout.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(bchainVout.AssetInfo.ValueSat)}
 		}		
 		vout.Hex = bchainVout.ScriptPubKey.Hex
 		vout.AddrDesc, vout.Addresses, vout.IsAddress, err = w.getAddressesFromVout(bchainVout)
@@ -416,7 +416,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 		vin.Hex = bchainVin.ScriptSig.Hex
 		vin.Coinbase = bchainVin.Coinbase
 		if bchainVin.AssetInfo != nil {
-			vin.AssetInfo = &AssetInfo{AssetGuid: bchainVin.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(bchainVin.AssetInfo.ValueSat)}
+			vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(bchainVin.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(bchainVin.AssetInfo.ValueSat)}
 		}
 		if w.chainType == bchain.ChainBitcoinType {
 			//  bchainVin.Txid=="" is coinbase transaction
@@ -473,7 +473,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			glog.V(2).Infof("getAddressesFromVout error %v, %v, output %v", err, mempoolTx.Txid, bchainVout.N)
 		}
 		if bchainVout.AssetInfo != nil {
-			vout.AssetInfo = &AssetInfo{AssetGuid: bchainVout.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(bchainVout.AssetInfo.ValueSat)}
+			vout.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(bchainVout.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(bchainVout.AssetInfo.ValueSat)}
 		}
 		if vout.AssetInfo != nil {
 			if mapTTS == nil {
@@ -650,7 +650,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 	}
 	return txids, nil
 }
-func (w *Worker) getAssetTxids(assetGuid uint32, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
+func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
 	var callback db.GetTxAssetsCallback
@@ -752,7 +752,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			glog.Errorf("tai.Addresses error %v, tx %v, input %v, tai %+v", err, txid, i, tai)
 		}
 		if tai.AssetInfo != nil {
-			vin.AssetInfo = &AssetInfo{AssetGuid: tai.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(tai.AssetInfo.ValueSat)}
+			vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(tai.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(tai.AssetInfo.ValueSat)}
 		}
 		if vin.AssetInfo != nil {
 			if mapTTS == nil {
@@ -789,7 +789,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		}
 		vout.Spent = tao.Spent
 		if tao.AssetInfo != nil {
-			vout.AssetInfo = &AssetInfo{AssetGuid: tao.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(tao.AssetInfo.ValueSat)}
+			vout.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(tao.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(tao.AssetInfo.ValueSat)}
 		}
 		if vout.AssetInfo != nil {
 			if mapTTS == nil {
@@ -1275,7 +1275,7 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 		}
 		if foundAsset == true {
 			assetSpecific := AssetsSpecific{
-				AssetGuid:		guid,
+				AssetGuid:		strconv.FormatUint(guid, 10),
 				Symbol:			string(assetCached.AssetObj.Symbol),
 				Contract:		"0x" + hex.EncodeToString(assetCached.AssetObj.Contract),
 				TotalSupply:	(*bchain.Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
@@ -1338,12 +1338,10 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		totalResults             int
 	)
 	var err error
-	var assetGuidInt int
-	assetGuidInt, err = strconv.Atoi(asset)
+	assetGuid, err := strconv.ParseUInt(asset, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	assetGuid := uint32(assetGuidInt)
 	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 	if errAsset != nil || dbAsset == nil || dbAsset.Transactions == 0 {
 		return nil, NewAPIError("Asset not found", true)
@@ -1415,7 +1413,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	}
 	r := &Asset{
 		AssetDetails:	&AssetSpecific{
-			AssetGuid:		assetGuid,
+			AssetGuid:		asset,
 			Symbol:			string(dbAsset.AssetObj.Symbol),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
@@ -1731,7 +1729,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 									Coinbase:  coinbase,
 								}
 								if vout.AssetInfo != nil {
-									utxoTmp.AssetInfo = &AssetInfo{AssetGuid: vout.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(vout.AssetInfo.ValueSat)}
+									utxoTmp.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(vout.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(vout.AssetInfo.ValueSat)}
 								}
 								utxos = append(utxos, utxoTmp)
 								inMempool[bchainTx.Txid] = struct{}{}
@@ -1791,7 +1789,7 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.A
 							Coinbase:      coinbase,
 						}
 						if utxo.AssetInfo != nil {
-							utxoTmp.AssetInfo = &AssetInfo{AssetGuid: utxo.AssetInfo.AssetGuid, ValueSat: (*bchain.Amount)(utxo.AssetInfo.ValueSat)}
+							utxoTmp.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(utxo.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(utxo.AssetInfo.ValueSat)}
 						}
 						utxos = append(utxos, utxoTmp)
 					}
@@ -1827,18 +1825,19 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 	for j := range utxoRes.Utxos {
 		a := &utxoRes.Utxos[j]
 		if a.AssetInfo != nil {
-			dbAsset, errAsset := w.db.GetAsset(a.AssetInfo.AssetGuid, nil)
+			baseAssetGuid := w.db.GetBaseAssetID(a.AssetInfo.AssetGuid)
+			dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
 			if errAsset != nil || dbAsset == nil {
 				return utxoRes, errAsset
 			}
 			// add unique assets
-			var _, ok = assetsMap[a.AssetInfo.AssetGuid]
+			var _, ok = assetsMap[baseAssetGuid]
 			if ok {
 				continue
 			}
-			assetsMap[a.AssetInfo.AssetGuid] = true
+			assetsMap[baseAssetGuid] = true
 			assetDetails :=	&AssetSpecific{
-				AssetGuid:		a.AssetInfo.AssetGuid,
+				AssetGuid:		strconv.FormatUint(baseAssetGuid, 10),
 				Symbol:			string(dbAsset.AssetObj.Symbol),
 				Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 				TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),

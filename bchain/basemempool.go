@@ -105,7 +105,7 @@ func (m *BaseMempool) GetAllEntries() MempoolTxidEntries {
 	sort.Sort(entries)
 	return entries
 }
-func (m *BaseMempool) GetTxAssets(assetGuid uint32) MempoolTxidEntries {
+func (m *BaseMempool) GetTxAssets(assetGuid uint64) MempoolTxidEntries {
 	i := 0
 	m.mux.Lock()
 	mapTxid := make(map[string]struct{})

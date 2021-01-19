@@ -341,10 +341,10 @@ func (p *BaseParser) PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
 func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
 	return nil, errors.New("Not supported")
 }
-func (p *BaseParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
+func (p *BaseParser) PackAssetKey(assetGuid uint64, height uint32) []byte {
 	return nil
 }
-func (p *BaseParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
+func (p *BaseParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
 	return 0, 0
 }
 func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte {
@@ -419,7 +419,9 @@ func (p *BaseParser) PackVarint(i int, buf []byte) int {
 func (p *BaseParser) PackVaruint(i uint, buf []byte) int {
 	return vlq.PutUint(buf, uint64(i))
 }
-
+func (p *BaseParser) PackVaruint64(i uint64, buf []byte) int {
+	return vlq.PutUint(buf, i)
+}
 func (p *BaseParser) UnpackVarint32(buf []byte) (int32, int) {
 	i, ofs := vlq.Int(buf)
 	return int32(i), ofs
@@ -433,6 +435,11 @@ func (p *BaseParser) UnpackVarint(buf []byte) (int, int) {
 func (p *BaseParser) UnpackVaruint(buf []byte) (uint, int) {
 	i, ofs := vlq.Uint(buf)
 	return uint(i), ofs
+}
+
+func (p *BaseParser) UnpackVaruint64(buf []byte) (uint64, int) {
+	i, ofs := vlq.Uint(buf)
+	return i, ofs
 }
 
 func (p *BaseParser) UnpackVarBytes(buf []byte) ([]byte, int) {

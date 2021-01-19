@@ -68,7 +68,7 @@ type xpubData struct {
 	balanceSat      big.Int
 	addresses       []xpubAddress
 	changeAddresses []xpubAddress
-	Tokens	    map[uint32]*bchain.AssetBalance `json:"tokens,omitempty"`
+	Tokens	    map[uint64]*bchain.AssetBalance `json:"tokens,omitempty"`
 }
 
 func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, filter *AddressFilter, maxResults int) ([]xpubTxid, bool, error) {
@@ -172,7 +172,7 @@ func (w *Worker) xpubDerivedAddressBalance(data *xpubData, ad *xpubAddress) (boo
 		data.balanceSat.Add(&data.balanceSat, &ad.balance.BalanceSat)
 		if ad.balance.AssetBalances != nil {
 			if data.Tokens == nil {
-				data.Tokens = map[uint32]*bchain.AssetBalance{}
+				data.Tokens = map[uint64]*bchain.AssetBalance{}
 			}
 			for assetGuid, assetBalance := range ad.balance.AssetBalances {
 				bhaToken, ok := data.Tokens[assetGuid];
@@ -669,18 +669,19 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 					for j := range utxos {
 						a := &utxos[j]
 						if a.AssetInfo != nil {
-							dbAsset, errAsset := w.db.GetAsset(a.AssetInfo.AssetGuid, nil)
+							baseAssetGuid := w.db.GetBaseAssetID(a.AssetInfo.AssetGuid)
+							dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
 							if errAsset != nil || dbAsset == nil {
 								return utxoRes, errAsset
 							}
 							// add unique assets
-							var _, ok = assetsMap[a.AssetInfo.AssetGuid]
+							var _, ok = assetsMap[baseAssetGuid]
 							if ok {
 								continue
 							}
-							assetsMap[a.AssetInfo.AssetGuid] = true
+							assetsMap[baseAssetGuid] = true
 							assetDetails :=	&AssetSpecific{
-								AssetGuid:		a.AssetInfo.AssetGuid,
+								AssetGuid:		strconv.FormatUint(baseAssetGuid, 10),
 								Symbol:			string(dbAsset.AssetObj.Symbol),
 								Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 								TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),

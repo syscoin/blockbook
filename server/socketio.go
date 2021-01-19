@@ -285,12 +285,12 @@ func (s *SocketIoServer) getAssetTxids(asset string, opts *assetOpts) (res resul
 	txids := make([]string, 0, 8)
 	lower, higher := uint32(opts.End), uint32(opts.Start)
 	assetBitMask := opts.AssetsMask
-	assetGuid, err := strconv.Atoi(asset)
+	assetGuid, err := strconv.ParseUInt(asset, 10, 64)
 	if err != nil {
 		return res, err
 	}
 	if !opts.QueryMempoolOnly {
-		err = s.db.GetTxAssets(uint32(assetGuid), lower, higher, assetBitMask, func(txidsIn []string) error {
+		err = s.db.GetTxAssets(assetGuid, lower, higher, assetBitMask, func(txidsIn []string) error {
 			txids = append(txids, txidsIn...)
 			return nil
 		})
@@ -298,7 +298,7 @@ func (s *SocketIoServer) getAssetTxids(asset string, opts *assetOpts) (res resul
 			return res, err
 		}
 	} else {
-		o := s.mempool.GetTxAssets(uint32(assetGuid))
+		o := s.mempool.GetTxAssets(assetGuid)
 		for _, m := range o {
 			txids = append(txids, m.Txid)
 		}
@@ -547,11 +547,10 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 	}
 	ahi := addressHistoryItem{}
 	ahi.Tokens = map[uint32]*api.TokenBalanceHistory{}
-	guid, errAG := strconv.Atoi(asset)
+	assetGuid, errAG := strconv.ParseUInt(asset, 10, 64)
 	if errAG != nil {
 		return res, errAG
 	}
-	assetGuid := uint32(guid)
 	for txi := opts.From; txi < to; txi++ {
 		tx, err := s.api.GetTransaction(txids[txi], false, false)
 		if err != nil {
@@ -628,7 +627,7 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 		ahi.Satoshis = totalSat.Int64()
 		ahi.Tx = txToResTx(tx)
 		res.Result.AssetDetails =	&api.AssetSpecific{
-			AssetGuid:		assetGuid,
+			AssetGuid:		strconv.FormatUint(assetGuid, 10),
 			Symbol:			string(dbAsset.AssetObj.Symbol),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),

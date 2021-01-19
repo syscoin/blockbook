@@ -479,7 +479,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 				AssetInfo: &bchain.AssetInfo{AssetGuid: 2529870008, ValueSat: dbtestdata.SatZero},
 			},
 		},
-		AssetBalances: map[uint32]*bchain.AssetBalance {
+		AssetBalances: map[uint64]*bchain.AssetBalance {
 			2529870008: &bchain.AssetBalance{
 				SentSat: 	dbtestdata.SatZero,
 				BalanceSat: dbtestdata.SatZero,

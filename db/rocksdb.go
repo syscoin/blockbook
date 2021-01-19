@@ -441,7 +441,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	}
 	addresses := make(bchain.AddressesMap)
 	if chainType == bchain.ChainBitcoinType {
-		assets := make(map[uint32]*bchain.Asset)
+		assets := make(map[uint64]*bchain.Asset)
 		txAssets := make(bchain.TxAssetMap, 0)
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
@@ -505,7 +505,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint32]*bchain.Asset, txAssets bchain.TxAssetMap) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	blockTxAssetAddresses := make(bchain.TxAssetAddressMap)
@@ -621,7 +621,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				}
 				if tao.AssetInfo != nil {
 					if balance.AssetBalances == nil {
-						balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
+						balance.AssetBalances = map[uint64]*bchain.AssetBalance{}
 					}
 					balanceAsset, ok := balance.AssetBalances[tao.AssetInfo.AssetGuid]
 					if !ok {
@@ -739,7 +739,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				balance.SentSat.Add(&balance.SentSat, &spentOutput.ValueSat)
 				if spentOutput.AssetInfo != nil {
 					if balance.AssetBalances == nil {
-						balance.AssetBalances = map[uint32]*bchain.AssetBalance{}
+						balance.AssetBalances = map[uint64]*bchain.AssetBalance{}
 					}
 					balanceAsset, ok := balance.AssetBalances[spentOutput.AssetInfo.AssetGuid]
 					if !ok {
@@ -1069,7 +1069,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOu
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error),
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
 	assetFoundInTx func(asset uint32, btxID []byte) bool,
-	assets map[uint32]*bchain.Asset, 
+	assets map[uint64]*bchain.Asset, 
 	blockTxAssetAddresses bchain.TxAssetAddressMap,
 	mapAssetsIn bchain.AssetsMap) error {
 	var err error
@@ -1149,7 +1149,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOu
 }
 
 func (d *RocksDB) disconnectTxAssetOutputs(txa *bchain.TxAddresses,
-	assets map[uint32]*bchain.Asset,
+	assets map[uint64]*bchain.Asset,
 	mapAssetsIn bchain.AssetsMap) error {
 	var asset *bchain.Asset = nil
 	isAssetTx := d.chainParser.IsAssetTx(txa.Version)
@@ -1190,7 +1190,7 @@ func (d *RocksDB) disconnectTxAddressesOutputs(btxID []byte, txa *bchain.TxAddre
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
 	blockTxAssetAddresses bchain.TxAssetAddressMap,
 	assetFoundInTx func(asset uint32, btxID []byte) bool,
-	assets map[uint32]*bchain.Asset) error {
+	assets map[uint64]*bchain.Asset) error {
 	for i, t := range txa.Outputs {
 		if len(t.AddrDesc) > 0 {
 			exist := addressFoundInTx(t.AddrDesc, btxID)
@@ -1239,7 +1239,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 	txsToDelete := make(map[string]struct{})
 	blockTxAssetAddresses := make(bchain.TxAssetAddressMap)
 	balances := make(map[string]*bchain.AddrBalance)
-	assets := make(map[uint32]*bchain.Asset)
+	assets := make(map[uint64]*bchain.Asset)
 	mapAssetsIn := make(bchain.AssetsMap)
 	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error

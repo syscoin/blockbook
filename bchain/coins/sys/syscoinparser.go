@@ -342,9 +342,9 @@ func (p *SyscoinParser) WitnessPubKeyHashFromKeyID(keyId []byte) (string, error)
 }
 
 
-func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
+func (p *SyscoinParser) PackAssetKey(assetGuid uint64, height uint32) []byte {
 	var buf []byte
-	varBuf := p.BaseParser.PackUint(assetGuid)
+	varBuf := p.BaseParser.PackVaruint64(assetGuid)
 	buf = append(buf, varBuf...)
 	// pack height as binary complement to achieve ordering from newest to oldest block
 	varBuf = p.BaseParser.PackUint(^height)
@@ -352,9 +352,9 @@ func (p *SyscoinParser) PackAssetKey(assetGuid uint32, height uint32) []byte {
 	return buf
 }
 
-func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint32, uint32) {
-	assetGuid := p.BaseParser.UnpackUint(buf)
-	height := p.BaseParser.UnpackUint(buf[4:])
+func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
+	assetGuid, l := p.BaseParser.UnpackVaruint64(buf)
+	height := p.BaseParser.UnpackUint(buf[l:])
 	// height is packed in binary complement, convert it
 	return assetGuid, ^height
 }
@@ -390,7 +390,7 @@ func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) []*bchain.TxAssetIndex {
 }
 
 func (p *SyscoinParser) AppendAssetInfo(assetInfo *bchain.AssetInfo, buf []byte, varBuf []byte) []byte {
-	l := p.BaseParser.PackVaruint(uint(assetInfo.AssetGuid), varBuf)
+	l := p.BaseParser.PackVaruint64(assetInfo.AssetGuid, varBuf)
 	buf = append(buf, varBuf[:l]...)
 	l = p.BaseParser.PackBigint(assetInfo.ValueSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -398,8 +398,7 @@ func (p *SyscoinParser) AppendAssetInfo(assetInfo *bchain.AssetInfo, buf []byte,
 }
 
 func (p *SyscoinParser) UnpackAssetInfo(assetInfo *bchain.AssetInfo, buf []byte) int {
-	assetGuid, l := p.BaseParser.UnpackVaruint(buf)
-	assetInfo.AssetGuid = uint32(assetGuid)
+	assetInfo.AssetGuid, l := p.BaseParser.UnpackVaruint64(buf)
 	valueSat, al := p.BaseParser.UnpackBigint(buf[l:])
 	assetInfo.ValueSat = &valueSat
 	l += al
@@ -495,9 +494,9 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 	numAssetBalances, ll := p.BaseParser.UnpackVaruint(buf[l:])
 	l += ll
 	if numAssetBalances > 0 {
-		ab.AssetBalances = make(map[uint32]*bchain.AssetBalance, numAssetBalances)
+		ab.AssetBalances = make(map[uint64]*bchain.AssetBalance, numAssetBalances)
 		for i := uint(0); i < numAssetBalances; i++ {
-			asset, ll := p.BaseParser.UnpackVaruint(buf[l:])
+			asset, ll := p.BaseParser.UnpackVaruint64(buf[l:])
 			l += ll
 			balancevalue, ll := p.BaseParser.UnpackBigint(buf[l:])
 			l += ll
@@ -505,7 +504,7 @@ func (p *SyscoinParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detai
 			l += ll
 			transfers, ll := p.BaseParser.UnpackVaruint(buf[l:])
 			l += ll
-			ab.AssetBalances[uint32(asset)] = &bchain.AssetBalance{Transfers: uint32(transfers), SentSat: &sentvalue, BalanceSat: &balancevalue}
+			ab.AssetBalances[asset] = &bchain.AssetBalance{Transfers: uint32(transfers), SentSat: &sentvalue, BalanceSat: &balancevalue}
 		}
 	}
 	if detail != bchain.AddressBalanceDetailNoUTXO {
@@ -556,7 +555,7 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	l = p.BaseParser.PackVaruint(uint(len(ab.AssetBalances)), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	for key, value := range ab.AssetBalances {
-		l = p.BaseParser.PackVaruint(uint(key), varBuf)
+		l = p.BaseParser.PackVaruint64(key, varBuf)
 		buf = append(buf, varBuf[:l]...)
 		l = p.BaseParser.PackBigint(value.BalanceSat, varBuf)
 		buf = append(buf, varBuf[:l]...)
