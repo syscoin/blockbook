@@ -357,7 +357,7 @@ func (d *RocksDB) SetupAssetCache() error {
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
 	for it.SeekToFirst(); it.Valid(); it.Next() {
-		assetKey, l := d.chainParser.UnpackVaruint64(it.Key().Data())
+		assetKey, _ := d.chainParser.UnpackVaruint64(it.Key().Data())
 		assetDb, err := d.chainParser.UnpackAsset(it.Value().Data())
 		if err != nil {
 			return err
