@@ -12,6 +12,7 @@ import (
 	"github.com/tecbot/gorocksdb"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/btcd/wire"
+	vlq "github.com/bsm/go-vlq"
 )
 var AssetCache map[uint64]bchain.Asset
 var SetupAssetCacheFirstTime bool = true
@@ -378,7 +379,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint64]*bchai
 	for guid, asset := range assets {
 		AssetCache[guid] = *asset
 		key := make([]byte, vlq.MaxLen64)
-		l := p.BaseParser.PackVaruint64(guid, key)
+		l := d.chainParser.PackVaruint64(guid, key)
 		key = key[:l]
 		// total supply of -1 signals asset to be removed from db - happens on disconnect of new asset
 		if asset.AssetObj.TotalSupply == -1 {
@@ -431,7 +432,7 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 		}
 	}
 	key := make([]byte, vlq.MaxLen64)
-	l := p.BaseParser.PackVaruint64(guid, key)
+	l := d.chainParser.PackVaruint64(guid, key)
 	key = key[:l]
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAssets], key)
 	if err != nil {
