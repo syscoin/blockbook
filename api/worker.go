@@ -581,8 +581,7 @@ func (w *Worker) getTokensFromErc20(erc20 []bchain.Erc20Transfer) []*bchain.Toke
 			erc20c = &bchain.Erc20Contract{Name: e.Contract}
 		}
 		tokens[i] = &bchain.TokenTransferSummary{
-			// SYSCOIN erc20 not compatible as Token is int
-			Token:    0, // e.Contract,
+			Token:    e.Contract,
 			From:     e.From,
 			To:       e.To,
 			Decimals: erc20c.Decimals,
