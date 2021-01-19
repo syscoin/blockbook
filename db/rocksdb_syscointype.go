@@ -239,7 +239,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 					valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
 					// get the NFT asset from asset DB or create new one if doesn't exist
 					nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
-					if nftDBAsset == nil {
+					if err == nil && nftDBAsset == nil {
 						nftDBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj}
 						nftDBAsset.AssetObj.TotalSupply = int64(0)
 						nftDBAsset.AssetObj.MaxSupply = valueDiffNFT
