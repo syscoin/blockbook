@@ -128,7 +128,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 	var err error
 	var ta *bchain.TxAddresses
 	var tokens []*bchain.TokenTransferSummary
-	var mapTTS  map[uint32]*bchain.TokenTransferSummary
+	var mapTTS  map[uint64]*bchain.TokenTransferSummary
 	var ethSpecific *EthereumSpecific
 	var blockhash string
 	if bchainTx.Confirmations > 0 {
@@ -221,7 +221,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 					valInSat.Add(&valInSat, (*big.Int)(vin.ValueSat))
 					if vin.AssetInfo != nil {
 						if mapTTS == nil {
-							mapTTS = map[uint32]*bchain.TokenTransferSummary{}
+							mapTTS = map[uint64]*bchain.TokenTransferSummary{}
 						}
 						tts, ok := mapTTS[vin.AssetInfo.AssetGuid]
 						if !ok {
@@ -270,7 +270,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		}
 		if vout.AssetInfo != nil {
 			if mapTTS == nil {
-				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
+				mapTTS = map[uint64]*bchain.TokenTransferSummary{}
 			}
 			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
 			if !ok {
@@ -397,7 +397,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 	var valInSat, valOutSat, feesSat big.Int
 	var pValInSat *big.Int
 	var tokens []*bchain.TokenTransferSummary
-	var mapTTS  map[uint32]*bchain.TokenTransferSummary
+	var mapTTS  map[uint64]*bchain.TokenTransferSummary
 	var ethSpecific *EthereumSpecific
 	vins := make([]Vin, len(mempoolTx.Vin))
 	rbf := false
@@ -429,7 +429,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 				}
 				if vin.AssetInfo != nil {
 					if mapTTS == nil {
-						mapTTS = map[uint32]*bchain.TokenTransferSummary{}
+						mapTTS = map[uint64]*bchain.TokenTransferSummary{}
 					}
 					tts, ok := mapTTS[vin.AssetInfo.AssetGuid]
 					if !ok {
@@ -477,7 +477,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 		}
 		if vout.AssetInfo != nil {
 			if mapTTS == nil {
-				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
+				mapTTS = map[uint64]*bchain.TokenTransferSummary{}
 			}
 			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
 			if !ok {
@@ -738,7 +738,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 	var err error
 	var valInSat, valOutSat, feesSat big.Int
 	var tokens []*bchain.TokenTransferSummary
-	var mapTTS  map[uint32]*bchain.TokenTransferSummary
+	var mapTTS  map[uint64]*bchain.TokenTransferSummary
 	vins := make([]Vin, len(ta.Inputs))
 	txVersionAsset := w.chainParser.GetAssetTypeFromVersion(ta.Version)
 	for i := range ta.Inputs {
@@ -756,7 +756,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		}
 		if vin.AssetInfo != nil {
 			if mapTTS == nil {
-				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
+				mapTTS = map[uint64]*bchain.TokenTransferSummary{}
 			}
 			tts, ok := mapTTS[vin.AssetInfo.AssetGuid]
 			if !ok {
@@ -793,7 +793,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		}
 		if vout.AssetInfo != nil {
 			if mapTTS == nil {
-				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
+				mapTTS = map[uint64]*bchain.TokenTransferSummary{}
 			}
 			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
 			if !ok {
@@ -1201,12 +1201,12 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if ba.AssetBalances != nil && option > AccountDetailsBasic {
 		tokens = make(bchain.Tokens, 0, len(ba.AssetBalances))
 		for k, v := range ba.AssetBalances {
-			dbAsset, errAsset := w.db.GetAsset(uint32(k), nil)
+			dbAsset, errAsset := w.db.GetAsset(k, nil)
 			if errAsset != nil || dbAsset == nil {
 				return nil, errAsset
 			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
-			assetGuid := strconv.FormatUint(uint64(k), 10)
+			assetGuid := strconv.FormatUint(k, 10)
 			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             address,
@@ -1516,7 +1516,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				}
 				if tai.AssetInfo != nil {
 					if bh.Tokens == nil {
-						bh.Tokens = map[uint32]*TokenBalanceHistory{}
+						bh.Tokens = map[uint64]*TokenBalanceHistory{}
 					}
 					bhaToken, ok := bh.Tokens[tai.AssetInfo.AssetGuid];
 					if !ok {
@@ -1533,7 +1533,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				(*big.Int)(bh.ReceivedSat).Add((*big.Int)(bh.ReceivedSat), &tao.ValueSat)
 				if tao.AssetInfo != nil {
 					if bh.Tokens == nil {
-						bh.Tokens = map[uint32]*TokenBalanceHistory{}
+						bh.Tokens = map[uint64]*TokenBalanceHistory{}
 					}
 					bhaToken, ok := bh.Tokens[tao.AssetInfo.AssetGuid];
 					if !ok {
@@ -1830,7 +1830,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 			if errAsset != nil || dbAsset == nil {
 				return utxoRes, errAsset
 			}
-			// add unique assets
+			// add unique base assets
 			var _, ok = assetsMap[baseAssetGuid]
 			if ok {
 				continue

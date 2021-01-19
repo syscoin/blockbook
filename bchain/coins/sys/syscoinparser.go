@@ -344,8 +344,9 @@ func (p *SyscoinParser) WitnessPubKeyHashFromKeyID(keyId []byte) (string, error)
 
 func (p *SyscoinParser) PackAssetKey(assetGuid uint64, height uint32) []byte {
 	var buf []byte
-	varBuf := p.BaseParser.PackVaruint64(assetGuid)
-	buf = append(buf, varBuf...)
+	varBuf := make([]byte, vlq.MaxLen64)
+	l := p.BaseParser.PackVaruint64(assetGuid, varBuf)
+	buf = append(buf, varBuf[:l]...)
 	// pack height as binary complement to achieve ordering from newest to oldest block
 	varBuf = p.BaseParser.PackUint(^height)
 	buf = append(buf, varBuf...)

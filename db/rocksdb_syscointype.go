@@ -13,7 +13,7 @@ import (
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/btcd/wire"
 )
-var AssetCache map[uint32]bchain.Asset
+var AssetCache map[uint64]bchain.Asset
 var SetupAssetCacheFirstTime bool = true
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
 type GetTxAssetsCallback func(txids []string) error
@@ -349,7 +349,7 @@ func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, 
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
 	if AssetCache == nil {
-		AssetCache = map[uint32]bchain.Asset{}
+		AssetCache = map[uint64]bchain.Asset{}
 	}
 	ro := gorocksdb.NewDefaultReadOptions()
 	ro.SetFillCache(false)
@@ -373,7 +373,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint64]*bchai
 		return nil
 	}
 	if AssetCache == nil {
-		AssetCache = map[uint32]bchain.Asset{}
+		AssetCache = map[uint64]bchain.Asset{}
 	}
 	for guid, asset := range assets {
 		AssetCache[guid] = *asset
@@ -393,7 +393,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint64]*bchai
 	return nil
 }
 
-func (d *RocksDB) GetAssetCache() *map[uint32]bchain.Asset {
+func (d *RocksDB) GetAssetCache() *map[uint64]bchain.Asset {
 	return &AssetCache
 }
 
@@ -404,10 +404,12 @@ func (d *RocksDB) GetSetupAssetCacheFirstTime() bool {
 func (d *RocksDB) SetSetupAssetCacheFirstTime(cacheVal bool) {
 	SetupAssetCacheFirstTime = cacheVal
 }
+
 func (d *RocksDB) GetBaseAssetID(guid uint64) uint64 {
 	return guid & 0xffffffff
 }
-func (d *RocksDB) GetAsset(guid uint32, assets map[uint64]*bchain.Asset) (*bchain.Asset, error) {
+
+func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchain.Asset, error) {
 	var assetDb *bchain.Asset
 	var assetL1 *bchain.Asset
 	var ok bool
@@ -417,7 +419,7 @@ func (d *RocksDB) GetAsset(guid uint32, assets map[uint64]*bchain.Asset) (*bchai
 		}
 	}
 	if AssetCache == nil {
-		AssetCache = map[uint32]bchain.Asset{}
+		AssetCache = map[uint64]bchain.Asset{}
 		// so it will store later in cache
 		ok = false
 	} else {

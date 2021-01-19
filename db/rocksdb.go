@@ -1273,9 +1273,9 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 		return exist
 	}
 	// all assets in the block are stored in blockAssetsTxs, together with a map of transactions where they appear
-	blockAssetsTxs := make(map[uint32]map[string]struct{})
+	blockAssetsTxs := make(map[uint64]map[string]struct{})
 	// assetFoundInTx handles updates of the blockAssetsTxs map and returns true if the asset+tx was already encountered
-	assetFoundInTx := func(asset uint32, btxID []byte) bool {
+	assetFoundInTx := func(asset uint64, btxID []byte) bool {
 		sBtxID := string(btxID)
 		a, exist := blockAssetsTxs[asset]
 		if !exist {

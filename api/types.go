@@ -303,7 +303,7 @@ type BalanceHistory struct {
 	SentToSelfSat *bchain.Amount            `json:"sentToSelf"`
 	FiatRates   map[string]float64 `json:"rates,omitempty"`
 	Txid        string             `json:"txid,omitempty"`
-	Tokens	    map[uint32]*TokenBalanceHistory `json:"tokens,omitempty"`	
+	Tokens	    map[uint64]*TokenBalanceHistory `json:"tokens,omitempty"`	
 }
 
 // BalanceHistories is array of BalanceHistory
@@ -352,7 +352,7 @@ func (a BalanceHistories) SortAndAggregate(groupByTime uint32) BalanceHistories 
 			}
 			if len(bh.Tokens) > 0 {
 				if bha.Tokens == nil {
-					bha.Tokens = map[uint32]*TokenBalanceHistory{}
+					bha.Tokens = map[uint64]*TokenBalanceHistory{}
 				}
 				// fill up map of balances for each asset guid
 				for assetGuid, token := range bh.Tokens {

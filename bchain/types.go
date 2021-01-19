@@ -258,7 +258,7 @@ type AddrBalance struct {
 	BalanceSat big.Int
 	Utxos      []Utxo
 	UtxosMap   map[string]int
-	AssetBalances map[uint32]*AssetBalance
+	AssetBalances map[uint64]*AssetBalance
 }
 
 type NotaryDetails = wire.NotaryDetailsType
@@ -595,8 +595,8 @@ type TxAssetAddressIndex struct {
 type TxAssetAddress struct {
 	Txs       []*TxAssetAddressIndex
 }
-type TxAssetAddressMap map[uint32]*TxAssetAddress
-type AssetsMap map[uint32]int64
+type TxAssetAddressMap map[uint64]*TxAssetAddress
+type AssetsMap map[uint64]int64
 // TxAddresses stores transaction inputs and outputs with amounts
 type TxAddresses struct {
 	Version int32
