@@ -354,7 +354,7 @@ type addressHistoryItem struct {
 	Satoshis      int64                             `json:"satoshis"`
 	Confirmations int                               `json:"confirmations"`
 	Tx            resTx                             `json:"tx"`
-	Tokens	      map[uint64]*api.TokenBalanceHistory 		`json:"tokens,omitempty"`	
+	Tokens	      map[string]*api.TokenBalanceHistory 		`json:"tokens,omitempty"`	
 }
 
 type resultGetAddressHistory struct {
@@ -487,7 +487,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 				if vin.AssetInfo != nil {
 					if ahi.Tokens == nil {
-						ahi.Tokens = map[uint64]*api.TokenBalanceHistory{}
+						ahi.Tokens = map[string]*api.TokenBalanceHistory{}
 					}
 					token, ok := ahi.Tokens[vin.AssetInfo.AssetGuid]
 					if !ok {
@@ -513,7 +513,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 				}
 				if vout.AssetInfo != nil {
 					if ahi.Tokens == nil {
-						ahi.Tokens = map[uint64]*api.TokenBalanceHistory{}
+						ahi.Tokens = map[string]*api.TokenBalanceHistory{}
 					}
 					token, ok := ahi.Tokens[vout.AssetInfo.AssetGuid]
 					if !ok {
@@ -533,7 +533,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	}
 	return
 }
-func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res resultGetAssetHistory, err error) {
+func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res resultGetAssetHistory, err error) {
 	txr, err := s.getAssetTxids(asset, opts)
 	if err != nil {
 		return
@@ -546,11 +546,7 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 		to = opts.To
 	}
 	ahi := addressHistoryItem{}
-	ahi.Tokens = map[uint64]*api.TokenBalanceHistory{}
-	assetGuid, errAG := strconv.ParseUint(asset, 10, 64)
-	if errAG != nil {
-		return res, errAG
-	}
+	ahi.Tokens = map[string]*api.TokenBalanceHistory{}
 	for txi := opts.From; txi < to; txi++ {
 		tx, err := s.api.GetTransaction(txids[txi], false, false)
 		if err != nil {

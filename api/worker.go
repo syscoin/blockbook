@@ -652,7 +652,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 	}
 	return txids, nil
 }
-func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
+func (w *Worker) getAssetTxids(assetGuid string, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
 	var callback db.GetTxAssetsCallback
@@ -1518,7 +1518,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				}
 				if tai.AssetInfo != nil {
 					if bh.Tokens == nil {
-						bh.Tokens = map[uint64]*TokenBalanceHistory{}
+						bh.Tokens = map[string]*TokenBalanceHistory{}
 					}
 					bhaToken, ok := bh.Tokens[tai.AssetInfo.AssetGuid];
 					if !ok {
@@ -1535,7 +1535,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 				(*big.Int)(bh.ReceivedSat).Add((*big.Int)(bh.ReceivedSat), &tao.ValueSat)
 				if tao.AssetInfo != nil {
 					if bh.Tokens == nil {
-						bh.Tokens = map[uint64]*TokenBalanceHistory{}
+						bh.Tokens = map[string]*TokenBalanceHistory{}
 					}
 					bhaToken, ok := bh.Tokens[tao.AssetInfo.AssetGuid];
 					if !ok {

@@ -68,7 +68,7 @@ type xpubData struct {
 	balanceSat      big.Int
 	addresses       []xpubAddress
 	changeAddresses []xpubAddress
-	Tokens	    map[uint64]*bchain.AssetBalance `json:"tokens,omitempty"`
+	Tokens	    map[string]*bchain.AssetBalance `json:"tokens,omitempty"`
 }
 
 func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, fromHeight, toHeight uint32, filter *AddressFilter, maxResults int) ([]xpubTxid, bool, error) {
@@ -172,7 +172,7 @@ func (w *Worker) xpubDerivedAddressBalance(data *xpubData, ad *xpubAddress) (boo
 		data.balanceSat.Add(&data.balanceSat, &ad.balance.BalanceSat)
 		if ad.balance.AssetBalances != nil {
 			if data.Tokens == nil {
-				data.Tokens = map[uint64]*bchain.AssetBalance{}
+				data.Tokens = map[string]*bchain.AssetBalance{}
 			}
 			for assetGuid, assetBalance := range ad.balance.AssetBalances {
 				bhaToken, ok := data.Tokens[assetGuid];
