@@ -126,12 +126,12 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	if !bytes.Equal(dBAsset.AssetObj.PubData, []byte(pubdata)) {
 		t.Fatal(fmt.Sprint("Block1: Property mismatch dBAsset.AssetObj.PubData: ", string(dBAsset.AssetObj.PubData)  , ". Expected: " + pubdata))
 	}
-	if dBAsset.AssetObj.UpdateCapabilityFlags != 193 {
-		t.Fatal(fmt.Sprint("Block1: Property mismatch dBAsset.AssetObj.UpdateCapabilityFlags: ", dBAsset.AssetObj.UpdateCapabilityFlags  , ". Expected: 193"))
+	if dBAsset.AssetObj.UpdateCapabilityFlags != 127 {
+		t.Fatal(fmt.Sprint("Block1: Property mismatch dBAsset.AssetObj.UpdateCapabilityFlags: ", dBAsset.AssetObj.UpdateCapabilityFlags  , ". Expected: 127"))
 	}
 	// init | pub data | capability flags
-	if dBAsset.AssetObj.UpdateFlags != 127 {
-		t.Fatal(fmt.Sprint("Block1: Property mismatch dBAsset.AssetObj.UpdateFlags: ", dBAsset.AssetObj.UpdateFlags  , ". Expected: 127"))
+	if dBAsset.AssetObj.UpdateFlags != 193 {
+		t.Fatal(fmt.Sprint("Block1: Property mismatch dBAsset.AssetObj.UpdateFlags: ", dBAsset.AssetObj.UpdateFlags  , ". Expected: 193"))
 	}
 	if dBAsset.AssetObj.TotalSupply != 0 {
 		t.Fatal(fmt.Sprint("Block1: Property mismatch dBAsset.AssetObj.TotalSupply: ", dBAsset.AssetObj.TotalSupply  , ". Expected: 0"))
@@ -229,9 +229,9 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 	if dBAsset.AssetObj.UpdateCapabilityFlags != 123 {
 		t.Fatal(fmt.Sprint("Block2: Property mismatch dBAsset.AssetObj.UpdateCapabilityFlags: ", dBAsset.AssetObj.UpdateCapabilityFlags  , ". Expected: 123"))
 	}
-	// not wire update flags but cummulative, adds contract which is 2
-	if dBAsset.AssetObj.UpdateFlags != 67 {
-		t.Fatal(fmt.Sprint("Block2: Property mismatch dBAsset.AssetObj.UpdateFlags: ", dBAsset.AssetObj.UpdateFlags  , ". Expected: 67"))
+	// not wire update flags but cummulative, adds contract which is 2 (193+2)
+	if dBAsset.AssetObj.UpdateFlags != 195 {
+		t.Fatal(fmt.Sprint("Block2: Property mismatch dBAsset.AssetObj.UpdateFlags: ", dBAsset.AssetObj.UpdateFlags  , ". Expected: 195"))
 	}
 	if dBAsset.AssetObj.TotalSupply != 0 {
 		t.Fatal(fmt.Sprint("Block2: Property mismatch dBAsset.AssetObj.TotalSupply: ", dBAsset.AssetObj.TotalSupply  , ". Expected: 0"))
