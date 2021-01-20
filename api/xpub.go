@@ -174,7 +174,11 @@ func (w *Worker) xpubDerivedAddressBalance(data *xpubData, ad *xpubAddress) (boo
 			if data.Tokens == nil {
 				data.Tokens = map[string]*bchain.AssetBalance{}
 			}
-			for assetGuid, assetBalance := range ad.balance.AssetBalances {
+			for guid, assetBalance := range ad.balance.AssetBalances {
+				assetGuid, err := strconv.ParseUint(guid, 10, 64)
+				if err != nil {
+					return false, err
+				}
 				bhaToken, ok := data.Tokens[assetGuid];
 				if !ok {
 					bhaToken = &bchain.AssetBalance{Transfers: 0, SentSat: big.NewInt(0), BalanceSat: big.NewInt(0)}
