@@ -671,7 +671,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 						if a.AssetInfo != nil {
 							assetGuid, err := strconv.ParseUint(a.AssetInfo.AssetGuid, 10, 64)
 							if err != nil {
-								return nil, err
+								return utxoRes, err
 							}
 							baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
 							dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)

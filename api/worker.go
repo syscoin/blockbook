@@ -1829,7 +1829,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 		if a.AssetInfo != nil {
 			assetGuid, err := strconv.ParseUint(a.AssetInfo.AssetGuid, 10, 64)
 			if err != nil {
-				return nil, err
+				return utxoRes, err
 			}
 			baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
 			dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
