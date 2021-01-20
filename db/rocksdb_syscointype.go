@@ -181,8 +181,7 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 			dBAsset = &bchain.Asset{Transactions: 0, AssetObj: dBBaseAsset.AssetObj}
 			dBAsset.AssetObj.TotalSupply = int64(0)
 			dBAsset.AssetObj.MaxSupply = dBBaseAsset.AssetObj.MaxSupply
-		}
-		else if !isActivate {
+		} else if !isActivate {
 			return errors.New(fmt.Sprint("ConnectAllocationOutput could not read asset " , assetInfo.AssetGuid))
 		}
 	}
