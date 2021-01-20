@@ -609,7 +609,11 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 			}
 		}
 		ahi.Addresses = ads
-		dbAsset, errAsset := s.db.GetAsset(assetGuid, nil)
+		assetGuidInt, err := strconv.ParseUint(assetGuid, 10, 64)
+		if err != nil {
+			return res, err
+		}
+		dbAsset, errAsset := s.db.GetAsset(assetGuidInt, nil)
 		if errAsset != nil || dbAsset == nil {
 			if err == nil{
 				return res, errors.New("getAssetHistory Asset not found")
@@ -623,7 +627,7 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 		ahi.Satoshis = totalSat.Int64()
 		ahi.Tx = txToResTx(tx)
 		res.Result.AssetDetails =	&api.AssetSpecific{
-			AssetGuid:		strconv.FormatUint(assetGuid, 10),
+			AssetGuid:		assetGuid,
 			Symbol:			string(dbAsset.AssetObj.Symbol),
 			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
