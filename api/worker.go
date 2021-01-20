@@ -1520,10 +1520,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					if bh.Tokens == nil {
 						bh.Tokens = map[string]*TokenBalanceHistory{}
 					}
-					assetGuid, err := strconv.ParseUint(tai.AssetInfo.AssetGuid, 10, 64)
-					if err != nil {
-						return nil, err
-					}
+					assetGuid := strconv.FormatUint(tai.AssetInfo.AssetGuid, 10)
 					bhaToken, ok := bh.Tokens[assetGuid];
 					if !ok {
 						bhaToken = &TokenBalanceHistory{SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
@@ -1541,10 +1538,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 					if bh.Tokens == nil {
 						bh.Tokens = map[string]*TokenBalanceHistory{}
 					}
-					assetGuid, err := strconv.ParseUint(tao.AssetInfo.AssetGuid, 10, 64)
-					if err != nil {
-						return nil, err
-					}
+					assetGuid := strconv.FormatUint(tao.AssetInfo.AssetGuid, 10)
 					bhaToken, ok := bh.Tokens[assetGuid];
 					if !ok {
 						bhaToken = &TokenBalanceHistory{SentSat: &bchain.Amount{}, ReceivedSat: &bchain.Amount{}}
