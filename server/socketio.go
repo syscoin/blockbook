@@ -285,7 +285,7 @@ func (s *SocketIoServer) getAssetTxids(asset string, opts *assetOpts) (res resul
 	txids := make([]string, 0, 8)
 	lower, higher := uint32(opts.End), uint32(opts.Start)
 	assetBitMask := opts.AssetsMask
-	assetGuid, err := strconv.ParseUInt(asset, 10, 64)
+	assetGuid, err := strconv.ParseUint(asset, 10, 64)
 	if err != nil {
 		return res, err
 	}
@@ -547,7 +547,7 @@ func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res res
 	}
 	ahi := addressHistoryItem{}
 	ahi.Tokens = map[uint64]*api.TokenBalanceHistory{}
-	assetGuid, errAG := strconv.ParseUInt(asset, 10, 64)
+	assetGuid, errAG := strconv.ParseUint(asset, 10, 64)
 	if errAG != nil {
 		return res, errAG
 	}

@@ -637,7 +637,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 	
 	utxoRes.Utxos = make([]Utxo, 0, 8)
 	assets := make([]*AssetSpecific, 0, 0)
-	assetsMap := make(map[uint32]bool, 0)
+	assetsMap := make(map[uint64]bool, 0)
 	for ci, da := range [][]xpubAddress{data.addresses, data.changeAddresses} {
 		for i := range da {
 			ad := &da[i]
@@ -669,7 +669,11 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 					for j := range utxos {
 						a := &utxos[j]
 						if a.AssetInfo != nil {
-							baseAssetGuid := w.db.GetBaseAssetID(a.AssetInfo.AssetGuid)
+							assetGuid, err := strconv.ParseUint(a.AssetInfo.AssetGuid, 10, 64)
+							if err != nil {
+								return nil, err
+							}
+							baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
 							dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
 							if errAsset != nil || dbAsset == nil {
 								return utxoRes, errAsset

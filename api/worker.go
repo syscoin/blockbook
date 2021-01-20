@@ -1340,7 +1340,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		totalResults             int
 	)
 	var err error
-	assetGuid, err := strconv.ParseUInt(asset, 10, 64)
+	assetGuid, err := strconv.ParseUint(asset, 10, 64)
 	if err != nil {
 		return nil, err
 	}
@@ -1813,7 +1813,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 		return utxoRes, NewAPIError("Not supported", true)
 	}
 	assets := make([]*AssetSpecific, 0, 0)
-	assetsMap := make(map[uint32]bool, 0)
+	assetsMap := make(map[uint64]bool, 0)
 	start := time.Now()
 	addrDesc, err := w.chainParser.GetAddrDescFromAddress(address)
 	if err != nil {
@@ -1827,7 +1827,11 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 	for j := range utxoRes.Utxos {
 		a := &utxoRes.Utxos[j]
 		if a.AssetInfo != nil {
-			baseAssetGuid := w.db.GetBaseAssetID(a.AssetInfo.AssetGuid)
+			assetGuid, err := strconv.ParseUint(a.AssetInfo.AssetGuid, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
 			dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
 			if errAsset != nil || dbAsset == nil {
 				return utxoRes, errAsset
