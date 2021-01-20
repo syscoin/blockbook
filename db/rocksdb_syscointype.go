@@ -197,7 +197,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 			return err
 		}
 		if dBAsset == nil {
-			return errors.New(fmt.Sprint("ConnectAssetOutput could not read asset " , assetGuid))
+			return errors.New(fmt.Sprint("ConnectAssetOutput: could not read asset " , assetGuid))
 		}
 	} else {
 		dBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj}
@@ -211,18 +211,12 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 		} else if isAssetSendTx {
 			// tally total amount and subtract from asset
 			valueSatOut := int64(0)
-			for _, v := range asset.AssetObj.Allocation.VoutAssets[0].Values {
-				valueSatOut += v.ValueSat
-			}
-			valueSatIn, e := mapAssetsIn[assetGuid]
-			if !e {
-				return errors.New(fmt.Sprint("ConnectAssetOutput asset input not found " , assetGuid))
-			}
+			valueSatIn := int64(0)	
 
 			// track in/out amounts and add to total for any NFT inputs+outputs
 			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
 				baseAssetGuid := d.GetBaseAssetID(voutAsset.AssetGuid)
-				if voutAsset.AssetGuid != assetGuid && baseAssetGuid == assetGuid {
+				if baseAssetGuid == assetGuid {
 					valueSatOutNFT := int64(0)
 					// add all output amounts that match the base asset of the first output
 					for _, value := range voutAsset.Values {
@@ -236,19 +230,28 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 					} else {
 						valueSatInNFT = int64(0)
 					}
-					valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
-					// get the NFT asset from asset DB or create new one if doesn't exist
-					nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
-					if err == nil && nftDBAsset == nil {
-						nftDBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj}
-						nftDBAsset.AssetObj.TotalSupply = int64(0)
-						nftDBAsset.AssetObj.MaxSupply = valueDiffNFT
+					if voutAsset.AssetGuid != assetGuid {
+						valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
+						if valueDiffNFT < 0 {
+							return errors.New(fmt.Sprint("ConnectAssetOutput: valueDiffNFT < 0 " , valueDiffNFT))
+						}
+						// get the NFT asset from asset DB or create new one if doesn't exist
+						nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
+						if err != nil || nftDBAsset == nil {
+							nftDBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj}
+							nftDBAsset.AssetObj.TotalSupply = int64(0)
+							nftDBAsset.AssetObj.MaxSupply = asset.AssetObj.MaxSupply
+						}
+						nftDBAsset.AssetObj.TotalSupply += valueDiffNFT
+						assets[voutAsset.AssetGuid] = nftDBAsset
 					}
-					nftDBAsset.AssetObj.TotalSupply += valueDiffNFT
-					assets[voutAsset.AssetGuid] = nftDBAsset
 				}
 			}
-			dBAsset.AssetObj.TotalSupply += (valueSatOut - valueSatIn)
+			valueDiff := (valueSatOut - valueSatIn)
+			if valueDiff < 0 {
+				return errors.New(fmt.Sprint("ConnectAssetOutput: valueDiff < 0 " , valueDiff))
+			}
+			dBAsset.AssetObj.TotalSupply += valueDiff
 			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_SUPPLY
 		} 
 		assets[assetGuid] = dBAsset
@@ -292,16 +295,58 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 	}
 	if !isActivate {
 		if isAssetSendTx {
-			// tally total amount and add to asset
+			// tally total amount and subtract from asset
 			valueSatOut := int64(0)
-			for _, v := range asset.AssetObj.Allocation.VoutAssets[0].Values {
-				valueSatOut += v.ValueSat
+			valueSatIn := int64(0)	
+
+			// track in/out amounts and add to total for any NFT inputs+outputs
+			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
+				baseAssetGuid := d.GetBaseAssetID(voutAsset.AssetGuid)
+				if baseAssetGuid == assetGuid {
+					valueSatOutNFT := int64(0)
+					// add all output amounts that match the base asset of the first output
+					for _, value := range voutAsset.Values {
+						valueSatOutNFT += value.ValueSat
+					}
+					valueSatOut += valueSatOutNFT
+					// if any inputs from this NFT asset were used add them as input amount
+					valueSatInNFT, e := mapAssetsIn[voutAsset.AssetGuid]
+					if e {
+						valueSatIn += valueSatInNFT
+					} else {
+						valueSatInNFT = int64(0)
+					}
+					if voutAsset.AssetGuid != assetGuid {
+						valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
+						if valueDiffNFT < 0 {
+							glog.Warningf("DisconnectAssetOutput valueDiffNFT is negative %v, setting to 0...", valueDiffNFT)
+							valueDiffNFT = 0
+						}
+						// get the NFT asset from asset DB or create new one if doesn't exist
+						nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
+						if nftDBAsset == nil || err != nil {
+							if nftDBAsset == nil {
+								return errors.New(fmt.Sprint("DisconnectAssetOutput could not read NFT asset " , voutAsset.AssetGuid))
+							}
+							return err
+						}
+						nftDBAsset.AssetObj.TotalSupply -= valueDiffNFT
+						if nftDBAsset.AssetObj.TotalSupply < 0 {
+							glog.Warningf("DisconnectAssetOutput total nft supply is negative %v, setting to -1...", nftDBAsset.AssetObj.TotalSupply)
+							nftDBAsset.AssetObj.TotalSupply = -1
+						} else nftDBAsset.AssetObj.TotalSupply == 0 {
+							nftDBAsset.AssetObj.TotalSupply = -1
+						}
+						assets[voutAsset.AssetGuid] = nftDBAsset
+					}
+				}
 			}
-			valueSatIn, e := mapAssetsIn[assetGuid]
-			if !e {
-				return errors.New(fmt.Sprint("DisconnectAssetOutput asset input not found " , assetGuid))
+			valueDiff := (valueSatOut - valueSatIn)
+			if valueDiff < 0 {
+				glog.Warningf("DisconnectAssetOutput valueDiff is negative %v, setting to 0...", valueDiff)
+				valueDiff = 0
 			}
-			dBAsset.AssetObj.TotalSupply -= (valueSatOut - valueSatIn)
+			dBAsset.AssetObj.TotalSupply -= valueDiff
 			if dBAsset.AssetObj.TotalSupply < 0 {
 				glog.Warningf("DisconnectAssetOutput total supply is negative %v, setting to 0...", dBAsset.AssetObj.TotalSupply)
 				dBAsset.AssetObj.TotalSupply = 0
