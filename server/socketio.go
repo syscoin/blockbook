@@ -533,11 +533,7 @@ func (s *SocketIoServer) getAddressHistory(addr []string, opts *addrOpts) (res r
 	}
 	return
 }
-func (s *SocketIoServer) getAssetHistory(asset string, opts *assetOpts) (res resultGetAssetHistory, err error) {
-	assetGuid, err := strconv.ParseUint(asset, 10, 64)
-	if err != nil {
-		return res, err
-	}
+func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res resultGetAssetHistory, err error) {
 	txr, err := s.getAssetTxids(assetGuid, opts)
 	if err != nil {
 		return res, err
