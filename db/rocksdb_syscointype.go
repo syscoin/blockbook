@@ -168,8 +168,23 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 	if !isActivate && err != nil {
 		return err
 	}
-	if !isActivate && dBAsset == nil {
-		return errors.New(fmt.Sprint("ConnectAllocationOutput could not read asset " , assetInfo.AssetGuid))
+	if dBAsset == nil {
+		baseAssetGuid := d.GetBaseAssetID(assetInfo.AssetGuid)
+		// if asset send to NFT output, create the asset if it doesn't exist
+		// it will update total supply of asset based on how much was issued in ConnectAssetOutput, for now we initialize the supply as 0
+		if isAssetSentTx && baseAssetGuid != assetInfo.AssetGuid {
+			// get base asset which should exist
+			dBBaseAsset, err := d.GetAsset(baseAssetGuid, assets)
+			if err != nil {
+				return err
+			}
+			dBAsset = &bchain.Asset{Transactions: 0, AssetObj: dBBaseAsset.AssetObj}
+			dBAsset.AssetObj.TotalSupply = int64(0)
+			dBAsset.AssetObj.MaxSupply = dBBaseAsset.AssetObj.MaxSupply
+		}
+		else if !isActivate {
+			return errors.New(fmt.Sprint("ConnectAllocationOutput could not read asset " , assetInfo.AssetGuid))
+		}
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
@@ -238,9 +253,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 						// get the NFT asset from asset DB or create new one if doesn't exist
 						nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
 						if err != nil || nftDBAsset == nil {
-							nftDBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj}
-							nftDBAsset.AssetObj.TotalSupply = int64(0)
-							nftDBAsset.AssetObj.MaxSupply = asset.AssetObj.MaxSupply
+							return errors.New(fmt.Sprint("ConnectAssetOutput: could not read NFT asset " , assetGuid))
 						}
 						nftDBAsset.AssetObj.TotalSupply += valueDiffNFT
 						assets[voutAsset.AssetGuid] = nftDBAsset
