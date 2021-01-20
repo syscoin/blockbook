@@ -23,9 +23,9 @@
     "package_revision": "satoshilabs-1",
     "system_user": "syscoin",
     "version": "4.2.0.1",
-    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.2.0rc1/syscoin-4.2.0rc1-x86_64-linux-gnu.tar.gz",
+    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.2.0rc2/syscoin-4.2.0rc2-x86_64-linux-gnu.tar.gz",
     "verification_type": "gpg-sha256",
-    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v4.2.0rc1/SHA256SUMS.asc",
+    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v4.2.0rc2/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
