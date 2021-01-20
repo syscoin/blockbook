@@ -334,7 +334,7 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 						if nftDBAsset.AssetObj.TotalSupply < 0 {
 							glog.Warningf("DisconnectAssetOutput total nft supply is negative %v, setting to -1...", nftDBAsset.AssetObj.TotalSupply)
 							nftDBAsset.AssetObj.TotalSupply = -1
-						} else nftDBAsset.AssetObj.TotalSupply == 0 {
+						} else if nftDBAsset.AssetObj.TotalSupply == 0 {
 							nftDBAsset.AssetObj.TotalSupply = -1
 						}
 						assets[voutAsset.AssetGuid] = nftDBAsset
