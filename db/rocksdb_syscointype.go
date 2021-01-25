@@ -227,7 +227,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 			// tally total amount and subtract from asset
 			valueSatOut := int64(0)
 			valueSatIn := int64(0)	
-
+			var e error
 			// track in/out amounts and add to total for any NFT inputs+outputs
 			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
 				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
@@ -311,7 +311,7 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 			// tally total amount and subtract from asset
 			valueSatOut := int64(0)
 			valueSatIn := int64(0)	
-
+			var e error
 			// track in/out amounts and add to total for any NFT inputs+outputs
 			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
 				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
