@@ -233,17 +233,16 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
 				if baseAssetInternal == baseAssetGuid {
 					valueSatOutNFT := int64(0)
+					valueSatInNFT := int64(0)
 					// add all output amounts that match the base asset of the first output
 					for _, value := range voutAsset.Values {
 						valueSatOutNFT += value.ValueSat
 					}
 					valueSatOut += valueSatOutNFT
 					// if any inputs from this NFT asset were used add them as input amount
-					valueSatInNFT, e := mapAssetsIn[voutAsset.AssetGuid]
+					valueSatInNFT, e = mapAssetsIn[voutAsset.AssetGuid]
 					if e {
 						valueSatIn += valueSatInNFT
-					} else {
-						valueSatInNFT = int64(0)
 					}
 					if voutAsset.AssetGuid != baseAssetGuid {
 						valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
@@ -318,17 +317,16 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
 				if baseAssetInternal == baseAssetGuid {
 					valueSatOutNFT := int64(0)
+					valueSatInNFT := int64(0)
 					// add all output amounts that match the base asset of the first output
 					for _, value := range voutAsset.Values {
 						valueSatOutNFT += value.ValueSat
 					}
 					valueSatOut += valueSatOutNFT
 					// if any inputs from this NFT asset were used add them as input amount
-					valueSatInNFT, e := mapAssetsIn[voutAsset.AssetGuid]
+					valueSatInNFT, e = mapAssetsIn[voutAsset.AssetGuid]
 					if e {
 						valueSatIn += valueSatInNFT
-					} else {
-						valueSatInNFT = int64(0)
 					}
 					if voutAsset.AssetGuid != baseAssetGuid {
 						valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
@@ -488,7 +486,7 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	}
 	// nil data means the key was not found in DB
 	if val.Data() == nil {
-		return &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}, nil
+		return nil, nil
 	}
 	defer val.Free()
 	buf := val.Data()

@@ -1345,7 +1345,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		return nil, err
 	}
 	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
-	if errAsset != nil || dbAsset == nil || dbAsset.Transactions == 0 {
+	if errAsset != nil || dbAsset == nil {
 		return nil, NewAPIError("Asset not found", true)
 	}
 	// totalResults is known only if there is no filter
