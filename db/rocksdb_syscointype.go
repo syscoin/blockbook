@@ -225,27 +225,20 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 			}
 		} else if isAssetSendTx {
 			// tally total amount and subtract from asset
-			valueSatOut := int64(0)
-			valueSatIn := int64(0)
 			valueDiff := int64(0)
-			var e bool
 			// track in/out amounts and add to total for any NFT inputs+outputs
 			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
 				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
 				if baseAssetInternal == baseAssetGuid {
-					valueSatOutNFT := int64(0)
-					valueSatInNFT := int64(0)
+					valueSatOut := int64(0)
+					valueSatIn := int64(0)
 					// add all output amounts that match the base asset of the first output
 					for _, value := range voutAsset.Values {
-						valueSatOutNFT += value.ValueSat
+						valueSatOut += value.ValueSat
 					}
-					valueSatOut += valueSatOutNFT
 					// if any inputs from this NFT asset were used add them as input amount
-					valueSatInNFT, e = mapAssetsIn[voutAsset.AssetGuid]
-					if e {
-						valueSatIn += valueSatInNFT
-					}
-					valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
+					valueSatIn, _ = mapAssetsIn[voutAsset.AssetGuid]
+					valueDiffNFT := (valueSatOut - valueSatIn)
 					valueDiff += valueDiffNFT
 					if voutAsset.AssetGuid != baseAssetGuid {
 						// get the NFT asset from asset DB or create new one if doesn't exist
@@ -309,28 +302,20 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 	}
 	if !isActivate {
 		if isAssetSendTx {
-			// tally total amount and subtract from asset
-			valueSatOut := int64(0)
-			valueSatIn := int64(0)	
-			var e bool
 			// track in/out amounts and add to total for any NFT inputs+outputs
 			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
 				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
 				if baseAssetInternal == baseAssetGuid {
-					valueSatOutNFT := int64(0)
-					valueSatInNFT := int64(0)
+					valueSatOut := int64(0)
+					valueSatIn := int64(0)
 					valueDiff := int64(0)
 					// add all output amounts that match the base asset of the first output
 					for _, value := range voutAsset.Values {
-						valueSatOutNFT += value.ValueSat
+						valueSatOut += value.ValueSat
 					}
-					valueSatOut += valueSatOutNFT
 					// if any inputs from this NFT asset were used add them as input amount
-					valueSatInNFT, e = mapAssetsIn[voutAsset.AssetGuid]
-					if e {
-						valueSatIn += valueSatInNFT
-					}
-					valueDiffNFT := (valueSatOutNFT - valueSatInNFT)
+					valueSatIn, _ = mapAssetsIn[voutAsset.AssetGuid]
+					valueDiffNFT := (valueSatOut - valueSatIn)
 					valueDiff += valueDiffNFT
 					if voutAsset.AssetGuid != baseAssetGuid {
 						// get the NFT asset from asset DB or create new one if doesn't exist
