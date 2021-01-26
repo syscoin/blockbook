@@ -647,7 +647,7 @@ func isNFT(guid string) bool {
 	var err error
 	assetGuid, err := strconv.ParseUint(guid, 10, 64)
 	if err != nil {
-		return 0
+		return false
 	}
 	return (assetGuid >> 32) > 0
 }
