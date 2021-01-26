@@ -204,15 +204,14 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAssetTx bool, isAssetSendTx bool, assets map[uint64]*bchain.Asset, mapAssetsIn bchain.AssetsMap) error {
 	var dBAsset* bchain.Asset = nil
 	var err error
-	assetGuid := asset.AssetObj.Allocation.VoutAssets[0].AssetGuid
-	baseAssetGuid := d.GetBaseAssetID(assetGuid)
+	baseAssetGuid := d.GetBaseAssetID(asset.AssetObj.Allocation.VoutAssets[0].AssetGuid)
 	if !isActivate {
-		dBAsset, err = d.GetAsset(assetGuid, assets)
+		dBAsset, err = d.GetAsset(baseAssetGuid, assets)
 		if  err != nil {
 			return err
 		}
 		if dBAsset == nil {
-			return errors.New(fmt.Sprint("ConnectAssetOutput: could not read asset " , assetGuid))
+			return errors.New(fmt.Sprint("ConnectAssetOutput: could not read asset " , baseAssetGuid))
 		}
 	} else {
 		dBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj}
@@ -244,7 +243,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 						// get the NFT asset from asset DB or create new one if doesn't exist
 						nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
 						if err != nil || nftDBAsset == nil {
-							return errors.New(fmt.Sprint("ConnectAssetOutput: could not read NFT asset " , assetGuid))
+							return errors.New(fmt.Sprint("ConnectAssetOutput: could not read NFT asset " , voutAsset.AssetGuid))
 						}
 						nftDBAsset.AssetObj.TotalSupply += valueDiffNFT
 						if nftDBAsset.AssetObj.TotalSupply <= 0 {
@@ -260,7 +259,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 			}
 			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_SUPPLY
 		} 
-		assets[assetGuid] = dBAsset
+		assets[baseAssetGuid] = dBAsset
 	} else {
 		return errors.New("ConnectSyscoinOutput: asset not found")
 	}
@@ -291,12 +290,11 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 	return nil
 }
 func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, isAssetSendTx bool, assets map[uint64]*bchain.Asset, mapAssetsIn bchain.AssetsMap) error {
-	assetGuid := asset.AssetObj.Allocation.VoutAssets[0].AssetGuid
-	baseAssetGuid :=  d.GetBaseAssetID(assetGuid)
-	dBAsset, err := d.GetAsset(assetGuid, assets)
+	baseAssetGuid :=  d.GetBaseAssetID(asset.AssetObj.Allocation.VoutAssets[0].AssetGuid)
+	dBAsset, err := d.GetAsset(baseAssetGuid, assets)
 	if dBAsset == nil || err != nil {
 		if dBAsset == nil {
-			return errors.New(fmt.Sprint("DisconnectAssetOutput could not read asset " , assetGuid))
+			return errors.New(fmt.Sprint("DisconnectAssetOutput could not read asset " , baseAssetGuid))
 		}
 		return err
 	}
@@ -352,7 +350,7 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 		// signals for removal from asset db
 		dBAsset.AssetObj.TotalSupply = -1
 	}
-	assets[assetGuid] = dBAsset
+	assets[baseAssetGuid] = dBAsset
 	return nil
 }
 func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, balanceAsset *bchain.AssetBalance,  btxID []byte, assetInfo *bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, assetFoundInTx func(asset uint64, btxID []byte) bool) error {
