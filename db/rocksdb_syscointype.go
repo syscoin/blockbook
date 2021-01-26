@@ -302,13 +302,13 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 	}
 	if !isActivate {
 		if isAssetSendTx {
+			valueDiff := int64(0)
 			// track in/out amounts and add to total for any NFT inputs+outputs
 			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
 				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
 				if baseAssetInternal == baseAssetGuid {
 					valueSatOut := int64(0)
 					valueSatIn := int64(0)
-					valueDiff := int64(0)
 					// add all output amounts that match the base asset of the first output
 					for _, value := range voutAsset.Values {
 						valueSatOut += value.ValueSat
