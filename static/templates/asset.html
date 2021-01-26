@@ -8,6 +8,14 @@
     <div class="col-lg-10">
         <table class="table data-table">
             <tbody>
+                {{- if isNFTID $asset.AssetDetails.AssetGuid -}}
+                <tr>
+                    <td>NFT ID</td>
+                    <td class="data">{{formatNFTID $asset.AssetDetails.AssetGuid}}</td>
+                    <td>Base Asset GUID</td>
+                    <td class="data"><a href="/asset/{{formatBaseAssetID $asset.AssetDetails.AssetGuid}}">{{formatBaseAssetID $asset.AssetDetails.AssetGuid}}</a></td>
+                </tr>
+                {{- end -}}
                 {{- if $asset.AssetDetails.PubData.desc -}}
                 <tr>
                     <td>Description</td>

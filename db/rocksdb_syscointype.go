@@ -444,6 +444,9 @@ func (d *RocksDB) SetSetupAssetCacheFirstTime(cacheVal bool) {
 func (d *RocksDB) GetBaseAssetID(guid uint64) uint64 {
 	return guid & 0xffffffff
 }
+func (d *RocksDB) GetNFTID(guid uint64) uint64 {
+	return guid >> 32
+}
 
 func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchain.Asset, error) {
 	var assetDb *bchain.Asset

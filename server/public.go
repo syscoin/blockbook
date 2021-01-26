@@ -465,6 +465,10 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatKeyID":              s.formatKeyID,
 		"formatDecodeBase64": 		formatDecodeBase64,
 		"formatDecodeBase64ValueStr": formatDecodeBase64ValueStr,
+		"formatNFTID": 				formatNFTID,
+		"formatBaseAssetID": 		formatBaseAssetID,
+		"isNFT":					isNFT,
+
 	}
 	var createTemplate func(filenames ...string) *template.Template
 	if s.debug {
@@ -566,6 +570,26 @@ func ToString(value interface{}) string {
     }
 }
 
+func formatNFTID(value interface{}) uint64 {
+	asset := ToString(value)
+	var err error
+	assetGuid, err := strconv.ParseUint(asset, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return assetGuid >> 32
+}
+
+func formatBaseAssetID(value interface{}) uint64 {
+	asset := ToString(value)
+	var err error
+	assetGuid, err := strconv.ParseUint(asset, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return assetGuid & 0xffffffff
+}
+
 func formatDecodeBase64(value interface{}) string {
 	a := ToString(value)
 	var pubData string
@@ -617,6 +641,15 @@ func isAssetUpdateCapabilityFlagSet(td *TemplateData, f string, mask uint8) bool
 		}
 	}
 	return false
+}
+
+func isNFT(guid string) bool {
+	var err error
+	assetGuid, err := strconv.ParseUint(guid, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return (assetGuid >> 32) > 0
 }
 
 // called from template to support txdetail.html functionality
