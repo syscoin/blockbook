@@ -282,7 +282,20 @@ func (p *SyscoinParser) GetSPTDataFromDesc(addrDesc *bchain.AddressDescriptor) (
 	return sptData, nil
 }
 
-
+func (p *SyscoinParser) GetAssetFromVout(vout []Vout) (*bchain.Asset, error) {
+	var addrDesc bchain.AddressDescriptor
+	var err error
+	for _, output := range vout {
+		addrDesc, err = p.GetAddrDescFromVout(&output)
+		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
+			continue
+		}
+		if addrDesc[0] == txscript.OP_RETURN {
+			break
+		}
+	}
+	return p.GetAssetFromDesc(&addrDesc)
+}
 func (p *SyscoinParser) GetAssetFromDesc(addrDesc *bchain.AddressDescriptor) (*bchain.Asset, error) {
 	sptData, err := p.GetSPTDataFromDesc(addrDesc)
 	if err != nil {

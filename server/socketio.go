@@ -615,10 +615,10 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 		}
 		dbAsset, errAsset := s.db.GetAsset(assetGuidInt, nil)
 		if errAsset != nil || dbAsset == nil {
-			if err == nil{
-				return res, errors.New("getAssetHistory Asset not found")
+			dbAsset, errAsset = s.chainParser.GetAssetFromVouts(tx.Vout)
+			if errAsset != nil || dbAsset == nil {
+				return nil, errAsset
 			}
-			return res, errAsset
 		}
 		if len(ahi.Tokens) <= 0 {
 			ahi.Tokens = nil
