@@ -282,7 +282,7 @@ func (p *SyscoinParser) GetSPTDataFromDesc(addrDesc *bchain.AddressDescriptor) (
 	return sptData, nil
 }
 
-func (p *SyscoinParser) GetAssetFromVout(vout []Vout) (*bchain.Asset, error) {
+func (p *SyscoinParser) GetAssetFromVout(vout []bchain.Vout) (*bchain.Asset, error) {
 	var addrDesc bchain.AddressDescriptor
 	var err error
 	for _, output := range vout {
