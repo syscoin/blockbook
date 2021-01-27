@@ -20,6 +20,7 @@ import (
 	"github.com/syscoin/blockbook/bchain/coins/eth"
 	"github.com/syscoin/blockbook/common"
 	"github.com/syscoin/blockbook/db"
+	"github.com/syscoin/btcd/wire"
 )
 
 // Worker is handle to api worker
@@ -495,7 +496,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			if !ok {
 				dbAsset, errAsset := w.db.GetAsset(bchainVout.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
-					dbAsset, errAsset = w.chainParser.GetAssetFromVouts(mempoolTx.Vout)
+					dbAsset, errAsset = w.chainParser.GetAssetFromVout(mempoolTx.Vout)
 					if errAsset != nil || dbAsset == nil {
 						return nil, errAsset
 					}

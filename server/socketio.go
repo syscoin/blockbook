@@ -615,7 +615,7 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 		}
 		dbAsset, errAsset := s.db.GetAsset(assetGuidInt, nil)
 		if errAsset != nil || dbAsset == nil {
-			dbAsset, errAsset = s.chainParser.GetAssetFromVouts(tx.Vout)
+			dbAsset, errAsset = s.chainParser.GetAssetFromVout(tx.Vout)
 			if errAsset != nil || dbAsset == nil {
 				return nil, errAsset
 			}

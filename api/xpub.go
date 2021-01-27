@@ -14,6 +14,7 @@ import (
 
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/db"
+	"github.com/syscoin/btcd/wire"
 )
 
 const defaultAddressesGap = 20
