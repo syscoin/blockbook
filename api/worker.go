@@ -230,7 +230,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 						}
 						tts, ok := mapTTS[baseAssetGuid]
 						if !ok {
-							dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+							dbAsset, errAsset := w.db.GetAsset((uint64)(baseAssetGuid), nil)
 							if errAsset != nil || dbAsset == nil {
 								dbAsset, errAsset = w.chainParser.GetAssetFromVout(bchainTx.Vout)
 								if errAsset != nil || dbAsset == nil {
@@ -283,7 +283,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			}
 			tts, ok := mapTTS[baseAssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset((uint64)(baseAssetGuid), nil)
 				if errAsset != nil || dbAsset == nil {
 					dbAsset, errAsset = w.chainParser.GetAssetFromVout(bchainTx.Vout)
 					if errAsset != nil || dbAsset == nil {
@@ -446,7 +446,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 					}
 					tts, ok := mapTTS[baseAssetGuid]
 					if !ok {
-						dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+						dbAsset, errAsset := w.db.GetAsset((uint64)(baseAssetGuid), nil)
 						if errAsset != nil || dbAsset == nil {
 							dbAsset, errAsset = w.chainParser.GetAssetFromVout(mempoolTx.Vout)
 							if errAsset != nil || dbAsset == nil {
@@ -498,7 +498,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			}
 			tts, ok := mapTTS[baseAssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset((uint64)(baseAssetGuid), nil)
 				if errAsset != nil || dbAsset == nil {
 					dbAsset, errAsset = w.chainParser.GetAssetFromVout(mempoolTx.Vout)
 					if errAsset != nil || dbAsset == nil {
@@ -780,7 +780,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			}
 			tts, ok := mapTTS[baseAssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset((uint64)(baseAssetGuid), nil)
 				if errAsset != nil || dbAsset == nil {
 					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 				}
@@ -818,7 +818,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			}
 			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
 			if !ok {
-				dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset((uint64)(baseAssetGuid), nil)
 				if errAsset != nil || dbAsset == nil {
 					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 				}
