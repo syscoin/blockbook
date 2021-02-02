@@ -35,7 +35,11 @@
                     <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.TotalSupply $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
+                    {{- if isNFT $asset.AssetDetails.AssetGuid -}}
+                    <td>Base Asset Max Supply</td>
+                    {{else}}
                     <td>Max Supply</td>
+                    {{- end -}}
                     <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
                 </tr>
                 <tr>
