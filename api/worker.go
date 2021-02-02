@@ -816,7 +816,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			if mapTTS == nil {
 				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
 			}
-			tts, ok := mapTTS[vout.AssetInfo.AssetGuid]
+			tts, ok := mapTTS[baseAssetGuid]
 			if !ok {
 				dbAsset, errAsset := w.db.GetAsset((uint64)(baseAssetGuid), nil)
 				if errAsset != nil || dbAsset == nil {
