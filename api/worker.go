@@ -224,7 +224,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 				if vin.ValueSat != nil {
 					valInSat.Add(&valInSat, (*big.Int)(vin.ValueSat))
 					if vin.AssetInfo != nil {
-						baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
+						baseAssetGuid := (uint32)(w.db.GetBaseAssetID(assetGuid))
 						if mapTTS == nil {
 							mapTTS = map[uint32]*bchain.TokenTransferSummary{}
 						}
@@ -277,7 +277,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			glog.V(2).Infof("getAddressesFromVout error %v, %v, output %v", err, bchainTx.Txid, bchainVout.N)
 		}
 		if vout.AssetInfo != nil {
-			baseAssetGuid := w.db.GetBaseAssetID(bchainVout.AssetInfo.AssetGuid)
+			baseAssetGuid := (uint32)(w.db.GetBaseAssetID(bchainVout.AssetInfo.AssetGuid))
 			if mapTTS == nil {
 				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
 			}
@@ -440,7 +440,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 					valInSat.Add(&valInSat, (*big.Int)(vin.ValueSat))
 				}
 				if vin.AssetInfo != nil {
-					baseAssetGuid := w.db.GetBaseAssetID(bchainVin.AssetInfo.AssetGuid)
+					baseAssetGuid := (uint32)(w.db.GetBaseAssetID(bchainVin.AssetInfo.AssetGuid))
 					if mapTTS == nil {
 						mapTTS = map[uint32]*bchain.TokenTransferSummary{}
 					}
@@ -492,7 +492,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			vout.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(bchainVout.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(bchainVout.AssetInfo.ValueSat)}
 		}
 		if vout.AssetInfo != nil {
-			baseAssetGuid := w.db.GetBaseAssetID(bchainVout.AssetInfo.AssetGuid)
+			baseAssetGuid := (uint32)(w.db.GetBaseAssetID(bchainVout.AssetInfo.AssetGuid))
 			if mapTTS == nil {
 				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
 			}
@@ -774,7 +774,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			vin.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(tai.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(tai.AssetInfo.ValueSat)}
 		}
 		if vin.AssetInfo != nil {
-			baseAssetGuid := w.db.GetBaseAssetID(tai.AssetInfo.AssetGuid)
+			baseAssetGuid := (uint32)(w.db.GetBaseAssetID(tai.AssetInfo.AssetGuid))
 			if mapTTS == nil {
 				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
 			}
@@ -812,7 +812,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			vout.AssetInfo = &AssetInfo{AssetGuid: strconv.FormatUint(tao.AssetInfo.AssetGuid, 10), ValueSat: (*bchain.Amount)(tao.AssetInfo.ValueSat)}
 		}
 		if vout.AssetInfo != nil {
-			baseAssetGuid := w.db.GetBaseAssetID(tao.AssetInfo.AssetGuid)
+			baseAssetGuid := (uint32)(w.db.GetBaseAssetID(tao.AssetInfo.AssetGuid))
 			if mapTTS == nil {
 				mapTTS = map[uint32]*bchain.TokenTransferSummary{}
 			}
