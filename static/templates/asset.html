@@ -79,8 +79,8 @@
                             <tbody>
                                 <tr>
                                     <th>Address</th>
-                                    <th>Bound</th>
-                                    <th>Percentage</th>
+                                    <th class="right">Bound</th>
+                                    <th class="right">Percentage</th>
                                 </tr>
                                 {{- range $f := $asset.AssetDetails.AuxFeeDetails.AuxFees -}}{{- if $f -}}
                                 <tr>
@@ -103,8 +103,8 @@
                                 <tr class="ellipsis">
                                     <th>Address</th>
                                     <th>Endpoint</th>
-                                    <th>Instant Transfers</th>
-                                    <th>HD Required</th>
+                                    <th class="center">Instant Transfers</th>
+                                    <th class="center">HD Required</th>
                                 </tr>
                                 <tr>
                                     <td class="data ellipsis"><a href="/address/{{formatKeyID $asset.AssetDetails.NotaryKeyID}}">{{formatKeyID $asset.AssetDetails.NotaryKeyID}}</a></td>
