@@ -76,11 +76,11 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 	var err error
 	complete := true
 	txs := make([]xpubTxid, 0, 4)
-	contract := 0
+	contract := uint64(0)
 	if len(filter.Contract) > 0 {
 		contract, err = strconv.ParseUint(filter.Contract, 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	var callback db.GetTransactionsCallback
@@ -121,7 +121,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 		for _, m := range o {
 			if l, found := uniqueTxs[m.Txid]; !found {
 				l = len(txs)
-				callback(m.Txid, 0, []int32{m.Vout})
+				callback(m.Txid, 0, []uint64{0}, []int32{m.Vout})
 				if len(txs) > l {
 					uniqueTxs[m.Txid] = l
 				}

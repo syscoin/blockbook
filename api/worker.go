@@ -60,7 +60,7 @@ func (w *Worker) getAddressesFromVout(vout *bchain.Vout) (bchain.AddressDescript
 // setSpendingTxToVout is helper function, that finds transaction that spent given output and sets it to the output
 // there is no direct index for the operation, it must be found using addresses -> txaddresses -> tx
 func (w *Worker) setSpendingTxToVout(vout *Vout, txid string, height uint32) error {
-	err := w.db.GetAddrDescTransactions(vout.AddrDesc, height, maxUint32, bchain.AllMask, func(t string, height uint32, indexes []int32) error {
+	err := w.db.GetAddrDescTransactions(vout.AddrDesc, height, maxUint32, bchain.AllMask, func(t string, height uint32, assetGuids []uint64, indexes []int32) error {
 		for _, index := range indexes {
 			// take only inputs
 			if index < 0 {
@@ -613,7 +613,7 @@ func (w *Worker) getTokensFromErc20(erc20 []bchain.Erc20Transfer) []*bchain.Toke
 func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
-	contract := 0
+	contract := uint64(0)
 	if len(filter.Contract) > 0 {
 		contract, err = strconv.ParseUint(filter.Contract, 10, 64)
 		if err != nil {
@@ -622,10 +622,22 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 	}
 	var callback db.GetTransactionsCallback
 	if filter.Vout == AddressFilterVoutOff {
-		callback = func(txid string, height uint32, indexes []int32) error {
-			txids = append(txids, txid)
-			if len(txids) >= maxResults {
-				return &db.StopIteration{}
+		callback = func(txid string, height uint32, assetGuids []uint64, indexes []int32) error {
+			if(contract > 0) {
+				for _, assetGuid := range assetGuids {
+					if (contract == assetGuid) {
+						txids = append(txids, txid)
+						if len(txids) >= maxResults {
+							return &db.StopIteration{}
+						}
+						break
+					}
+				}
+			} else {
+				txids = append(txids, txid)
+				if len(txids) >= maxResults {
+					return &db.StopIteration{}
+				}
 			}
 			return nil
 		}
@@ -669,7 +681,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 		for _, m := range o {
 			if _, found := uniqueTxs[m.Txid]; !found {
 				l := len(txids)
-				callback(m.Txid, 0, []int32{m.Vout})
+				callback(m.Txid, 0, []uint64{0}, []int32{m.Vout})
 				if len(txids) > l {
 					uniqueTxs[m.Txid] = struct{}{}
 				}
