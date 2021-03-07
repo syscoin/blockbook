@@ -76,8 +76,16 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 	var err error
 	complete := true
 	txs := make([]xpubTxid, 0, 4)
+	contract := 0
+	if len(filter.Contract) > 0 {
+		contract, err = strconv.ParseUint(filter.Contract, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var callback db.GetTransactionsCallback
-	callback = func(txid string, height uint32, indexes []int32) error {
+	callback = func(txid string, height uint32, assetGuids []uint64, indexes []int32) error {
+		foundAsset := contract == 0
 		// take all txs in the last found block even if it exceeds maxResults
 		if len(txs) >= maxResults && txs[len(txs)-1].height != height {
 			complete = false
@@ -91,7 +99,17 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				inputOutput |= txOutput
 			}
 		}
-		txs = append(txs, xpubTxid{txid, height, inputOutput})
+		if(!foundAsset) {
+			for _, assetGuid := range assetGuids {
+				if (contract == assetGuid) {
+					foundAsset = true
+					break
+				}
+			}
+		}
+		if(foundAsset) {
+			txs = append(txs, xpubTxid{txid, height, inputOutput})
+		}
 		return nil
 	}
 	if mempool {

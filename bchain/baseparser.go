@@ -407,8 +407,18 @@ func (p *BaseParser) PackUint(i uint32) []byte {
 	return buf
 }
 
+func (p *BaseParser) PackUint64(i uint64) []byte {
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, i)
+	return buf
+}
+
 func (p *BaseParser) UnpackUint(buf []byte) uint32 {
 	return binary.BigEndian.Uint32(buf)
+}
+
+func (p *BaseParser) UnpackUint64(buf []byte) uint64 {
+	return binary.BigEndian.Uint64(buf)
 }
 
 func (p *BaseParser) PackVarint32(i int32, buf []byte) int {

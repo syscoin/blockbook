@@ -627,6 +627,11 @@ func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 			l := p.BaseParser.PackVarint32(index, bvout)
 			buf = append(buf, bvout[:l]...)
 		}
+		l = p.BaseParser.PackVaruint(uint(len(t.Assets)), bvout)
+		buf = append(buf, bvout[:l]...)
+		for _, asset := range t.Assets {
+			buf = append(buf, p.BaseParser.PackUint64(asset)...)
+		}
 	}
 	return buf
 }

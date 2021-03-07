@@ -745,7 +745,6 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 		to = 0
 	}
 	filterParam := r.URL.Query().Get("filter")
-	assetsMask := bchain.AllMask
 	if len(filterParam) > 0 {
 		if filterParam == "inputs" {
 			voutFilter = api.AddressFilterVoutInputs
@@ -757,20 +756,22 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 				voutFilter = api.AddressFilterVoutOff
 			}
 		}
-		if filterParam == "non-tokens" {
-			assetsMask = bchain.BaseCoinMask
-		} else if filterParam == "token-only" {
-			assetsMask = bchain.AssetMask
-		} else if filterParam == "token-transfers" {
-			assetsMask = bchain.AssetAllocationSendMask
-		} else if filterParam == "non-token-transfers" {
-			// everything but allocation send
-			assetsMask = bchain.AssetMask &^ bchain.AssetAllocationSendMask
-		} else {
-			var mask, ec = strconv.Atoi(filterParam)
-			if ec == nil {
-				assetsMask = bchain.AssetsMask(mask)
-			}
+	}
+	assetMaskParam := r.URL.Query().Get("assetMask")
+	assetsMask := bchain.AllMask
+	if assetMaskParam == "non-tokens" {
+		assetsMask = bchain.BaseCoinMask
+	} else if assetMaskParam == "token-only" {
+		assetsMask = bchain.AssetMask
+	} else if assetMaskParam == "token-transfers" {
+		assetsMask = bchain.AssetAllocationSendMask
+	} else if assetMaskParam == "non-token-transfers" {
+		// everything but allocation send
+		assetsMask = bchain.AssetMask &^ bchain.AssetAllocationSendMask
+	} else {
+		var mask, ec = strconv.Atoi(assetMaskParam)
+		if ec == nil {
+			assetsMask = bchain.AssetsMask(mask)
 		}
 	}
 

@@ -308,10 +308,24 @@ The optional query parameters:
 - *filter*: specifies what tokens (xpub addresses/tokens) are returned by the request (default *nonzero*)
     - *inputs*: Return transactions sending inputs to this xpub
     - *outputs*: Return transactions sending outputs to this xpub
-    - *tokens*: Only return token transfers
-    - *0*: Omit all token transfers. Returns only base coin transactions.
-    - *uint32*: Set to the Token GUID (uint32) for coin types such as Syscoin, to filter transactions by that token.  
-- *contract*: return only transactions which affect specified contract (applicable only to Ethereum)
+    - *number*: Return specific vout index
+- *assetMask*: What type of transactions to return (default *all*)
+  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *number* for the masks.
+  - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
+  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
+  - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
+  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of bchain.*token-only* &^ *assetallocationsend*
+  - *number*: Apply a custom mask which is a bitmask of the following values:
+    - *basecoin*: 1
+    - *assetallocationsend*: 2
+    - *syscoinburntoallocation*: 4
+    - *assetallocationburntosyscoin*: 8
+    - *assetallocationburntoethereum*: 16
+    - *assetallocationmint*: 32
+    - *assetupdate*: 64
+    - *assetsend*: 128
+    - *assetactivate*: 256
+- *contract*: return only transactions which affect specified contract or asset (applicable only to Ethereum and Syscoin)
 
 Response:
 
@@ -364,11 +378,26 @@ The optional query parameters:
     - *used*: return addresses/tokens with at least one transaction
     - *derived*: return all derived addresses/tokens
 - *filter*: specifies what tokens (xpub addresses/tokens) are returned by the request (default *nonzero*)
-    - *inputs*: Return transactions sending inputs to this address
-    - *outputs*: Return transactions sending outputs to this address
-    - *tokens*: Only return token transfers
-    - *0*: Omit all token transfers. Returns only base coin transactions. 
-    - *uint32*: Set to the Token GUID (uint32) for coin types such as Syscoin, to filter transactions by that token.  
+    - *inputs*: Return transactions sending inputs to this xpub
+    - *outputs*: Return transactions sending outputs to this xpub
+    - *number*: Return specific vout index
+- *assetMask*: What type of transactions to return (default *all*)
+  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *number* for the masks.
+  - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
+  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
+  - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
+  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of bchain.*token-only* &^ *assetallocationsend*
+  - *number*: Apply a custom mask which is a bitmask of the following values:
+    - *basecoin*: 1
+    - *assetallocationsend*: 2
+    - *syscoinburntoallocation*: 4
+    - *assetallocationburntosyscoin*: 8
+    - *assetallocationburntoethereum*: 16
+    - *assetallocationmint*: 32
+    - *assetupdate*: 64
+    - *assetsend*: 128
+    - *assetactivate*: 256
+- *contract*: return only transactions which affect specified contract or asset (applicable only to Ethereum and Syscoin)
 
 Response:
 
@@ -667,7 +696,7 @@ Example error response (e.g. rate unavailable, incorrect currency...):
 Returns a balance history for the specified XPUB or address.
 
 ```
-GET /api/v2/balancehistory/<XPUB | address>?from=<dateFrom>&to=<dateTo>[&fiatcurrency=<currency>&groupBy=<groupBySeconds>&filter=<token guid>]
+GET /api/v2/balancehistory/<XPUB | address>?from=<dateFrom>&to=<dateTo>[&fiatcurrency=<currency>&groupBy=<groupBySeconds>
 ```
 
 Query parameters:
@@ -677,7 +706,6 @@ Query parameters:
 The optional query parameters:
 - *fiatcurrency*: if specified, the response will contain fiat rate at the time of transaction. If not, all available currencies will be returned.
 - *groupBy*: an interval in seconds, to group results by. Default is 3600 seconds.
-- *filter*: if specified, filter tokens by their GUID or 0 for non-token transfers. Set to the Token GUID (uint32) for coin types such as Syscoin, to filter transactions by that token. Set to 0 to show only non-token related transactions.
 
 Example response (fiatcurrency not specified):
 ```javascript

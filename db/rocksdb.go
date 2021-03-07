@@ -393,6 +393,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 		for len(val) > txIndexUnpackedLen {
 			mask, l := d.chainParser.UnpackTxIndexType(val)
 			maskUint := uint32(mask)
+			assetGuids := make([]uint64, 0)
 			tx, err := d.chainParser.UnpackTxid(val[l:l+txidUnpackedLen])
 			if err != nil {
 				return err
@@ -404,8 +405,14 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 				glog.Warningf("rocksdb: addresses contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
 				break
 			}
+			numAssets, l := d.chainParser.UnpackVaruint(val)
+			val = val[l:]
+			for k := 0; k < numAssets; k++ {
+				assetGuids = append(assetGuids, p.BaseParser.UnpackUint64(val))
+				val = val[8:]
+			}
 			if assetsBitMask == bchain.AllMask || mask == bchain.AllMask || (assetsBitMaskUint & maskUint) == maskUint {
-				if err := fn(tx, height, indexes); err != nil {
+				if err := fn(tx, height, assetGuids, indexes); err != nil {
 					if _, ok := err.(*StopIteration); ok {
 						return nil
 					}
@@ -615,7 +622,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 					ValueSat: output.ValueSat,
 					AssetInfo: tao.AssetInfo,
 				})
-				counted := addToAddressesMap(addresses, strAddrDesc, btxID, int32(i), assetsMask)
+				counted := addToAddressesMap(addresses, strAddrDesc, btxID, int32(i), assetsMask, tao.AssetInfo.AssetGuid)
 				if !counted {
 					balance.Txs++
 				}
@@ -727,7 +734,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				} else {
 					d.cbs.balancesHit++
 				}
-				counted := addToAddressesMap(addresses, strAddrDesc, spendingTxid, ^int32(i), assetsMask)
+				counted := addToAddressesMap(addresses, strAddrDesc, spendingTxid, ^int32(i), assetsMask, spentOutput.AssetInfo.AssetGuid)
 				if !counted {
 					balance.Txs++
 				}
@@ -760,24 +767,38 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 // addToAddressesMap maintains mapping between addresses and transactions in one block
 // the method assumes that outputs in the block are processed before the inputs
 // the return value is true if the tx was processed before, to not to count the tx multiple times
-func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID []byte, index int32, assetsMask bchain.AssetsMask) bool {
+func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID []byte, index int32, assetsMask bchain.AssetsMask, assetGuid uint64) bool {
 	// check that the address was already processed in this block
 	// if not found, it has certainly not been counted
 	at, found := addresses[strAddrDesc]
 	if found {
 		// if the tx is already in the slice, append the index to the array of indexes
 		for i, t := range at {
+			// add asset if set
+			if assetGuid > 0 {
+				// only append if not existing already
+				for assetGuidFound := range t.Assets {
+					if assetGuid == assetGuidFound {
+						foundAsset = true
+						break
+					}
+				}
+				if !foundAsset {
+					t.Assets = append(t.Assets, assetGuid)
+				}
+			}
 			if bytes.Equal(btxID, t.BtxID) {
 				at[i].Indexes = append(t.Indexes, index)
 				return true
 			}
 		}
-	}
+	} 
 
 	addresses[strAddrDesc] = append(at, bchain.TxIndexes{
 		Type:    assetsMask,
 		BtxID:   btxID,
 		Indexes: []int32{index},
+		Assets: []uint64{assetGuid},
 	})
 	return false
 }

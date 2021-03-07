@@ -398,6 +398,8 @@ type TxIndexes struct {
 	BtxID   []byte
 	Indexes []int32
 	Type 	AssetsMask
+	Assets  []uint64
+
 }
 
 // AddressesMap is a map of addresses in a block
@@ -721,6 +723,8 @@ type BlockChainParser interface {
 	// packing/unpacking generic to all chain (expect this to be in baseparser)
 	PackUint(i uint32) []byte
 	UnpackUint(buf []byte) uint32
+	PackUint64(i uint64) []byte
+	UnpackUint64(buf []byte) uint64
 	PackVarint32(i int32, buf []byte) int
 	PackVarint(i int, buf []byte) int
 	PackVaruint(i uint, buf []byte) int

@@ -613,6 +613,13 @@ func (w *Worker) getTokensFromErc20(erc20 []bchain.Erc20Transfer) []*bchain.Toke
 func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
+	contract := 0
+	if len(filter.Contract) > 0 {
+		contract, err = strconv.ParseUint(filter.Contract, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var callback db.GetTransactionsCallback
 	if filter.Vout == AddressFilterVoutOff {
 		callback = func(txid string, height uint32, indexes []int32) error {
@@ -623,7 +630,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 			return nil
 		}
 	} else {
-		callback = func(txid string, height uint32, indexes []int32) error {
+		callback = func(txid string, height uint32, assetGuids []uint64, indexes []int32) error {
 			for _, index := range indexes {
 				vout := index
 				if vout < 0 {
@@ -637,6 +644,17 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 						return &db.StopIteration{}
 					}
 					break
+				}
+			}
+			if(contract > 0) {
+				for _, assetGuid := range assetGuids {
+					if (contract == assetGuid) {
+						txids = append(txids, txid)
+						if len(txids) >= maxResults {
+							return &db.StopIteration{}
+						}
+						break
+					}
 				}
 			}
 			return nil
