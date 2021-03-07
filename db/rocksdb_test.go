@@ -482,7 +482,7 @@ type txidIndex struct {
 
 func verifyGetTransactions(t *testing.T, d *RocksDB, addr string, low, high uint32, wantTxids []txidIndex, wantErr error) {
 	gotTxids := make([]txidIndex, 0)
-	addToTxids := func(txid string, height uint32, indexes []int32) error {
+	addToTxids := func(txid string, height uint32, assetGuid []uint64, indexes []int32) error {
 		for _, index := range indexes {
 			gotTxids = append(gotTxids, txidIndex{txid, index})
 		}

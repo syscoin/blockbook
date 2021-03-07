@@ -130,7 +130,7 @@ func verifyTransactions2(t *testing.T, d *db.RocksDB, rng Range, addr2txs map[st
 			checkMap[txid] = false
 		}
 
-		err := d.GetTransactions(addr, rng.Lower, rng.Upper, func(txid string, height uint32, indexes []int32) error {
+		err := d.GetTransactions(addr, rng.Lower, rng.Upper, func(txid string, height uint32, assetGuid []uint64, indexes []int32) error {
 			for _, index := range indexes {
 				if index >= 0 {
 					checkMap[txid] = true

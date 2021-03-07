@@ -134,7 +134,7 @@ func verifyTransactions(t *testing.T, d *db.RocksDB, h *TestHandler, rng Range) 
 	}
 
 	for addr, txs := range addr2txs {
-		err := d.GetTransactions(addr, rng.Lower, rng.Upper, func(txid string, height uint32, indexes []int32) error {
+		err := d.GetTransactions(addr, rng.Lower, rng.Upper, func(txid string, height uint32, assetGuid []uint64, indexes []int32) error {
 			for i, tx := range txs {
 				for _, index := range indexes {
 					if txid == tx.txid && index == tx.index {
