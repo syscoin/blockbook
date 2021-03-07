@@ -1727,7 +1727,7 @@ func (d *RocksDB) fixUtxo(addrDesc bchain.AddressDescriptor, ba *bchain.AddrBala
 	if checksum.Cmp(&ba.BalanceSat) != 0 {
 		var checksumFromTxs big.Int
 		var utxos []bchain.Utxo
-		err := d.GetAddrDescTransactions(addrDesc, 0, ^uint32(0), bchain.AllMask, func(txid string, height uint32, indexes []int32) error {
+		err := d.GetAddrDescTransactions(addrDesc, 0, ^uint32(0), bchain.AllMask, func(txid string, height uint32, assetGuids []uint64, indexes []int32) error {
 			var ta *bchain.TxAddresses
 			var err error
 			// sort the indexes so that the utxos are appended in the reverse order
