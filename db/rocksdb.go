@@ -344,7 +344,7 @@ func (e *StopIteration) Error() string {
 
 // GetTransactionsCallback is called by GetTransactions/GetAddrDescTransactions for each found tx
 // indexes contain array of indexes (input negative, output positive) in tx where is given address
-type GetTransactionsCallback func(txid string, height uint32, indexes []int32) error
+type GetTransactionsCallback func(txid string, height uint32, assetGuids []uint64, indexes []int32) error
 
 // GetTransactions finds all input/output transactions for address
 // Transaction are passed to callback function.
@@ -407,8 +407,8 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			}
 			numAssets, l := d.chainParser.UnpackVaruint(val)
 			val = val[l:]
-			for k := 0; k < numAssets; k++ {
-				assetGuids = append(assetGuids, p.BaseParser.UnpackUint64(val))
+			for k := uint(0); k < numAssets; k++ {
+				assetGuids = append(assetGuids, d.chainParser.UnpackUint64(val))
 				val = val[8:]
 			}
 			if assetsBitMask == bchain.AllMask || mask == bchain.AllMask || (assetsBitMaskUint & maskUint) == maskUint {
@@ -777,7 +777,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 			// add asset if set
 			if assetGuid > 0 {
 				// only append if not existing already
-				for assetGuidFound := range t.Assets {
+				for _, assetGuidFound := range t.Assets {
 					if assetGuid == assetGuidFound {
 						foundAsset = true
 						break
