@@ -1066,7 +1066,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 			if err != nil {
 				return nil, nil, nil, 0, 0, 0, err
 			}
-			tokens = []bchain.Token{*t}
+			tokens = bchain.Tokens{t}
 			// switch off query for transactions, there are no transactions
 			filter.Vout = AddressFilterVoutQueryNotNecessary
 		}
