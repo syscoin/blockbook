@@ -776,6 +776,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 		for i, t := range at {
 			// add asset if set
 			if assetGuid > 0 {
+				foundAsset := false
 				// only append if not existing already
 				for _, assetGuidFound := range t.Assets {
 					if assetGuid == assetGuidFound {
