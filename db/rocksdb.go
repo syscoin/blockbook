@@ -793,7 +793,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 	txIndex := &bchain.TxIndexes{
 		Type:    assetsMask,
 		BtxID:   btxID,
-		Indexes: []int32{index}
+		Indexes: []int32{index},
 	}
 	
 	if assetInfo != nil {
