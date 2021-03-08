@@ -41,7 +41,7 @@ func txIndexesHexSyscoin(tx string, assetsMask bchain.AssetsMask, assetGuids []u
 		l = d.chainParser.PackVarint32(index, buf)
 		tx += hex.EncodeToString(buf[:l])
 	}
-	l = d.chainParse.PackVaruint(uint(len(t.Assets)), buf)
+	l = d.chainParser.PackVaruint(uint(len(t.Assets)), buf)
 	tx = hex.EncodeToString(buf[:l]) + tx
 	for _, asset := range t.Assets {
 		tx += hex.EncodeToString(d.chainParser.PackUint64(asset))
