@@ -314,7 +314,7 @@ The optional query parameters:
   - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
   - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
   - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
-  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *assetallocationsend*
+  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
   - *number*: Apply a custom mask which is a bitmask of the following values:
     - *basecoin*: 1
     - *assetallocationsend*: 2
@@ -386,7 +386,7 @@ The optional query parameters:
   - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
   - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
   - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
-  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *assetallocationsend*
+  - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
   - *number*: Apply a custom mask which is a bitmask of the following values:
     - *basecoin*: 1
     - *assetallocationsend*: 2
