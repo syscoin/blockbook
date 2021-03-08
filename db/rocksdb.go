@@ -618,7 +618,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 					ValueSat: output.ValueSat,
 					AssetInfo: tao.AssetInfo,
 				})
-				counted := addToAddressesMap(addresses, strAddrDesc, btxID, int32(i), assetsMask, tao.AssetInfo.AssetGuid)
+				counted := addToAddressesMap(addresses, strAddrDesc, btxID, int32(i), assetsMask, tao.AssetInfo)
 				if !counted {
 					balance.Txs++
 				}
@@ -730,7 +730,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				} else {
 					d.cbs.balancesHit++
 				}
-				counted := addToAddressesMap(addresses, strAddrDesc, spendingTxid, ^int32(i), assetsMask, spentOutput.AssetInfo.AssetGuid)
+				counted := addToAddressesMap(addresses, strAddrDesc, spendingTxid, ^int32(i), assetsMask, spentOutput.AssetInfo)
 				if !counted {
 					balance.Txs++
 				}
@@ -763,7 +763,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 // addToAddressesMap maintains mapping between addresses and transactions in one block
 // the method assumes that outputs in the block are processed before the inputs
 // the return value is true if the tx was processed before, to not to count the tx multiple times
-func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID []byte, index int32, assetsMask bchain.AssetsMask, assetGuid uint64) bool {
+func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID []byte, index int32, assetsMask bchain.AssetsMask, assetInfo *bchain.AssetInfo) bool {
 	// check that the address was already processed in this block
 	// if not found, it has certainly not been counted
 	at, found := addresses[strAddrDesc]
@@ -771,17 +771,17 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 		// if the tx is already in the slice, append the index to the array of indexes
 		for i, t := range at {
 			// add asset if set
-			if assetGuid > 0 {
+			if assetInfo != nil {
 				foundAsset := false
 				// only append if not existing already
 				for _, assetGuidFound := range t.Assets {
-					if assetGuid == assetGuidFound {
+					if assetInfo.AssetGuid == assetGuidFound {
 						foundAsset = true
 						break
 					}
 				}
 				if !foundAsset {
-					t.Assets = append(t.Assets, assetGuid)
+					t.Assets = append(t.Assets, assetInfo.AssetGuid)
 				}
 			}
 			if bytes.Equal(btxID, t.BtxID) {
@@ -790,13 +790,16 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 			}
 		}
 	} 
-
-	addresses[strAddrDesc] = append(at, bchain.TxIndexes{
+	txIndex := &bchain.TxIndexes{
 		Type:    assetsMask,
 		BtxID:   btxID,
-		Indexes: []int32{index},
-		Assets: []uint64{assetGuid},
-	})
+		Indexes: []int32{index}
+	}
+	
+	if assetInfo != nil {
+		txIndex.Assets = []uint64{assetInfo.AssetGuid}
+	}
+	addresses[strAddrDesc] = append(at, *txIndex)
 	return false
 }
 
