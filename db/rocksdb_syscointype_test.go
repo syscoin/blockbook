@@ -29,7 +29,7 @@ func syscoinTestParser() *syscoin.SyscoinParser {
 	&btc.Configuration{BlockAddressesToKeep: 2})
 }
 
-func txIndexesHexSyscoin(tx string, assetsMask bchain.AssetsMask, indexes []int32, d *RocksDB) string {
+func txIndexesHexSyscoin(tx string, assetsMask bchain.AssetsMask, assetGuids []uint64, indexes []int32, d *RocksDB) string {
 	buf := make([]byte, vlq.MaxLen32)
 	l := d.chainParser.PackVaruint(uint(assetsMask), buf)
 	tx = hex.EncodeToString(buf[:l]) + tx
@@ -40,6 +40,11 @@ func txIndexesHexSyscoin(tx string, assetsMask bchain.AssetsMask, indexes []int3
 		}
 		l = d.chainParser.PackVarint32(index, buf)
 		tx += hex.EncodeToString(buf[:l])
+	}
+	l = d.chainParse.PackVaruint(uint(len(t.Assets)), buf)
+	tx = hex.EncodeToString(buf[:l]) + tx
+	for _, asset := range t.Assets {
+		tx += hex.EncodeToString(d.chainParser.PackUint64(asset))
 	}
 	return tx
 } 
@@ -57,8 +62,8 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	}
 	// the vout is encoded as signed varint, i.e. value * 2 for non negative values
 	if err := checkColumn(d, cfAddresses, []keyPair{
-		{addressKeyHex(dbtestdata.AddrS1, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T0, bchain.BaseCoinMask, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS2, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T1, bchain.AssetActivateMask, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS1, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T0, bchain.BaseCoinMask, []uint64{}, []int32{0}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS2, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T1, bchain.AssetActivateMask, []uint64{2529870008}, []int32{1}, d), nil},
 	
 	}); err != nil {
 		{
@@ -167,11 +172,11 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
 		}
 	}
 	if err := checkColumn(d, cfAddresses, []keyPair{
-		{addressKeyHex(dbtestdata.AddrS1, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T0, bchain.BaseCoinMask, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS2, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T1, bchain.AssetActivateMask, []int32{1}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS2, 113, d), txIndexesHexSyscoin(dbtestdata.TxidS2T1, bchain.AssetUpdateMask, []int32{^0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS3, 113, d), txIndexesHexSyscoin(dbtestdata.TxidS2T0, bchain.BaseCoinMask, []int32{0}, d), nil},
-		{addressKeyHex(dbtestdata.AddrS4, 113, d), txIndexesHexSyscoin(dbtestdata.TxidS2T1, bchain.AssetUpdateMask, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS1, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T0, bchain.BaseCoinMask, []uint64{}, []int32{0}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS2, 112, d), txIndexesHexSyscoin(dbtestdata.TxidS1T1, bchain.AssetActivateMask, []uint64{2529870008}, []int32{1}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS2, 113, d), txIndexesHexSyscoin(dbtestdata.TxidS2T1, bchain.AssetUpdateMask, []uint64{2529870008}, []int32{^0}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS3, 113, d), txIndexesHexSyscoin(dbtestdata.TxidS2T0, bchain.BaseCoinMask, []uint64{}, []int32{0}, d), nil},
+		{addressKeyHex(dbtestdata.AddrS4, 113, d), txIndexesHexSyscoin(dbtestdata.TxidS2T1, bchain.AssetUpdateMask, []uint64{2529870008}, []int32{1}, d), nil},
 	}); err != nil {
 		{
 			t.Fatal(err)
