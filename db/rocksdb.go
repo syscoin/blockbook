@@ -770,22 +770,22 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 	if found {
 		// if the tx is already in the slice, append the index to the array of indexes
 		for i, t := range at {
-			// add asset if set
-			if assetInfo != nil {
-				foundAsset := false
-				// only append if not existing already
-				for _, assetGuidFound := range t.Assets {
-					if assetInfo.AssetGuid == assetGuidFound {
-						foundAsset = true
-						break
+			if bytes.Equal(btxID, t.BtxID) {
+				at[i].Indexes = append(t.Indexes, index)			
+				// append asset if set
+				if assetInfo != nil {
+					foundAsset := false
+					// only append if not existing already
+					for _, assetGuidFound := range t.Assets {
+						if assetInfo.AssetGuid == assetGuidFound {
+							foundAsset = true
+							break
+						}
+					}
+					if !foundAsset {
+						t.Assets = append(t.Assets, assetInfo.AssetGuid)
 					}
 				}
-				if !foundAsset {
-					t.Assets = append(t.Assets, assetInfo.AssetGuid)
-				}
-			}
-			if bytes.Equal(btxID, t.BtxID) {
-				at[i].Indexes = append(t.Indexes, index)
 				return true
 			}
 		}
@@ -795,7 +795,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 		BtxID:   btxID,
 		Indexes: []int32{index},
 	}
-	
+	// create asset array if assetInfo is set
 	if assetInfo != nil {
 		txIndex.Assets = []uint64{assetInfo.AssetGuid}
 	}
