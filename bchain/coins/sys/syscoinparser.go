@@ -605,9 +605,20 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 func (p *SyscoinParser) PackedTxIndexLen() int {
 	return p.BaseParser.PackedTxidLen() + 1
 }
+
 func (p *SyscoinParser) UnpackTxIndexType(buf []byte) (bchain.AssetsMask, int) {
 	maskUint, l := p.BaseParser.UnpackVaruint(buf)
 	return bchain.AssetsMask(maskUint), l
+}
+
+func (p *SyscoinParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) int {
+	numAssets, l := p.UnpackVaruint(*buf)
+	*buf = (*buf)[l:]
+	for k := uint(0); k < numAssets; k++ {
+		assetGuids = append(assetGuids, d.chainParser.UnpackUint64(*buf))
+		*buf = (*buf)[8:]
+	}
+	return numAssets
 }
 
 func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {

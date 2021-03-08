@@ -369,6 +369,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 	startKey := d.chainParser.PackAddressKey(addrDesc, higher)
 	stopKey := d.chainParser.PackAddressKey(addrDesc, lower)
 	indexes := make([]int32, 0, 16)
+	assetGuids := make([]uint64, 0, 8)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAddresses])
 	defer it.Close()
 	for it.Seek(startKey); it.Valid(); it.Next() {
@@ -393,7 +394,6 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 		for len(val) > txIndexUnpackedLen {
 			mask, l := d.chainParser.UnpackTxIndexType(val)
 			maskUint := uint32(mask)
-			assetGuids := make([]uint64, 0)
 			tx, err := d.chainParser.UnpackTxid(val[l:l+txidUnpackedLen])
 			if err != nil {
 				return err
@@ -402,15 +402,11 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			val = val[l+txidUnpackedLen:]
 			err = d.chainParser.UnpackTxIndexes(&indexes, &val)
 			if err != nil {
-				glog.Warningf("rocksdb: addresses contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
+				glog.Warningf("rocksdb: addresses (tx index) contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
 				break
 			}
-			numAssets, l := d.chainParser.UnpackVaruint(val)
-			val = val[l:]
-			for k := uint(0); k < numAssets; k++ {
-				assetGuids = append(assetGuids, d.chainParser.UnpackUint64(val))
-				val = val[8:]
-			}
+			assetGuids = assetGuids[:0]
+			d.chainParser.UnpackTxIndexAssets(&assetGuids, &val)	
 			if assetsBitMask == bchain.AllMask || mask == bchain.AllMask || (assetsBitMaskUint & maskUint) == maskUint {
 				if err := fn(tx, height, assetGuids, indexes); err != nil {
 					if _, ok := err.(*StopIteration); ok {
@@ -421,7 +417,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			}
 		}
 		if len(val) != 0 {
-			glog.Warningf("rocksdb: addresses contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
+			glog.Warningf("rocksdb: addresses (bytes unread) contain incorrect data %s: %s", hex.EncodeToString(key), hex.EncodeToString(val))
 		}
 	}
 	return nil
