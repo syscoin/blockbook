@@ -308,14 +308,14 @@ The optional query parameters:
 - *filter*: specifies what tokens (xpub addresses/tokens) are returned by the request (default *nonzero*)
     - *inputs*: Return transactions sending inputs to this xpub
     - *outputs*: Return transactions sending outputs to this xpub
-    - *number*: Return specific vout index
+    - *=*: Return specific numerical vout index
 - *assetMask*: What type of transactions to return (default *all*)
-  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *number* for the masks.
+  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *=* for the masks.
   - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
   - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
   - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
   - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
-  - *number*: Apply a custom mask which is a bitmask of the following values:
+  - *=*: Apply a custom numerical mask which is a bitmask of the following values:
     - *basecoin*: 1
     - *assetallocationsend*: 2
     - *syscoinburntoallocation*: 4
@@ -380,14 +380,14 @@ The optional query parameters:
 - *filter*: specifies what tokens (xpub addresses/tokens) are returned by the request (default *nonzero*)
     - *inputs*: Return transactions sending inputs to this xpub
     - *outputs*: Return transactions sending outputs to this xpub
-    - *number*: Return specific vout index
+    - *=*: Return specific numerical vout index
 - *assetMask*: What type of transactions to return (default *all*)
-  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *number* for the masks.
+  - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *=* for the masks.
   - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
   - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
   - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
   - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
-  - *number*: Apply a custom mask which is a bitmask of the following values:
+  - *=*: Apply a custom numerical mask which is a bitmask of the following values:
     - *basecoin*: 1
     - *assetallocationsend*: 2
     - *syscoinburntoallocation*: 4
