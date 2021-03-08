@@ -615,7 +615,7 @@ func (p *SyscoinParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) i
 	numAssets, l := p.UnpackVaruint(*buf)
 	*buf = (*buf)[l:]
 	for k := uint(0); k < numAssets; k++ {
-		assetGuids = append(assetGuids, d.chainParser.UnpackUint64(*buf))
+		assetGuids = append(assetGuids, p.UnpackUint64(*buf))
 		*buf = (*buf)[8:]
 	}
 	return numAssets
