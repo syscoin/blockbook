@@ -565,8 +565,8 @@ func (p *BaseParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
 	return nil
 }
 
-func (p *BaseParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) int {
-	return 0
+func (p *BaseParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) uint {
+	return uint(0)
 }
 
 func (p *BaseParser) PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {

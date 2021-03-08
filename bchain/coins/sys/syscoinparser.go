@@ -611,11 +611,11 @@ func (p *SyscoinParser) UnpackTxIndexType(buf []byte) (bchain.AssetsMask, int) {
 	return bchain.AssetsMask(maskUint), l
 }
 
-func (p *SyscoinParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) int {
+func (p *SyscoinParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) uint {
 	numAssets, l := p.UnpackVaruint(*buf)
 	*buf = (*buf)[l:]
 	for k := uint(0); k < numAssets; k++ {
-		assetGuids = append(assetGuids, p.UnpackUint64(*buf))
+		assetGuids = append(assetGuids, p.UnpackUint64(*buf)...)
 		*buf = (*buf)[8:]
 	}
 	return numAssets
