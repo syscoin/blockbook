@@ -612,11 +612,12 @@ func (p *SyscoinParser) UnpackTxIndexType(buf []byte) (bchain.AssetsMask, int) {
 }
 
 func (p *SyscoinParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) uint {
-	numAssets, l := p.UnpackVaruint(*buf)
+	numAssets, l := p.BaseParser.UnpackVaruint(*buf)
 	*buf = (*buf)[l:]
 	for k := uint(0); k < numAssets; k++ {
-		*assetGuids = append(*assetGuids, p.UnpackUint64(*buf))
-		*buf = (*buf)[8:]
+		assetGuidUint, l := p.BaseParser.UnpackVaruint64(buf)
+		*assetGuids = append(*assetGuids, assetGuidUint)
+		*buf = (*buf)[l:]
 	}
 	return numAssets
 }
@@ -624,6 +625,7 @@ func (p *SyscoinParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) u
 func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 	buf := make([]byte, 0, 34)
 	bvout := make([]byte, vlq.MaxLen32)
+	varBuf := make([]byte, vlq.MaxLen64)
 	// store the txs in reverse order for ordering from newest to oldest
 	for j := len(txi) - 1; j >= 0; j-- {
 		t := &txi[j]
@@ -641,7 +643,8 @@ func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 		l = p.BaseParser.PackVaruint(uint(len(t.Assets)), bvout)
 		buf = append(buf, bvout[:l]...)
 		for _, asset := range t.Assets {
-			buf = append(buf, p.BaseParser.PackUint64(asset)...)
+			l = p.BaseParser.PackVaruint64(asset, varBuf)
+			buf = append(buf, varBuf[:l]...)
 		}
 	}
 	return buf

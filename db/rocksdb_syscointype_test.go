@@ -31,6 +31,7 @@ func syscoinTestParser() *syscoin.SyscoinParser {
 
 func txIndexesHexSyscoin(tx string, assetsMask bchain.AssetsMask, assetGuids []uint64, indexes []int32, d *RocksDB) string {
 	buf := make([]byte, vlq.MaxLen32)
+	varBuf := make([]byte, vlq.MaxLen64)
 	l := d.chainParser.PackVaruint(uint(assetsMask), buf)
 	tx = hex.EncodeToString(buf[:l]) + tx
 	for i, index := range indexes {
@@ -44,7 +45,8 @@ func txIndexesHexSyscoin(tx string, assetsMask bchain.AssetsMask, assetGuids []u
 	l = d.chainParser.PackVaruint(uint(len(assetGuids)), buf)
 	tx += hex.EncodeToString(buf[:l])
 	for _, asset := range assetGuids {
-		tx += hex.EncodeToString(d.chainParser.PackUint64(asset))
+		l = d.chainParser.PackVaruint64(index, varBuf)
+		tx += hex.EncodeToString(varBuf[:l])
 	}
 	return tx
 } 
