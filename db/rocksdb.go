@@ -783,7 +783,7 @@ func addToAddressesMap(addresses bchain.AddressesMap, strAddrDesc string, btxID 
 						}
 					}
 					if !foundAsset {
-						t.Assets = append(t.Assets, assetInfo.AssetGuid)
+						at[i].Assets = append(t.Assets, assetInfo.AssetGuid)
 					}
 				}
 				return true
