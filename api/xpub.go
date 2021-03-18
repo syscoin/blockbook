@@ -293,7 +293,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 					TotalSentSat:     (*bchain.Amount)(v.SentSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-					Contract:		  assetGuid,
+					AssetGuid:		  assetGuid,
 					Transfers:		  v.Transfers,
 				})
 			}

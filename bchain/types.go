@@ -541,6 +541,7 @@ type Token struct {
 	Name             string    `json:"name"`
 	Path             string    `json:"path,omitempty"`
 	Contract         string    `json:"contract,omitempty"`
+	AssetGuid        string    `json:"assetGuid,omitempty"`
 	Transfers        uint32    `json:"transfers"`
 	Symbol           string    `json:"symbol,omitempty"`
 	Decimals         int       `json:"decimals"`
