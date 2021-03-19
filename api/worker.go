@@ -734,7 +734,7 @@ func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFi
 	}
 	return txids, nil
 }
-func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor, mapAssetMempool map[uint64]*TokenMempoolInfo) *big.Int{
+func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor, mapAssetMempool map[string]*TokenMempoolInfo) *big.Int{
 	var val big.Int
 	for _, vout := range t.Vout {
 		if bytes.Equal(vout.AddrDesc, addrDesc) && vout.ValueSat != nil {
@@ -745,7 +745,7 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor, mapAssetMempool
 					mempoolAsset = &TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &bchain.Amount{}}
 					mapAssetMempool[vout.AssetInfo.AssetGuid] = mempoolAsset
 				}
-				(*big.Int)(mempoolAsset.ValueSat).Add((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(vout.AssetInfo.ValueSat))
+				mempoolAsset.ValueSat.Add(mempoolAsset.ValueSat, (*big.Int)(vout.AssetInfo.ValueSat))
 				mempoolAsset.UnconfirmedTxs++
 			}
 		}
@@ -766,7 +766,7 @@ func (t *Tx) getAddrEthereumTypeMempoolInputValue(addrDesc bchain.AddressDescrip
 	return &val
 }
 
-func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor, mapAssetMempool map[uint64]*TokenMempoolInfo) *big.Int {
+func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor, mapAssetMempool map[string]*TokenMempoolInfo) *big.Int {
 	var val big.Int
 	for _, vin := range t.Vin {
 		if bytes.Equal(vin.AddrDesc, addrDesc) && vin.ValueSat != nil {
@@ -774,7 +774,7 @@ func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor, mapAssetMempool 
 			if vin.AssetInfo != nil {
 				mempoolAsset, ok := mapAssetMempool[vin.AssetInfo.AssetGuid];
 				if ok {
-					(*big.Int)(mempoolAsset.ValueSat).Sub((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfo.ValueSat))
+					mempoolAsset.ValueSat.Sub(mempoolAsset.ValueSat, (*big.Int)(vin.AssetInfo.ValueSat))
 				}
 				mempoolAsset.ValueSat.Add(&mempoolAsset.ValueSat, (*big.Int)(vin.AssetInfo.ValueSat))
 			}
@@ -1289,7 +1289,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			unconfirmedTransfers := 0
 			mempoolAsset, ok := mapAssetMempool[k]
 			if ok {
-				unconfirmedBalanceSat = mempoolAsset.ValueSat
+				unconfirmedBalanceSat = *mempoolAsset.ValueSat
 				unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
 			}
 			tokens = append(tokens, &bchain.Token{

@@ -179,7 +179,7 @@ type Paging struct {
 type TokensToReturn int
 type TokenMempoolInfo struct {
 	UnconfirmedTxs int 
-	ValueSat *bchain.Amount
+	ValueSat *big.Int
 }
 const (
 	// AddressFilterVoutOff disables filtering of transactions by vout
