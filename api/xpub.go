@@ -605,7 +605,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 									if token.Type != bchain.XPUBAddressTokenType {
 										mempoolAsset, ok := mapAssetMempool[token.AssetGuid]
 										if ok {
-											token.UnconfirmedBalanceSat = (*bchain.Amount)(&mempoolAsset.ValueSat)
+											token.UnconfirmedBalanceSat = (*bchain.Amount)(mempoolAsset.ValueSat)
 											token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
 										}
 										tokensAsset = append(tokensAsset, token)

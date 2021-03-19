@@ -1284,11 +1284,11 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 			assetGuid := strconv.FormatUint(k, 10)
-			var unconfirmedBalanceSat big.Int
+			var unconfirmedBalanceSat *big.Int
 			unconfirmedTransfers := 0
 			mempoolAsset, ok := mapAssetMempool[assetGuid]
 			if ok {
-				unconfirmedBalanceSat = *mempoolAsset.ValueSat
+				unconfirmedBalanceSat = mempoolAsset.ValueSat
 				unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
 			}
 			tokens = append(tokens, &bchain.Token{
@@ -1297,7 +1297,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				Decimals:         int(dbAsset.AssetObj.Precision),
 				Symbol:			  string(dbAsset.AssetObj.Symbol),
 				BalanceSat:       (*bchain.Amount)(v.BalanceSat),
-				UnconfirmedBalanceSat:       (*bchain.Amount)(&unconfirmedBalanceSat),
+				UnconfirmedBalanceSat:       (*bchain.Amount)(unconfirmedBalanceSat),
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentSat),
 				AssetGuid:		  assetGuid,
