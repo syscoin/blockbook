@@ -448,6 +448,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	if err != nil {
 		return nil, err
 	}
+	mapAssetMempool := map[uint64]*TokenMempoolInfo{}
 	// setup filtering of txids
 	var txidFilter func(txid *xpubTxid, ad *xpubAddress) bool
 	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff) {
@@ -497,8 +498,28 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 						if !foundTx {
 							unconfirmedTxs++
 						}
-						uBalSat.Add(&uBalSat, tx.getAddrVoutValue(ad.addrDesc))
-						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc))
+						valOut, assetInfoOut := tx.getAddrVoutValue(ad.addrDesc)
+						if assetInfoOut {
+							assetGuid := strconv.FormatUint(assetInfoOut.AssetGuid, 10)
+							mempoolAsset, ok := mapAssetMempool[assetGuid];
+							if !ok {
+								mempoolAsset = &TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &bchain.Amount{}}
+								mapAssetMempool[assetGuid] = mempoolAsset
+							}
+							(*big.Int)(mempoolAsset.ValueSat).Add((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfoOut.ValueSat))
+							mempoolAsset.UnconfirmedTxs++
+						}
+						valIn, assetInfoIn := tx.getAddrVoutValue(ad.addrDesc)
+						if assetInfoIn {
+							assetGuid := strconv.FormatUint(assetInfoIn.AssetGuid, 10)
+							mempoolAsset, ok := mapAssetMempool[assetGuid];
+							if ok {
+								(*big.Int)(mempoolAsset.ValueSat).Sub((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfoIn.ValueSat))
+							}
+						}
+						}
+						uBalSat.Add(&uBalSat, valOut)
+						uBalSat.Sub(&uBalSat, valIn)
 						// mempool txs are returned only on the first page, uniquely and filtered
 						if page == 0 && !foundTx && (txidFilter == nil || txidFilter(&txid, ad)) {
 							mempoolEntries = append(mempoolEntries, bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
@@ -602,6 +623,11 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
 								filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
 									if token.Type != bchain.XPUBAddressTokenType {
+										mempoolAsset, ok := mapAssetMempool[token.AssetGuid]
+										if ok {
+											token.UnconfirmedBalanceSat = (*bchain.Amount)(&mempoolAsset.ValueSat)
+											token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
+										}
 										tokensAsset = append(tokensAsset, token)
 									} else {
 										tokens = append(tokens, token)

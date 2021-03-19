@@ -734,14 +734,18 @@ func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFi
 	}
 	return txids, nil
 }
-func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
+func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int, *big.Int {
 	var val big.Int
+	var valAsset big.Int
 	for _, vout := range t.Vout {
 		if bytes.Equal(vout.AddrDesc, addrDesc) && vout.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vout.ValueSat))
+			if vout.AssetInfo != nil {
+				valAsset.Add(&valAsset, (*big.Int)(vout.AssetInfo.ValueSat))
+			}
 		}
 	}
-	return &val
+	return &val, &valAsset
 }
 func (t *Tx) getAddrEthereumTypeMempoolInputValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
@@ -757,14 +761,18 @@ func (t *Tx) getAddrEthereumTypeMempoolInputValue(addrDesc bchain.AddressDescrip
 	return &val
 }
 
-func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) *big.Int {
+func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) *big.Int, *big.Int {
 	var val big.Int
+	var valAsset big.Int
 	for _, vin := range t.Vin {
 		if bytes.Equal(vin.AddrDesc, addrDesc) && vin.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vin.ValueSat))
+			if vin.AssetInfo != nil {
+				valAsset.Add(&valAsset, (*big.Int)(vin.AssetInfo.ValueSat))
+			}
 		}
 	}
-	return &val
+	return &val, &valAsset
 }
 
 // GetUniqueTxids removes duplicate transactions
@@ -1163,6 +1171,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if err != nil {
 		return nil, err
 	}
+	mapAssetMempool := map[string]*TokenMempoolInfo{}
 	if w.chainType == bchain.ChainEthereumType {
 		var n uint64
 		ba, tokens, erc20c, n, nonTokenTxs, totalResults, err = w.getEthereumTypeAddressBalances(addrDesc, option, filter)
@@ -1190,6 +1199,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		ba = &bchain.AddrBalance{}
 		page = 0
 	}
+	mapAssetMempool := map[uint64]*TokenMempoolInfo{}
 	// process mempool, only if toHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txm, err = w.getAddressTxids(addrDesc, true, filter, maxInt)
@@ -1205,12 +1215,29 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				// skip already confirmed txs, mempool may be out of sync
 				if tx.Confirmations == 0 {
 					unconfirmedTxs++
-					uBalSat.Add(&uBalSat, tx.getAddrVoutValue(addrDesc))
+					val, assetInfo := tx.getAddrVoutValue(addrDesc)
+					if assetInfo {
+						mempoolAsset, ok := mapAssetMempool[assetInfo.AssetGuid];
+						if !ok {
+							mempoolAsset = &TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &bchain.Amount{}}
+							mapAssetMempool[assetInfo.AssetGuid] = mempoolAsset
+						}
+						(*big.Int)(mempoolAsset.ValueSat).Add((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfo.ValueSat))
+						mempoolAsset.UnconfirmedTxs++
+					}
+					uBalSat.Add(&uBalSat, val)
 					// ethereum has a different logic - value not in input and add maximum possible fees
 					if w.chainType == bchain.ChainEthereumType {
 						uBalSat.Sub(&uBalSat, tx.getAddrEthereumTypeMempoolInputValue(addrDesc))
 					} else {
-						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(addrDesc))
+						val, assetInfo := tx.getAddrVinValue(addrDesc)
+						if assetInfo {
+							mempoolAsset, ok := mapAssetMempool[assetInfo.AssetGuid];
+							if ok {
+								(*big.Int)(mempoolAsset.ValueSat).Sub((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfo.ValueSat))
+							}
+						}
+						uBalSat.Sub(&uBalSat, val)
 					}
 					if page == 0 {
 						if option == AccountDetailsTxidHistory {
@@ -1268,16 +1295,26 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 			assetGuid := strconv.FormatUint(k, 10)
+			unconfirmedBalanceSat big.Int
+			unconfirmedTransfers := 0
+			mempoolAsset, ok := mapAssetMempool[k]
+			if ok {
+				unconfirmedBalanceSat = mempoolAsset.ValueSat
+				unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
+			}
+		}
 			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             address,
 				Decimals:         int(dbAsset.AssetObj.Precision),
 				Symbol:			  string(dbAsset.AssetObj.Symbol),
 				BalanceSat:       (*bchain.Amount)(v.BalanceSat),
+				UnconfirmedBalanceSat:       (*bchain.Amount)(&unconfirmedBalanceSat),
 				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 				TotalSentSat:     (*bchain.Amount)(v.SentSat),
 				AssetGuid:		  assetGuid,
 				Transfers:		  v.Transfers,
+				UnconfirmedTransfers:		  unconfirmedTransfers,
 			})
 		}
 		sort.Sort(tokens)

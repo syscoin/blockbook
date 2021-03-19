@@ -177,7 +177,10 @@ type Paging struct {
 
 // TokensToReturn specifies what tokens are returned by GetAddress and GetXpubAddress
 type TokensToReturn int
-
+type TokenMempoolInfo struct {
+	UnconfirmedTxs int 
+	ValueSat *bchain.Amount
+}
 const (
 	// AddressFilterVoutOff disables filtering of transactions by vout
 	AddressFilterVoutOff = -1
