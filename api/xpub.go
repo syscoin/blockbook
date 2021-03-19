@@ -517,7 +517,6 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								(*big.Int)(mempoolAsset.ValueSat).Sub((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfoIn.ValueSat))
 							}
 						}
-						}
 						uBalSat.Add(&uBalSat, valOut)
 						uBalSat.Sub(&uBalSat, valIn)
 						// mempool txs are returned only on the first page, uniquely and filtered
