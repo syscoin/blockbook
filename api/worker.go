@@ -1295,7 +1295,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			}
 			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 			assetGuid := strconv.FormatUint(k, 10)
-			unconfirmedBalanceSat big.Int
+			var unconfirmedBalanceSat big.Int
 			unconfirmedTransfers := 0
 			mempoolAsset, ok := mapAssetMempool[k]
 			if ok {
