@@ -734,7 +734,7 @@ func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFi
 	}
 	return txids, nil
 }
-func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int, *big.Int {
+func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) (*big.Int, *big.Int) {
 	var val big.Int
 	var valAsset big.Int
 	for _, vout := range t.Vout {
@@ -761,7 +761,7 @@ func (t *Tx) getAddrEthereumTypeMempoolInputValue(addrDesc bchain.AddressDescrip
 	return &val
 }
 
-func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) *big.Int, *big.Int {
+func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor) (*big.Int, *big.Int) {
 	var val big.Int
 	var valAsset big.Int
 	for _, vin := range t.Vin {
