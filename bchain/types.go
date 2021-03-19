@@ -543,6 +543,7 @@ type Token struct {
 	Contract         string    `json:"contract,omitempty"`
 	AssetGuid        string    `json:"assetGuid,omitempty"`
 	Transfers        uint32    `json:"transfers"`
+	UnconfirmedTransfers   int       `json:"unconfirmedTransfers,omitempty"`
 	Symbol           string    `json:"symbol,omitempty"`
 	Decimals         int       `json:"decimals"`
 	BalanceSat       *Amount   `json:"balance,omitempty"`
@@ -551,7 +552,6 @@ type Token struct {
 	TotalSentSat     *Amount   `json:"totalSent,omitempty"`
 	ContractIndex    string    `json:"-"`
 	AddrStr		 	 string    `json:"addrStr,omitempty"`
-	UnconfirmedTxs   int       `json:"unconfirmedTxs,omitempty"`
 }
 type Tokens []*Token
 func (t Tokens) Len() int           { return len(t) }

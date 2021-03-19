@@ -1286,7 +1286,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			assetGuid := strconv.FormatUint(k, 10)
 			var unconfirmedBalanceSat big.Int
 			unconfirmedTransfers := 0
-			mempoolAsset, ok := mapAssetMempool[k]
+			mempoolAsset, ok := mapAssetMempool[assetGuid]
 			if ok {
 				unconfirmedBalanceSat = *mempoolAsset.ValueSat
 				unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
