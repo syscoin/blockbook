@@ -734,9 +734,9 @@ func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFi
 	}
 	return txids, nil
 }
-func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) (*big.Int, *big.Int) {
+func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) (*big.Int, *bchain.AssetInfo) {
 	var val big.Int
-	var valAsset big.Int
+	var valAsset bchain.AssetInfo
 	for _, vout := range t.Vout {
 		if bytes.Equal(vout.AddrDesc, addrDesc) && vout.ValueSat != nil {
 			val.Add(&val, (*big.Int)(vout.ValueSat))
@@ -1171,7 +1171,6 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if err != nil {
 		return nil, err
 	}
-	mapAssetMempool := map[string]*TokenMempoolInfo{}
 	if w.chainType == bchain.ChainEthereumType {
 		var n uint64
 		ba, tokens, erc20c, n, nonTokenTxs, totalResults, err = w.getEthereumTypeAddressBalances(addrDesc, option, filter)
