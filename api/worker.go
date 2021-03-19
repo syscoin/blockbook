@@ -1302,7 +1302,6 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				unconfirmedBalanceSat = mempoolAsset.ValueSat
 				unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
 			}
-		}
 			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             address,
