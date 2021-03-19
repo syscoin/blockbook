@@ -448,7 +448,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	if err != nil {
 		return nil, err
 	}
-	mapAssetMempool := map[uint64]*TokenMempoolInfo{}
+	mapAssetMempool := map[string]*TokenMempoolInfo{}
 	// setup filtering of txids
 	var txidFilter func(txid *xpubTxid, ad *xpubAddress) bool
 	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff) {

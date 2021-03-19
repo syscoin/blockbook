@@ -742,7 +742,7 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor, mapAssetMempool
 			if vout.AssetInfo != nil {
 				mempoolAsset, ok := mapAssetMempool[vout.AssetInfo.AssetGuid];
 				if !ok {
-					mempoolAsset = &TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &bchain.Amount{}}
+					mempoolAsset = &TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &big.Int{}}
 					mapAssetMempool[vout.AssetInfo.AssetGuid] = mempoolAsset
 				}
 				mempoolAsset.ValueSat.Add(mempoolAsset.ValueSat, (*big.Int)(vout.AssetInfo.ValueSat))
@@ -776,7 +776,6 @@ func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor, mapAssetMempool 
 				if ok {
 					mempoolAsset.ValueSat.Sub(mempoolAsset.ValueSat, (*big.Int)(vin.AssetInfo.ValueSat))
 				}
-				mempoolAsset.ValueSat.Add(&mempoolAsset.ValueSat, (*big.Int)(vin.AssetInfo.ValueSat))
 			}
 		}
 	}
@@ -1206,7 +1205,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		ba = &bchain.AddrBalance{}
 		page = 0
 	}
-	mapAssetMempool := map[uint64]*TokenMempoolInfo{}
+	mapAssetMempool := map[string]*TokenMempoolInfo{}
 	// process mempool, only if toHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txm, err = w.getAddressTxids(addrDesc, true, filter, maxInt)
