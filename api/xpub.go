@@ -498,27 +498,8 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 						if !foundTx {
 							unconfirmedTxs++
 						}
-						valOut, assetInfoOut := tx.getAddrVoutValue(ad.addrDesc)
-						if assetInfoOut {
-							assetGuid := strconv.FormatUint(assetInfoOut.AssetGuid, 10)
-							mempoolAsset, ok := mapAssetMempool[assetGuid];
-							if !ok {
-								mempoolAsset = &TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &bchain.Amount{}}
-								mapAssetMempool[assetGuid] = mempoolAsset
-							}
-							(*big.Int)(mempoolAsset.ValueSat).Add((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfoOut.ValueSat))
-							mempoolAsset.UnconfirmedTxs++
-						}
-						valIn, assetInfoIn := tx.getAddrVoutValue(ad.addrDesc)
-						if assetInfoIn {
-							assetGuid := strconv.FormatUint(assetInfoIn.AssetGuid, 10)
-							mempoolAsset, ok := mapAssetMempool[assetGuid];
-							if ok {
-								(*big.Int)(mempoolAsset.ValueSat).Sub((*big.Int)(mempoolAsset.ValueSat), (*big.Int)(assetInfoIn.ValueSat))
-							}
-						}
-						uBalSat.Add(&uBalSat, valOut)
-						uBalSat.Sub(&uBalSat, valIn)
+						uBalSat.Add(&uBalSat,  tx.getAddrVoutValue(ad.addrDesc, mapAssetMempool))
+						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc, mapAssetMempool))
 						// mempool txs are returned only on the first page, uniquely and filtered
 						if page == 0 && !foundTx && (txidFilter == nil || txidFilter(&txid, ad)) {
 							mempoolEntries = append(mempoolEntries, bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
