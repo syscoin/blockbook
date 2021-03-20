@@ -634,7 +634,8 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 							if v.Used == true {
 								continue
 							}
-							dbAsset, errAsset := w.db.GetAsset(k, nil)
+							assetGuid := strconv.FormatUint(k, 10)
+							dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 							if errAsset != nil || dbAsset == nil {
 								dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 							}
@@ -647,7 +648,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								UnconfirmedBalanceSat:       (*bchain.Amount)(v.ValueSat),
 								TotalReceivedSat: &bchain.Amount{},
 								TotalSentSat:     &bchain.Amount{},
-								AssetGuid:		  k,
+								AssetGuid:		  assetGuid,
 								Transfers:		  0,
 								UnconfirmedTransfers:		   v.UnconfirmedTxs,
 							})
