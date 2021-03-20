@@ -116,6 +116,29 @@
                 <td>No. Transactions</td>
                 <td class="data">{{$addr.UnconfirmedTxs}}</td>
             </tr>
+            {{- if $addr.TokensAsset -}}
+            <tr>
+                <td>Tokens</td>
+                <td style="padding: 0;">
+                    <table class="table data-table">
+                        <tbody>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Unconfirmed Balance</th>
+                                <th style="width: 15%;">Transfers</th>
+                            </tr>
+                            {{- range $t := $addr.TokensAsset -}}{{- if $t -}}{{- if $t.UnconfirmedBalanceSat -}}
+                            <tr>
+                                <td class="data ellipsis">{{if $t.AssetGuid}}<a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>{{else}}{{$t.Name}}{{end}}&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
+                                <td class="data ellipsis">{{formatAmountWithDecimals $t.UnconfirmedBalanceSat $t.Decimals}}</td>
+                                <td class="data">{{$t.UnconfirmedTransfers}}</td>
+                            </tr>
+                            {{- end -}}{{- end -}}{{- end -}}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            {{- end -}}
         </tbody>
     </table>
 </div>

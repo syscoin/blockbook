@@ -238,7 +238,8 @@ type Address struct {
 type Asset struct {
 	Paging
 	AssetDetails		  *AssetSpecific		`json:"asset"`
-	UnconfirmedTxs        int                   `json:"unconfirmedTxs"`
+	UnconfirmedTxs        int                   `json:"unconfirmedTxs,omitempty"`
+	UnconfirmedBalanceSat *bchain.Amount        `json:"unconfirmedBalance,omitempty"`
 	Txs                   int                   `json:"txs"`
 	Transactions          []*Tx                 `json:"transactions,omitempty"`
 	Txids                 []string              `json:"txids,omitempty"`
