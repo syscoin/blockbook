@@ -1538,7 +1538,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			UpdateCapabilityFlags:	dbBaseAsset.AssetObj.UpdateCapabilityFlags,
 			NotaryKeyID: 	dbBaseAsset.AssetObj.NotaryKeyID,
 			UnconfirmedTxs: tokenMempoolInfo.UnconfirmedTxs,
-			UnconfirmedBalanceSat: (*bchain.Amount)(tokenMempoolInfo.ValueSat)
+			UnconfirmedBalanceSat: (*bchain.Amount)(tokenMempoolInfo.ValueSat),
 		},
 		Paging:                pg,
 		UnconfirmedTxs:        unconfirmedTxs,
