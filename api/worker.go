@@ -1298,7 +1298,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			tokens = make(bchain.Tokens, 0, len(ba.AssetBalances))
 			for k, v := range ba.AssetBalances {
 				assetGuid := strconv.FormatUint(k, 10)
-				dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
+				dbAsset, errAsset := w.db.GetAsset(k, nil)
 				if errAsset != nil || dbAsset == nil {
 					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 				}
@@ -1333,7 +1333,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			if v.Used == true {
 				continue
 			}
-			dbAsset, errAsset := w.db.GetAsset(k, nil)
+			assetGuid := strconv.FormatUint(k, 10)
+			dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 			if errAsset != nil || dbAsset == nil {
 				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 			}
