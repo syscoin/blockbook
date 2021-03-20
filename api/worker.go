@@ -743,7 +743,7 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor, mapAssetMempool
 			if vout.AssetInfo != nil {
 				mempoolAsset, ok := mapAssetMempool[vout.AssetInfo.AssetGuid];
 				if !ok {
-					mempoolAsset = &TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &big.Int{}}
+					mempoolAsset = &TokenMempoolInfo{Used: false, UnconfirmedTxs: 0, ValueSat: &big.Int{}}
 					mapAssetMempool[vout.AssetInfo.AssetGuid] = mempoolAsset
 				}
 				mempoolAsset.ValueSat.Add(mempoolAsset.ValueSat, (*big.Int)(vout.AssetInfo.ValueSat))
@@ -1293,36 +1293,66 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		totalReceived = ba.ReceivedSat()
 		totalSent = &ba.SentSat
 	} 
-	if ba.AssetBalances != nil && option > AccountDetailsBasic {
-		tokens = make(bchain.Tokens, 0, len(ba.AssetBalances))
-		for k, v := range ba.AssetBalances {
+	if option > AccountDetailsBasic {
+		if ba.AssetBalances != nil {
+			tokens = make(bchain.Tokens, 0, len(ba.AssetBalances))
+			for k, v := range ba.AssetBalances {
+				dbAsset, errAsset := w.db.GetAsset(k, nil)
+				if errAsset != nil || dbAsset == nil {
+					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
+				}
+				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
+				assetGuid := strconv.FormatUint(k, 10)
+				var unconfirmedBalanceSat *big.Int
+				unconfirmedTransfers := 0
+				mempoolAsset, ok := mapAssetMempool[assetGuid]
+				if ok {
+					unconfirmedBalanceSat = mempoolAsset.ValueSat
+					unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
+					// set address to used to ensure uniqueness
+					mempoolAsset.Used = true
+					mapAssetMempool[vout.AssetInfo.AssetGuid] = mempoolAsset
+				}
+				tokens = append(tokens, &bchain.Token{
+					Type:             bchain.SPTTokenType,
+					Name:             address,
+					Decimals:         int(dbAsset.AssetObj.Precision),
+					Symbol:			  string(dbAsset.AssetObj.Symbol),
+					BalanceSat:       (*bchain.Amount)(v.BalanceSat),
+					UnconfirmedBalanceSat:       (*bchain.Amount)(unconfirmedBalanceSat),
+					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
+					TotalSentSat:     (*bchain.Amount)(v.SentSat),
+					AssetGuid:		  assetGuid,
+					Transfers:		  v.Transfers,
+					UnconfirmedTransfers:		  unconfirmedTransfers,
+				})
+			}
+		} 
+
+		for k, v := range mapAssetMempool {
+			if v.Used == true {
+				continue
+			}
 			dbAsset, errAsset := w.db.GetAsset(k, nil)
 			if errAsset != nil || dbAsset == nil {
 				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 			}
-			totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 			assetGuid := strconv.FormatUint(k, 10)
-			var unconfirmedBalanceSat *big.Int
-			unconfirmedTransfers := 0
-			mempoolAsset, ok := mapAssetMempool[assetGuid]
-			if ok {
-				unconfirmedBalanceSat = mempoolAsset.ValueSat
-				unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
-			}
 			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             address,
 				Decimals:         int(dbAsset.AssetObj.Precision),
 				Symbol:			  string(dbAsset.AssetObj.Symbol),
-				BalanceSat:       (*bchain.Amount)(v.BalanceSat),
-				UnconfirmedBalanceSat:       (*bchain.Amount)(unconfirmedBalanceSat),
-				TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
-				TotalSentSat:     (*bchain.Amount)(v.SentSat),
+				BalanceSat:       &bchain.Amount{0},
+				UnconfirmedBalanceSat:       (*bchain.Amount)(v.ValueSat),
+				TotalReceivedSat: &bchain.Amount{0},
+				TotalSentSat:     &bchain.Amount{0},
 				AssetGuid:		  assetGuid,
-				Transfers:		  v.Transfers,
-				UnconfirmedTransfers:		  unconfirmedTransfers,
+				Transfers:		  0,
+				UnconfirmedTransfers:		   v.UnconfirmedTxs,
 			})
 		}
+		
 		sort.Sort(tokens)
 	}
 	r := &Address{

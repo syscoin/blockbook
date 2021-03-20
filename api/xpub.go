@@ -605,9 +605,12 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 									if token.Type != bchain.XPUBAddressTokenType {
 										mempoolAsset, ok := mapAssetMempool[token.AssetGuid]
 										// add unique asset token balances for unconfirmed state
-										if ok && token.UnconfirmedBalanceSat == nil {
+										if ok && mempoolAsset.Used == false {
 											token.UnconfirmedBalanceSat = (*bchain.Amount)(mempoolAsset.ValueSat)
 											token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
+											// set address to used to ensure uniqueness
+											mempoolAsset.Used = true
+											mapAssetMempool[vout.AssetInfo.AssetGuid] = mempoolAsset
 										}
 										tokensAsset = append(tokensAsset, token)
 									} else {
@@ -615,6 +618,40 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 									}
 							}
 							xpubAddresses[token.Name] = struct{}{}
+						}
+					}
+				}
+				if option > AccountDetailsBasic {
+					
+					if len(mapAssetMempool) > 0 {
+						a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
+						var address string
+						if len(a) > 0 {
+							address = a[0]
+						}
+						for k, v := range mapAssetMempool {
+							// if already used we show the unconfirmed amounts in token above, otherwise we add a new token with some cleared values as the token is being sent to a new address
+							if v.Used == true {
+								continue
+							}
+							dbAsset, errAsset := w.db.GetAsset(k, nil)
+							if errAsset != nil || dbAsset == nil {
+								dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
+							}
+							assetGuid := strconv.FormatUint(k, 10)
+							tokensAsset = append(tokensAsset, &bchain.Token{
+								Type:             bchain.SPTTokenType,
+								Name:             address,
+								Decimals:         int(dbAsset.AssetObj.Precision),
+								Symbol:			  string(dbAsset.AssetObj.Symbol),
+								BalanceSat:       &bchain.Amount{0},
+								UnconfirmedBalanceSat:       (*bchain.Amount)(v.ValueSat),
+								TotalReceivedSat: &bchain.Amount{0},
+								TotalSentSat:     &bchain.Amount{0},
+								AssetGuid:		  assetGuid,
+								Transfers:		  0,
+								UnconfirmedTransfers:		   v.UnconfirmedTxs,
+							})
 						}
 					}
 				}

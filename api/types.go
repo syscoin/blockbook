@@ -178,6 +178,7 @@ type Paging struct {
 // TokensToReturn specifies what tokens are returned by GetAddress and GetXpubAddress
 type TokensToReturn int
 type TokenMempoolInfo struct {
+	Used bool
 	UnconfirmedTxs int 
 	ValueSat *big.Int
 }
