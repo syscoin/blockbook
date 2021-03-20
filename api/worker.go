@@ -1297,12 +1297,12 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		if ba.AssetBalances != nil {
 			tokens = make(bchain.Tokens, 0, len(ba.AssetBalances))
 			for k, v := range ba.AssetBalances {
-				dbAsset, errAsset := w.db.GetAsset(k, nil)
+				assetGuid := strconv.FormatUint(k, 10)
+				dbAsset, errAsset := w.db.GetAsset(assetGuid nil)
 				if errAsset != nil || dbAsset == nil {
 					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
-				assetGuid := strconv.FormatUint(k, 10)
 				var unconfirmedBalanceSat *big.Int
 				unconfirmedTransfers := 0
 				mempoolAsset, ok := mapAssetMempool[assetGuid]
@@ -1337,7 +1337,6 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			if errAsset != nil || dbAsset == nil {
 				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 			}
-			assetGuid := strconv.FormatUint(k, 10)
 			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.SPTTokenType,
 				Name:             address,

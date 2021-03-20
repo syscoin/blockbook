@@ -610,7 +610,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 											token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
 											// set address to used to ensure uniqueness
 											mempoolAsset.Used = true
-											mapAssetMempool[vout.AssetInfo.AssetGuid] = mempoolAsset
+											mapAssetMempool[token.AssetGuid] = mempoolAsset
 										}
 										tokensAsset = append(tokensAsset, token)
 									} else {
@@ -634,11 +634,11 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 							if v.Used == true {
 								continue
 							}
-							dbAsset, errAsset := w.db.GetAsset(k, nil)
+							assetGuid := strconv.FormatUint(k, 10)
+							dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 							if errAsset != nil || dbAsset == nil {
 								dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 							}
-							assetGuid := strconv.FormatUint(k, 10)
 							tokensAsset = append(tokensAsset, &bchain.Token{
 								Type:             bchain.SPTTokenType,
 								Name:             address,
