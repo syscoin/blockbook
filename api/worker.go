@@ -771,17 +771,14 @@ func (t *Tx) getAddrEthereumTypeMempoolInputValue(addrDesc bchain.AddressDescrip
 	return &val
 }
 
-func (t *Tx) getAssetValue(assetGuid string, uBalSat *big.Int) {
+func (t *Tx) getAssetOutValue(assetGuid string) *big.Int {
+	var val big.Int
 	for _, vout := range t.Vout {
 		if vout.AssetInfo != nil && vout.AssetInfo.AssetGuid == assetGuid {
-			uBalSat.Add(uBalSat, (*big.Int)(vout.AssetInfo.ValueSat))
+			val.Add(&val, (*big.Int)(vout.AssetInfo.ValueSat))
 		}
 	}
-	for _, vin := range t.Vin {
-		if vin.AssetInfo != nil && vin.AssetInfo.AssetGuid == assetGuid {
-			uBalSat.Sub(uBalSat, (*big.Int)(vin.AssetInfo.ValueSat))
-		}
-	}
+	return &val
 }
 
 func (t *Tx) getAddrVinValue(addrDesc bchain.AddressDescriptor, mapAssetMempool map[string]*TokenMempoolInfo) *big.Int {
@@ -1509,7 +1506,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			} else {
 				// skip already confirmed txs, mempool may be out of sync
 				if tx.Confirmations == 0 {
-					tx.getAssetValue(asset, &uBalSat)
+					uBalSat.Add(&uBalSat, tx.getAssetOutValue(asset))
 					unconfirmedTxs++
 					if page == 0 {
 						if option == AccountDetailsTxidHistory {
