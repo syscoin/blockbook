@@ -604,7 +604,8 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
 									if token.Type != bchain.XPUBAddressTokenType {
 										mempoolAsset, ok := mapAssetMempool[token.AssetGuid]
-										if ok {
+										// add unique asset token balances for unconfirmed state
+										if ok && token.UnconfirmedBalanceSat == nil {
 											token.UnconfirmedBalanceSat = (*bchain.Amount)(mempoolAsset.ValueSat)
 											token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
 										}
