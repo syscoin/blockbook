@@ -146,6 +146,10 @@
     <table class="table data-table">
         <tbody>
             <tr>
+                <td style="width: 25%;">Unconfirmed Balance</td>
+                <td class="data">{{formatAmountWithDecimals $asset.UnconfirmedBalanceSat $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
+            </tr>
+            <tr>
                 <td>No. Transactions</td>
                 <td class="data">{{$asset.UnconfirmedTxs}}</td>
             </tr>
