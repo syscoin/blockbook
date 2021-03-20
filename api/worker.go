@@ -1333,7 +1333,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			if v.Used == true {
 				continue
 			}
-			assetGuid, err := strconv.ParseUint(k, 10)
+			assetGuid, err := strconv.ParseUint(k, 10, 64)
 			if err != nil {
 				return nil, err
 			}
