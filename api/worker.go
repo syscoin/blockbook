@@ -1334,7 +1334,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				continue
 			}
 			assetGuid := strconv.FormatUint(k, 10)
-			dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
+			dbAsset, errAsset := w.db.GetAsset(k, nil)
 			if errAsset != nil || dbAsset == nil {
 				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 			}
