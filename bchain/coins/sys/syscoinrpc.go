@@ -88,3 +88,9 @@ func (b *SyscoinRPC) GetChainTips() (string, error) {
 	}
 	return result, nil
 }
+
+// GetTransactionForMempool returns a transaction by the transaction ID.
+// It could be optimized for mempool, i.e. without block time and confirmations
+func (b *SyscoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
+	return b.GetTransaction(txid)
+}
