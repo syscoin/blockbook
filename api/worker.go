@@ -1311,7 +1311,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					unconfirmedTransfers = mempoolAsset.UnconfirmedTxs
 					// set address to used to ensure uniqueness
 					mempoolAsset.Used = true
-					mapAssetMempool[vout.AssetInfo.AssetGuid] = mempoolAsset
+					mapAssetMempool[assetGuid] = mempoolAsset
 				}
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
@@ -1343,10 +1343,10 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				Name:             address,
 				Decimals:         int(dbAsset.AssetObj.Precision),
 				Symbol:			  string(dbAsset.AssetObj.Symbol),
-				BalanceSat:       &bchain.Amount{0},
+				BalanceSat:       &bchain.Amount{},
 				UnconfirmedBalanceSat:       (*bchain.Amount)(v.ValueSat),
-				TotalReceivedSat: &bchain.Amount{0},
-				TotalSentSat:     &bchain.Amount{0},
+				TotalReceivedSat: &bchain.Amount{},
+				TotalSentSat:     &bchain.Amount{},
 				AssetGuid:		  assetGuid,
 				Transfers:		  0,
 				UnconfirmedTransfers:		   v.UnconfirmedTxs,
