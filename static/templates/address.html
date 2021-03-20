@@ -130,13 +130,13 @@
                                 <th>Unconfirmed Balance</th>
                                 <th style="width: 15%;">Transfers</th>
                             </tr>
-                            {{- range $t := $addr.Tokens -}}{{- if $t -}}
+                            {{- range $t := $addr.Tokens -}}{{- if $t -}}{{- if $t.UnconfirmedBalanceSat -}}
                             <tr>
                                 <td class="data ellipsis">{{if $t.AssetGuid}}<a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>{{else}}{{$t.Name}}{{end}}&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
                                 <td class="data ellipsis">{{formatAmountWithDecimals $t.UnconfirmedBalanceSat $t.Decimals}}</td>
                                 <td class="data">{{$t.UnconfirmedTransfers}}</td>
                             </tr>
-                            {{- end -}}{{- end -}}
+                            {{- end -}}{{- end -}}{{- end -}}
                         </tbody>
                     </table>
                 </td>
