@@ -651,7 +651,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								UnconfirmedBalanceSat:       (*bchain.Amount)(v.ValueSat),
 								TotalReceivedSat: &bchain.Amount{},
 								TotalSentSat:     &bchain.Amount{},
-								AssetGuid:		  assetGuid,
+								AssetGuid:		  k,
 								Transfers:		  0,
 								UnconfirmedTransfers:		   v.UnconfirmedTxs,
 							})
