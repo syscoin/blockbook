@@ -771,21 +771,15 @@ func (t *Tx) getAddrEthereumTypeMempoolInputValue(addrDesc bchain.AddressDescrip
 	return &val
 }
 
-func (t *Tx) getAssetValue(assetGuid string, tokenMempoolInfo *TokenMempoolInfo) {
-	var foundAsset bool = false
+func (t *Tx) getAssetValue(assetGuid string, uBalSat *big.Int) {
 	for _, vout := range t.Vout {
 		if vout.AssetInfo != nil && vout.AssetInfo.AssetGuid == assetGuid {
-			tokenMempoolInfo.ValueSat.Add(tokenMempoolInfo.ValueSat, (*big.Int)(vout.AssetInfo.ValueSat))
-			// count tx only once
-			if !foundAsset {
-				tokenMempoolInfo.UnconfirmedTxs++
-			}
-			foundAsset = true
+			uBalSat.Add(uBalSat, (*big.Int)(vout.AssetInfo.ValueSat))
 		}
 	}
 	for _, vin := range t.Vin {
 		if vin.AssetInfo != nil && vin.AssetInfo.AssetGuid == assetGuid {
-			tokenMempoolInfo.ValueSat.Sub(tokenMempoolInfo.ValueSat, (*big.Int)(vin.AssetInfo.ValueSat))
+			uBalSat.Sub(uBalSat, (*big.Int)(vin.AssetInfo.ValueSat))
 		}
 	}
 }
@@ -1446,6 +1440,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		pg                       Paging
 		unconfirmedTxs           int
 		totalResults             int
+		uBalSat                  big.Int
 	)
 	var err error
 	assetGuid, err := strconv.ParseUint(asset, 10, 64)
@@ -1476,13 +1471,13 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		}
 		for _, txid := range txm {
 			tx, err := w.GetTransaction(txid, false, false)
-			tx.getAssetValue(asset, &tokenMempoolInfo)
 			// mempool transaction may fail
 			if err != nil || tx == nil {
 				glog.Warning("GetTransaction in mempool: ", err)
 			} else {
 				// skip already confirmed txs, mempool may be out of sync
 				if tx.Confirmations == 0 {
+					tx.getAssetValue(asset, &uBalSat)
 					unconfirmedTxs++
 					if page == 0 {
 						if option == AccountDetailsTxidHistory {
@@ -1537,10 +1532,9 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			Decimals:		int(dbAsset.AssetObj.Precision),
 			UpdateCapabilityFlags:	dbBaseAsset.AssetObj.UpdateCapabilityFlags,
 			NotaryKeyID: 	dbBaseAsset.AssetObj.NotaryKeyID,
-			UnconfirmedTxs: tokenMempoolInfo.UnconfirmedTxs,
-			UnconfirmedBalanceSat: (*bchain.Amount)(tokenMempoolInfo.ValueSat),
 		},
 		Paging:                pg,
+		UnconfirmedBalanceSat: (*bchain.Amount)(&uBalSat),
 		UnconfirmedTxs:        unconfirmedTxs,
 		Transactions:          txs,
 		Txs:				   int(dbAsset.Transactions),
