@@ -1467,7 +1467,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	} else {
 		totalResults = -1
 	}
-	tokenMempoolInfo TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &big.Int{}}
+	tokenMempoolInfo := TokenMempoolInfo{UnconfirmedTxs: 0, ValueSat: &big.Int{}}
 	// process mempool, only if toHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txm, err = w.getAssetTxids(assetGuid, true, filter, maxInt)
