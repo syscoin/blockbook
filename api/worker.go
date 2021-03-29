@@ -276,6 +276,9 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			glog.V(2).Infof("getAddressesFromVout error %v, %v, output %v", err, bchainTx.Txid, bchainVout.N)
 		}
 		if vout.AssetInfo != nil {
+			if mapTTS == nil {
+				mapTTS = map[uint64]*bchain.TokenTransferSummary{}
+			}
 			tts, ok := mapTTS[bchainVout.AssetInfo.AssetGuid]
 			if !ok {
 				dbAsset, errAsset := w.db.GetAsset(bchainVout.AssetInfo.AssetGuid, nil)
