@@ -159,7 +159,7 @@
 {{- end}}{{if or $asset.Transactions $asset.Filter -}}
 <div class="row h-container">
     <h3 class="col-md-3">Transactions</h3>
-    <select class="col-md-2" style="background-color: #eaeaea;" onchange="self.location='?filter='+options[selectedIndex].value">
+    <select class="col-md-2" style="background-color: #eaeaea;" onchange="self.location='?assetMask='+options[selectedIndex].value">
         <option>All</option>
         <option {{if eq $asset.Filter "token-transfers" -}} selected{{end}} value="token-transfers">Transfers</option>
         <option {{if eq $asset.Filter "non-token-transfers" -}} selected{{end}} value="non-token-transfers">Non-Transfers</option>

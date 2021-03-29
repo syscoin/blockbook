@@ -866,7 +866,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	data.Page = asset.Page
 	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
 	if filterParam != "" {
-		data.PageParams = template.URL("&filter=" + filterParam)
+		data.PageParams = template.URL("&assetMask=" + filterParam)
 		data.Asset.Filter = filterParam
 	}
 	return assetTpl, data, nil
