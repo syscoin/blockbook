@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"unicode/utf8"
 	"math/big"
 	"strconv"
 	"github.com/golang/glog"
@@ -143,14 +144,7 @@ func (p *BitcoinParser) TryParseOPReturn(script []byte) string {
 				return ed
 			}
 
-			isASCII := true
-			for _, c := range data {
-				if c < 32 || c > 127 {
-					isASCII = false
-					break
-				}
-			}
-			if isASCII {
+			if utf8.Valid(data) {
 				ed = "(" + string(data) + ")"
 			} else {
 				ed = hex.EncodeToString(data)
