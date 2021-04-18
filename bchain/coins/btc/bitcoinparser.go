@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"unicode/utf8"
 	"math/big"
 	"strconv"
 	"github.com/golang/glog"
 	
+	"unicode/utf8"
+
 	vlq "github.com/bsm/go-vlq"
 	"github.com/juju/errors"
 	"github.com/martinboehm/btcd/blockchain"
@@ -123,6 +124,7 @@ func (p *BitcoinParser) TryParseOPReturn(script []byte) string {
 		// trying 2 variants of OP_RETURN data
 		// 1) OP_RETURN OP_PUSHDATA1 <datalen> <data>
 		// 2) OP_RETURN <datalen> <data>
+		// 3) OP_RETURN OP_PUSHDATA2 <datalenlow> <datalenhigh> <data>
 		var data []byte
 		var l int
 		if script[1] == txscript.OP_PUSHDATA1 && len(script) > 2 {
@@ -132,6 +134,9 @@ func (p *BitcoinParser) TryParseOPReturn(script []byte) string {
 				l = int(script[1])
 				data = script[2:]
 			}
+		} else if script[1] == txscript.OP_PUSHDATA2 && len(script) > 3 {
+			l = int(script[2]) + int(script[3])<<8
+			data = script[4:]
 		} else {
 			l = int(script[1])
 			data = script[2:]
