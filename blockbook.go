@@ -713,7 +713,7 @@ func computeFeeStats(stopCompute chan os.Signal, blockFrom, blockTo int, db *db.
 		return err
 	}
 	err = api.ComputeFeeStats(blockFrom, blockTo, stopCompute)
-	glog.Info("computeFeeStats finished in ", time.Since(start))
+	glog.Info("computeFeeStats, ", time.Since(start))
 	return err
 }
 

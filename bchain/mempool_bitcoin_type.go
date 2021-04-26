@@ -202,6 +202,6 @@ func (m *MempoolBitcoinType) Resync() (int, error) {
 			m.mux.Unlock()
 		}
 	}
-	glog.Info("mempool: resync finished in ", time.Since(start), ", ", len(m.txEntries), " transactions in mempool")
+	glog.Info("mempool: resync, ", time.Since(start), ", ", len(m.txEntries), " transactions in mempool")
 	return len(m.txEntries), nil
 }

@@ -108,7 +108,7 @@ func (w *Worker) GetSpendingTxid(txid string, n int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	glog.Info("GetSpendingTxid ", txid, " ", n, " finished in ", time.Since(start))
+	glog.Info("GetSpendingTxid ", txid, " ", n, ", ", time.Since(start))
 	return tx.Vout[n].SpentTxID, nil
 }
 
@@ -1365,7 +1365,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		Erc20Contract:         erc20c,
 		Nonce:                 nonce,
 	}
-	glog.Info("GetAddress ", address, " finished in ", time.Since(start))
+	glog.Info("GetAddress ", address, ", ", time.Since(start))
 	return r, nil
 }
 
@@ -1414,7 +1414,7 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 			assetDetails = append(assetDetails, &assetSpecific)
 		}
 	}
-	glog.Info("FindAssetsFromFilter finished in ", time.Since(start))
+	glog.Info("FindAssetsFromFilter, ", time.Since(start))
 	return assetDetails
 }
 
@@ -1439,7 +1439,7 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 		NumAssets:			len(assetsFiltered),
 		Filter:				filter,
 	}
-	glog.Info("FindAssets filter: ", filter, " finished in ", time.Since(start))
+	glog.Info("FindAssets filter: ", filter, ", ", time.Since(start))
 	return r
 }
 func (w *Worker) GetChainTips() (string, error) {
@@ -1572,7 +1572,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	if len(dbBaseAsset.AssetObj.PubData) > 0 {
 		json.Unmarshal(dbBaseAsset.AssetObj.PubData, &r.AssetDetails.PubData)
 	}
-	glog.Info("GetAsset ", asset, " finished in ", time.Since(start))
+	glog.Info("GetAsset ", asset, ", ", time.Since(start))
 	return r, nil
 }
 
@@ -1799,7 +1799,7 @@ func (w *Worker) GetBalanceHistory(address string, fromTimestamp, toTimestamp in
 	if err != nil {
 		return nil, err
 	}
-	glog.Info("GetBalanceHistory ", address, ", blocks ", fromHeight, "-", toHeight, ", count ", len(bha), " finished in ", time.Since(start))
+	glog.Info("GetBalanceHistory ", address, ", blocks ", fromHeight, "-", toHeight, ", count ", len(bha), ", ", time.Since(start))
 	return bha, nil
 }
 
@@ -1999,7 +1999,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 			assets = append(assets, assetDetails)
 		}
 	}
-	glog.Info("GetAddressUtxo ", address, ", ", len(utxoRes.Utxos), " utxos, ", len(assets), " assets, finished in ", time.Since(start))
+	glog.Info("GetAddressUtxo ", address, ", ", len(utxoRes.Utxos), " utxos, ", len(assets), " assets, ", time.Since(start))
 	if len(assets) > 0 {
 		utxoRes.Assets = assets
 	}
@@ -2032,7 +2032,7 @@ func (w *Worker) GetBlocks(page int, blocksOnPage int) (*Blocks, error) {
 		}
 		r.Blocks[i-from] = *bi
 	}
-	glog.Info("GetBlocks page ", page, " finished in ", time.Since(start))
+	glog.Info("GetBlocks page ", page, ", ", time.Since(start))
 	return r, nil
 }
 
@@ -2294,7 +2294,7 @@ func (w *Worker) GetFeeStats(bid string) (*FeeStats, error) {
 		}
 	}
 
-	glog.Info("GetFeeStats ", bid, " (", len(feesPerKb), " txs) finished in ", time.Since(start))
+	glog.Info("GetFeeStats ", bid, " (", len(feesPerKb), " txs), ", time.Since(start))
 
 	return &FeeStats{
 		TxCount:         len(feesPerKb),
@@ -2346,7 +2346,7 @@ func (w *Worker) GetBlock(bid string, page int, txsOnPage int) (*Block, error) {
 	}
 	txs = txs[:txi]
 	bi.Txids = nil
-	glog.Info("GetBlock ", bid, ", page ", page, " finished in ", time.Since(start))
+	glog.Info("GetBlock ", bid, ", page ", page, ", ", time.Since(start))
 	return &Block{
 		Paging: pg,
 		BlockInfo: BlockInfo{
@@ -2487,7 +2487,7 @@ func (w *Worker) GetSystemInfo(internal bool) (*SystemInfo, error) {
 		Consensus:       ci.Consensus,
 	}
 	w.is.SetBackendInfo(backendInfo)
-	glog.Info("GetSystemInfo finished in ", time.Since(start))
+	glog.Info("GetSystemInfo, ", time.Since(start))
 	return &SystemInfo{blockbookInfo, backendInfo}, nil
 }
 

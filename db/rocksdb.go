@@ -1676,7 +1676,7 @@ func (d *RocksDB) ComputeInternalStateColumnStats(stopCompute chan os.Signal) er
 		d.is.SetDBColumnStats(c, rows, keysSum, valuesSum)
 		glog.Info("db: Column ", cfNames[c], ": rows ", rows, ", key bytes ", keysSum, ", value bytes ", valuesSum)
 	}
-	glog.Info("db: ComputeInternalStateColumnStats finished in ", time.Since(start))
+	glog.Info("db: ComputeInternalStateColumnStats, ", time.Since(start))
 	return nil
 }
 

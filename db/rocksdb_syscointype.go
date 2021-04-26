@@ -395,7 +395,7 @@ func (d *RocksDB) SetupAssetCache() error {
 		}
 		AssetCache[assetKey] = *assetDb
 	}
-	glog.Info("SetupAssetCache finished in ", time.Since(start))
+	glog.Info("SetupAssetCache, ", time.Since(start))
 	return nil
 }
 
