@@ -693,6 +693,7 @@ func (s *WebsocketServer) subscribeNewBlock(c *websocketChannel, req *websocketR
 	s.newBlockSubscriptionsLock.Lock()
 	defer s.newBlockSubscriptionsLock.Unlock()
 	s.newBlockSubscriptions[c] = req.ID
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeNewBlock"})).Set(float64(len(s.newBlockSubscriptions)))
 	return &subscriptionResponse{true}, nil
 }
 
@@ -700,6 +701,7 @@ func (s *WebsocketServer) unsubscribeNewBlock(c *websocketChannel) (res interfac
 	s.newBlockSubscriptionsLock.Lock()
 	defer s.newBlockSubscriptionsLock.Unlock()
 	delete(s.newBlockSubscriptions, c)
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeNewBlock"})).Set(float64(len(s.newBlockSubscriptions)))
 	return &subscriptionResponse{false}, nil
 }
 
@@ -710,6 +712,7 @@ func (s *WebsocketServer) subscribeNewTransaction(c *websocketChannel, req *webs
 		return &subscriptionResponseMessage{false, "subscribeNewTransaction not enabled, use -enablesubnewtx flag to enable."}, nil
 	}
 	s.newTransactionSubscriptions[c] = req.ID
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeNewTransaction"})).Set(float64(len(s.newTransactionSubscriptions)))
 	return &subscriptionResponse{true}, nil
 }
 
@@ -720,6 +723,7 @@ func (s *WebsocketServer) unsubscribeNewTransaction(c *websocketChannel) (res in
 		return &subscriptionResponseMessage{false, "unsubscribeNewTransaction not enabled, use -enablesubnewtx flag to enable."}, nil
 	}
 	delete(s.newTransactionSubscriptions, c)
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeNewTransaction"})).Set(float64(len(s.newTransactionSubscriptions)))
 	return &subscriptionResponse{false}, nil
 }
 
@@ -770,6 +774,7 @@ func (s *WebsocketServer) subscribeAddresses(c *websocketChannel, addrDesc []bch
 		}
 		as[c] = req.ID
 	}
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeAddresses"})).Set(float64(len(s.addressSubscriptions)))
 	return &subscriptionResponse{true}, nil
 }
 
@@ -778,6 +783,7 @@ func (s *WebsocketServer) unsubscribeAddresses(c *websocketChannel) (res interfa
 	s.addressSubscriptionsLock.Lock()
 	defer s.addressSubscriptionsLock.Unlock()
 	s.doUnsubscribeAddresses(c)
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeAddresses"})).Set(float64(len(s.addressSubscriptions)))
 	return &subscriptionResponse{false}, nil
 }
 
@@ -810,6 +816,7 @@ func (s *WebsocketServer) subscribeFiatRates(c *websocketChannel, currency strin
 		s.fiatRatesSubscriptions[currency] = as
 	}
 	as[c] = req.ID
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeFiatRates"})).Set(float64(len(s.fiatRatesSubscriptions)))
 	return &subscriptionResponse{true}, nil
 }
 
@@ -818,6 +825,7 @@ func (s *WebsocketServer) unsubscribeFiatRates(c *websocketChannel) (res interfa
 	s.fiatRatesSubscriptionsLock.Lock()
 	defer s.fiatRatesSubscriptionsLock.Unlock()
 	s.doUnsubscribeFiatRates(c)
+	s.metrics.WebsocketSubscribes.With((common.Labels{"method": "subscribeFiatRates"})).Set(float64(len(s.fiatRatesSubscriptions)))
 	return &subscriptionResponse{false}, nil
 }
 
