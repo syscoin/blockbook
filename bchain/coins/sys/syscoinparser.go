@@ -333,7 +333,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.Asse
 	var memo []byte
 	if bytesLeft > 0 {
 		totalSize := r.Size()
-		offset :=  totalSize - bytesLeft
+		offset :=  totalSize - int64(bytesLeft)
 		memo = make([]byte, bytesLeft)
 		r.ReadAt(memo, offset)
 	}
