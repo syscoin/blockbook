@@ -306,7 +306,7 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 		if dBAssetAllocationMemo.PrevMemo == nil {
 			dBAssetAllocationMemo.InitialMemo = nil
 			dBAssetAllocationMemo.MostRecentMemo = nil
-		} else if dBAssetAllocationMemo != nil {
+		} else {
 			dBAssetAllocationMemo.MostRecentMemo = dBAssetAllocationMemo.PrevMemo
 			dBAssetAllocationMemo.PrevMemo = nil
 		}
