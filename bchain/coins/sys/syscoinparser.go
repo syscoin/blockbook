@@ -490,7 +490,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	buf = p.BaseParser.PackVarBytes(ta.Memo, buf, varBuf)
+	buf, _ = p.BaseParser.PackVarBytes(ta.Memo, buf, varBuf)
 	return buf
 }
 
@@ -528,7 +528,7 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 			l += p.UnpackAssetInfo(to.AssetInfo, buf[l:])
 		}
 	}
-	ta.Memo, ll = p.BaseParser.UnpackVarBytes(buf[l:])
+	ta.Memo, _ = p.BaseParser.UnpackVarBytes(buf[l:])
 	return &ta, nil
 }
 
