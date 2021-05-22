@@ -480,7 +480,7 @@ func (p *BaseParser) PackVarBytes(bufValue []byte, buf []byte, varBuf []byte) ([
 	if len > 0 {
 		buf = append(buf, bufValue...)
 	}
-	return buf, int(l + len)
+	return buf, l + int(len)
 }
 
 const (
