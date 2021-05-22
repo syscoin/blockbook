@@ -378,8 +378,8 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
 }
 
 func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *bchain.AddressDescriptor) string {
-	buf := make([]byte, len(addrDesc)+vlq.MaxLen64)
-	copy(buf, addrDesc)
+	buf := make([]byte, len(*addrDesc)+vlq.MaxLen64)
+	copy(buf, *addrDesc)
 	varBuf := make([]byte, vlq.MaxLen64)
 	l := p.BaseParser.PackVaruint64(assetGuid, varBuf)
 	buf = append(buf, varBuf[:l]...)
