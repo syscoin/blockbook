@@ -348,7 +348,7 @@ func (p *BaseParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
 	return 0, 0
 }
 func (p *BaseParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *AddressDescriptor) string {
-	return nil
+	return ""
 }
 func (p *BaseParser) PackAssetAllocationMemo(assetAllocationMemo *AssetAllocationMemo) []byte {
 	return nil
