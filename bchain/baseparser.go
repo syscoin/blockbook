@@ -374,10 +374,10 @@ func (p *BaseParser) GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, erro
 func (p *BaseParser) GetAssetFromVout(vout []Vout) (*Asset, error)  {
 	return nil, errors.New("Not supported")
 }
-func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor) (*AssetAllocation, error) {
+func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor) (*AssetAllocation, []byte, error) {
 	return nil, errors.New("Not supported")
 }
-func (p *BaseParser) GetAllocationFromTx(tx *Tx) (*AssetAllocation, error) {
+func (p *BaseParser) GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error) {
 	return nil, errors.New("Not supported")
 }
 func (p *BaseParser) LoadAssets(tx *Tx) error {
