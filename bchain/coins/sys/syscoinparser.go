@@ -329,8 +329,15 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.Asse
 	if err != nil {
 		return nil, nil, err
 	}
-	var memo = make([]byte, maxMemoLen)
-	return &assetAllocation, memo[:0], nil
+	bytesLeft := r.Len()
+	var memo []byte
+	if bytesLeft > 0 {
+		totalSize := r.Size()
+		offset :=  totalSize - bytesLeft
+		memo = make([]byte, bytesLeft)
+		r.ReadAt(memo, offset)
+	}
+	return &assetAllocation, memo, nil
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
     if p.IsSyscoinTx(tx.Version) {
