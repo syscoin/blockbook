@@ -199,7 +199,7 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 	}
 	balanceAsset.BalanceSat.Add(balanceAsset.BalanceSat, assetInfo.ValueSat)
 	if len(memo) > 0 {
-		dBAssetAllocationMemo, _ := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
+		dBAssetAllocationMemo, strKey := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
 		// memo doesn't exist
 		if dBAssetAllocationMemo == nil {
 			dBAssetAllocationMemo = &bchain.AssetAllocationMemo{InitialMemo: memo, MostRecentMemo: memo}
@@ -207,7 +207,7 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 			dBAssetAllocationMemo.PrevMemo = dBAssetAllocationMemo.MostRecentMemo
 			dBAssetAllocationMemo.MostRecentMemo = memo
 		}
-		
+		assetAllocationMemos[strKey] = dBAssetAllocationMemo
 	}
 	return nil
 }
@@ -298,8 +298,8 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 		balanceAsset.Transfers--
 	}
 	if len(memo) > 0 {
-		dBAssetAllocationMemo, err := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
-		if err == nil {
+		dBAssetAllocationMemo, strKey := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
+		if dBAssetAllocationMemo == nil {
 			return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read memo " , assetInfo.AssetGuid, " memo ", memo, " memo (length): ", len(memo)))
 		}
 		if dBAssetAllocationMemo.PrevMemo == nil {
@@ -309,6 +309,7 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 			dBAssetAllocationMemo.MostRecentMemo = dBAssetAllocationMemo.PrevMemo
 			dBAssetAllocationMemo.PrevMemo = nil
 		}
+		assetAllocationMemos[strKey] = dBAssetAllocationMemo
 	}
 	assets[assetInfo.AssetGuid] = dBAsset
 	return nil
@@ -516,32 +517,34 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	}
 	return assetDb, nil
 }
-func (d *RocksDB) GetAssetAllocationMemo(guid uint64, addrDesc *bchain.AddressDescriptor, assetAllocationMemos bchain.TxAssetAllocationMemoMap) (*bchain.AssetAllocationMemo, error) {
+func (d *RocksDB) GetAssetAllocationMemo(guid uint64, addrDesc *bchain.AddressDescriptor, assetAllocationMemos bchain.TxAssetAllocationMemoMap) (*bchain.AssetAllocationMemo, string) {
 	var assetAllocationMemoDb *bchain.AssetAllocationMemo
 	var assetAllocationMemoL1 *bchain.AssetAllocationMemo
 	key := d.chainParser.PackAssetAllocationMemoKey(guid, addrDesc)
+	strKey := string(key)
 	var ok bool
 	if assetAllocationMemos != nil {
-		if assetAllocationMemoL1, ok = assetAllocationMemos[string(key)]; ok {
-			return assetAllocationMemoL1, nil
+		if assetAllocationMemoL1, ok = assetAllocationMemos[strKey]; ok {
+			return assetAllocationMemoL1, strKey
 		}
 	}
 	
 	val, err := d.db.GetCF(d.ro, d.cfh[cfAssetAllocationMemos], key)
 	if err != nil {
-		return nil, err
+		return nil, strKey
 	}
 	// nil data means the key was not found in DB
 	if val.Data() == nil {
-		return nil, nil
+		return nil, strKey
 	}
 	defer val.Free()
 	buf := val.Data()
 	if len(buf) == 0 {
-		return nil, errors.New("GetAssetAllocationMemo: empty value in asset allocation memo db")
+		glog.Warningf("GetAssetAllocationMemo: empty value in asset allocation memo db")
+		return nil, strKey
 	}
 	assetAllocationMemoDb = d.chainParser.UnpackAssetAllocationMemo(buf)
-	return assetAllocationMemoDb, nil
+	return assetAllocationMemoDb, strKey
 }
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets bchain.TxAssetMap) error {
 	for key, txAsset := range txassets {
