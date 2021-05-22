@@ -365,7 +365,7 @@ func (p *BaseParser) UnpackAssetTxIndex(buf []byte) []*TxAssetIndex {
 func (p *BaseParser) GetAssetFromData(sptData []byte) (*Asset, error) {
 	return nil, errors.New("Not supported")
 }
-func (p *BaseParser) GetAssetAllocationFromData(sptData []byte) (*AssetAllocation, []byte, error) {
+func (p *BaseParser) GetAssetAllocationFromData(sptData []byte, txVersion int32) (*AssetAllocation, []byte, error) {
 	return nil, nil, errors.New("Not supported")
 }
 func (p *BaseParser) GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, error) {
@@ -374,7 +374,7 @@ func (p *BaseParser) GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, erro
 func (p *BaseParser) GetAssetFromVout(vout []Vout) (*Asset, error)  {
 	return nil, errors.New("Not supported")
 }
-func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor) (*AssetAllocation, []byte, error) {
+func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor, txVersion int32) (*AssetAllocation, []byte, error) {
 	return nil, nil, errors.New("Not supported")
 }
 func (p *BaseParser) GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error) {

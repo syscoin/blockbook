@@ -269,7 +269,7 @@ func (p *SyscoinParser) GetAllocationFromTx(tx *bchain.Tx) (*bchain.AssetAllocat
 			break
 		}
 	}
-	return p.GetAssetAllocationFromDesc(&addrDesc)
+	return p.GetAssetAllocationFromDesc(&addrDesc, tx.Version)
 }
 func (p *SyscoinParser) GetSPTDataFromDesc(addrDesc *bchain.AddressDescriptor) ([]byte, error) {
 	script, err := p.GetScriptFromAddrDesc(*addrDesc)
@@ -305,12 +305,12 @@ func (p *SyscoinParser) GetAssetFromDesc(addrDesc *bchain.AddressDescriptor) (*b
 	return p.GetAssetFromData(sptData)
 }
 
-func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescriptor) (*bchain.AssetAllocation, []byte, error) {
+func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescriptor, txVersion int32) (*bchain.AssetAllocation, []byte, error) {
 	sptData, err := p.GetSPTDataFromDesc(addrDesc)
 	if err != nil {
 		return nil, nil, err
 	}
-	return p.GetAssetAllocationFromData(sptData)
+	return p.GetAssetAllocationFromData(sptData, txVersion)
 }
 
 func (p *SyscoinParser) GetAssetFromData(sptData []byte) (*bchain.Asset, error) {
@@ -322,20 +322,18 @@ func (p *SyscoinParser) GetAssetFromData(sptData []byte) (*bchain.Asset, error) 
 	}
 	return &asset, nil
 }
-func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.AssetAllocation, []byte, error) {
+func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int32) (*bchain.AssetAllocation, []byte, error) {
 	var assetAllocation bchain.AssetAllocation
 	r := bytes.NewReader(sptData)
 	err := assetAllocation.AssetObj.Deserialize(r)
 	if err != nil {
 		return nil, nil, err
 	}
-	bytesLeft := r.Len()
 	var memo []byte
-	if bytesLeft > 0 {
-		totalSize := r.Size()
-		offset :=  totalSize - int64(bytesLeft)
-		memo = make([]byte, bytesLeft)
-		r.ReadAt(memo, offset)
+	if p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN {
+		memo = make([]byte, maxMemoLen)
+		n, _ = r.Read(memo)
+		memo = memo[:n]
 	}
 	return &assetAllocation, memo, nil
 }

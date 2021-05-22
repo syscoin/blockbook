@@ -783,10 +783,10 @@ type BlockChainParser interface {
 	PackAsset(asset *Asset) ([]byte, error)
 	UnpackAsset(buf []byte) (*Asset, error)
 	GetAssetFromData(sptData []byte) (*Asset, error)
-	GetAssetAllocationFromData(sptData []byte) (*AssetAllocation, []byte, error)
+	GetAssetAllocationFromData(sptData []byte, txVersion int32) (*AssetAllocation, []byte, error)
 	GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, error)
 	GetAssetFromVout(vout []Vout) (*Asset, error) 
-	GetAssetAllocationFromDesc(addrDesc *AddressDescriptor) (*AssetAllocation, []byte, error) 
+	GetAssetAllocationFromDesc(addrDesc *AddressDescriptor, txVersion int32) (*AssetAllocation, []byte, error) 
 	GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error)
 	LoadAssets(tx *Tx) error
 	AppendAssetInfo(assetInfo *AssetInfo, buf []byte, varBuf []byte) []byte
