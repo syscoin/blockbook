@@ -580,11 +580,11 @@ func formatMemoField(a []byte) string {
 	if a == nil {
 		return ""
 	}
-	bs, err := hex.DecodeString(a)
+	bs, err := hex.DecodeString(string(a))
     if err != nil {
         return ""
     }
-	return bs
+	return string(bs)
 }
 
 func formatInt64WithDecimals(a int64, d int) string {

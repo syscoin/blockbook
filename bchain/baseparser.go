@@ -375,10 +375,10 @@ func (p *BaseParser) GetAssetFromVout(vout []Vout) (*Asset, error)  {
 	return nil, errors.New("Not supported")
 }
 func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor) (*AssetAllocation, []byte, error) {
-	return nil, errors.New("Not supported")
+	return nil, nil, errors.New("Not supported")
 }
 func (p *BaseParser) GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error) {
-	return nil, errors.New("Not supported")
+	return nil, nil, errors.New("Not supported")
 }
 func (p *BaseParser) LoadAssets(tx *Tx) error {
 	return errors.New("Not supported")
