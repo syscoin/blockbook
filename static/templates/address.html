@@ -88,6 +88,18 @@
                                     <td class="data ellipsis">{{formatAmountWithDecimals $t.BalanceSat $t.Decimals}}</td>
                                     <td class="data">{{$t.Transfers}}</td>
                                 </tr>
+                                {{- if $t.Memo -}}
+                                <tr>
+                                    <td class="data"><span class="text-muted">Initial Memo:</span></td>
+                                    <td class="data ellipsis" colspan="4">{{formatMemoField $t.Memo.InitialMemo}}</td>
+                                </tr>
+                                {{- if ne $t.Memo.InitialMemo $t.Memo.MostRecentMemo -}}
+                                <tr>
+                                    <td class="data"><span class="text-muted">Most Recent Memo:</span></td>
+                                    <td class="data ellipsis" colspan="4">{{formatMemoField $t.Memo.MostRecentMemo}}</td>
+                                </tr>
+                                {{- end -}}
+                                {{- end -}}
                                 {{- end -}}{{- end -}}
                             </tbody>
                         </table>

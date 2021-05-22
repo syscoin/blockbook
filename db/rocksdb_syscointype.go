@@ -163,7 +163,7 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	return nil
 }
 
-func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, isActivate bool, isAssetSendTx bool, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap) error {
+func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, isActivate bool, isAssetSendTx bool, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, assetAllocationMemos bchain.TxAssetAllocationMemoMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if !isActivate && err != nil {
 		return err
@@ -198,6 +198,18 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 		balanceAsset.Transfers++
 	}
 	balanceAsset.BalanceSat.Add(balanceAsset.BalanceSat, assetInfo.ValueSat)
+	if len(memo) > 0 {
+		dBAssetAllocationMemo, err := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
+		// memo doesn't exist
+		if err != nil {
+			dBAssetAllocationMemo.InitialMemo = memo
+			dBAssetAllocationMemo.MostRecentMemo = memo
+		} else {
+			dBAssetAllocationMemo.PrevMemo = dBAssetAllocationMemo.MostRecentMemo
+			dBAssetAllocationMemo.MostRecentMemo = memo
+		}
+		
+	}
 	return nil
 }
 
@@ -266,7 +278,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 	return nil
 }
 
-func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor, balanceAsset *bchain.AssetBalance,  btxID []byte, assetInfo *bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, assetFoundInTx func(asset uint64, btxID []byte) bool) error {
+func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor, balanceAsset *bchain.AssetBalance,  btxID []byte, assetInfo *bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, assetFoundInTx func(asset uint64, btxID []byte) bool, assetAllocationMemos bchain.TxAssetAllocationMemoMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if dBAsset == nil || err != nil {
 		if dBAsset == nil {
@@ -285,6 +297,19 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 	counted := d.addToAssetAddressMap(blockTxAssetAddresses, assetInfo.AssetGuid, btxID, addrDesc)
 	if !counted {
 		balanceAsset.Transfers--
+	}
+	if len(memo) > 0 {
+		dBAssetAllocationMemo, err := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
+		if err == nil {
+			return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read memo " , assetInfo.AssetGuid))
+		}
+		if dBAssetAllocationMemo.PrevMemo == nil {
+			dBAssetAllocationMemo.InitialMemo = nil
+			dBAssetAllocationMemo.MostRecentMemo = nil
+		} else {
+			dBAssetAllocationMemo.MostRecentMemo = dBAssetAllocationMemo.PrevMemo
+			dBAssetAllocationMemo.PrevMemo = nil
+		}
 	}
 	assets[assetInfo.AssetGuid] = dBAsset
 	return nil
@@ -492,7 +517,33 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	}
 	return assetDb, nil
 }
-
+func (d *RocksDB) GetAssetAllocationMemo(guid uint64, addrDesc *bchain.AddressDescriptor, assetAllocationMemos bchain.TxAssetAllocationMemoMap) (*bchain.AssetAllocationMemo, error) {
+	var assetAllocationMemoDb *bchain.AssetAllocationMemo
+	var assetAllocationMemoL1 *bchain.AssetAllocationMemo
+	key := d.chainParser.PackAssetAllocationMemoKey(guid, addrDesc)
+	var ok bool
+	if assetAllocationMemos != nil {
+		if assetAllocationMemoL1, ok = assetAllocationMemos[key]; ok {
+			return assetAllocationMemoL1, nil
+		}
+	}
+	
+	val, err := d.db.GetCF(d.ro, d.cfh[cfAssetAllocationMemos], []byte(key))
+	if err != nil {
+		return nil, err
+	}
+	// nil data means the key was not found in DB
+	if val.Data() == nil {
+		return nil, nil
+	}
+	defer val.Free()
+	buf := val.Data()
+	if len(buf) == 0 {
+		return nil, errors.New("GetAssetAllocationMemo: empty value in asset allocation memo db")
+	}
+	assetAllocationMemoDb = d.chainParser.UnpackAssetAllocationMemo(buf)
+	return assetAllocationMemoDb, nil
+}
 func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets bchain.TxAssetMap) error {
 	for key, txAsset := range txassets {
 		buf := d.chainParser.PackAssetTxIndex(txAsset)
@@ -501,6 +552,20 @@ func (d *RocksDB) storeTxAssets(wb *gorocksdb.WriteBatch, txassets bchain.TxAsse
 	return nil
 }
 
+func (d *RocksDB) storeAssetAllocationMemos(wb *gorocksdb.WriteBatch, assetAllocationMemos bchain.TxAssetAllocationMemoMap) error {
+	if assetAllocationMemos == nil {
+		return nil
+	}
+	for key, assetAllocationMemo := range assetAllocationMemos {
+		if assetAllocationMemo.InitialMemo == nil {
+			wb.DeleteCF(d.cfh[cfAssetAllocationMemos], []byte(key))	
+		} else {
+			buf := d.chainParser.PackAssetAllocationMemo(assetAllocationMemo)
+			wb.PutCF(d.cfh[cfAssetAllocationMemos], []byte(key), buf)
+		}
+	}
+	return nil
+}
 // GetTxAssets finds all asset transactions for each asset
 // Transaction are passed to callback function in the order from newest block to the oldest
 func (d *RocksDB) GetTxAssets(assetGuid uint64, lower uint32, higher uint32, assetsBitMask bchain.AssetsMask, fn GetTxAssetsCallback) (err error) {

@@ -347,6 +347,15 @@ func (p *BaseParser) PackAssetKey(assetGuid uint64, height uint32) []byte {
 func (p *BaseParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
 	return 0, 0
 }
+func (p *BaseParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *AddressDescriptor) string {
+	return nil
+}
+func (p *BaseParser) PackAssetAllocationMemo(assetAllocationMemo *AssetAllocationMemo) []byte {
+	return nil
+}
+func (p *BaseParser) UnpackAssetAllocationMemo(buf []byte) *AssetAllocationMemo {
+	return nil
+}
 func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte {
 	return nil
 }
@@ -457,14 +466,20 @@ func (p *BaseParser) UnpackVaruint64(buf []byte) (uint64, int) {
 
 func (p *BaseParser) UnpackVarBytes(buf []byte) ([]byte, int) {
 	txvalue, l := p.UnpackVaruint(buf)
+	if txvalue == 0 {
+		return nil, 0
+	}
 	bufValue := append([]byte(nil), buf[l:l+int(txvalue)]...)
 	return bufValue, (l+int(txvalue))
 }
 
 func (p *BaseParser) PackVarBytes(bufValue []byte, buf []byte, varBuf []byte) []byte {
-	l := p.PackVaruint(uint(len(bufValue)), varBuf)
-	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, bufValue...)
+	len := uint(len(bufValue)
+	l := p.PackVaruint(len, varBuf)
+	if len > 0 {
+		buf = append(buf, varBuf[:l]...)
+		buf = append(buf, bufValue...)
+	}
 	return buf
 }
 

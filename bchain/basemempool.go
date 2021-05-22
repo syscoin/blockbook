@@ -148,6 +148,9 @@ func (m *BaseMempool) txToMempoolTx(tx *Tx) *MempoolTx {
 		Vout:             tx.Vout,
 		CoinSpecificData: tx.CoinSpecificData,
 	}
+	if len(tx.Memo) > 0 {
+		mtx.Memo = tx.Memo
+	}
 	mtx.Vin = make([]MempoolVin, len(tx.Vin))
 	for i, vin := range tx.Vin {
 		mtx.Vin[i] = MempoolVin{

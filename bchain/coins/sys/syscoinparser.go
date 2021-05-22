@@ -3,6 +3,7 @@ package syscoin
 import (
 	"encoding/json"
 	"bytes"
+	"io"
 	"math/big"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
@@ -30,6 +31,7 @@ const (
 	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM int32 = 134
 	SYSCOIN_TX_VERSION_ALLOCATION_SEND int32 = 135
 	maxAddrDescLen = 10000
+	maxMemoLen = 80
 )
 
 // chain parameters
@@ -256,7 +258,7 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	return nil
 }
 
-func (p *SyscoinParser) GetAllocationFromTx(tx *bchain.Tx) (*bchain.AssetAllocation, error) {
+func (p *SyscoinParser) GetAllocationFromTx(tx *bchain.Tx) (*bchain.AssetAllocation, []byte, error) {
 	var addrDesc bchain.AddressDescriptor
 	var err error
 	for _, output := range tx.Vout {
@@ -304,7 +306,7 @@ func (p *SyscoinParser) GetAssetFromDesc(addrDesc *bchain.AddressDescriptor) (*b
 	return p.GetAssetFromData(sptData)
 }
 
-func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescriptor) (*bchain.AssetAllocation, error) {
+func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescriptor) (*bchain.AssetAllocation, []byte, error) {
 	sptData, err := p.GetSPTDataFromDesc(addrDesc)
 	if err != nil {
 		return nil, err
@@ -321,18 +323,22 @@ func (p *SyscoinParser) GetAssetFromData(sptData []byte) (*bchain.Asset, error) 
 	}
 	return &asset, nil
 }
-func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.AssetAllocation, error) {
+func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.AssetAllocation, []byte, error) {
 	var assetAllocation bchain.AssetAllocation
 	r := bytes.NewReader(sptData)
 	err := assetAllocation.AssetObj.Deserialize(r)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &assetAllocation, nil
+	memo, _ := r.ReadBytes(io.EOF)
+	if len(memo) > 0 {
+		memo = memo[:len(memo)-1]
+	}
+	return &assetAllocation, memo, nil
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
     if p.IsSyscoinTx(tx.Version) {
-        allocation, err := p.GetAllocationFromTx(tx);
+        allocation, tx.Memo, err := p.GetAllocationFromTx(tx);
 		if err != nil {
 			return err
 		}
@@ -371,6 +377,32 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
 	height := p.BaseParser.UnpackUint(buf[l:])
 	// height is packed in binary complement, convert it
 	return assetGuid, ^height
+}
+
+func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *bchain.AddressDescriptor) string {
+	buf := make([]byte, len(addrDesc)+vlq.MaxLen64)
+	copy(buf, addrDesc)
+	varBuf := make([]byte, vlq.MaxLen64)
+	l := p.BaseParser.PackVaruint64(assetGuid, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return string(buf)
+}
+
+func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAllocationMemo {
+	var assetAllocationMemo *bchain.AssetAllocationMemo
+	memo.InitialMemo, l := p.BaseParser.UnpackVarBytes(buf)
+	memo.MostRecentMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
+	memo.PrevMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
+	return assetAllocationMemo
+}
+
+func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
+	var buf []byte
+	varBuf := make([]byte, maxMemoLen)
+	buf = p.BaseParser.PackVarBytes(memo.InitialMemo, buf, varBuf)
+	buf = p.BaseParser.PackVarBytes(memo.MostRecentMemo, buf, varBuf)
+	buf = p.BaseParser.PackVarBytes(memo.PrevMemo, buf, varBuf)
+	return buf
 }
 
 func (p *SyscoinParser) PackAssetTxIndex(txAsset *bchain.TxAsset) []byte {
@@ -455,6 +487,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
+	buf = p.BaseParser.PackVarBytes(ta.Memo, buf, varBuf)
 	return buf
 }
 
@@ -492,6 +525,7 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 			l += p.UnpackAssetInfo(to.AssetInfo, buf[l:])
 		}
 	}
+	ta.Memo, ll = p.BaseParser.UnpackVarBytes(buf[l:])
 	return &ta, nil
 }
 

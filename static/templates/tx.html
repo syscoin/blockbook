@@ -65,6 +65,11 @@
                 <td>Fees</td>
                 <td class="data">{{formatAmount $tx.FeesSat}} {{$cs}}</td>
             </tr>{{end -}}
+            {{- if $tx.Memo -}}
+            <tr>
+                <td>Memo</td>
+                <td class="data">{{formatMemoField $tx.Memo}}</td>
+            </tr>{{end}}
             {{- if $tx.TokenTransferSummary -}}
             <tr>
                 <td>Tokens</td>

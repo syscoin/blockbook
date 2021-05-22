@@ -81,8 +81,11 @@
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
             {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if and $tokenTransfer $tokenTransfer.Fee}}	
-            <span class="txvalues txvalues-default">Fee: {{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</span>	
+            <span class="txvalues txvalues-default">SPT Fee: {{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</span>	
             {{- end -}}{{- end -}}
+            {{- if $tx.Memo -}}
+            <span class="txvalues txvalues-default ellipsis">Memo: {{formatMemoField $tx.Memo}} {{$cs}}</span>
+            {{- end -}}     
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">
             {{- if $tx.Confirmations -}}

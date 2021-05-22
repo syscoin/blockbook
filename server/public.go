@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -468,6 +469,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatUnixTime":           formatUnixTime,
 		"formatAmount":             s.formatAmount,
 		"formatAmountWithDecimals": formatAmountWithDecimals,
+		"formatMemoField":			formatMemoField,
 		"formatInt64WithDecimals": formatInt64WithDecimals,
 		"formatPercentage": 		formatPercentage,
 		"isAssetUpdateCapabilityFlagSet":     isAssetUpdateCapabilityFlagSet,
@@ -572,6 +574,17 @@ func formatAmountWithDecimals(a *bchain.Amount, d int) string {
 		return "0"
 	}
 	return a.DecimalString(d)
+}
+
+func formatMemoField(a []byte) string {
+	if a == nil {
+		return ""
+	}
+	bs, err := hex.DecodeString(a)
+    if err != nil {
+        return ""
+    }
+	return bs
 }
 
 func formatInt64WithDecimals(a int64, d int) string {

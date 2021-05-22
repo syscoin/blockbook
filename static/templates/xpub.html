@@ -133,6 +133,18 @@
                                 <td class="data ellipsis">{{formatAmountWithDecimals $t.UnconfirmedBalanceSat $t.Decimals}}</td>
                                 <td class="data">{{$t.UnconfirmedTransfers}}</td>
                             </tr>
+                            {{- if $addr.TokensAsset.Memo -}}
+                            <tr>
+                                <td class="data"><span class="text-muted">Initial Memo:</span></td>
+                                <td class="data ellipsis" colspan="4">{{formatMemoField $addr.TokensAsset.Memo.InitialMemo}}</td>
+                            </tr>
+                            {{- if ne $addr.TokensAsset.Memo.InitialMemo $addr.TokensAsset.Memo.MostRecentMemo -}}
+                            <tr>
+                                <td class="data"><span class="text-muted">Most Recent Memo:</span></td>
+                                <td class="data ellipsis" colspan="4">{{formatMemoField $addr.TokensAsset.Memo.MostRecentMemo}}</td>
+                            </tr>
+                            {{- end -}}
+                            {{- end -}}
                             {{- end -}}{{- end -}}{{- end -}}
                         </tbody>
                     </table>

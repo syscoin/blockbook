@@ -311,6 +311,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 				assetGuid := strconv.FormatUint(uint64(k), 10)
+				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(assetGuid, ad.addrDesc, nil)
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             address,
@@ -322,6 +323,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
 					AssetGuid:		  assetGuid,
 					Transfers:		  v.Transfers,
+					Memo:			  dbAssetAllocationMemo,
 				})
 			}
 			sort.Sort(tokens)

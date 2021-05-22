@@ -293,6 +293,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 						return nil, errAsset
 					}
 				}
+
 				tts = &bchain.TokenTransferSummary{
 					Token:    vout.AssetInfo.AssetGuid,
 					Decimals: int(dbAsset.AssetObj.Precision),
@@ -401,6 +402,9 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		TokenTransferSummary:   tokens,
 		TokenType: txVersionAsset,
 		EthereumSpecific: ethSpecific,
+	}
+	if ta != nil && len(ta.Memo) > 0 {
+		r.Memo = ta.Memo
 	}
 	return r, nil
 }
@@ -935,6 +939,9 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 		TokenTransferSummary:   tokens,
 		TokenType: txVersionAsset,
 	}
+	if len(ta.Memo) > 0 {
+		r.Memo = ta.Memo
+	}
 	return r
 }
 
@@ -1309,6 +1316,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					mempoolAsset.Used = true
 					mapAssetMempool[assetGuid] = mempoolAsset
 				}
+				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(assetGuid, addrDesc, nil)
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             address,
@@ -1321,6 +1329,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					AssetGuid:		  assetGuid,
 					Transfers:		  v.Transfers,
 					UnconfirmedTransfers:		  unconfirmedTransfers,
+					Memo: 		dbAssetAllocationMemo,
 				})
 			}
 		} 
