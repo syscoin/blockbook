@@ -301,11 +301,7 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 	if len(memo) > 0 {
 		dBAssetAllocationMemo, err := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
 		if err == nil {
-			memoStr, err := hex.DecodeString(string(memo))
-			if err != nil {
-				return errors.New(fmt.Sprint("DisconnectAllocationOutput could not decode memo ", string(memoStr)))
-			}
-			return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read memo " , assetInfo.AssetGuid, " memo ", string(memoStr)))
+			return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read memo " , assetInfo.AssetGuid, " memo ", memo, " memo (length): ", len(memo)))
 		}
 		if dBAssetAllocationMemo.PrevMemo == nil {
 			dBAssetAllocationMemo.InitialMemo = nil
