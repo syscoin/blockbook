@@ -330,7 +330,6 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.Asse
 		return nil, nil, err
 	}
 	var memo = make([]byte, maxMemoLen)
-	_, _ := r.Read(memo)
 	return &assetAllocation, memo[:0], nil
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
