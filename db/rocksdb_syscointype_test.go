@@ -526,7 +526,6 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
 				AssetInfo: &bchain.AssetInfo{AssetGuid: 2529870008, ValueSat: dbtestdata.SatZero},
 			},
 		},
-		Memo: []byte{},
 	}
 	if !reflect.DeepEqual(ta, taw) {
 		t.Errorf("GetTxAddresses() = %+v, want %+v", ta, taw)
