@@ -158,9 +158,10 @@ type Tx struct {
 	TokenTransferSummary   []*bchain.TokenTransferSummary   `json:"tokenTransfers,omitempty"`
 	TokenType		 *bchain.TokenType	`json:"tokenType,omitempty"`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty"`
+	Memo		     []byte			   `json:"memo,omitempty"`
 }
 
-// FeeStats contains detailed block fee statistics
+// FeeStats contains detailed block fee statistics	
 type FeeStats struct {
 	TxCount         int       `json:"txCount"`
 	TotalFeesSat    *bchain.Amount   `json:"totalFeesSat"`

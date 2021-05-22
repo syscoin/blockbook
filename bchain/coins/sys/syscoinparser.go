@@ -3,7 +3,6 @@ package syscoin
 import (
 	"encoding/json"
 	"bytes"
-	"io"
 	"math/big"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
@@ -309,7 +308,7 @@ func (p *SyscoinParser) GetAssetFromDesc(addrDesc *bchain.AddressDescriptor) (*b
 func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescriptor) (*bchain.AssetAllocation, []byte, error) {
 	sptData, err := p.GetSPTDataFromDesc(addrDesc)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return p.GetAssetAllocationFromData(sptData)
 }
@@ -330,11 +329,9 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.Asse
 	if err != nil {
 		return nil, nil, err
 	}
-	memo, _ := r.ReadBytes(io.EOF)
-	if len(memo) > 0 {
-		memo = memo[:len(memo)-1]
-	}
-	return &assetAllocation, memo, nil
+	var memo := make([]byte, maxMemoLen)
+	n, _ := r.Read(memo)
+	return &assetAllocation, memo[:n], nil
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
     if p.IsSyscoinTx(tx.Version) {
@@ -393,9 +390,9 @@ func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAlloc
 	var assetAllocationMemo *bchain.AssetAllocationMemo
 	initialMemo, l := p.BaseParser.UnpackVarBytes(buf)
 	assetAllocationMemo.InitialMemo = initialMemo
-	mostRecentMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
+	mostRecentMemo, l := p.BaseParser.UnpackVarBytes(buf[l:])
 	assetAllocationMemo.MostRecentMemo = mostRecentMemo
-	prevMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
+	prevMemo, l := p.BaseParser.UnpackVarBytes(buf[l:])
 	assetAllocationMemo.PrevMemo = prevMemo
 	return assetAllocationMemo
 }
@@ -403,9 +400,9 @@ func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAlloc
 func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
 	var buf []byte
 	varBuf := make([]byte, maxMemoLen)
-	buf = p.BaseParser.PackVarBytes(memo.InitialMemo, buf, varBuf)
-	buf = p.BaseParser.PackVarBytes(memo.MostRecentMemo, buf, varBuf)
-	buf = p.BaseParser.PackVarBytes(memo.PrevMemo, buf, varBuf)
+	buf = p.BaseParser.PackVarBytes(assetAllocationMemo.InitialMemo, buf, varBuf)
+	buf = p.BaseParser.PackVarBytes(assetAllocationMemo.MostRecentMemo, buf, varBuf)
+	buf = p.BaseParser.PackVarBytes(assetAllocationMemo.PrevMemo, buf, varBuf)
 	return buf
 }
 

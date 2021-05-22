@@ -311,7 +311,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 				assetGuid := strconv.FormatUint(uint64(k), 10)
-				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(assetGuid, ad.addrDesc, nil)
+				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(k, &ad.addrDesc, nil)
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             address,
