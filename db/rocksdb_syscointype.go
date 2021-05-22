@@ -201,10 +201,10 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 	if len(memo) > 0 {
 		dBAssetAllocationMemo, err := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
 		// memo doesn't exist
-		if err != nil {
+		if err != nil || dBAssetAllocationMemo == nil {
 			dBAssetAllocationMemo.InitialMemo = memo
 			dBAssetAllocationMemo.MostRecentMemo = memo
-		} else if dBAssetAllocationMemo != nil {
+		} else {
 			dBAssetAllocationMemo.PrevMemo = dBAssetAllocationMemo.MostRecentMemo
 			dBAssetAllocationMemo.MostRecentMemo = memo
 		}
