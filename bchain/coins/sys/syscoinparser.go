@@ -338,7 +338,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.Asse
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
     if p.IsSyscoinTx(tx.Version) {
-        allocation, tx.Memo, err := p.GetAllocationFromTx(tx);
+        allocation, tx.Memo, err := p.GetAllocationFromTx(tx)
 		if err != nil {
 			return err
 		}
