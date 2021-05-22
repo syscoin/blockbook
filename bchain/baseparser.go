@@ -473,14 +473,14 @@ func (p *BaseParser) UnpackVarBytes(buf []byte) ([]byte, int) {
 	return bufValue, (l+int(txvalue))
 }
 
-func (p *BaseParser) PackVarBytes(bufValue []byte, buf []byte, varBuf []byte) []byte {
+func (p *BaseParser) PackVarBytes(bufValue []byte, buf []byte, varBuf []byte) ([]byte, int) {
 	len := uint(len(bufValue))
 	l := p.PackVaruint(len, varBuf)
+	buf = append(buf, varBuf[:l]...)
 	if len > 0 {
-		buf = append(buf, varBuf[:l]...)
 		buf = append(buf, bufValue...)
 	}
-	return buf
+	return buf, int(l + len)
 }
 
 const (
