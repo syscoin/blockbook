@@ -774,7 +774,7 @@ type BlockChainParser interface {
 	GetAssetsMaskFromVersion(nVersion int32) AssetsMask
 	GetAssetTypeFromVersion(nVersion int32) *TokenType
 	PackAssetKey(assetGuid uint64, height uint32) []byte
-	PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *AddressDescriptor) string
+	PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *AddressDescriptor) []byte
 	PackAssetAllocationMemo(assetAllocationMemo *AssetAllocationMemo) []byte
 	UnpackAssetAllocationMemo(buf []byte) *AssetAllocationMemo
 	UnpackAssetKey(key []byte) (uint64, uint32)

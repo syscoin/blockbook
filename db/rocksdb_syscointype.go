@@ -523,12 +523,12 @@ func (d *RocksDB) GetAssetAllocationMemo(guid uint64, addrDesc *bchain.AddressDe
 	key := d.chainParser.PackAssetAllocationMemoKey(guid, addrDesc)
 	var ok bool
 	if assetAllocationMemos != nil {
-		if assetAllocationMemoL1, ok = assetAllocationMemos[key]; ok {
+		if assetAllocationMemoL1, ok = assetAllocationMemos[string(key)]; ok {
 			return assetAllocationMemoL1, nil
 		}
 	}
 	
-	val, err := d.db.GetCF(d.ro, d.cfh[cfAssetAllocationMemos], []byte(key))
+	val, err := d.db.GetCF(d.ro, d.cfh[cfAssetAllocationMemos], key)
 	if err != nil {
 		return nil, err
 	}

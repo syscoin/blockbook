@@ -377,13 +377,13 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
 	return assetGuid, ^height
 }
 
-func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *bchain.AddressDescriptor) string {
+func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *bchain.AddressDescriptor) []byte {
 	varBuf := make([]byte, vlq.MaxLen64)
 	l := p.BaseParser.PackVaruint64(assetGuid, varBuf)
 	buf := make([]byte, len(*addrDesc)+l)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, *addrDesc...)
-	return string(buf)
+	return buf
 }
 
 func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAllocationMemo {
