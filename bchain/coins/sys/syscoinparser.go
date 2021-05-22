@@ -332,7 +332,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int
 	var memo []byte
 	if p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN {
 		memo = make([]byte, maxMemoLen)
-		n, _ = r.Read(memo)
+		n, _ := r.Read(memo)
 		memo = memo[:n]
 	}
 	return &assetAllocation, memo, nil
