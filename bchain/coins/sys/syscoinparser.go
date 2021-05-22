@@ -338,10 +338,11 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.Asse
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
     if p.IsSyscoinTx(tx.Version) {
-        allocation, tx.Memo, err := p.GetAllocationFromTx(tx)
+        allocation, memo, err := p.GetAllocationFromTx(tx)
 		if err != nil {
 			return err
 		}
+		tx.Memo = memo
         for _, v := range allocation.AssetObj.VoutAssets {
             for _,voutAsset := range v.Values {
 				// store in vout
