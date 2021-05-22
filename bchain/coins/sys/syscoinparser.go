@@ -329,7 +329,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte) (*bchain.Asse
 	if err != nil {
 		return nil, nil, err
 	}
-	var memo := make([]byte, maxMemoLen)
+	var memo = make([]byte, maxMemoLen)
 	n, _ := r.Read(memo)
 	return &assetAllocation, memo[:n], nil
 }
