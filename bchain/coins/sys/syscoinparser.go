@@ -391,9 +391,9 @@ func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *b
 
 func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAllocationMemo {
 	var assetAllocationMemo *bchain.AssetAllocationMemo
-	memo.InitialMemo, l := p.BaseParser.UnpackVarBytes(buf)
-	memo.MostRecentMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
-	memo.PrevMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
+	assetAllocationMemo.InitialMemo, l := p.BaseParser.UnpackVarBytes(buf)
+	assetAllocationMemo.MostRecentMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
+	assetAllocationMemo.PrevMemo, l = p.BaseParser.UnpackVarBytes(buf[l:])
 	return assetAllocationMemo
 }
 
