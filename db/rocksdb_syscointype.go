@@ -199,11 +199,10 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 	}
 	balanceAsset.BalanceSat.Add(balanceAsset.BalanceSat, assetInfo.ValueSat)
 	if len(memo) > 0 {
-		dBAssetAllocationMemo, err := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
+		dBAssetAllocationMemo, _ := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
 		// memo doesn't exist
-		if err != nil || dBAssetAllocationMemo == nil {
-			dBAssetAllocationMemo.InitialMemo = memo
-			dBAssetAllocationMemo.MostRecentMemo = memo
+		if dBAssetAllocationMemo == nil {
+			dBAssetAllocationMemo = bchain.AssetAllocationMemo{InitialMemo: memo, MostRecentMemo: memo}
 		} else {
 			dBAssetAllocationMemo.PrevMemo = dBAssetAllocationMemo.MostRecentMemo
 			dBAssetAllocationMemo.MostRecentMemo = memo
