@@ -89,11 +89,13 @@
                                     <td class="data">{{$t.Transfers}}</td>
                                 </tr>
                                 {{- if $t.Memo -}}
+                                {{if gt (len $t.Memo.InitialMemo) 0}}
                                 <tr>
                                     <td class="data"><span class="text-muted">Initial Memo:</span></td>
                                     <td class="data ellipsis" colspan="4">{{formatMemoField $t.Memo.InitialMemo}}</td>
                                 </tr>
-                                {{- if ne $t.Memo.InitialMemo $t.Memo.MostRecentMemo -}}
+                                {{- end -}}
+                                {{if gt (len $t.Memo.MostRecentMemo) 0}}
                                 <tr>
                                     <td class="data"><span class="text-muted">Most Recent Memo:</span></td>
                                     <td class="data ellipsis" colspan="4">{{formatMemoField $t.Memo.MostRecentMemo}}</td>
