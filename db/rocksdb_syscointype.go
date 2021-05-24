@@ -391,7 +391,7 @@ func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, 
 			return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read memo " , assetInfo.AssetGuid, " memo ", memo, " memo (length): ", len(memo)))
 		}
 		dBAssetAllocationMemo.Memo = nil
-		dBAssetAllocationMemo.MemoTxID = ""
+		dBAssetAllocationMemo.MemoTxID = nil
 		assetAllocationMemos[strKey] = dBAssetAllocationMemo
 	}
 	assets[assetInfo.AssetGuid] = dBAsset
