@@ -254,7 +254,7 @@ type AssetBalance struct {
 }
 type AssetAllocationMemo struct {
 	Memo  	[]byte
-	MemoTxID string
+	MemoTxID []byte
 }
 // AddrBalance stores number of transactions and balances of an address
 type AddrBalance struct {

@@ -116,6 +116,11 @@ type AssetSpecific struct {
 	UpdateCapabilityFlags 	uint8 `json:"updateCapabilityFlags"`
 }
 
+type AssetAllocationMemo struct {
+	Memo  	[]byte
+	MemoTxID string
+}
+
 // Contains SyscoinSpecific assets information when searching for assets
 type AssetsSpecific struct {
 	AssetGuid 		string `json:"assetGuid"`

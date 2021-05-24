@@ -394,13 +394,13 @@ func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAlloc
 	len := p.BaseParser.PackedTxidLen()
 	memo, l := p.BaseParser.UnpackVarBytes(buf)
 	memoTxID := append([]byte(nil), buf[l:l+len]...)
-	return &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: string(memoTxID)}
+	return &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: memoTxID}
 }
 
 func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
 	var buf []byte
 	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.Memo)...)
-	buf = append(buf, []byte(assetAllocationMemo.MemoTxID)...)
+	buf = append(buf, assetAllocationMemo.MemoTxID...)
 	return buf
 }
 

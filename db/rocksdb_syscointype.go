@@ -162,13 +162,12 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	balanceAsset.SentSat.Add(balanceAsset.SentSat, assetInfo.ValueSat)
 	if len(memo) > 0 {
 		dBAssetAllocationMemo, strKey := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
-		txStr := hex.EncodeToString(btxID)
 		// memo doesn't exist
 		if dBAssetAllocationMemo == nil {
-			dBAssetAllocationMemo = &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: txStr}
+			dBAssetAllocationMemo = &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: btxID}
 		} else {
 			dBAssetAllocationMemo.Memo = memo
-			dBAssetAllocationMemo.MemoTxID = txStr
+			dBAssetAllocationMemo.MemoTxID = btxID
 		}
 		assetAllocationMemos[strKey] = dBAssetAllocationMemo
 	}
