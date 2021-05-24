@@ -84,7 +84,7 @@
             <span class="txvalues txvalues-default">SPT Fee: {{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</span>	
             {{- end -}}{{- end -}}
             {{if gt (len $tx.Memo) 0}}
-            <span class="txvalues txvalues-default">Memo: {{$tx.Memo}}</span>
+            <span class="txvalues txvalues-default">Memo: {{toString $tx.Memo}}</span>
             {{- end -}}     
         </div>
         <div class="col-xs-6 col-sm-8 col-md-8 text-right">

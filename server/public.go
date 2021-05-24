@@ -481,6 +481,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatBaseAssetID": 		formatBaseAssetID,
 		"isNFT":					isNFT,
 		"toJSON":                   toJSON,
+		"toString":					toString,
 	}
 	var createTemplate func(filenames ...string) *template.Template
 	if s.debug {
@@ -579,7 +580,7 @@ func formatInt64WithDecimals(a int64, d int) string {
 	return amount.DecimalString(d)
 }
 
-func ToString(value interface{}) string {
+func toString(value interface{}) string {
     switch v := value.(type) {
     case string:
         return v
@@ -591,7 +592,7 @@ func ToString(value interface{}) string {
 }
 
 func formatNFTID(value interface{}) uint64 {
-	asset := ToString(value)
+	asset := toString(value)
 	var err error
 	assetGuid, err := strconv.ParseUint(asset, 10, 64)
 	if err != nil {
@@ -601,7 +602,7 @@ func formatNFTID(value interface{}) uint64 {
 }
 
 func formatBaseAssetID(value interface{}) uint64 {
-	asset := ToString(value)
+	asset := toString(value)
 	var err error
 	assetGuid, err := strconv.ParseUint(asset, 10, 64)
 	if err != nil {
@@ -611,7 +612,7 @@ func formatBaseAssetID(value interface{}) uint64 {
 }
 
 func formatDecodeBase64(value interface{}) string {
-	a := ToString(value)
+	a := toString(value)
 	var pubData string
 	base64Text := make([]byte, base64.StdEncoding.DecodedLen(len(a)))
 	n, err := base64.StdEncoding.Decode(base64Text, []byte(a))
@@ -623,7 +624,7 @@ func formatDecodeBase64(value interface{}) string {
 }
 
 func formatDecodeBase64ValueStr(valueStr interface{}) string {
-	a := ToString(valueStr)
+	a := toString(valueStr)
 	i := strings.Index(a, " ")
 	if i < len(a) {
 		symbol := a[i+1:]
