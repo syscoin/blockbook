@@ -399,16 +399,11 @@ func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAlloc
 }
 
 func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
-	buf := make([]byte, (maxMemoLen*3) + 3)
-	varBuf := make([]byte, maxMemoLen)
-	var l = 0
-	var ll = 0
-	buf, ll = p.BaseParser.PackVarBytes(assetAllocationMemo.InitialMemo, buf, varBuf)
-	buf, l = p.BaseParser.PackVarBytes(assetAllocationMemo.MostRecentMemo, buf, varBuf)
-	ll += l
-	buf, l = p.BaseParser.PackVarBytes(assetAllocationMemo.PrevMemo, buf, varBuf)
-	ll += l
-	return buf[:ll]
+	buf := make([]byte, len(assetAllocationMemo.InitialMemo) + len(assetAllocationMemo.MostRecentMemo) + len(assetAllocationMemo.PrevMemo) + 3)
+	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.InitialMemo)...)
+	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.MostRecentMemo)...)
+	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.PrevMemo)...)
+	return buf
 }
 
 func (p *SyscoinParser) PackAssetTxIndex(txAsset *bchain.TxAsset) []byte {
@@ -493,7 +488,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 			buf = append(buf, varBuf[:l]...)
 		}
 	}
-	buf, _ = p.BaseParser.PackVarBytes(ta.Memo, buf, varBuf)
+	buf = append(buf, p.BaseParser.PackVarBytes(ta.Memo)...)
 	return buf
 }
 
