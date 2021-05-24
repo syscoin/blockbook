@@ -391,18 +391,22 @@ func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *b
 }
 
 func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAllocationMemo {
-	initialMemo, ll := p.BaseParser.UnpackVarBytes(buf)
-	mostRecentMemo, l := p.BaseParser.UnpackVarBytes(buf[ll:])
+	memo, ll := p.BaseParser.UnpackVarBytes(buf)
 	ll += l
-	prevMemo, _ := p.BaseParser.UnpackVarBytes(buf[ll:])
-	return &bchain.AssetAllocationMemo{InitialMemo: initialMemo, MostRecentMemo: mostRecentMemo, PrevMemo: prevMemo}
+	prevMemo, l := p.BaseParser.UnpackVarBytes(buf[ll:])
+	ll += l
+	memoTxID, l := p.BaseParser.UnpackVarBytes(buf[ll:])
+	ll += l
+	prevMemoTxID, _ := p.BaseParser.UnpackVarBytes(buf[ll:])
+	return &bchain.AssetAllocationMemo{Memo: memo, PrevMemo: prevMemo, MemoTxID: string(memoTxID), PrevMemoTxID: string(prevMemoTxID)}
 }
 
 func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
 	var buf []byte
-	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.InitialMemo)...)
-	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.MostRecentMemo)...)
+	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.Memo)...)
 	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.PrevMemo)...)
+	buf = append(buf, p.BaseParser.PackVarBytes([]byte(assetAllocationMemo.MemoTxID))...)
+	buf = append(buf, p.BaseParser.PackVarBytes([]byte(assetAllocationMemo.PrevMemoTxID))...)
 	return buf
 }
 

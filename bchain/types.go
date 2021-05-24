@@ -253,9 +253,10 @@ type AssetBalance struct {
 	Transfers	uint32
 }
 type AssetAllocationMemo struct {
-	InitialMemo  	[]byte
-	MostRecentMemo  []byte
+	Memo  	[]byte
+	MemoTxID string
 	PrevMemo  		[]byte
+	PrevMemoTxID  		string
 }
 // AddrBalance stores number of transactions and balances of an address
 type AddrBalance struct {

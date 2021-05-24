@@ -162,12 +162,15 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	balanceAsset.SentSat.Add(balanceAsset.SentSat, assetInfo.ValueSat)
 	if len(memo) > 0 {
 		dBAssetAllocationMemo, strKey := d.GetAssetAllocationMemo(assetInfo.AssetGuid, addrDesc, assetAllocationMemos)
+		txStr := hex.EncodeToString(btxID)
 		// memo doesn't exist
 		if dBAssetAllocationMemo == nil {
-			dBAssetAllocationMemo = &bchain.AssetAllocationMemo{InitialMemo: memo, MostRecentMemo: memo}
+			dBAssetAllocationMemo = &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: txStr}
 		} else {
-			dBAssetAllocationMemo.PrevMemo = dBAssetAllocationMemo.MostRecentMemo
-			dBAssetAllocationMemo.MostRecentMemo = memo
+			dBAssetAllocationMemo.PrevMemo = dBAssetAllocationMemo.Memo
+			dBAssetAllocationMemo.PrevMemoTxID = dBAssetAllocationMemo.MemoTxID
+			dBAssetAllocationMemo.Memo = memo
+			dBAssetAllocationMemo.MemoTxID = txStr
 		}
 		assetAllocationMemos[strKey] = dBAssetAllocationMemo
 	}
@@ -391,11 +394,13 @@ func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, 
 			return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read memo " , assetInfo.AssetGuid, " memo ", memo, " memo (length): ", len(memo)))
 		}
 		if dBAssetAllocationMemo.PrevMemo == nil {
-			dBAssetAllocationMemo.InitialMemo = nil
-			dBAssetAllocationMemo.MostRecentMemo = nil
+			dBAssetAllocationMemo.Memo = nil
+			dBAssetAllocationMemo.MemoTxID = ""
 		} else {
-			dBAssetAllocationMemo.MostRecentMemo = dBAssetAllocationMemo.PrevMemo
+			dBAssetAllocationMemo.Memo = dBAssetAllocationMemo.PrevMemo
+			dBAssetAllocationMemo.MemoTxID = dBAssetAllocationMemo.PrevMemoTxID
 			dBAssetAllocationMemo.PrevMemo = nil
+			dBAssetAllocationMemo.PrevMemoTxID = ""
 		}
 		assetAllocationMemos[strKey] = dBAssetAllocationMemo
 	}
@@ -559,7 +564,7 @@ func (d *RocksDB) storeAssetAllocationMemos(wb *gorocksdb.WriteBatch, assetAlloc
 		return nil
 	}
 	for key, assetAllocationMemo := range assetAllocationMemos {
-		if assetAllocationMemo.InitialMemo == nil {
+		if assetAllocationMemo.Memo == nil {
 			wb.DeleteCF(d.cfh[cfAssetAllocationMemos], []byte(key))	
 		} else {
 			buf := d.chainParser.PackAssetAllocationMemo(assetAllocationMemo)
