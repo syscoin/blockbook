@@ -391,21 +391,16 @@ func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *b
 }
 
 func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAllocationMemo {
-	memo, ll := p.BaseParser.UnpackVarBytes(buf)
-	prevMemo, l := p.BaseParser.UnpackVarBytes(buf[ll:])
-	ll += l
-	memoTxID, l := p.BaseParser.UnpackVarBytes(buf[ll:])
-	ll += l
-	prevMemoTxID, _ := p.BaseParser.UnpackVarBytes(buf[ll:])
-	return &bchain.AssetAllocationMemo{Memo: memo, PrevMemo: prevMemo, MemoTxID: string(memoTxID), PrevMemoTxID: string(prevMemoTxID)}
+	len := p.BaseParser.PackedTxidLen()
+	memo, l := p.BaseParser.UnpackVarBytes(buf)
+	memoTxID := append([]byte(nil), buf[l:l+len]...)
+	return &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: string(memoTxID)}
 }
 
 func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
 	var buf []byte
 	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.Memo)...)
-	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.PrevMemo)...)
-	buf = append(buf, p.BaseParser.PackVarBytes([]byte(assetAllocationMemo.MemoTxID))...)
-	buf = append(buf, p.BaseParser.PackVarBytes([]byte(assetAllocationMemo.PrevMemoTxID))...)
+	buf = append(buf, []byte(assetAllocationMemo.MemoTxID))...)
 	return buf
 }
 
@@ -424,6 +419,7 @@ func (p *SyscoinParser) PackAssetTxIndex(txAsset *bchain.TxAsset) []byte {
 
 func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) []*bchain.TxAssetIndex {
 	var txAssetIndexes []*bchain.TxAssetIndex
+	len := p.BaseParser.PackedTxidLen()
 	numTxIndexes, l := p.BaseParser.UnpackVaruint(buf)
 	if numTxIndexes > 0 {
 		txAssetIndexes = make([]*bchain.TxAssetIndex, numTxIndexes)
@@ -431,8 +427,8 @@ func (p *SyscoinParser) UnpackAssetTxIndex(buf []byte) []*bchain.TxAssetIndex {
 			var txIndex bchain.TxAssetIndex
 			txIndex.Type = bchain.AssetsMask(p.BaseParser.UnpackUint(buf[l:]))
 			l += 4
-			txIndex.BtxID = append([]byte(nil), buf[l:l+32]...)
-			l += 32
+			txIndex.BtxID = append([]byte(nil), buf[l:l+len]...)
+			l += len
 			txAssetIndexes[i] = &txIndex
 		}
 	}

@@ -167,8 +167,6 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 		if dBAssetAllocationMemo == nil {
 			dBAssetAllocationMemo = &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: txStr}
 		} else {
-			dBAssetAllocationMemo.PrevMemo = dBAssetAllocationMemo.Memo
-			dBAssetAllocationMemo.PrevMemoTxID = dBAssetAllocationMemo.MemoTxID
 			dBAssetAllocationMemo.Memo = memo
 			dBAssetAllocationMemo.MemoTxID = txStr
 		}
@@ -393,15 +391,8 @@ func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, 
 		if dBAssetAllocationMemo == nil {
 			return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read memo " , assetInfo.AssetGuid, " memo ", memo, " memo (length): ", len(memo)))
 		}
-		if dBAssetAllocationMemo.PrevMemo == nil {
-			dBAssetAllocationMemo.Memo = nil
-			dBAssetAllocationMemo.MemoTxID = ""
-		} else {
-			dBAssetAllocationMemo.Memo = dBAssetAllocationMemo.PrevMemo
-			dBAssetAllocationMemo.MemoTxID = dBAssetAllocationMemo.PrevMemoTxID
-			dBAssetAllocationMemo.PrevMemo = nil
-			dBAssetAllocationMemo.PrevMemoTxID = ""
-		}
+		dBAssetAllocationMemo.Memo = nil
+		dBAssetAllocationMemo.MemoTxID = ""
 		assetAllocationMemos[strKey] = dBAssetAllocationMemo
 	}
 	assets[assetInfo.AssetGuid] = dBAsset
