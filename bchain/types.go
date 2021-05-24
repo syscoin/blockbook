@@ -751,7 +751,7 @@ type BlockChainParser interface {
 	UnpackBigint(buf []byte) (big.Int, int)
 	MaxPackedBigintBytes() int
 	UnpackVarBytes(buf []byte) ([]byte, int)
-	PackVarBytes(bufValue []byte, buf []byte) []byte
+	PackVarBytes(bufValue []byte) []byte
 
 	// blocks
 	PackBlockHash(hash string) ([]byte, error)
