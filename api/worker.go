@@ -1319,7 +1319,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(k, &addrDesc, nil)
 				var memo *AssetAllocationMemo = nil
 				if dbAssetAllocationMemo {
-					memo = &AssetAllocationMemo{Memo: dbAssetAllocationMemo.Memo, MemoTxID: hex.EncodeToString(dbAssetAllocationMemo.MemoTxID)},
+					memo = &AssetAllocationMemo{Memo: dbAssetAllocationMemo.Memo, MemoTxID: hex.EncodeToString(dbAssetAllocationMemo.MemoTxID)}
 				}
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
