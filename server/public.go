@@ -482,6 +482,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"isNFT":					isNFT,
 		"toJSON":                   toJSON,
 		"toString":					toString,
+		"formatEncodeBase64":		formatEncodeBase64,
 	}
 	var createTemplate func(filenames ...string) *template.Template
 	if s.debug {
@@ -621,6 +622,10 @@ func formatDecodeBase64(value interface{}) string {
 		return pubData
 	}
 	return a
+}
+
+func formatEncodeBase64(value []byte) string {
+	return base64.StdEncoding.EncodeToString(value)
 }
 
 func formatDecodeBase64ValueStr(valueStr interface{}) string {

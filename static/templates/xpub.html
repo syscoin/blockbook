@@ -136,12 +136,12 @@
                             {{- if $addr.TokensAsset.Memo -}}
                             <tr>
                                 <td class="data"><span class="text-muted">Initial Memo:</span></td>
-                                <td class="data ellipsis" colspan="4">{{toString $addr.TokensAsset.Memo.InitialMemo}}</td>
+                                <td class="data ellipsis" colspan="4">{{formatEncodeBase64 $addr.TokensAsset.Memo.InitialMemo}}</td>
                             </tr>
                             {{- if ne $addr.TokensAsset.Memo.InitialMemo $addr.TokensAsset.Memo.MostRecentMemo -}}
                             <tr>
                                 <td class="data"><span class="text-muted">Most Recent Memo:</span></td>
-                                <td class="data ellipsis" colspan="4">{{toString $addr.TokensAsset.Memo.MostRecentMemo}}</td>
+                                <td class="data ellipsis" colspan="4">{{formatEncodeBase64 $addr.TokensAsset.Memo.MostRecentMemo}}</td>
                             </tr>
                             {{- end -}}
                             {{- end -}}

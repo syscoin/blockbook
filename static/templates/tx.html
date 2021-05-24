@@ -68,7 +68,7 @@
             {{if gt (len $tx.Memo) 0}}
             <tr>
                 <td>Memo</td>
-                <td class="data">{{toString $tx.Memo}}</td>
+                <td class="data">{{formatEncodeBase64 $tx.Memo}}</td>
             </tr>{{end}}
             {{- if $tx.TokenTransferSummary -}}
             <tr>

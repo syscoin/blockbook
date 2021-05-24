@@ -92,13 +92,13 @@
                                 {{if gt (len $t.Memo.InitialMemo) 0}}
                                 <tr>
                                     <td class="data"><span class="text-muted">Initial Memo:</span></td>
-                                    <td class="data ellipsis" colspan="4">{{toString $t.Memo.InitialMemo}}</td>
+                                    <td class="data ellipsis" colspan="4">{{formatEncodeBase64 $t.Memo.InitialMemo}}</td>
                                 </tr>
                                 {{- end -}}
                                 {{if gt (len $t.Memo.MostRecentMemo) 0}}
                                 <tr>
                                     <td class="data"><span class="text-muted">Most Recent Memo:</span></td>
-                                    <td class="data ellipsis" colspan="4">{{toString $t.Memo.MostRecentMemo}}</td>
+                                    <td class="data ellipsis" colspan="4">{{formatEncodeBase64 $t.Memo.MostRecentMemo}}</td>
                                 </tr>
                                 {{- end -}}
                                 {{- end -}}
