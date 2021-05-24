@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"encoding/hex"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -478,7 +477,6 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatKeyID":              s.formatKeyID,
 		"formatDecodeBase64": 		formatDecodeBase64,
 		"formatDecodeBase64ValueStr": formatDecodeBase64ValueStr,
-		"formatMemoField":			formatMemoField,
 		"formatNFTID": 				formatNFTID,
 		"formatBaseAssetID": 		formatBaseAssetID,
 		"isNFT":					isNFT,
@@ -622,11 +620,6 @@ func formatDecodeBase64(value interface{}) string {
 		return pubData
 	}
 	return a
-}
-
-func formatMemoField(value interface{}) string {
-	base64Str := formatDecodeBase64(value)
-	return hex.EncodeToString([]byte(base64Str))
 }
 
 func formatDecodeBase64ValueStr(valueStr interface{}) string {
