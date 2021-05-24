@@ -312,9 +312,9 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 				assetGuid := strconv.FormatUint(uint64(k), 10)
 				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(k, &ad.addrDesc, nil)
-				var memo *AssetAllocationMemo = nil
+				var memo *bchain.AssetAllocationMemoAPI = nil
 				if dbAssetAllocationMemo {
-					memo = &AssetAllocationMemo{Memo: dbAssetAllocationMemo.Memo, MemoTxID: hex.EncodeToString(dbAssetAllocationMemo.MemoTxID)}
+					memo = &bchain.AssetAllocationMemoAPI{Memo: dbAssetAllocationMemo.Memo, MemoTxID: hex.EncodeToString(dbAssetAllocationMemo.MemoTxID)}
 				}
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,

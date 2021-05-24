@@ -256,6 +256,11 @@ type AssetAllocationMemo struct {
 	Memo  	[]byte
 	MemoTxID []byte
 }
+
+type AssetAllocationMemoAPI struct {
+	Memo  	[]byte
+	MemoTxID string
+}
 // AddrBalance stores number of transactions and balances of an address
 type AddrBalance struct {
 	Txs        uint32
@@ -557,7 +562,7 @@ type Token struct {
 	TotalSentSat     *Amount   `json:"totalSent,omitempty"`
 	ContractIndex    string    `json:"-"`
 	AddrStr		 	 string    `json:"addrStr,omitempty"`
-	Memo    		 *AssetAllocationMemo `json:"memo,omitempty"`
+	Memo    		 *AssetAllocationMemoAPI `json:"memo,omitempty"`
 }
 type Tokens []*Token
 func (t Tokens) Len() int           { return len(t) }

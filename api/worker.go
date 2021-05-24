@@ -1317,9 +1317,9 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					mapAssetMempool[assetGuid] = mempoolAsset
 				}
 				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(k, &addrDesc, nil)
-				var memo *AssetAllocationMemo = nil
-				if dbAssetAllocationMemo {
-					memo = &AssetAllocationMemo{Memo: dbAssetAllocationMemo.Memo, MemoTxID: hex.EncodeToString(dbAssetAllocationMemo.MemoTxID)}
+				var memo *bchain.AssetAllocationMemoAPI = nil
+				if dbAssetAllocationMemo != nil {
+					memo = &bchain.AssetAllocationMemoAPI{Memo: dbAssetAllocationMemo.Memo, MemoTxID: hex.EncodeToString(dbAssetAllocationMemo.MemoTxID)}
 				}
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
