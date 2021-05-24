@@ -215,7 +215,7 @@ func (b *BulkConnect) storeAssetAllocationMemos(wb *gorocksdb.WriteBatch, all bo
 		b.assetAllocationMemos = make(bchain.TxAssetAllocationMemoMap)
 	} else {
 		assetAllocationMemosMap = make(bchain.TxAssetAllocationMemoMap)
-		// store some random asset txids
+		// store some random asset memos
 		for k, a := range b.assetAllocationMemos {
 			assetAllocationMemosMap[k] = a
 			delete(b.assetAllocationMemos, k)
@@ -309,7 +309,7 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 	}
 	var storeAddressesChan, storeBalancesChan, storeAssetsChan, storeTxAssetsChan, storeAssetAllocationMemosChan chan error
 	var sa bool
-	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances || len(b.assets) > maxBulkAssets {
+	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances || len(b.assets) > maxBulkAssets || len(b.txAssets) > maxBulkTxAssets || len(b.assetAllocationMemos) > maxBulkAssetAllocationMemos {
 		sa = true
 		if len(b.txAddressesMap)+partialStoreAddresses > maxBulkTxAddresses {
 			storeAddressesChan = make(chan error)
