@@ -400,7 +400,7 @@ func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAlloc
 func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
 	var buf []byte
 	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.Memo)...)
-	buf = append(buf, []byte(assetAllocationMemo.MemoTxID))...)
+	buf = append(buf, []byte(assetAllocationMemo.MemoTxID)...)
 	return buf
 }
 
