@@ -30,7 +30,7 @@ const (
 	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM int32 = 134
 	SYSCOIN_TX_VERSION_ALLOCATION_SEND int32 = 135
 	maxAddrDescLen = 10000
-	maxMemoLen = 80
+	maxMemoLen = 256
 )
 
 // chain parameters
@@ -330,7 +330,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int
 		return nil, nil, err
 	}
 	var memo []byte
-	if p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN {
+	if p.IsAssetSendTx(txVersion) || (p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN) {
 		memo = make([]byte, maxMemoLen)
 		n, _ := r.Read(memo)
 		memo = memo[:n]
@@ -379,29 +379,6 @@ func (p *SyscoinParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
 	height := p.BaseParser.UnpackUint(buf[l:])
 	// height is packed in binary complement, convert it
 	return assetGuid, ^height
-}
-
-func (p *SyscoinParser) PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *bchain.AddressDescriptor) []byte {
-	varBuf := make([]byte, vlq.MaxLen64)
-	var buf []byte
-	l := p.BaseParser.PackVaruint64(assetGuid, varBuf)
-	buf = append(buf, varBuf[:l]...)
-	buf = append(buf, *addrDesc...)
-	return buf
-}
-
-func (p *SyscoinParser) UnpackAssetAllocationMemo(buf []byte) *bchain.AssetAllocationMemo {
-	len := p.BaseParser.PackedTxidLen()
-	memo, l := p.BaseParser.UnpackVarBytes(buf)
-	memoTxID := append([]byte(nil), buf[l:l+len]...)
-	return &bchain.AssetAllocationMemo{Memo: memo, MemoTxID: memoTxID}
-}
-
-func (p *SyscoinParser) PackAssetAllocationMemo(assetAllocationMemo *bchain.AssetAllocationMemo) []byte {
-	var buf []byte
-	buf = append(buf, p.BaseParser.PackVarBytes(assetAllocationMemo.Memo)...)
-	buf = append(buf, assetAllocationMemo.MemoTxID...)
-	return buf
 }
 
 func (p *SyscoinParser) PackAssetTxIndex(txAsset *bchain.TxAsset) []byte {
@@ -689,6 +666,7 @@ func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 	varBuf := make([]byte, 4)
 	l := p.BaseParser.PackVaruint(uint(asset.Transactions), varBuf)
 	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, p.BaseParser.PackVarBytes(asset.MetaData)...)
 	var buffer bytes.Buffer
 	err := asset.AssetObj.Serialize(&buffer)
 	if err != nil {
@@ -702,6 +680,9 @@ func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 	var asset bchain.Asset
 	transactions, l := p.BaseParser.UnpackVaruint(buf)
 	asset.Transactions = uint32(transactions)
+	metaData, ll := p.BaseParser.UnpackVarBytes(buf[l:])
+	asset.MetaData = metaData
+	l += ll
 	r := bytes.NewReader(buf[l:])
 	err := asset.AssetObj.Deserialize(r)
 	if err != nil {

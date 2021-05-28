@@ -1316,11 +1316,6 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					mempoolAsset.Used = true
 					mapAssetMempool[assetGuid] = mempoolAsset
 				}
-				dbAssetAllocationMemo, _ := w.db.GetAssetAllocationMemo(k, &addrDesc, nil)
-				var memo *bchain.AssetAllocationMemoAPI = nil
-				if dbAssetAllocationMemo != nil {
-					memo = &bchain.AssetAllocationMemoAPI{Memo: dbAssetAllocationMemo.Memo, MemoTxID: hex.EncodeToString(dbAssetAllocationMemo.MemoTxID)}
-				}
 				tokens = append(tokens, &bchain.Token{
 					Type:             bchain.SPTTokenType,
 					Name:             address,
@@ -1333,7 +1328,6 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					AssetGuid:		  assetGuid,
 					Transfers:		  v.Transfers,
 					UnconfirmedTransfers:		  unconfirmedTransfers,
-					Memo: 		memo,
 				})
 			}
 		} 

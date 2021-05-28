@@ -99,7 +99,6 @@ const (
 	// SyscoinType
 	cfAssets
 	cfTxAssets
-	cfAssetAllocationMemos
 	// EthereumType
 	cfAddressContracts = cfAddressBalance
 
@@ -110,7 +109,7 @@ var cfNames []string
 var cfBaseNames = []string{"default", "height", "addresses", "blockTxs", "transactions", "fiatRates"}
 
 // type specific columns
-var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "assets", "txAssets", "assetAllocationMemos"}
+var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "assets", "txAssets"}
 var cfNamesEthereumType = []string{"addressContracts"}
 
 func openDB(path string, c *gorocksdb.Cache, openFiles int) (*gorocksdb.DB, []*gorocksdb.ColumnFamilyHandle, error) {
@@ -447,10 +446,9 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	if chainType == bchain.ChainBitcoinType {
 		assets := make(map[uint64]*bchain.Asset)
 		txAssets := make(bchain.TxAssetMap, 0)
-		assetAllocationMemos := make(bchain.TxAssetAllocationMemoMap, 0)
 		txAddressesMap := make(map[string]*bchain.TxAddresses)
 		balances := make(map[string]*bchain.AddrBalance)
-		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets, txAssets, assetAllocationMemos); err != nil {
+		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, assets, txAssets); err != nil {
 			return err
 		}
 		if err := d.storeTxAddresses(wb, txAddressesMap); err != nil {
@@ -466,9 +464,6 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 			return err
 		}
 		if err := d.storeTxAssets(wb, txAssets); err != nil {
-			return err
-		}
-		if err := d.storeAssetAllocationMemos(wb, assetAllocationMemos); err != nil {
 			return err
 		}
 	} else if chainType == bchain.ChainEthereumType {
@@ -513,7 +508,7 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, assetAllocationMemos bchain.TxAssetAllocationMemoMap) error {
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bchain.AddressesMap, txAddressesMap map[string]*bchain.TxAddresses, balances map[string]*bchain.AddrBalance, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	blockTxAssetAddresses := make(bchain.TxAssetAddressMap)
@@ -636,7 +631,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 						balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceSat: big.NewInt(0), SentSat: big.NewInt(0)}
 						balance.AssetBalances[tao.AssetInfo.AssetGuid] = balanceAsset
 					}
-					err = d.ConnectAllocationOutput(&addrDesc, block.Height, balanceAsset, isActivate, isAssetSendTx, tx.Version, btxID, tao.AssetInfo, blockTxAssetAddresses, assets, txAssets)
+					err = d.ConnectAllocationOutput(&addrDesc, block.Height, balanceAsset, isActivate, isAssetSendTx, tx.Version, btxID, tao.AssetInfo, blockTxAssetAddresses, assets, txAssets, tx.Memo)
 					if err != nil {
 						return err
 					}
@@ -754,7 +749,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 						balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceSat: big.NewInt(0), SentSat: big.NewInt(0)}
 						balance.AssetBalances[spentOutput.AssetInfo.AssetGuid] = balanceAsset
 					}
-					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, spendingTxid, spentOutput.AssetInfo, blockTxAssetAddresses, assets, txAssets, assetAllocationMemos, tx.Memo)
+					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, spendingTxid, spentOutput.AssetInfo, blockTxAssetAddresses, assets, txAssets)
 					if err != nil {
 						return err
 					}
@@ -1097,8 +1092,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOu
 	assetFoundInTx func(asset uint64, btxID []byte) bool,
 	assets map[uint64]*bchain.Asset, 
 	blockTxAssetAddresses bchain.TxAssetAddressMap,
-	mapAssetsIn bchain.AssetsMap,
-	assetAllocationMemos bchain.TxAssetAllocationMemoMap) error {
+	mapAssetsIn bchain.AssetsMap) error {
 	var err error
 	isAssetSendTx := d.chainParser.IsAssetSendTx(txa.Version)
 	for i, t := range txa.Inputs {
@@ -1151,7 +1145,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOu
 						if !ok {
 							return errors.New("DisconnectSyscoinInput asset balance not found")
 						}
-						err := d.DisconnectAllocationInput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses, assets, assetFoundInTx, assetAllocationMemos, txa.Memo)
+						err := d.DisconnectAllocationInput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses, assets, assetFoundInTx, txa.Memo)
 						if err != nil {
 							return err
 						}
@@ -1268,7 +1262,6 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 	balances := make(map[string]*bchain.AddrBalance)
 	assets := make(map[uint64]*bchain.Asset)
 	mapAssetsIn := make(bchain.AssetsMap)
-	assetAllocationMemos := make(bchain.TxAssetAllocationMemoMap, 0)
 	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
 		s := string(addrDesc)
@@ -1333,7 +1326,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 			continue
 		}
 		txAddresses[i] = txa
-		if err := d.disconnectTxAddressesInputs(btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx, assetFoundInTx, assets, blockTxAssetAddresses, mapAssetsIn, assetAllocationMemos); err != nil {
+		if err := d.disconnectTxAddressesInputs(btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx, assetFoundInTx, assets, blockTxAssetAddresses, mapAssetsIn); err != nil {
 			return err
 		}
 	}
@@ -1365,7 +1358,6 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 	d.storeTxAddresses(wb, txAddressesToUpdate)
 	d.storeBalancesDisconnect(wb, balances)
 	d.storeAssets(wb, assets)
-	d.storeAssetAllocationMemos(wb, assetAllocationMemos)
 	for s := range txsToDelete {
 		b := []byte(s)
 		wb.DeleteCF(d.cfh[cfTransactions], b)

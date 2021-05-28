@@ -30,7 +30,6 @@ type BulkConnect struct {
 	addressContracts   map[string]*AddrContracts
 	assets             map[uint64]*bchain.Asset
 	txAssets           bchain.TxAssetMap
-	assetAllocationMemos           bchain.TxAssetAllocationMemoMap
 	height             uint32
 }
 
@@ -46,8 +45,6 @@ const (
 	partialStoreAssets        = maxBulkAssets / 10
 	maxBulkTxAssets           = 500000
 	partialStoreTxAssets      = maxBulkTxAssets / 10
-	maxBulkAssetAllocationMemos           = 700000
-	partialStoreAssetAllocationMemos      = maxBulkAssetAllocationMemos / 10
 )
 
 // InitBulkConnect initializes bulk connect and switches DB to inconsistent state
@@ -60,7 +57,6 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 		addressContracts: make(map[string]*AddrContracts),
 		assets:           make(map[uint64]*bchain.Asset),
 		txAssets:         make(bchain.TxAssetMap),
-		assetAllocationMemos:         make(bchain.TxAssetAllocationMemoMap),
 	}
 	if err := d.SetInconsistentState(true); err != nil {
 		return nil, err
@@ -208,46 +204,6 @@ func (b *BulkConnect) parallelStoreTxAssets(c chan error, all bool) {
 	c <- nil
 }
 
-func (b *BulkConnect) storeAssetAllocationMemos(wb *gorocksdb.WriteBatch, all bool) (int, error) {
-	var assetAllocationMemosMap bchain.TxAssetAllocationMemoMap
-	if all {
-		assetAllocationMemosMap = b.assetAllocationMemos
-		b.assetAllocationMemos = make(bchain.TxAssetAllocationMemoMap)
-	} else {
-		assetAllocationMemosMap = make(bchain.TxAssetAllocationMemoMap)
-		// store some random asset memos
-		for k, a := range b.assetAllocationMemos {
-			assetAllocationMemosMap[k] = a
-			delete(b.assetAllocationMemos, k)
-			if len(assetAllocationMemosMap) >= partialStoreAssetAllocationMemos {
-				break
-			}
-		}
-	}
-	if err := b.d.storeAssetAllocationMemos(wb, assetAllocationMemosMap); err != nil {
-		return 0, err
-	}
-	return len(assetAllocationMemosMap), nil
-}
-
-func (b *BulkConnect) parallelStoreAssetAllocationMemos(c chan error, all bool) {
-	defer close(c)
-	start := time.Now()
-	wb := gorocksdb.NewWriteBatch()
-	defer wb.Destroy()
-	count, err := b.storeAssetAllocationMemos(wb, all)
-	if err != nil {
-		c <- err
-		return
-	}
-	if err := b.d.db.Write(b.d.wo, wb); err != nil {
-		c <- err
-		return
-	}
-	glog.Info("rocksdb: height ", b.height, ", stored ", count, " tx asset allocation memos, ", len(b.assetAllocationMemos), " remaining, done in ", time.Since(start))
-	c <- nil
-}
-
 func (b *BulkConnect) storeBalances(wb *gorocksdb.WriteBatch, all bool) (int, error) {
 	var bal map[string]*bchain.AddrBalance
 	if all {
@@ -304,12 +260,12 @@ func (b *BulkConnect) storeBulkAddresses(wb *gorocksdb.WriteBatch) error {
 
 func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs bool) error {
 	addresses := make(bchain.AddressesMap)
-	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, b.assets, b.txAssets, b.assetAllocationMemos); err != nil {
+	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, b.assets, b.txAssets); err != nil {
 		return err
 	}
-	var storeAddressesChan, storeBalancesChan, storeAssetsChan, storeTxAssetsChan, storeAssetAllocationMemosChan chan error
+	var storeAddressesChan, storeBalancesChan, storeAssetsChan, storeTxAssetsChan chan error
 	var sa bool
-	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances || len(b.assets) > maxBulkAssets || len(b.txAssets) > maxBulkTxAssets || len(b.assetAllocationMemos) > maxBulkAssetAllocationMemos {
+	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances || len(b.assets) > maxBulkAssets || len(b.txAssets) > maxBulkTxAssets {
 		sa = true
 		if len(b.txAddressesMap)+partialStoreAddresses > maxBulkTxAddresses {
 			storeAddressesChan = make(chan error)
@@ -326,10 +282,6 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 		if len(b.txAssets)+partialStoreTxAssets > maxBulkTxAssets {
 			storeTxAssetsChan = make(chan error)
 			go b.parallelStoreTxAssets(storeTxAssetsChan, false)
-		}
-		if len(b.assetAllocationMemos)+partialStoreAssetAllocationMemos > maxBulkAssetAllocationMemos {
-			storeAssetAllocationMemosChan = make(chan error)
-			go b.parallelStoreAssetAllocationMemos(storeAssetAllocationMemosChan, false)
 		}
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
@@ -383,11 +335,6 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 	}
 	if storeTxAssetsChan != nil {
 		if err := <-storeTxAssetsChan; err != nil {
-			return err
-		}
-	}
-	if storeAssetAllocationMemosChan != nil {
-		if err := <-storeAssetAllocationMemosChan; err != nil {
 			return err
 		}
 	}
@@ -506,7 +453,7 @@ func (b *BulkConnect) ConnectBlock(block *bchain.Block, storeBlockTxs bool) erro
 func (b *BulkConnect) Close() error {
 	glog.Info("rocksdb: bulk connect closing")
 	start := time.Now()
-	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan, storeAssetsChan, storeTxAssetsChan, storeAssetAllocationMemosChan chan error
+	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan, storeAssetsChan, storeTxAssetsChan chan error
 	if b.chainType == bchain.ChainBitcoinType {
 		storeTxAddressesChan = make(chan error)
 		go b.parallelStoreTxAddresses(storeTxAddressesChan, true)
@@ -516,8 +463,6 @@ func (b *BulkConnect) Close() error {
 		go b.parallelStoreAssets(storeAssetsChan, true)
 		storeTxAssetsChan = make(chan error)
 		go b.parallelStoreTxAssets(storeTxAssetsChan, true)
-		storeAssetAllocationMemosChan = make(chan error)
-		go b.parallelStoreAssetAllocationMemos(storeAssetAllocationMemosChan, true)
 	} else if b.chainType == bchain.ChainEthereumType {
 		storeAddressContractsChan = make(chan error)
 		go b.parallelStoreAddressContracts(storeAddressContractsChan, true)
@@ -554,11 +499,6 @@ func (b *BulkConnect) Close() error {
 	}
 	if storeTxAssetsChan != nil {
 		if err := <-storeTxAssetsChan; err != nil {
-			return err
-		}
-	}
-	if storeAssetAllocationMemosChan != nil {
-		if err := <-storeAssetAllocationMemosChan; err != nil {
 			return err
 		}
 	}

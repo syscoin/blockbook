@@ -252,15 +252,7 @@ type AssetBalance struct {
 	BalanceSat  *big.Int
 	Transfers	uint32
 }
-type AssetAllocationMemo struct {
-	Memo  	[]byte
-	MemoTxID []byte
-}
 
-type AssetAllocationMemoAPI struct {
-	Memo  	[]byte
-	MemoTxID string
-}
 // AddrBalance stores number of transactions and balances of an address
 type AddrBalance struct {
 	Txs        uint32
@@ -533,6 +525,7 @@ type AssetAllocation struct {
 type Asset struct {
 	Transactions	uint32
 	AssetObj 		wire.AssetType
+	MetaData		[]byte
 }
 // Assets is array of Asset
 type Assets []Asset
@@ -562,7 +555,6 @@ type Token struct {
 	TotalSentSat     *Amount   `json:"totalSent,omitempty"`
 	ContractIndex    string    `json:"-"`
 	AddrStr		 	 string    `json:"addrStr,omitempty"`
-	Memo    		 *AssetAllocationMemoAPI `json:"memo,omitempty"`
 }
 type Tokens []*Token
 func (t Tokens) Len() int           { return len(t) }
@@ -602,8 +594,6 @@ type TxAsset struct {
 	Txs       []*TxAssetIndex
 }
 type TxAssetMap map[string]*TxAsset
-
-type TxAssetAllocationMemoMap map[string]*AssetAllocationMemo
 
 // used to store all unique txid/address tuples related to an asset
 type TxAssetAddressIndex struct {
@@ -778,9 +768,6 @@ type BlockChainParser interface {
 	GetAssetsMaskFromVersion(nVersion int32) AssetsMask
 	GetAssetTypeFromVersion(nVersion int32) *TokenType
 	PackAssetKey(assetGuid uint64, height uint32) []byte
-	PackAssetAllocationMemoKey(assetGuid uint64, addrDesc *AddressDescriptor) []byte
-	PackAssetAllocationMemo(assetAllocationMemo *AssetAllocationMemo) []byte
-	UnpackAssetAllocationMemo(buf []byte) *AssetAllocationMemo
 	UnpackAssetKey(key []byte) (uint64, uint32)
 	PackAssetTxIndex(txAsset *TxAsset) []byte
 	UnpackAssetTxIndex(buf []byte) []*TxAssetIndex
