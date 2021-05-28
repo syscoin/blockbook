@@ -762,6 +762,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 								Decimals:		int(dbAsset.AssetObj.Precision),
 								UpdateCapabilityFlags:	dbAsset.AssetObj.UpdateCapabilityFlags,
 								NotaryKeyID: 	dbAsset.AssetObj.NotaryKeyID,
+								MetaData:		dbAsset.MetaData,
 							}
 							if len(dbAsset.AssetObj.PubData) > 0 {
 								json.Unmarshal(dbAsset.AssetObj.PubData, &assetDetails.PubData)

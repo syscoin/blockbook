@@ -1567,6 +1567,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			Decimals:		int(dbAsset.AssetObj.Precision),
 			UpdateCapabilityFlags:	dbBaseAsset.AssetObj.UpdateCapabilityFlags,
 			NotaryKeyID: 	dbBaseAsset.AssetObj.NotaryKeyID,
+			MetaData:		dbAsset.MetaData,
 		},
 		Paging:                pg,
 		UnconfirmedBalanceSat: (*bchain.Amount)(&uBalSat),
@@ -1998,6 +1999,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 				Decimals:		int(dbAsset.AssetObj.Precision),
 				UpdateCapabilityFlags:	dbAsset.AssetObj.UpdateCapabilityFlags,
 				NotaryKeyID: 	dbAsset.AssetObj.NotaryKeyID,
+				MetaData:		dbAsset.MetaData,
 			}
 			if len(dbAsset.AssetObj.PubData) > 0 {
 				json.Unmarshal(dbAsset.AssetObj.PubData, &assetDetails.PubData)
