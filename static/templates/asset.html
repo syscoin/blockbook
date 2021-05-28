@@ -43,10 +43,12 @@
                     <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
                 </tr>
                 {{- if isNFT $asset.AssetDetails.AssetGuid -}}
+                {{if gt (len $asset.MetaData) 0}}
                 <tr>
                     <td>Metadata</td>
                     <td class="data ellipsis">{{$asset.MetaData}}</td>
                 </tr>
+                {{- end -}}
                 {{- end -}}
                 <tr>
                     <td>Decimals</td>
