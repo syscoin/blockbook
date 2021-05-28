@@ -1145,7 +1145,7 @@ func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOu
 						if !ok {
 							return errors.New("DisconnectSyscoinInput asset balance not found")
 						}
-						err := d.DisconnectAllocationInput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses, assets, assetFoundInTx, txa.Memo)
+						err := d.DisconnectAllocationInput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses, assets, assetFoundInTx)
 						if err != nil {
 							return err
 						}
