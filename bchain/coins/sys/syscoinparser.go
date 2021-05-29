@@ -678,10 +678,10 @@ func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 
 func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 	var asset bchain.Asset
+	var ll = 0
 	transactions, l := p.BaseParser.UnpackVaruint(buf)
 	asset.Transactions = uint32(transactions)
-	metaData, ll := p.BaseParser.UnpackVarBytes(buf[l:])
-	asset.MetaData = metaData
+	asset.MetaData, ll = p.BaseParser.UnpackVarBytes(buf[l:])
 	l += ll
 	r := bytes.NewReader(buf[l:])
 	err := asset.AssetObj.Deserialize(r)
