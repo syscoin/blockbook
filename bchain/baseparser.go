@@ -465,7 +465,7 @@ func (p *BaseParser) UnpackVarBytes(buf []byte) ([]byte, int) {
 }
 
 func (p *BaseParser) PackVarBytes(bufValue []byte) []byte {
-	if bufValue = nil {
+	if bufValue == nil {
 		varBuf := make([]byte, vlq.MaxLen64)
 		l := p.PackVaruint(0, varBuf)
 		buf = append(buf, varBuf[:l]...)
