@@ -1421,6 +1421,7 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 				TotalSupply:	(*bchain.Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
 				Decimals:		int(assetCached.AssetObj.Precision),
 				Txs:			int(assetCached.Transactions),
+				MetaData:		assetCached.MetaData,
 			}
 			json.Unmarshal(assetCached.AssetObj.PubData, &assetSpecific.PubData)
 			assetDetails = append(assetDetails, &assetSpecific)
@@ -1999,7 +2000,6 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 				Decimals:		int(dbAsset.AssetObj.Precision),
 				UpdateCapabilityFlags:	dbAsset.AssetObj.UpdateCapabilityFlags,
 				NotaryKeyID: 	dbAsset.AssetObj.NotaryKeyID,
-				MetaData:		dbAsset.MetaData,
 			}
 			if len(dbAsset.AssetObj.PubData) > 0 {
 				json.Unmarshal(dbAsset.AssetObj.PubData, &assetDetails.PubData)

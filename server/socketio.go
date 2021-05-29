@@ -638,8 +638,6 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 			Decimals:		int(dbAsset.AssetObj.Precision),
 			UpdateCapabilityFlags:	dbAsset.AssetObj.UpdateCapabilityFlags,
 			NotaryKeyID: 	dbAsset.AssetObj.NotaryKeyID,
-			MetaData:		dbAsset.MetaData,
-			
 		}
 		if len(dbAsset.AssetObj.AuxFeeDetails.AuxFeeKeyID) > 0 {
 			res.Result.AssetDetails.AuxFeeDetails = &dbAsset.AssetObj.AuxFeeDetails
