@@ -42,18 +42,18 @@
                     {{- end -}}
                     <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
                 </tr>
-                {{- if isNFT $asset.AssetDetails.AssetGuid -}}
-                {{if gt (len $asset.AssetDetails.MetaData) 0}}
-                <tr>
-                    <td>Metadata</td>
-                    <td class="data ellipsis">{{formatEncodeBase64 $asset.AssetDetails.MetaData}}</td>
-                </tr>
-                {{- end -}}
-                {{- end -}}
                 <tr>
                     <td>Decimals</td>
                     <td class="data">{{$asset.AssetDetails.Decimals}}</td>
                 </tr>
+                {{- if isNFT $asset.AssetDetails.AssetGuid -}}
+                {{if gt (len $asset.AssetDetails.MetaData) 0}}
+                <tr>
+                    <td>Metadata</td>
+                    <td class="data ellipsis" colspan="3">{{formatEncodeBase64 $asset.AssetDetails.MetaData}}</td>
+                </tr>
+                {{- end -}}
+                {{- end -}}
                 <tr>
                         <td>Capability Flags</td>
                         <td style="padding: 0;" colspan="3">
