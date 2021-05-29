@@ -184,16 +184,16 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 		} else if !isActivate {
 			return errors.New(fmt.Sprint("ConnectAllocationOutput could not read asset " , assetInfo.AssetGuid))
 		}
-	} else {
-		// if NFT asset exists and meta data isn't set yet we set it here
-		if baseAssetGuid != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 {
-			dBAsset.MetaData = memo
-		}
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
 		if dBAsset != nil {
 			dBAsset.Transactions++
+			// only if this is the first transaction after NFT creation allow metadata to be set
+			// if NFT asset exists and meta data isn't set yet we set it here
+			if dBAsset.Transactions == 1 && baseAssetGuid != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 {
+				dBAsset.MetaData = memo
+			}
 			assets[assetInfo.AssetGuid] = dBAsset
 		}
 	}
