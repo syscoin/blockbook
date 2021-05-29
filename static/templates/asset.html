@@ -46,7 +46,7 @@
                 {{if gt (len $asset.MetaData) 0}}
                 <tr>
                     <td>Metadata</td>
-                    <td class="data ellipsis">{{$asset.MetaData}}</td>
+                    <td class="data ellipsis">{{formatEncodeBase64 $asset.MetaData}}</td>
                 </tr>
                 {{- end -}}
                 {{- end -}}
