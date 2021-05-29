@@ -191,7 +191,7 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 			dBAsset.Transactions++
 			// only if this is the first transaction after NFT creation allow metadata to be set
 			// if NFT asset exists and meta data isn't set yet we set it here
-			if dBAsset.Transactions == 1 && baseAssetGuid != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 {
+			if dBAsset.Transactions == 2 && baseAssetGuid != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 {
 				dBAsset.MetaData = memo
 			}
 			assets[assetInfo.AssetGuid] = dBAsset
@@ -286,6 +286,9 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 	exists := assetFoundInTx(assetInfo.AssetGuid, btxID)
 	if !exists {
 		dBAsset.Transactions--
+		if dBAsset.Transactions == 1 && d.GetBaseAssetID(assetInfo.AssetGuid) != assetInfo.AssetGuid && len(dBAsset.MetaData) > 0 {
+			dBAsset.MetaData = nil
+		}
 	}
 	counted := d.addToAssetAddressMap(blockTxAssetAddresses, assetInfo.AssetGuid, btxID, addrDesc)
 	if !counted {
@@ -321,7 +324,7 @@ func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, is
 					valueDiffNFT := (valueSatOut - valueSatIn)
 					valueDiff += valueDiffNFT
 					if voutAsset.AssetGuid != baseAssetGuid {
-						// get the NFT asset from asset DB or create new one if doesn't exist
+						// get the NFT asset from asset DB
 						nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
 						if nftDBAsset == nil || err != nil {
 							if nftDBAsset == nil {
