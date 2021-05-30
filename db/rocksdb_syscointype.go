@@ -464,7 +464,7 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 		}
 	}
 	if AssetCache == nil {
-		AssetCache = map[uint64]bchain.Asset{MetaData: nil}
+		AssetCache = map[uint64]bchain.Asset{}
 		// so it will store later in cache
 		ok = false
 	} else {
