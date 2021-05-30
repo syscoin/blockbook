@@ -389,7 +389,7 @@ func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, 
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
 	if AssetCache == nil {
-		AssetCache = map[uint64]bchain.Asset{MetaData: nil}
+		AssetCache = map[uint64]bchain.Asset{}
 	}
 	ro := gorocksdb.NewDefaultReadOptions()
 	ro.SetFillCache(false)
@@ -413,7 +413,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint64]*bchai
 		return nil
 	}
 	if AssetCache == nil {
-		AssetCache = map[uint64]bchain.Asset{MetaData: nil}
+		AssetCache = map[uint64]bchain.Asset{}
 	}
 	for guid, asset := range assets {
 		AssetCache[guid] = *asset
