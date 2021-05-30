@@ -662,7 +662,7 @@ func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 }
 
 func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
-	var buf []byte
+	buf := make([]byte, 0, 53)
 	varBuf := make([]byte, 4)
 	l := p.BaseParser.PackVaruint(uint(asset.Transactions), varBuf)
 	buf = append(buf, varBuf[:l]...)
