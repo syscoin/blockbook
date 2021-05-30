@@ -640,7 +640,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 				if isAssetTx {
 					asset, err = d.chainParser.GetAssetFromDesc(&addrDesc)
 				} else if isAssetSendTx {
-					asset = &bchain.Asset{}
+					asset = &bchain.Asset{MemoData: nil}
 					var allocation *bchain.AssetAllocation
 					allocation, _, err = d.chainParser.GetAssetAllocationFromDesc(&addrDesc, tx.Version)
 					asset.AssetObj.Allocation = allocation.AssetObj
@@ -1185,7 +1185,7 @@ func (d *RocksDB) disconnectTxAssetOutputs(txa *bchain.TxAddresses,
 				if isAssetTx {
 					asset, err = d.chainParser.GetAssetFromDesc(&t.AddrDesc)
 				} else if isAssetSendTx {
-					asset = &bchain.Asset{}
+					asset = &bchain.Asset{MemoData: nil}
 					var allocation *bchain.AssetAllocation
 					allocation, _, err = d.chainParser.GetAssetAllocationFromDesc(&t.AddrDesc, txa.Version)
 					asset.AssetObj.Allocation = allocation.AssetObj

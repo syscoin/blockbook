@@ -219,7 +219,7 @@ func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAss
 			return errors.New(fmt.Sprint("ConnectAssetOutput: could not read asset " , baseAssetGuid))
 		}
 	} else {
-		dBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj}
+		dBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj, MemoData: nil}
 	}
 	if dBAsset != nil {
 		if isAssetTx {
@@ -389,7 +389,7 @@ func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, 
 func (d *RocksDB) SetupAssetCache() error {
 	start := time.Now()
 	if AssetCache == nil {
-		AssetCache = map[uint64]bchain.Asset{}
+		AssetCache = map[uint64]bchain.Asset{MemoData: nil}
 	}
 	ro := gorocksdb.NewDefaultReadOptions()
 	ro.SetFillCache(false)
@@ -413,7 +413,7 @@ func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint64]*bchai
 		return nil
 	}
 	if AssetCache == nil {
-		AssetCache = map[uint64]bchain.Asset{}
+		AssetCache = map[uint64]bchain.Asset{MemoData: nil}
 	}
 	for guid, asset := range assets {
 		AssetCache[guid] = *asset
@@ -464,7 +464,7 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 		}
 	}
 	if AssetCache == nil {
-		AssetCache = map[uint64]bchain.Asset{}
+		AssetCache = map[uint64]bchain.Asset{MemoData: nil}
 		// so it will store later in cache
 		ok = false
 	} else {
