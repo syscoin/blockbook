@@ -138,7 +138,7 @@ func (d *RocksDB) DisconnectAssetOutputHelper(asset *bchain.Asset, dBAsset *bcha
 	return nil
 }
 
-func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, height uint32, version int32, balanceAsset *bchain.AssetBalance, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap) error {
+func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, height uint32, version int32, balanceAsset *bchain.AssetBalance, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if err != nil {
 		return err
@@ -149,6 +149,11 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
 		dBAsset.Transactions++
+		// only if this is the first transaction after NFT creation allow metadata to be set
+		// if NFT asset exists and meta data isn't set yet we set it here
+		if  !d.chainParser.IsAssetSendTx(tx.Version) && dBAsset.Transactions == 2 && d.GetBaseAssetID(assetInfo.AssetGuid) != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 && len(memo) > 0 {
+			dBAsset.MetaData = memo
+		}
 		assets[assetInfo.AssetGuid] = dBAsset
 	}
 	counted = d.addToAssetAddressMap(blockTxAssetAddresses, assetInfo.AssetGuid, btxID, addrDesc)
