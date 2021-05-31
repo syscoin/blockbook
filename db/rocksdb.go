@@ -749,7 +749,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 						balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceSat: big.NewInt(0), SentSat: big.NewInt(0)}
 						balance.AssetBalances[spentOutput.AssetInfo.AssetGuid] = balanceAsset
 					}
-					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, spendingTxid, spentOutput.AssetInfo, blockTxAssetAddresses, assets, txAssets, tx.memo)
+					err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, spendingTxid, spentOutput.AssetInfo, blockTxAssetAddresses, assets, txAssets, tx.Memo)
 					if err != nil {
 						return err
 					}
