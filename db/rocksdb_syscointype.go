@@ -191,7 +191,7 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 			dBAsset.Transactions++
 			// only if this is the first transaction after NFT creation allow metadata to be set
 			// if NFT asset exists and meta data isn't set yet we set it here
-			if dBAsset.Transactions == 2 && baseAssetGuid != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 {
+			if !isAssetSendTx && dBAsset.Transactions == 2 && baseAssetGuid != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 && len(memo) > 0 {
 				dBAsset.MetaData = memo
 			}
 			assets[assetInfo.AssetGuid] = dBAsset
