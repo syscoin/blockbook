@@ -689,4 +689,4 @@ func (p *SyscoinParser) UnpackAsset(buf []byte) (*bchain.Asset, error) {
 		return nil, err
 	}
 	return &asset, nil
-} bv
+}
