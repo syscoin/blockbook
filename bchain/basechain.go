@@ -62,3 +62,6 @@ func (b *BaseChain) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc A
 func (b *BaseChain) GetChainTips() (string, error) {
 	return "", errors.New("Not supported")
 }
+func (b *BaseChain) GetSPVProof(hash string) (string, error) {
+	return "", errors.New("Not supported")
+}

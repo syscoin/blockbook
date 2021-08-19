@@ -368,6 +368,16 @@ type ResGetChainTips struct {
 type CmdGetChainTips struct {
 	Method string `json:"method"`
 }
+
+// syscoingetspvproof
+type ResGetSPVProof struct {
+	Error  *bchain.RPCError `json:"error"`
+	Result json.RawMessage  `json:"result"`
+}
+
+type CmdGetSPVProof struct {
+	Method string `json:"method"`
+}
 // estimatesmartfee
 
 type CmdEstimateSmartFee struct {
@@ -803,12 +813,32 @@ func (b *BitcoinRPC) DecodeRawTransaction(hex string) (string, error) {
 }
 
 
-// getRawTransaction returns json as returned by backend, with all coin specific data
 func (b *BitcoinRPC) GetChainTips() (string, error) {
 	glog.V(1).Info("rpc: getChainTips")
 
 	res := ResGetChainTips{}
 	req := CmdGetChainTips{Method: "getchaintips"}
+	err := b.Call(&req, &res)
+
+	if err != nil {
+		return "", err
+	}
+	if res.Error != nil {
+		return "", err
+	}
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return "", err
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
+}
+
+func (b *BitcoinRPC) GetSPVProof() (string, error) {
+	glog.V(1).Info("rpc: getspvproof")
+
+	res := ResGetSPVProof{}
+	req := CmdGetSPVProof{Method: "syscoingetspvproof"}
 	err := b.Call(&req, &res)
 
 	if err != nil {

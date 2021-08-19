@@ -89,6 +89,15 @@ func (b *SyscoinRPC) GetChainTips() (string, error) {
 	return result, nil
 }
 
+func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
+	glog.V(1).Info("rpc: getspvproof")
+	result, err := b.GetSPVProof(hash);
+	if err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
 // GetTransactionForMempool returns a transaction by the transaction ID.
 // It could be optimized for mempool, i.e. without block time and confirmations
 func (b *SyscoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
