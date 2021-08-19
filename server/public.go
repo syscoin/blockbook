@@ -186,6 +186,7 @@ func (s *PublicServer) ConnectFullPublicInterface() {
 	serveMux.HandleFunc(path+"api/v2/address/", s.jsonHandler(s.apiAddress, apiV2))
 	serveMux.HandleFunc(path+"api/v2/asset/", s.jsonHandler(s.apiAsset, apiV2))
 	serveMux.HandleFunc(path+"api/v2/getchaintips/", s.jsonHandler(s.apiGetChainTips, apiV2))
+	serveMux.HandleFunc(path+"api/v2/getspvproof/", s.jsonHandler(s.apiGetSPVProof, apiV2))
 	serveMux.HandleFunc(path+"api/v2/assets/", s.jsonHandler(s.apiAssets, apiV2))
 	serveMux.HandleFunc(path+"api/v2/xpub/", s.jsonHandler(s.apiXpub, apiV2))
 	serveMux.HandleFunc(path+"api/v2/utxo/", s.jsonHandler(s.apiUtxo, apiV2))
@@ -1248,6 +1249,25 @@ func (s *PublicServer) apiGetChainTips(r *http.Request, apiVersion int) (interfa
 	var err error
 	var res resultGetChainTips
 	res.Result, err = s.api.GetChainTips()
+	return res, err
+}
+
+func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interface{}, error) {
+	var txid string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		txid = r.URL.Path[i+1:]
+	}
+	if len(txid) == 0 {
+		return nil, api.NewAPIError("Missing txid", true)
+	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "api-getspvproof"}).Inc()
+	type resultGetSPVProof struct {
+		Result string `json:"result"`
+	}
+	var err error
+	var res resultGetSPVProof
+	res.Result, err = s.api.GetSPVProof()
 	return res, err
 }
 

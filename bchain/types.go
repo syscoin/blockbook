@@ -674,6 +674,7 @@ type BlockChain interface {
 	EthereumTypeGetErc20ContractInfo(contractDesc AddressDescriptor) (*Erc20Contract, error)
 	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error)
 	GetChainTips() (string, error)
+	GetSPVProof(hash string) (string, error)
 }
 
 // BlockChainParser defines common interface to parsing and conversions of block chain data

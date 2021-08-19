@@ -319,6 +319,12 @@ func (c *blockChainWithMetrics) GetChainTips() (result string, err error) {
 	result, err = c.b.GetChainTips()
 	return result, err
 }
+
+func (c *blockChainWithMetrics) GetSPVProof(hash string) (result string, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("GetSPVProof", s, err) }(time.Now())
+	result, err = c.b.GetSPVProof(hash)
+	return result, err
+}
 type mempoolWithMetrics struct {
 	mempool bchain.Mempool
 	m       *common.Metrics

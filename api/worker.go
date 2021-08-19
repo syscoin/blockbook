@@ -1463,6 +1463,13 @@ func (w *Worker) GetChainTips() (string, error) {
 	return result, nil
 }
 
+func (w *Worker) GetSPVProof(hash string) (string, error) {
+	result, err := w.chain.GetSPVProof(hash)
+	if err != nil {
+		return "", err
+	}
+	return result, nil
+}
 // GetAsset gets transactions for given asset
 func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AddressFilter) (*Asset, error) {
 	start := time.Now()
