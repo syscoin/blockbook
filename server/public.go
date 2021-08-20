@@ -1267,7 +1267,7 @@ func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interfac
 	}
 	var err error
 	var res resultGetSPVProof
-	res.Result, err = s.api.GetSPVProof()
+	res.Result, err = s.api.GetSPVProof(txid)
 	return res, err
 }
 
