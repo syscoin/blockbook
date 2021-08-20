@@ -377,6 +377,9 @@ type ResGetSPVProof struct {
 
 type CmdGetSPVProof struct {
 	Method string `json:"method"`
+	Params struct {
+		Txid    string `json:"txid"`
+	} `json:"params"`
 }
 // estimatesmartfee
 
@@ -834,11 +837,12 @@ func (b *BitcoinRPC) GetChainTips() (string, error) {
 	return decodedRawString, nil
 }
 
-func (b *BitcoinRPC) GetSPVProof() (string, error) {
+func (b *BitcoinRPC) GetSPVProof(hash string) (string, error) {
 	glog.V(1).Info("rpc: getspvproof")
 
 	res := ResGetSPVProof{}
 	req := CmdGetSPVProof{Method: "syscoingetspvproof"}
+	req.Params.Txid = hash
 	err := b.Call(&req, &res)
 
 	if err != nil {
