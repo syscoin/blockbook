@@ -93,7 +93,7 @@ func (b *SyscoinRPC) GetChainTips() (string, error) {
 	return decodedRawString, nil
 }
 
-func (b *BitcoinRPC) GetSPVProof(hash string) (string, error) {
+func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
 	glog.V(1).Info("rpc: getspvproof", hash)
 
 	res := btc.ResGetSPVProof{}
