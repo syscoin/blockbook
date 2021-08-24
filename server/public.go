@@ -1261,6 +1261,7 @@ func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interfac
 	if len(txid) == 0 {
 		return nil, api.NewAPIError("Missing txid", true)
 	}
+	glog.Info("apiGetSPVProof txid ", txid)
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-getspvproof"}).Inc()
 	type resultGetSPVProof struct {
 		Result string `json:"result"`
@@ -1268,6 +1269,7 @@ func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interfac
 	var err error
 	var res resultGetSPVProof
 	res.Result, err = s.api.GetSPVProof(txid)
+	glog.Info("server response for getspvproof", res.Result)
 	return res, err
 }
 
