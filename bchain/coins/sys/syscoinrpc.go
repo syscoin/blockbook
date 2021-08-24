@@ -72,30 +72,47 @@ func (b *SyscoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error)
 	return b.GetBlockWithoutHeader(hash, height)
 }
 
-type ResSyscoinSend struct {
-	Error  *bchain.RPCError `json:"error"`
-	Result json.RawMessage      `json:"result"`
-}
-type GetSyscoinTxHex struct {
-	Hex string `json:"hex"`
-}
-
 func (b *SyscoinRPC) GetChainTips() (string, error) {
 	glog.V(1).Info("rpc: getchaintips")
-	result, err := b.GetChainTips();
+
+	res := btc.ResGetChainTips{}
+	req := btc.CmdGetChainTips{Method: "getchaintips"}
+	err := b.Call(&req, &res)
+
 	if err != nil {
 		return "", err
 	}
-	return result, nil
+	if res.Error != nil {
+		return "", err
+	}
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return "", err
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
 }
 
-func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
-	glog.Info("rpc: getspvproof", hash)
-	result, err := b.GetSPVProof(hash);
+func (b *BitcoinRPC) GetSPVProof(hash string) (string, error) {
+	glog.V(1).Info("rpc: getspvproof", hash)
+
+	res := btc.ResGetSPVProof{}
+	req := btc.CmdGetSPVProof{Method: "syscoingetspvproof"}
+	req.Params.Txid = hash
+	err := b.Call(&req, &res)
+
 	if err != nil {
 		return "", err
 	}
-	return result, nil
+	if res.Error != nil {
+		return "", err
+	}
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return "", err
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
 }
 
 // GetTransactionForMempool returns a transaction by the transaction ID.
