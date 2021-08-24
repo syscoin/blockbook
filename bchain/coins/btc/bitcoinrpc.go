@@ -815,51 +815,6 @@ func (b *BitcoinRPC) DecodeRawTransaction(hex string) (string, error) {
 	return decodedRawString, nil
 }
 
-
-func (b *BitcoinRPC) GetChainTips() (string, error) {
-	glog.V(1).Info("rpc: getchaintips")
-
-	res := ResGetChainTips{}
-	req := CmdGetChainTips{Method: "getchaintips"}
-	err := b.Call(&req, &res)
-
-	if err != nil {
-		return "", err
-	}
-	if res.Error != nil {
-		return "", err
-	}
-	rawMarshal, err := json.Marshal(&res.Result)
-    if err != nil {
-        return "", err
-    }
-	decodedRawString := string(rawMarshal)
-	return decodedRawString, nil
-}
-
-func (b *BitcoinRPC) GetSPVProof(hash string) (string, error) {
-	glog.Info("rpc: getspvproof", hash)
-
-	res := ResGetSPVProof{}
-	req := CmdGetSPVProof{Method: "syscoingetspvproof"}
-	req.Params.Txid = hash
-	err := b.Call(&req, &res)
-
-	if err != nil {
-		return "", err
-	}
-	if res.Error != nil {
-		return "", err
-	}
-	rawMarshal, err := json.Marshal(&res.Result)
-    if err != nil {
-        return "", err
-    }
-	decodedRawString := string(rawMarshal)
-	glog.Info("rpc: getspvproof decodedRawString ", decodedRawString)
-	return decodedRawString, nil
-}
-
 // EstimateSmartFee returns fee estimation
 func (b *BitcoinRPC) EstimateSmartFee(blocks int, conservative bool) (big.Int, error) {
 	// use EstimateFee if EstimateSmartFee is not supported
