@@ -1253,6 +1253,7 @@ func (s *PublicServer) apiGetChainTips(r *http.Request, apiVersion int) (interfa
 }
 
 func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interface{}, error) {
+	glog.Info("apiGetSPVProof")
 	var txid string
 	i := strings.LastIndexByte(r.URL.Path, '/')
 	if i > 0 {
@@ -1261,13 +1262,16 @@ func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interfac
 	if len(txid) == 0 {
 		return nil, api.NewAPIError("Missing txid", true)
 	}
+	glog.Info("apiGetSPVProof txid ", txid)
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-getspvproof"}).Inc()
+	glog.Info("apiGetSPVProof before getspvproof ", txid)
 	type resultGetSPVProof struct {
 		Result string `json:"result"`
 	}
 	var err error
 	var res resultGetSPVProof
 	res.Result, err = s.api.GetSPVProof(txid)
+	glog.Info("server response for getspvproof", res.Result)
 	return res, err
 }
 
