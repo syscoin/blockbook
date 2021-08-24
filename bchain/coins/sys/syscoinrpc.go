@@ -90,7 +90,7 @@ func (b *SyscoinRPC) GetChainTips() (string, error) {
 }
 
 func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
-	glog.V(1).Info("rpc: getspvproof")
+	glog.Info("rpc: getspvproof", hash)
 	result, err := b.GetSPVProof(hash);
 	if err != nil {
 		return "", err

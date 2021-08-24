@@ -817,7 +817,7 @@ func (b *BitcoinRPC) DecodeRawTransaction(hex string) (string, error) {
 
 
 func (b *BitcoinRPC) GetChainTips() (string, error) {
-	glog.V(1).Info("rpc: getChainTips")
+	glog.V(1).Info("rpc: getchaintips")
 
 	res := ResGetChainTips{}
 	req := CmdGetChainTips{Method: "getchaintips"}
@@ -838,7 +838,7 @@ func (b *BitcoinRPC) GetChainTips() (string, error) {
 }
 
 func (b *BitcoinRPC) GetSPVProof(hash string) (string, error) {
-	glog.V(1).Info("rpc: getspvproof")
+	glog.Info("rpc: getspvproof", hash)
 
 	res := ResGetSPVProof{}
 	req := CmdGetSPVProof{Method: "syscoingetspvproof"}
@@ -856,6 +856,7 @@ func (b *BitcoinRPC) GetSPVProof(hash string) (string, error) {
         return "", err
     }
 	decodedRawString := string(rawMarshal)
+	glog.Info("rpc: getspvproof decodedRawString ", decodedRawString)
 	return decodedRawString, nil
 }
 
