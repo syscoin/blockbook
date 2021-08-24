@@ -900,7 +900,7 @@ func (s *PublicServer) explorerAssets(w http.ResponseWriter, r *http.Request) (t
 	if len(assetParam) == 0 {
 		return errorTpl, nil, api.NewAPIError("Missing asset", true)
 	}
-	s.metrics.ExplorerViews.With(common.Labels{"action": "asset"}).Inc()
+	s.metrics.ExplorerViews.With(common.Labels{"action": "assets"}).Inc()
 	page, _, _, _, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
 	// do not allow details to be changed by query params
 	assets := s.api.FindAssets(assetParam, page, txsOnPage)
