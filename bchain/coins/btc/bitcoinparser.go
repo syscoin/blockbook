@@ -240,6 +240,10 @@ func (p *BitcoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.T
 	vout := make([]bchain.Vout, len(t.TxOut))
 	for i, out := range t.TxOut {
 		addrs := []string{}
+		// skip coinbase OPRETURN
+		if blockchain.IsCoinBaseTx(t) && len(out.PkScript) > 0 && out.PkScript[0] == txscript.OP_RETURN {
+			continue
+		}
 		if parseAddresses {
 			addrs, _, _ = p.OutputScriptToAddressesFunc(out.PkScript)
 		}
