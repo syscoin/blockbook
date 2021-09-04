@@ -464,19 +464,19 @@ const SPTAssetAllocationMintType TokenType = "SPTAssetAllocationMint"
 const SPTAssetAllocationSendType TokenType = "SPTAssetAllocationSend"
 const SPTAssetSyscoinBurnToAllocationType TokenType = "SPTSyscoinBurnToAssetAllocation"
 const SPTAssetAllocationBurnToSyscoinType TokenType = "SPTAssetAllocationBurnToSyscoin"
-const SPTAssetAllocationBurnToEthereumType TokenType = "SPTAssetAllocationBurnToEthereum"
+const SPTAssetAllocationBurnToNEVMType TokenType = "SPTAssetAllocationBurnToNEVM"
 
 const AllMask AssetsMask = 0
 const BaseCoinMask AssetsMask = 1
 const AssetAllocationSendMask AssetsMask = 2
 const AssetSyscoinBurnToAllocationMask AssetsMask = 4
 const AssetAllocationBurnToSyscoinMask AssetsMask = 8
-const AssetAllocationBurnToEthereumMask AssetsMask = 16
+const AssetAllocationBurnToNEVMMask AssetsMask = 16
 const AssetAllocationMintMask AssetsMask = 32
 const AssetUpdateMask AssetsMask = 64
 const AssetSendMask AssetsMask = 128
 const AssetActivateMask AssetsMask = 256
-const AssetMask AssetsMask = AssetActivateMask | AssetUpdateMask | AssetSendMask | AssetSyscoinBurnToAllocationMask | AssetAllocationBurnToSyscoinMask | AssetAllocationBurnToEthereumMask | AssetAllocationMintMask | AssetAllocationSendMask
+const AssetMask AssetsMask = AssetActivateMask | AssetUpdateMask | AssetSendMask | AssetSyscoinBurnToAllocationMask | AssetAllocationBurnToSyscoinMask | AssetAllocationBurnToNEVMMask | AssetAllocationMintMask | AssetAllocationSendMask
 // Amount is datatype holding amounts
 type Amount big.Int
 // MarshalJSON Amount serialization
