@@ -27,12 +27,11 @@ const (
 	SYSCOIN_TX_VERSION_ASSET_UPDATE int32 = 131
 	SYSCOIN_TX_VERSION_ASSET_SEND int32 = 132
 	SYSCOIN_TX_VERSION_ALLOCATION_MINT int32 = 133
-	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM int32 = 134
+	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM int32 = 134
 	SYSCOIN_TX_VERSION_ALLOCATION_SEND int32 = 135
 	maxAddrDescLen = 10000
 	maxMemoLen = 256
 )
-
 // chain parameters
 var (
 	MainNetParams chaincfg.Params
@@ -172,8 +171,8 @@ func (p *SyscoinParser) GetAssetTypeFromVersion(nVersion int32) *bchain.TokenTyp
 		ttype = bchain.SPTAssetSendType
 	case SYSCOIN_TX_VERSION_ALLOCATION_MINT:
 		ttype = bchain.SPTAssetAllocationMintType
-	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM:
-		ttype = bchain.SPTAssetAllocationBurnToEthereumType
+	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM:
+		ttype = bchain.SPTAssetAllocationBurnToNEVMType
 	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN:
 		ttype = bchain.SPTAssetAllocationBurnToSyscoinType
 	case SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION:
@@ -196,8 +195,8 @@ func (p *SyscoinParser) GetAssetsMaskFromVersion(nVersion int32) bchain.AssetsMa
 		return bchain.AssetSendMask
 	case SYSCOIN_TX_VERSION_ALLOCATION_MINT:
 		return bchain.AssetAllocationMintMask
-	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM:
-		return bchain.AssetAllocationBurnToEthereumMask
+	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM:
+		return bchain.AssetAllocationBurnToNEVMMask
 	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN:
 		return bchain.AssetAllocationBurnToSyscoinMask
 	case SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION:
@@ -219,7 +218,7 @@ func (p *SyscoinParser) IsAssetTx(nVersion int32) bool {
 
 // note assetsend in core is assettx but its deserialized as allocation, we just care about balances so we can do it in same code for allocations
 func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
-	return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN || nVersion == SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION ||
+	return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN || nVersion == SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION ||
 	nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND
 }
 
@@ -330,7 +329,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int
 		return nil, nil, err
 	}
 	var memo []byte
-	if p.IsAssetSendTx(txVersion) || (p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_ETHEREUM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN) {
+	if p.IsAssetSendTx(txVersion) || (p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN) {
 		memo = make([]byte, maxMemoLen)
 		n, _ := r.Read(memo)
 		memo = memo[:n]

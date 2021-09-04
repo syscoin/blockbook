@@ -312,7 +312,7 @@ The optional query parameters:
 - *assetMask*: What type of transactions to return (default *all*)
   - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *=* for the masks.
   - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
-  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
+  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntonevm* | *assetallocationmint* | *assetallocationsend*.
   - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
   - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
   - *=*: Apply a custom numerical mask which is a bitmask of the following values:
@@ -320,7 +320,7 @@ The optional query parameters:
     - *assetallocationsend*: 2
     - *syscoinburntoallocation*: 4
     - *assetallocationburntosyscoin*: 8
-    - *assetallocationburntoethereum*: 16
+    - *assetallocationburntonevm*: 16
     - *assetallocationmint*: 32
     - *assetupdate*: 64
     - *assetsend*: 128
@@ -384,7 +384,7 @@ The optional query parameters:
 - *assetMask*: What type of transactions to return (default *all*)
   - *all*: Returns all types of transactions, base and asset type. The assetMask will represent value of all values OR'ed together see below in *=* for the masks.
   - *non-tokens*: Return only base coin transactions no asset type. The assetMask will represent value of *basecoin*.
-  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntoethereum* | *assetallocationmint* | *assetallocationsend*.
+  - *token-only*: Return only asset type transactions no base coin type. The assetMask will represent value of *assetactivate* | *assetupdate* | *assetsend* | *syscoinburntoallocation* | *assetallocationburntosyscoin* | *assetallocationburntonevm* | *assetallocationmint* | *assetallocationsend*.
   - *token-transfers*: Return only assetallocationsend type transactions.  The assetMask will represent value of *assetallocationsend*.
   - *non-token-transfers*: Return any transactions not of type assetallocationsend. The assetMask will represent value of *token-only* &^ *token-transfers*
   - *=*: Apply a custom numerical mask which is a bitmask of the following values:
@@ -392,7 +392,7 @@ The optional query parameters:
     - *assetallocationsend*: 2
     - *syscoinburntoallocation*: 4
     - *assetallocationburntosyscoin*: 8
-    - *assetallocationburntoethereum*: 16
+    - *assetallocationburntonevm*: 16
     - *assetallocationmint*: 32
     - *assetupdate*: 64
     - *assetsend*: 128
