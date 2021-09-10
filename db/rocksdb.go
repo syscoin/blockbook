@@ -14,9 +14,9 @@ import (
 	"unsafe"
 
 	vlq "github.com/bsm/go-vlq"
+	"github.com/flier/gorocksdb"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/tecbot/gorocksdb"
 	"github.com/martinboehm/btcutil/txscript"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/common"
