@@ -9,12 +9,12 @@ ARGS ?=
 
 all: build tools
 
-build: prepare-sources generate-data
+build: prepare-sources
 	cd $(BLOCKBOOK_SRC) && go build -tags rocksdb_6_16 -o $(CURDIR)/blockbook -ldflags="-s -w $(LDFLAGS)" $(ARGS)
 	cp $(CURDIR)/blockbook /out/blockbook
 	chown $(PACKAGER) /out/blockbook
 
-build-debug: prepare-sources generate-data
+build-debug: prepare-sources
 	cd $(BLOCKBOOK_SRC) && go build -tags rocksdb_6_16 -o $(CURDIR)/blockbook -ldflags="$(LDFLAGS)" $(ARGS)
 	cp $(CURDIR)/blockbook /out/blockbook
 	chown $(PACKAGER) /out/blockbook
@@ -23,13 +23,13 @@ tools:
 	cp $(CURDIR)/{ldb,sst_dump} /out
 	chown $(PACKAGER) /out/{ldb,sst_dump}
 
-test: prepare-sources generate-data
+test: prepare-sources
 	cd $(BLOCKBOOK_SRC) && go test -tags 'rocksdb_6_16 unittest' `go list ./... | grep -vP '^github.com/syscoin/blockbook/(contrib|tests)'` $(ARGS)
 
-test-integration: prepare-sources generate-data
+test-integration: prepare-sources
 	cd $(BLOCKBOOK_SRC) && go test -tags 'rocksdb_6_16 integration' `go list github.com/syscoin/blockbook/tests/...` $(ARGS)
 
-test-all: prepare-sources generate-data
+test-all: prepare-sources
 	cd $(BLOCKBOOK_SRC) && go test -tags 'rocksdb_6_16 unittest integration' `go list ./... | grep -v '^github.com/syscoin/blockbook/contrib'` $(ARGS)
 
 prepare-sources:
@@ -38,7 +38,3 @@ prepare-sources:
 	mkdir -p $(BLOCKBOOK_BASE)
 	cp -r /src $(BLOCKBOOK_SRC)
 	cd $(BLOCKBOOK_SRC) && go mod download
-	sed -i 's/maxRequestContentLength\ =\ 1024\ \*\ 1024\ \*\ 5/maxRequestContentLength = 1024 * 1024 * 20/g' $(GOPATH)/pkg/mod/github.com/ethereum/go-ethereum*/rpc/http.go
-
-generate-data:
-	cd $(BLOCKBOOK_SRC) && packr clean && packr
