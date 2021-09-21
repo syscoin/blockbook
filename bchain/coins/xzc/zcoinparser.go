@@ -60,15 +60,15 @@ func init() {
 	RegtestParams.Net = RegtestMagic
 }
 
-// ZcoinParser handle
-type ZcoinParser struct {
-	*btc.BitcoinParser
+// FiroParser handle
+type FiroParser struct {
+	*btc.BitcoinLikeParser
 }
 
-// NewZcoinParser returns new ZcoinParser instance
-func NewZcoinParser(params *chaincfg.Params, c *btc.Configuration) *ZcoinParser {
-	return &ZcoinParser{
-		BitcoinParser: btc.NewBitcoinParser(params, c),
+// NewFiroParser returns new FiroParser instance
+func NewFiroParser(params *chaincfg.Params, c *btc.Configuration) *FiroParser {
+	return &FiroParser{
+		BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c),
 	}
 }
 

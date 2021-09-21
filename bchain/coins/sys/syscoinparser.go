@@ -58,16 +58,16 @@ func init() {
 
 // SyscoinParser handle
 type SyscoinParser struct {
-	*btc.BitcoinParser
+	*btc.BitcoinLikeParser
 	BaseParser *bchain.BaseParser
 }
 
 // NewSyscoinParser returns new SyscoinParser instance
 func NewSyscoinParser(params *chaincfg.Params, c *btc.Configuration) *SyscoinParser {
 	parser := &SyscoinParser{
-		BitcoinParser: btc.NewBitcoinParser(params, c),
+		BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c),
 	}
-	parser.BaseParser = parser.BitcoinParser.BaseParser
+	parser.BaseParser = parser.BitcoinLikeParser.BaseParser
 	return parser
 }
 
