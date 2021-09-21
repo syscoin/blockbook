@@ -50,7 +50,7 @@ func init() {
 
 // DecredParser handle
 type DecredParser struct {
-	*btc.BitcoinParser
+	*btc.BitcoinLikeParser
 	baseParser *bchain.BaseParser
 	netConfig  *cfg.Params
 }
@@ -58,11 +58,11 @@ type DecredParser struct {
 // NewDecredParser returns new DecredParser instance
 func NewDecredParser(params *chaincfg.Params, c *btc.Configuration) *DecredParser {
 	d := &DecredParser{
-		BitcoinParser: btc.NewBitcoinParser(params, c),
-		baseParser:    &bchain.BaseParser{},
+		BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c),
+		baseParser:        &bchain.BaseParser{},
 	}
 
-	switch d.BitcoinParser.Params.Name {
+	switch d.BitcoinLikeParser.Params.Name {
 	case "testnet3":
 		d.netConfig = &cfg.TestNet3Params
 	default:
@@ -208,7 +208,7 @@ func (p *DecredParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressD
 	}
 
 	if scriptClass.String() == "nulldata" {
-		if parsedOPReturn := p.BitcoinParser.TryParseOPReturn(script); parsedOPReturn != "" {
+		if parsedOPReturn := p.BitcoinLikeParser.TryParseOPReturn(script); parsedOPReturn != "" {
 			return []byte(parsedOPReturn), nil
 		}
 	}
