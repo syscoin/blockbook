@@ -23,9 +23,11 @@ const (
 	TestnetMagic wire.BitcoinNet = 0xcffcbeea
 	RegtestMagic wire.BitcoinNet = 0xfabfb5da
 
-	GenesisBlockTime       = 1414776286
-	SwitchToMTPBlockHeader = 1544443200
-	MTPL                   = 64
+	GenesisBlockTime                  = 1414776286
+	SwitchToMTPBlockHeader            = 1544443200
+	SwitchToProgPowBlockHeaderTestnet = 1630069200
+	SwitchToProgPowBlockHeaderMainnet = 1635228000
+	MTPL                              = 64
 
 	SpendTxID = "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -147,10 +149,9 @@ func (p *ZcoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 		return nil, err
 	}
 
-	// then MTP header
-	if isMTP(header) {
-		mtpHeader := MTPBlockHeader{}
-		mtpHashData := MTPHashData{}
+	// then ProgPow or MTP header
+	if isProgPow(header, p.Params.Net == TestnetMagic) {
+		progPowHeader := ProgPowBlockHeader{}
 
 		// header
 		err = binary.Read(reader, binary.LittleEndian, &mtpHeader)
