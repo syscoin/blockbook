@@ -42,7 +42,7 @@ func init() {
 
 // GroestlcoinParser handle
 type GroestlcoinParser struct {
-	*btc.BitcoinLikeParser
+	*btc.BitcoinParser
 	baseparser *bchain.BaseParser
 }
 
