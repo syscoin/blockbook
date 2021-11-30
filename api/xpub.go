@@ -700,16 +700,16 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 // GetXpubUtxo returns unspent outputs for given xpub
 func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, error) {
 	start := time.Now()
+	var utxoRes Utxos
 	xd, err := w.chainParser.ParseXpub(xpub)
 	if err != nil {
-		return nil, err
+		return utxoRes, err
 	}
 	data, _, inCache, err := w.getXpubData(xd, 0, 1, AccountDetailsBasic, &AddressFilter{
 		Vout:          AddressFilterVoutOff,
 		OnlyConfirmed: onlyConfirmed,
 		AssetsMask:	   bchain.AllMask,
 	}, gap)
-	var utxoRes Utxos
 	if err != nil {
 		return utxoRes, err
 	}
