@@ -5,7 +5,8 @@ import (
 	"math/big"
 	"github.com/golang/glog"
 	vlq "github.com/bsm/go-vlq"
-	
+	"github.com/juju/errors"
+
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/syscoin/blockbook/bchain"
