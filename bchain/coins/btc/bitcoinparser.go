@@ -3,10 +3,7 @@ package btc
 import (
 	"encoding/json"
 	"math/big"
-	"strconv"
 	"github.com/golang/glog"
-	
-	"unicode/utf8"
 
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
