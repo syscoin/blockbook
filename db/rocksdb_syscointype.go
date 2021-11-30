@@ -9,7 +9,7 @@ import (
 	
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/tecbot/gorocksdb"
+	"github.com/flier/gorocksdb"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/btcd/wire"
 	vlq "github.com/bsm/go-vlq"

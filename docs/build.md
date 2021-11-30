@@ -210,7 +210,7 @@ git checkout v6.13.3
 CFLAGS=-fPIC CXXFLAGS=-fPIC make release
 ```
 
-Setup variables for gorocksdb: https://github.com/tecbot/gorocksdb
+Setup variables for gorocksdb: https://github.com/flier/gorocksdb
 
 ```
 export CGO_CFLAGS="-I/path/to/rocksdb/include"
