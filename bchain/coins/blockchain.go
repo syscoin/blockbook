@@ -48,7 +48,6 @@ import (
 	"github.com/syscoin/blockbook/bchain/coins/vertcoin"
 	"github.com/syscoin/blockbook/bchain/coins/viacoin"
 	"github.com/syscoin/blockbook/bchain/coins/vipstarcoin"
-	"github.com/syscoin/blockbook/bchain/coins/xzc"
 	"github.com/syscoin/blockbook/bchain/coins/zec"
 	"github.com/syscoin/blockbook/common"
 )
@@ -93,7 +92,6 @@ func init() {
 	BlockChainFactories["PIVX"] = pivx.NewPivXRPC
 	BlockChainFactories["PIVX Testnet"] = pivx.NewPivXRPC
 	BlockChainFactories["Polis"] = polis.NewPolisRPC
-	BlockChainFactories["Zcoin"] = xzc.NewZcoinRPC
 	BlockChainFactories["Fujicoin"] = fujicoin.NewFujicoinRPC
 	BlockChainFactories["Flo"] = flo.NewFloRPC
 	BlockChainFactories["Bellcoin"] = bellcoin.NewBellcoinRPC
