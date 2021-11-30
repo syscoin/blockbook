@@ -103,7 +103,7 @@ func GetChainParams(chain string) *chaincfg.Params {
 
 // UnpackTx unpacks transaction from protobuf byte array
 func (p *SyscoinParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
-	tx, height, err := p.BitcoinParser.UnpackTx(buf)
+	tx, height, err := p.BitcoinLikeParser.UnpackTx(buf)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -112,7 +112,7 @@ func (p *SyscoinParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 }
 // TxFromMsgTx converts syscoin wire Tx to bchain.Tx
 func (p *SyscoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
-	tx := p.BitcoinParser.TxFromMsgTx(t, parseAddresses)
+	tx := p.BitcoinLikeParser.TxFromMsgTx(t, parseAddresses)
 	p.LoadAssets(&tx)
 	return tx
 }
@@ -354,7 +354,7 @@ func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
 }
 
 func (p *SyscoinParser) WitnessPubKeyHashFromKeyID(keyId []byte) (string, error) {
-	addr, err := btcutil.NewAddressWitnessPubKeyHash(keyId, p.BitcoinParser.Params)
+	addr, err := btcutil.NewAddressWitnessPubKeyHash(keyId, p.BitcoinLikeParser.Params)
 	if err != nil {
 		return "", err
 	}
@@ -439,7 +439,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
 		ti := &ta.Inputs[i]
-		buf = p.BitcoinParser.AppendTxInput(ti, buf, varBuf)
+		buf = p.BitcoinLikeParser.AppendTxInput(ti, buf, varBuf)
 		if ti.AssetInfo != nil {
 			l = p.BaseParser.PackVaruint(1, varBuf)
 			buf = append(buf, varBuf[:l]...)
@@ -453,7 +453,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
 		to := &ta.Outputs[i]
-		buf = p.BitcoinParser.AppendTxOutput(to, buf, varBuf)
+		buf = p.BitcoinLikeParser.AppendTxOutput(to, buf, varBuf)
 		if to.AssetInfo != nil {
 			l = p.BaseParser.PackVaruint(1, varBuf)
 			buf = append(buf, varBuf[:l]...)
@@ -480,7 +480,7 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	ta.Inputs = make([]bchain.TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
 		ti := &ta.Inputs[i]
-		l += p.BitcoinParser.UnpackTxInput(ti, buf[l:])
+		l += p.BitcoinLikeParser.UnpackTxInput(ti, buf[l:])
 		assetInfoFlag, ll := p.BaseParser.UnpackVaruint(buf[l:])
 		l += ll
 		if assetInfoFlag == 1 {
@@ -493,7 +493,7 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	ta.Outputs = make([]bchain.TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
 		to := &ta.Outputs[i]
-		l += p.BitcoinParser.UnpackTxOutput(to, buf[l:])
+		l += p.BitcoinLikeParser.UnpackTxOutput(to, buf[l:])
 		assetInfoFlag, ll := p.BaseParser.UnpackVaruint(buf[l:])
 		l += ll
 		if assetInfoFlag == 1 {
