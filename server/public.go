@@ -477,8 +477,6 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatPercentage": 		formatPercentage,
 		"isAssetUpdateCapabilityFlagSet":     isAssetUpdateCapabilityFlagSet,
 		"setTxToTemplateData":      setTxToTemplateData,
-		"isOwnAddress":             isOwnAddress,
-		"isOwnAddresses":           isOwnAddresses,
 		"formatKeyID":              s.formatKeyID,
 		"formatDecodeBase64": 		formatDecodeBase64,
 		"formatDecodeBase64ValueStr": formatDecodeBase64ValueStr,
@@ -687,29 +685,6 @@ func isNFT(guid string) bool {
 func setTxToTemplateData(td *TemplateData, tx *api.Tx) *TemplateData {
 	td.Tx = tx
 	return td
-}
-
-// returns true if address is "own",
-// i.e. either the address of the address detail or belonging to the xpub
-func isOwnAddress(td *TemplateData, a string) bool {
-	if a == td.AddrStr {
-		return true
-	}
-	if td.Address != nil && td.Address.XPubAddresses != nil {
-		if _, found := td.Address.XPubAddresses[a]; found {
-			return true
-		}
-	}
-	return false
-}
-
-// returns true if addresses are "own",
-// i.e. either the address of the address detail or belonging to the xpub
-func isOwnAddresses(td *TemplateData, addresses []string) bool {
-	if len(addresses) == 1 {
-		return isOwnAddress(td, addresses[0])
-	}
-	return false
 }
 
 func (s *PublicServer) explorerTx(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
