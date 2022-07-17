@@ -24,7 +24,6 @@
     "system_user": "syscoin",
     "version": "4.4.0.1",
     "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.4.0rc1/syscoin-4.4.0rc1-x86_64-linux-gnu.tar.gz",
-    "verification_type": "_gpg-sha256",
     "verification_source": "https://github.com/syscoin/syscoin/releases/download/v4.4.0rc1/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
