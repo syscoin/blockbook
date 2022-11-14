@@ -44,8 +44,7 @@
     },
     "platforms": {
       "arm64": {
-        "binary_url": "https://bitcoincore.org/bin/bitcoin-core-23.0/bitcoin-23.0-aarch64-linux-gnu.tar.gz",
-        "verification_source": "06f4c78271a77752ba5990d60d81b1751507f77efda1e5981b4e92fd4d9969fb"
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.4.0rc12/syscoin-4.4.0rc12-aarch64-linux-gnu.tar.gz",
       }
     }
     
