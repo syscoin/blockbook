@@ -77,8 +77,8 @@ type Vin struct {
 	AddrDesc  bchain.AddressDescriptor `json:"-"`
 	Addresses []string                 `json:"addresses,omitempty"`
 	IsAddress bool                     `json:"isAddress"`
-	ValueSat  *bchain.Amount                  `json:"value,omitempty"`
 	IsOwn     bool                     `json:"isOwn,omitempty"`
+	ValueSat  *bchain.Amount           `json:"value,omitempty"`
 	Hex       string                   `json:"hex,omitempty"`
 	Asm       string                   `json:"asm,omitempty"`
 	Coinbase  string                   `json:"coinbase,omitempty"`
