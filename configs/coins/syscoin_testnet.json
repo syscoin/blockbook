@@ -44,7 +44,7 @@
     },
     "platforms": {
       "arm64": {
-        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.4.0rc12/syscoin-4.4.0rc12-aarch64-linux-gnu.tar.gz",
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.4.0rc12/syscoin-4.4.0rc12-aarch64-linux-gnu.tar.gz"
       }
     }
     
