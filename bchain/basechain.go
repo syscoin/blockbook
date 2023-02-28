@@ -54,8 +54,8 @@ func (b *BaseChain) EthereumTypeEstimateGas(params map[string]interface{}) (uint
 	return 0, errors.New("Not supported")
 }
 
-// GetContractInfo is not supported
-func (b *BaseChain) GetContractInfo(contractDesc AddressDescriptor) (*ContractInfo, error) {
+// EthereumTypeGetErc20ContractInfo is not supported
+func (b *BaseChain) EthereumTypeGetErc20ContractInfo(contractDesc AddressDescriptor) (*Erc20Contract, error) {
 	return nil, errors.New("Not supported")
 }
 
@@ -64,7 +64,9 @@ func (b *BaseChain) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc A
 	return nil, errors.New("Not supported")
 }
 
-// GetContractInfo returns URI of non fungible or multi token defined by token id
-func (p *BaseChain) GetTokenURI(contractDesc AddressDescriptor, tokenID *big.Int) (string, error) {
+func (b *BaseChain) GetChainTips() (string, error) {
+	return "", errors.New("Not supported")
+}
+func (b *BaseChain) GetSPVProof(hash string) (string, error) {
 	return "", errors.New("Not supported")
 }

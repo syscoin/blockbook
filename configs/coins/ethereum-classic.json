@@ -8,8 +8,6 @@
   "ports": {
     "backend_rpc": 8037,
     "backend_message_queue": 0,
-    "backend_p2p": 38337,
-    "backend_http": 8137,
     "blockbook_internal": 9037,
     "blockbook_public": 9137
   },
@@ -21,13 +19,13 @@
     "package_name": "backend-ethereum-classic",
     "package_revision": "satoshilabs-1",
     "system_user": "ethereum-classic",
-    "version": "1.12.10",
-    "binary_url": "https://github.com/etclabscore/core-geth/releases/download/v1.12.10/core-geth-linux-v1.12.10.zip",
+    "version": "1.11.18",
+    "binary_url": "https://github.com/etclabscore/core-geth/releases/download/v1.11.18/core-geth-linux-v1.11.18.zip",
     "verification_type": "sha256",
-    "verification_source": "40f423fb19b36b9412388adb18353d78bfda31c71395be56a2c51772a12cbf81",
+    "verification_source": "ee1533e546e9520eeb327be30978b55449cce09341c3d242f4104ae41b2c9c2c",
     "extract_command": "unzip -d backend",
     "exclude_files": [],
-    "exec_command_template": "/bin/sh -c '{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/geth --classic --ipcdisable --txlookuplimit 0 --cache 1024 --nat none --datadir {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --port {{.Ports.BackendP2P}} --ws --ws.addr 127.0.0.1 --ws.port {{.Ports.BackendRPC}} --ws.origins \"*\" --http --http.port {{.Ports.BackendHttp}} --http.addr 127.0.0.1 --http.corsdomain \"*\" 2>>{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/{{.Coin.Alias}}.log'",
+    "exec_command_template": "/bin/sh -c '{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/geth --classic --ipcdisable --cache 1024 --nat none --datadir {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --port 38337 --ws --wsaddr 127.0.0.1 --wsport {{.Ports.BackendRPC}} --wsorigins \"*\" --rpc --rpcport 8137 -rpcaddr 127.0.0.1 --rpccorsdomain \"*\" 2>>{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/{{.Coin.Alias}}.log'",
     "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/{{.Coin.Alias}}.log",
     "postinst_script_template": "",
     "service_type": "simple",
@@ -50,13 +48,10 @@
       "mempool_sub_workers": 2,
       "block_addresses_to_keep": 10000,
       "additional_params": {
-        "address_aliases": true,
         "mempoolTxTimeoutHours": 48,
         "queryBackendOnMempoolResync": true,
         "fiat_rates": "coingecko",
-        "fiat_rates_vs_currencies": "AED,ARS,AUD,BDT,BHD,BMD,BRL,CAD,CHF,CLP,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,KWD,LKR,MMK,MXN,MYR,NGN,NOK,NZD,PHP,PKR,PLN,RUB,SAR,SEK,SGD,THB,TRY,TWD,UAH,USD,VEF,VND,ZAR,BTC,ETH",
-        "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"ethereum-classic\", \"periodSeconds\": 900}",
-        "fourByteSignatures": "https://www.4byte.directory/api/v1/signatures/"
+        "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"ethereum-classic\", \"periodSeconds\": 60}"
       }
     }
   },

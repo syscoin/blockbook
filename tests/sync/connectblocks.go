@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/db"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/db"
 )
 
 func testConnectBlocks(t *testing.T, h *TestHandler) {
@@ -134,7 +134,7 @@ func verifyTransactions(t *testing.T, d *db.RocksDB, h *TestHandler, rng Range) 
 	}
 
 	for addr, txs := range addr2txs {
-		err := d.GetTransactions(addr, rng.Lower, rng.Upper, func(txid string, height uint32, indexes []int32) error {
+		err := d.GetTransactions(addr, rng.Lower, rng.Upper, func(txid string, height uint32, assetGuid []uint64, indexes []int32) error {
 			for i, tx := range txs {
 				for _, index := range indexes {
 					if txid == tx.txid && index == tx.index {
@@ -238,7 +238,7 @@ func getTxInfo(tx *bchain.Tx) *txInfo {
 	return info
 }
 
-func getTaInfo(parser bchain.BlockChainParser, ta *db.TxAddresses) (*txInfo, error) {
+func getTaInfo(parser bchain.BlockChainParser, ta *bchain.TxAddresses) (*txInfo, error) {
 	info := &txInfo{inputs: []string{}, outputs: []string{}}
 
 	for i := range ta.Inputs {

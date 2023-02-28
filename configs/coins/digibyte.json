@@ -22,12 +22,14 @@
     "package_name": "backend-digibyte",
     "package_revision": "satoshilabs-1",
     "system_user": "digibyte",
-    "version": "7.17.3",
-    "binary_url": "https://github.com/digibyte-core/digibyte/releases/download/v7.17.3/digibyte-7.17.3-x86_64-linux-gnu.tar.gz",
+    "version": "7.17.2",
+    "binary_url": "https://github.com/digibyte/digibyte/releases/download/v7.17.2/digibyte-7.17.2-x86_64-linux-gnu.tar.gz",
     "verification_type": "sha256",
-    "verification_source": "b5cd8f590d359e4846dd5cbe60751221e54d773a6227ea9686d17c4890057f46",
+    "verification_source": "caa8ecc42cbebbd2c43e742c7ecc2dd21d76a9e2db23676af428b67b131f6413",
     "extract_command": "tar -C backend --strip 1 -xf",
-    "exclude_files": ["bin/digibyte-qt"],
+    "exclude_files": [
+      "bin/digibyte-qt"
+    ],
     "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/bin/digibyted -datadir={{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend -conf={{.Env.BackendInstallPath}}/{{.Coin.Alias}}/{{.Coin.Alias}}.conf -pid=/run/{{.Coin.Alias}}/{{.Coin.Alias}}.pid",
     "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/*.log",
     "postinst_script_template": "",
@@ -59,8 +61,7 @@
       "slip44": 20,
       "additional_params": {
         "fiat_rates": "coingecko",
-        "fiat_rates_vs_currencies": "AED,ARS,AUD,BDT,BHD,BMD,BRL,CAD,CHF,CLP,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,KWD,LKR,MMK,MXN,MYR,NGN,NOK,NZD,PHP,PKR,PLN,RUB,SAR,SEK,SGD,THB,TRY,TWD,UAH,USD,VEF,VND,ZAR,BTC,ETH",
-        "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"digibyte\", \"periodSeconds\": 900}"
+        "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"digibyte\", \"periodSeconds\": 60}"
       }
     }
   },

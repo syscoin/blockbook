@@ -6,7 +6,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/trezor/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 type fakeBlockChain struct {
@@ -188,7 +188,7 @@ func (c *fakeBlockChain) GetTransactionForMempool(txid string) (v *bchain.Tx, er
 }
 
 func (c *fakeBlockChain) EstimateSmartFee(blocks int, conservative bool) (v big.Int, err error) {
-	if !conservative {
+	if conservative == false {
 		v.SetInt64(int64(blocks)*100 - 1)
 	} else {
 		v.SetInt64(int64(blocks) * 100)

@@ -9,6 +9,7 @@ import (
 type addrIndex struct {
 	addrDesc string
 	n        int32
+	AssetInfo *AssetInfo
 }
 
 type txEntry struct {
@@ -104,7 +105,28 @@ func (m *BaseMempool) GetAllEntries() MempoolTxidEntries {
 	sort.Sort(entries)
 	return entries
 }
-
+func (m *BaseMempool) GetTxAssets(assetGuid uint64) MempoolTxidEntries {
+	m.mux.Lock()
+	mapTxid := make(map[string]struct{})
+	entries := make(MempoolTxidEntries, 0)
+	for txid, entry := range m.txEntries {
+		if _, found := mapTxid[txid]; !found {
+			for _, addrIndex := range entry.addrIndexes {
+				if addrIndex.AssetInfo != nil && addrIndex.AssetInfo.AssetGuid == assetGuid {
+					mapTxid[txid] = struct{}{}
+					entries = append(entries, MempoolTxidEntry{
+						Txid: txid,
+						Time: entry.time,
+					})
+					break
+				}
+			}
+		}
+	}
+	m.mux.Unlock()
+	sort.Sort(entries)
+	return entries
+}
 // GetTransactionTime returns first seen time of a transaction
 func (m *BaseMempool) GetTransactionTime(txid string) uint32 {
 	m.mux.Lock()
@@ -122,10 +144,12 @@ func (m *BaseMempool) txToMempoolTx(tx *Tx) *MempoolTx {
 		Blocktime:        time.Now().Unix(),
 		LockTime:         tx.LockTime,
 		Txid:             tx.Txid,
-		VSize:            tx.VSize,
 		Version:          tx.Version,
 		Vout:             tx.Vout,
 		CoinSpecificData: tx.CoinSpecificData,
+	}
+	if len(tx.Memo) > 0 {
+		mtx.Memo = tx.Memo
 	}
 	mtx.Vin = make([]MempoolVin, len(tx.Vin))
 	for i, vin := range tx.Vin {

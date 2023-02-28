@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
 )
 
 func TestMain(m *testing.M) {
@@ -90,7 +90,6 @@ func init() {
 		Blocktime: 1529925180,
 		Txid:      "d58c11aa970449c3e0ee5e0cdf78532435a9d2b28a2da284a8dd4dd6bdd0331c",
 		LockTime:  952180,
-		VSize:     223,
 		Version:   1,
 		Vin: []bchain.Vin{
 			{

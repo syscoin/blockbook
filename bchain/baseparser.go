@@ -3,20 +3,20 @@ package bchain
 import (
 	"encoding/hex"
 	"encoding/json"
+	"encoding/binary"
 	"math/big"
 	"strings"
-
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/common"
-	"google.golang.org/protobuf/proto"
+	vlq "github.com/bsm/go-vlq"
+	"github.com/syscoin/blockbook/common"
 )
 
 // BaseParser implements data parsing/handling functionality base for all other parsers
 type BaseParser struct {
 	BlockAddressesToKeep int
 	AmountDecimalPoint   int
-	AddressAliases       bool
 }
 
 // ParseBlock parses raw block to our Block struct - currently not implemented
@@ -104,11 +104,6 @@ func (p *BaseParser) AmountDecimals() int {
 	return p.AmountDecimalPoint
 }
 
-// UseAddressAliases returns true if address aliases are enabled
-func (p *BaseParser) UseAddressAliases() bool {
-	return p.AddressAliases
-}
-
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
 func (p *BaseParser) ParseTxFromJson(msg json.RawMessage) (*Tx, error) {
 	var tx Tx
@@ -133,6 +128,10 @@ func (p *BaseParser) ParseTxFromJson(msg json.RawMessage) (*Tx, error) {
 // PackedTxidLen returns length in bytes of packed txid
 func (p *BaseParser) PackedTxidLen() int {
 	return 32
+}
+
+func (p *BaseParser) PackedTxIndexLen() int {
+	return p.PackedTxidLen()
 }
 
 // KeepBlockAddresses returns number of blocks which are to be kept in blockaddresses column
@@ -171,11 +170,6 @@ func (p *BaseParser) GetChainType() ChainType {
 // MinimumCoinbaseConfirmations returns minimum number of confirmations a coinbase transaction must have before it can be spent
 func (p *BaseParser) MinimumCoinbaseConfirmations() int {
 	return 0
-}
-
-// SupportsVSize returns true if vsize of a transaction should be computed and returned by API
-func (p *BaseParser) SupportsVSize() bool {
-	return false
 }
 
 // PackTx packs transaction to byte array using protobuf
@@ -221,7 +215,6 @@ func (p *BaseParser) PackTx(tx *Tx, height uint32, blockTime int64) ([]byte, err
 		Vin:       pti,
 		Vout:      pto,
 		Version:   tx.Version,
-		VSize:     tx.VSize,
 	}
 	if pt.Hex, err = hex.DecodeString(tx.Hex); err != nil {
 		return nil, errors.Annotatef(err, "Hex %v", tx.Hex)
@@ -282,7 +275,6 @@ func (p *BaseParser) UnpackTx(buf []byte) (*Tx, uint32, error) {
 		Vin:       vin,
 		Vout:      vout,
 		Version:   pt.Version,
-		VSize:     pt.VSize,
 	}
 	return &tx, pt.Height, nil
 }
@@ -313,12 +305,328 @@ func (p *BaseParser) DeriveAddressDescriptorsFromTo(descriptor *XpubDescriptor, 
 	return nil, errors.New("Not supported")
 }
 
-// EthereumTypeGetTokenTransfersFromTx is unsupported
-func (p *BaseParser) EthereumTypeGetTokenTransfersFromTx(tx *Tx) (TokenTransfers, error) {
+// EthereumTypeGetErc20FromTx is unsupported
+func (p *BaseParser) EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error) {
 	return nil, errors.New("Not supported")
 }
 
-// FormatAddressAlias makes possible to do coin specific formatting to an address alias
-func (p *BaseParser) FormatAddressAlias(address string, name string) string {
-	return name
+func (p *BaseParser) IsSyscoinTx(nVersion int32) bool {
+	return false
 }
+func (p *BaseParser) IsSyscoinMintTx(nVersion int32) bool {
+	return false
+}
+func (p *BaseParser) IsAssetTx(nVersion int32) bool {
+    return false
+}
+func (p *BaseParser) IsAssetAllocationTx(nVersion int32) bool {
+	return false
+}
+func (p *BaseParser) IsAssetSendTx(nVersion int32) bool {
+	return false
+}
+func (p *BaseParser) IsAssetActivateTx(nVersion int32) bool {
+	return false
+}
+func (p *BaseParser) GetAssetsMaskFromVersion(nVersion int32) AssetsMask {
+	return BaseCoinMask
+}
+func (p *BaseParser) GetAssetTypeFromVersion(nVersion int32) *TokenType {
+	return nil
+}
+func (p *BaseParser) TryGetOPReturn(script []byte) []byte {
+	return nil
+}
+func (p *BaseParser) GetMaxAddrLength() int {
+	return 1024
+}
+func (p *BaseParser) PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
+	return nil
+}
+func (p *BaseParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) PackAssetKey(assetGuid uint64, height uint32) []byte {
+	return nil
+}
+func (p *BaseParser) UnpackAssetKey(buf []byte) (uint64, uint32) {
+	return 0, 0
+}
+func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte {
+	return nil
+}
+func (p *BaseParser) UnpackAssetTxIndex(buf []byte) []*TxAssetIndex {
+	return nil
+}
+func (p *BaseParser) GetAssetFromData(sptData []byte) (*Asset, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetAllocationFromData(sptData []byte, txVersion int32) (*AssetAllocation, []byte, error) {
+	return nil, nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, error) {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetFromVout(vout []Vout) (*Asset, error)  {
+	return nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor, txVersion int32) (*AssetAllocation, []byte, error) {
+	return nil, nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error) {
+	return nil, nil, errors.New("Not supported")
+}
+func (p *BaseParser) LoadAssets(tx *Tx) error {
+	return errors.New("Not supported")
+}
+func (p *BaseParser) WitnessPubKeyHashFromKeyID(keyId []byte) (string, error) {
+	return "", errors.New("Not supported")
+}
+func (p *BaseParser) AppendAssetInfo(assetInfo *AssetInfo, buf []byte, varBuf []byte) []byte  {
+	return nil
+}
+func (p *BaseParser) UnpackAssetInfo(assetInfo *AssetInfo, buf []byte) int  {
+	return 0
+}
+const PackedHeightBytes = 4
+func (p *BaseParser) PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte {
+	buf := make([]byte, len(addrDesc)+PackedHeightBytes)
+	copy(buf, addrDesc)
+	// pack height as binary complement to achieve ordering from newest to oldest block
+	binary.BigEndian.PutUint32(buf[len(addrDesc):], ^height)
+	return buf
+}
+
+func (p *BaseParser) UnpackAddressKey(key []byte) ([]byte, uint32, error) {
+	i := len(key) - PackedHeightBytes
+	if i <= 0 {
+		return nil, 0, errors.New("Invalid address key")
+	}
+	// height is packed in binary complement, convert it
+	return key[:i], ^p.UnpackUint(key[i : i+PackedHeightBytes]), nil
+}
+
+func (p *BaseParser) PackUint(i uint32) []byte {
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, i)
+	return buf
+}
+
+func (p *BaseParser) PackUint64(i uint64) []byte {
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, i)
+	return buf
+}
+
+func (p *BaseParser) UnpackUint(buf []byte) uint32 {
+	return binary.BigEndian.Uint32(buf)
+}
+
+func (p *BaseParser) UnpackUint64(buf []byte) uint64 {
+	return binary.BigEndian.Uint64(buf)
+}
+
+func (p *BaseParser) PackVarint32(i int32, buf []byte) int {
+	return vlq.PutInt(buf, int64(i))
+}
+
+func (p *BaseParser) PackVarint(i int, buf []byte) int {
+	return vlq.PutInt(buf, int64(i))
+}
+
+func (p *BaseParser) PackVaruint(i uint, buf []byte) int {
+	return vlq.PutUint(buf, uint64(i))
+}
+func (p *BaseParser) PackVaruint64(i uint64, buf []byte) int {
+	return vlq.PutUint(buf, i)
+}
+func (p *BaseParser) UnpackVarint32(buf []byte) (int32, int) {
+	i, ofs := vlq.Int(buf)
+	return int32(i), ofs
+}
+
+func (p *BaseParser) UnpackVarint(buf []byte) (int, int) {
+	i, ofs := vlq.Int(buf)
+	return int(i), ofs
+}
+
+func (p *BaseParser) UnpackVaruint(buf []byte) (uint, int) {
+	i, ofs := vlq.Uint(buf)
+	return uint(i), ofs
+}
+
+func (p *BaseParser) UnpackVaruint64(buf []byte) (uint64, int) {
+	i, ofs := vlq.Uint(buf)
+	return i, ofs
+}
+
+func (p *BaseParser) UnpackVarBytes(buf []byte) ([]byte, int) {
+	txvalue, l := p.UnpackVaruint(buf)
+	bufValue := append([]byte(nil), buf[l:l+int(txvalue)]...)
+	return bufValue, (l+int(txvalue))
+}
+
+func (p *BaseParser) PackVarBytes(bufValue []byte) []byte {
+	len := uint(len(bufValue))
+	var buf []byte
+	varBuf := make([]byte, vlq.MaxLen64)
+	l := p.PackVaruint(len, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	if len > 0 {
+		buf = append(buf, bufValue...)
+	}
+	return buf
+}
+
+const (
+	// number of bits in a big.Word
+	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
+	// number of bytes in a big.Word
+	wordBytes = wordBits / 8
+	// max packed bigint words
+	maxPackedBigintWords = (256 - wordBytes) / wordBytes
+	maxPackedBigintBytes = 249
+)
+
+func (p *BaseParser) MaxPackedBigintBytes() int {
+	return maxPackedBigintBytes
+}
+
+// big int is packed in BigEndian order without memory allocation as 1 byte length followed by bytes of big int
+// number of written bytes is returned
+// limitation: bigints longer than 248 bytes are truncated to 248 bytes
+// caution: buffer must be big enough to hold the packed big int, buffer 249 bytes big is always safe
+func (p *BaseParser) PackBigint(bi *big.Int, buf []byte) int {
+	w := bi.Bits()
+	lw := len(w)
+	// zero returns only one byte - zero length
+	if lw == 0 {
+		buf[0] = 0
+		return 1
+	}
+	// pack the most significant word in a special way - skip leading zeros
+	w0 := w[lw-1]
+	fb := 8
+	mask := big.Word(0xff) << (wordBits - 8)
+	for w0&mask == 0 {
+		fb--
+		mask >>= 8
+	}
+	for i := fb; i > 0; i-- {
+		buf[i] = byte(w0)
+		w0 >>= 8
+	}
+	// if the big int is too big (> 2^1984), the number of bytes would not fit to 1 byte
+	// in this case, truncate the number, it is not expected to work with this big numbers as amounts
+	s := 0
+	if lw > maxPackedBigintWords {
+		s = lw - maxPackedBigintWords
+	}
+	// pack the rest of the words in reverse order
+	for j := lw - 2; j >= s; j-- {
+		d := w[j]
+		for i := fb + wordBytes; i > fb; i-- {
+			buf[i] = byte(d)
+			d >>= 8
+		}
+		fb += wordBytes
+	}
+	buf[0] = byte(fb)
+	return fb + 1
+}
+
+func (p *BaseParser) UnpackBigint(buf []byte) (big.Int, int) {
+	var r big.Int
+	l := int(buf[0]) + 1
+	r.SetBytes(buf[1:l])
+	return r, l
+}
+
+func (p *BaseParser) PackTxIndexes(txi []TxIndexes) []byte {
+	buf := make([]byte, 0, 32)
+	bvout := make([]byte, vlq.MaxLen32)
+	// store the txs in reverse order for ordering from newest to oldest
+	for j := len(txi) - 1; j >= 0; j-- {
+		t := &txi[j]
+		buf = append(buf, []byte(t.BtxID)...)
+		for i, index := range t.Indexes {
+			index <<= 1
+			if i == len(t.Indexes)-1 {
+				index |= 1
+			}
+			l := p.PackVarint32(index, bvout)
+			buf = append(buf, bvout[:l]...)
+		}
+	}
+	return buf
+}
+
+func (p *BaseParser) UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error {
+	for {
+		index, l := p.UnpackVarint32(*buf)
+		*txindexes = append(*txindexes, index>>1)
+		*buf = (*buf)[l:]
+		if index&1 == 1 {
+			return nil
+		} else if len(*buf) == 0 {
+			return errors.New("rocksdb: index buffer length is zero")
+		}
+	}
+	return nil
+}
+
+func (p *BaseParser) UnpackTxIndexAssets(assetGuids *[]uint64, buf *[]byte) uint {
+	return uint(0)
+}
+
+func (p *BaseParser) PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
+	return nil
+}
+
+func (p *BaseParser) AppendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte {
+	return nil
+}
+
+func (p *BaseParser) AppendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte {
+	return nil
+}
+
+func (p *BaseParser) UnpackTxAddresses(buf []byte) (*TxAddresses, error) {
+	return nil, errors.New("Not supported")
+}
+
+func (p *BaseParser) UnpackTxInput(ti *TxInput, buf []byte) int {
+	return 0
+}
+
+func (p *BaseParser) UnpackTxOutput(to *TxOutput, buf []byte) int {
+	return 0
+}
+
+func (p *BaseParser) PackOutpoints(outpoints []DbOutpoint) []byte {
+	return nil
+}
+
+func (p *BaseParser) UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error) {
+	return nil, 0, errors.New("Not supported")
+}
+
+func (p *BaseParser) PackBlockInfo(block *DbBlockInfo) ([]byte, error) {
+	return nil, errors.New("Not supported")
+}
+
+func (p *BaseParser) UnpackBlockInfo(buf []byte) (*DbBlockInfo, error) {
+	return nil, errors.New("Not supported")
+}
+
+func (p *BaseParser) UnpackAsset(buf []byte) (*Asset, error) {
+	return nil, nil
+}
+
+func (p *BaseParser) PackAsset(asset *Asset) ([]byte, error) {
+	return nil, nil
+}
+func (p *BaseParser) UnpackTxIndexType(buf []byte) (AssetsMask, int) {
+	return AllMask, 0
+}
+

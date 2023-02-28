@@ -13,7 +13,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 var testMap = map[string]func(t *testing.T, th *TestHandler){
@@ -356,7 +356,7 @@ func testGetBestBlockHeight(t *testing.T, h *TestHandler) {
 			return
 		}
 	}
-	t.Error("GetBestBlockHeight() didn't get the best height")
+	t.Error("GetBestBlockHeigh() didn't get the the best heigh")
 }
 
 func testGetBlockHeader(t *testing.T, h *TestHandler) {

@@ -3,9 +3,9 @@ package db
 import (
 	"time"
 
+	"github.com/flier/gorocksdb"
 	"github.com/golang/glog"
-	"github.com/linxGnu/grocksdb"
-	"github.com/trezor/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // bulk connect
@@ -15,8 +15,8 @@ import (
 // 2) rocksdb seems to handle better fewer larger batches than continuous stream of smaller batches
 
 type bulkAddresses struct {
-	bi        BlockInfo
-	addresses addressesMap
+	bi        bchain.DbBlockInfo
+	addresses bchain.AddressesMap
 }
 
 // BulkConnect is used to connect blocks in bulk, faster but if interrupted inconsistent way
@@ -25,10 +25,11 @@ type BulkConnect struct {
 	chainType          bchain.ChainType
 	bulkAddresses      []bulkAddresses
 	bulkAddressesCount int
-	ethBlockTxs        []ethBlockTx
-	txAddressesMap     map[string]*TxAddresses
-	balances           map[string]*AddrBalance
+	txAddressesMap     map[string]*bchain.TxAddresses
+	balances           map[string]*bchain.AddrBalance
 	addressContracts   map[string]*AddrContracts
+	assets             map[uint64]*bchain.Asset
+	txAssets           bchain.TxAssetMap
 	height             uint32
 }
 
@@ -40,6 +41,10 @@ const (
 	partialStoreBalances      = maxBulkBalances / 10
 	maxBulkAddrContracts      = 1200000
 	partialStoreAddrContracts = maxBulkAddrContracts / 10
+	maxBulkAssets             = 100
+	partialStoreAssets        = maxBulkAssets / 10
+	maxBulkTxAssets           = 500000
+	partialStoreTxAssets      = maxBulkTxAssets / 10
 )
 
 // InitBulkConnect initializes bulk connect and switches DB to inconsistent state
@@ -47,9 +52,11 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 	b := &BulkConnect{
 		d:                d,
 		chainType:        d.chainParser.GetChainType(),
-		txAddressesMap:   make(map[string]*TxAddresses),
-		balances:         make(map[string]*AddrBalance),
+		txAddressesMap:   make(map[string]*bchain.TxAddresses),
+		balances:         make(map[string]*bchain.AddrBalance),
 		addressContracts: make(map[string]*AddrContracts),
+		assets:           make(map[uint64]*bchain.Asset),
+		txAssets:         make(bchain.TxAssetMap),
 	}
 	if err := d.SetInconsistentState(true); err != nil {
 		return nil, err
@@ -58,14 +65,14 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 	return b, nil
 }
 
-func (b *BulkConnect) storeTxAddresses(wb *grocksdb.WriteBatch, all bool) (int, int, error) {
-	var txm map[string]*TxAddresses
+func (b *BulkConnect) storeTxAddresses(wb *gorocksdb.WriteBatch, all bool) (int, int, error) {
+	var txm map[string]*bchain.TxAddresses
 	var sp int
 	if all {
 		txm = b.txAddressesMap
-		b.txAddressesMap = make(map[string]*TxAddresses)
+		b.txAddressesMap = make(map[string]*bchain.TxAddresses)
 	} else {
-		txm = make(map[string]*TxAddresses)
+		txm = make(map[string]*bchain.TxAddresses)
 		for k, a := range b.txAddressesMap {
 			// store all completely spent transactions, they will not be modified again
 			r := true
@@ -101,14 +108,14 @@ func (b *BulkConnect) storeTxAddresses(wb *grocksdb.WriteBatch, all bool) (int, 
 func (b *BulkConnect) parallelStoreTxAddresses(c chan error, all bool) {
 	defer close(c)
 	start := time.Now()
-	wb := grocksdb.NewWriteBatch()
+	wb := gorocksdb.NewWriteBatch()
 	defer wb.Destroy()
 	count, sp, err := b.storeTxAddresses(wb, all)
 	if err != nil {
 		c <- err
 		return
 	}
-	if err := b.d.WriteBatch(wb); err != nil {
+	if err := b.d.db.Write(b.d.wo, wb); err != nil {
 		c <- err
 		return
 	}
@@ -116,13 +123,94 @@ func (b *BulkConnect) parallelStoreTxAddresses(c chan error, all bool) {
 	c <- nil
 }
 
-func (b *BulkConnect) storeBalances(wb *grocksdb.WriteBatch, all bool) (int, error) {
-	var bal map[string]*AddrBalance
+func (b *BulkConnect) storeAssets(wb *gorocksdb.WriteBatch, all bool) (int, error) {
+	var assets map[uint64]*bchain.Asset
+	if all {
+		assets = b.assets
+		b.assets = make(map[uint64]*bchain.Asset)
+	} else {
+		assets = make(map[uint64]*bchain.Asset)
+		// store some random assets
+		for k, a := range b.assets {
+			assets[k] = a
+			delete(b.assets, k)
+			if len(assets) >= partialStoreAssets {
+				break
+			}
+		}
+	}
+	if err := b.d.storeAssets(wb, assets); err != nil {
+		return 0, err
+	}
+	return len(assets), nil
+}
+
+func (b *BulkConnect) parallelStoreAssets(c chan error, all bool) {
+	defer close(c)
+	start := time.Now()
+	wb := gorocksdb.NewWriteBatch()
+	defer wb.Destroy()
+	count, err := b.storeAssets(wb, all)
+	if err != nil {
+		c <- err
+		return
+	}
+	if err := b.d.db.Write(b.d.wo, wb); err != nil {
+		c <- err
+		return
+	}
+	glog.Info("rocksdb: height ", b.height, ", stored ", count, " assets, ", len(b.assets), " remaining, done in ", time.Since(start))
+	c <- nil
+}
+
+
+func (b *BulkConnect) storeTxAssets(wb *gorocksdb.WriteBatch, all bool) (int, error) {
+	var assetsMap bchain.TxAssetMap
+	if all {
+		assetsMap = b.txAssets
+		b.txAssets = make(bchain.TxAssetMap)
+	} else {
+		assetsMap = make(bchain.TxAssetMap)
+		// store some random asset txids
+		for k, a := range b.txAssets {
+			assetsMap[k] = a
+			delete(b.txAssets, k)
+			if len(assetsMap) >= partialStoreAssets {
+				break
+			}
+		}
+	}
+	if err := b.d.storeTxAssets(wb, assetsMap); err != nil {
+		return 0, err
+	}
+	return len(assetsMap), nil
+}
+
+func (b *BulkConnect) parallelStoreTxAssets(c chan error, all bool) {
+	defer close(c)
+	start := time.Now()
+	wb := gorocksdb.NewWriteBatch()
+	defer wb.Destroy()
+	count, err := b.storeTxAssets(wb, all)
+	if err != nil {
+		c <- err
+		return
+	}
+	if err := b.d.db.Write(b.d.wo, wb); err != nil {
+		c <- err
+		return
+	}
+	glog.Info("rocksdb: height ", b.height, ", stored ", count, " tx assets, ", len(b.assets), " remaining, done in ", time.Since(start))
+	c <- nil
+}
+
+func (b *BulkConnect) storeBalances(wb *gorocksdb.WriteBatch, all bool) (int, error) {
+	var bal map[string]*bchain.AddrBalance
 	if all {
 		bal = b.balances
-		b.balances = make(map[string]*AddrBalance)
+		b.balances = make(map[string]*bchain.AddrBalance)
 	} else {
-		bal = make(map[string]*AddrBalance)
+		bal = make(map[string]*bchain.AddrBalance)
 		// store some random balances
 		for k, a := range b.balances {
 			bal[k] = a
@@ -141,14 +229,14 @@ func (b *BulkConnect) storeBalances(wb *grocksdb.WriteBatch, all bool) (int, err
 func (b *BulkConnect) parallelStoreBalances(c chan error, all bool) {
 	defer close(c)
 	start := time.Now()
-	wb := grocksdb.NewWriteBatch()
+	wb := gorocksdb.NewWriteBatch()
 	defer wb.Destroy()
 	count, err := b.storeBalances(wb, all)
 	if err != nil {
 		c <- err
 		return
 	}
-	if err := b.d.WriteBatch(wb); err != nil {
+	if err := b.d.db.Write(b.d.wo, wb); err != nil {
 		c <- err
 		return
 	}
@@ -156,7 +244,7 @@ func (b *BulkConnect) parallelStoreBalances(c chan error, all bool) {
 	c <- nil
 }
 
-func (b *BulkConnect) storeBulkAddresses(wb *grocksdb.WriteBatch) error {
+func (b *BulkConnect) storeBulkAddresses(wb *gorocksdb.WriteBatch) error {
 	for _, ba := range b.bulkAddresses {
 		if err := b.d.storeAddresses(wb, ba.bi.Height, ba.addresses); err != nil {
 			return err
@@ -171,13 +259,13 @@ func (b *BulkConnect) storeBulkAddresses(wb *grocksdb.WriteBatch) error {
 }
 
 func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs bool) error {
-	addresses := make(addressesMap)
-	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances); err != nil {
+	addresses := make(bchain.AddressesMap)
+	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, b.assets, b.txAssets); err != nil {
 		return err
 	}
-	var storeAddressesChan, storeBalancesChan chan error
+	var storeAddressesChan, storeBalancesChan, storeAssetsChan, storeTxAssetsChan chan error
 	var sa bool
-	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances {
+	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances || len(b.assets) > maxBulkAssets || len(b.txAssets) > maxBulkTxAssets {
 		sa = true
 		if len(b.txAddressesMap)+partialStoreAddresses > maxBulkTxAddresses {
 			storeAddressesChan = make(chan error)
@@ -187,9 +275,17 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 			storeBalancesChan = make(chan error)
 			go b.parallelStoreBalances(storeBalancesChan, false)
 		}
+		if len(b.assets)+partialStoreAssets > maxBulkAssets {
+			storeAssetsChan = make(chan error)
+			go b.parallelStoreAssets(storeAssetsChan, false)
+		}
+		if len(b.txAssets)+partialStoreTxAssets > maxBulkTxAssets {
+			storeTxAssetsChan = make(chan error)
+			go b.parallelStoreTxAssets(storeTxAssetsChan, false)
+		}
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
-		bi: BlockInfo{
+		bi: bchain.DbBlockInfo{
 			Hash:   block.Hash,
 			Time:   block.Time,
 			Txs:    uint32(len(block.Txs)),
@@ -202,7 +298,7 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 	// open WriteBatch only if going to write
 	if sa || b.bulkAddressesCount > maxBulkAddresses || storeBlockTxs {
 		start := time.Now()
-		wb := grocksdb.NewWriteBatch()
+		wb := gorocksdb.NewWriteBatch()
 		defer wb.Destroy()
 		bac := b.bulkAddressesCount
 		if sa || b.bulkAddressesCount > maxBulkAddresses {
@@ -215,7 +311,7 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 				return err
 			}
 		}
-		if err := b.d.WriteBatch(wb); err != nil {
+		if err := b.d.db.Write(b.d.wo, wb); err != nil {
 			return err
 		}
 		if bac > b.bulkAddressesCount {
@@ -232,10 +328,20 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 			return err
 		}
 	}
+	if storeAssetsChan != nil {
+		if err := <-storeAssetsChan; err != nil {
+			return err
+		}
+	}
+	if storeTxAssetsChan != nil {
+		if err := <-storeTxAssetsChan; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func (b *BulkConnect) storeAddressContracts(wb *grocksdb.WriteBatch, all bool) (int, error) {
+func (b *BulkConnect) storeAddressContracts(wb *gorocksdb.WriteBatch, all bool) (int, error) {
 	var ac map[string]*AddrContracts
 	if all {
 		ac = b.addressContracts
@@ -260,14 +366,14 @@ func (b *BulkConnect) storeAddressContracts(wb *grocksdb.WriteBatch, all bool) (
 func (b *BulkConnect) parallelStoreAddressContracts(c chan error, all bool) {
 	defer close(c)
 	start := time.Now()
-	wb := grocksdb.NewWriteBatch()
+	wb := gorocksdb.NewWriteBatch()
 	defer wb.Destroy()
 	count, err := b.storeAddressContracts(wb, all)
 	if err != nil {
 		c <- err
 		return
 	}
-	if err := b.d.WriteBatch(wb); err != nil {
+	if err := b.d.db.Write(b.d.wo, wb); err != nil {
 		c <- err
 		return
 	}
@@ -276,12 +382,11 @@ func (b *BulkConnect) parallelStoreAddressContracts(c chan error, all bool) {
 }
 
 func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTxs bool) error {
-	addresses := make(addressesMap)
+	addresses := make(bchain.AddressesMap)
 	blockTxs, err := b.d.processAddressesEthereumType(block, addresses, b.addressContracts)
 	if err != nil {
 		return err
 	}
-	b.ethBlockTxs = append(b.ethBlockTxs, blockTxs...)
 	var storeAddrContracts chan error
 	var sa bool
 	if len(b.addressContracts) > maxBulkAddrContracts {
@@ -290,7 +395,7 @@ func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTx
 		go b.parallelStoreAddressContracts(storeAddrContracts, false)
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
-		bi: BlockInfo{
+		bi: bchain.DbBlockInfo{
 			Hash:   block.Hash,
 			Time:   block.Time,
 			Txs:    uint32(len(block.Txs)),
@@ -303,44 +408,24 @@ func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTx
 	// open WriteBatch only if going to write
 	if sa || b.bulkAddressesCount > maxBulkAddresses || storeBlockTxs {
 		start := time.Now()
-		wb := grocksdb.NewWriteBatch()
+		wb := gorocksdb.NewWriteBatch()
 		defer wb.Destroy()
 		bac := b.bulkAddressesCount
 		if sa || b.bulkAddressesCount > maxBulkAddresses {
-			if err = b.storeBulkAddresses(wb); err != nil {
+			if err := b.storeBulkAddresses(wb); err != nil {
 				return err
 			}
-		}
-		if err = b.d.storeInternalDataEthereumType(wb, b.ethBlockTxs); err != nil {
-			return err
-		}
-		b.ethBlockTxs = b.ethBlockTxs[:0]
-		if err = b.d.storeBlockSpecificDataEthereumType(wb, block); err != nil {
-			return err
 		}
 		if storeBlockTxs {
-			if err = b.d.storeAndCleanupBlockTxsEthereumType(wb, block, blockTxs); err != nil {
+			if err := b.d.storeAndCleanupBlockTxsEthereumType(wb, block, blockTxs); err != nil {
 				return err
 			}
 		}
-		if err = b.d.WriteBatch(wb); err != nil {
+		if err := b.d.db.Write(b.d.wo, wb); err != nil {
 			return err
 		}
 		if bac > b.bulkAddressesCount {
 			glog.Info("rocksdb: height ", b.height, ", stored ", bac, " addresses, done in ", time.Since(start))
-		}
-	} else {
-		// if there are blockSpecificData, store them
-		blockSpecificData, _ := block.CoinSpecificData.(*bchain.EthereumBlockSpecificData)
-		if blockSpecificData != nil {
-			wb := grocksdb.NewWriteBatch()
-			defer wb.Destroy()
-			if err = b.d.storeBlockSpecificDataEthereumType(wb, block); err != nil {
-				return err
-			}
-			if err := b.d.WriteBatch(wb); err != nil {
-				return err
-			}
 		}
 	}
 	if storeAddrContracts != nil {
@@ -368,23 +453,27 @@ func (b *BulkConnect) ConnectBlock(block *bchain.Block, storeBlockTxs bool) erro
 func (b *BulkConnect) Close() error {
 	glog.Info("rocksdb: bulk connect closing")
 	start := time.Now()
-	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan chan error
+	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan, storeAssetsChan, storeTxAssetsChan chan error
 	if b.chainType == bchain.ChainBitcoinType {
 		storeTxAddressesChan = make(chan error)
 		go b.parallelStoreTxAddresses(storeTxAddressesChan, true)
 		storeBalancesChan = make(chan error)
 		go b.parallelStoreBalances(storeBalancesChan, true)
+		storeAssetsChan = make(chan error)
+		go b.parallelStoreAssets(storeAssetsChan, true)
+		storeTxAssetsChan = make(chan error)
+		go b.parallelStoreTxAssets(storeTxAssetsChan, true)
 	} else if b.chainType == bchain.ChainEthereumType {
 		storeAddressContractsChan = make(chan error)
 		go b.parallelStoreAddressContracts(storeAddressContractsChan, true)
 	}
-	wb := grocksdb.NewWriteBatch()
+	wb := gorocksdb.NewWriteBatch()
 	defer wb.Destroy()
 	bac := b.bulkAddressesCount
 	if err := b.storeBulkAddresses(wb); err != nil {
 		return err
 	}
-	if err := b.d.WriteBatch(wb); err != nil {
+	if err := b.d.db.Write(b.d.wo, wb); err != nil {
 		return err
 	}
 	glog.Info("rocksdb: height ", b.height, ", stored ", bac, " addresses, done in ", time.Since(start))
@@ -403,13 +492,20 @@ func (b *BulkConnect) Close() error {
 			return err
 		}
 	}
-	bt, err := b.d.loadBlockTimes()
+	if storeAssetsChan != nil {
+		if err := <-storeAssetsChan; err != nil {
+			return err
+		}
+	}
+	if storeTxAssetsChan != nil {
+		if err := <-storeTxAssetsChan; err != nil {
+			return err
+		}
+	}
+	var err error
+	b.d.is.BlockTimes, err = b.d.loadBlockTimes()
 	if err != nil {
 		return err
-	}
-	avg := b.d.is.SetBlockTimes(bt)
-	if b.d.metrics != nil {
-		b.d.metrics.AvgBlockPeriod.Set(float64(avg))
 	}
 
 	if err := b.d.SetInconsistentState(false); err != nil {

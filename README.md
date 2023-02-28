@@ -1,14 +1,15 @@
-[![Go Report Card](https://goreportcard.com/badge/trezor/blockbook)](https://goreportcard.com/report/trezor/blockbook)
+[![Go Report Card](https://goreportcard.com/badge/syscoin/blockbook)](https://goreportcard.com/report/syscoin/blockbook)
 
 # Blockbook
 
 **Blockbook** is back-end service for Trezor wallet. Main features of **Blockbook** are:
 
+- full support for Syscoin SPT’s through indexing and filtering transactions
 - index of addresses and address balances of the connected block chain
 - fast index search
 - simple blockchain explorer
 - websocket, API and legacy Bitcore Insight compatible socket.io interfaces
-- support of multiple coins (Bitcoin and Ethereum type) with easy extensibility to other coins
+- support of multiple coins (Syscoin/Bitcoin and Ethereum type) with easy extensibility to other coins
 - scripts for easy creation of debian packages for backend and blockbook
 
 ## Build and installation instructions
@@ -29,12 +30,12 @@ Contribution guide is [here](CONTRIBUTING.md).
 
 Blockbook currently supports over 30 coins. The Trezor team implemented 
 
-- Bitcoin, Bitcoin Cash, Zcash, Dash, Litecoin, Bitcoin Gold, Ethereum, Ethereum Classic, Dogecoin, Namecoin, Vertcoin, DigiByte, Liquid
+- Bitcoin, Bitcoin Cash, Zcash, Dash, Litecoin, Bitcoin Gold, Ethereum, Ethereum Classic, Dogecoin, Namecoin, Vertcoin, DigiByte, Liquid, Syscoin
 
 the rest of coins were implemented by the community.
 
 Testnets for some coins are also supported, for example:
-- Bitcoin Testnet, Bitcoin Cash Testnet, ZCash Testnet, Ethereum Testnet Ropsten
+- Bitcoin Testnet, Bitcoin Cash Testnet, ZCash Testnet, Ethereum Testnet Ropsten, Syscoin Testnet
 
 List of all implemented coins is in [the registry of ports](/docs/ports.md).
 
@@ -47,7 +48,7 @@ How to reduce memory footprint of the initial sync:
 - disable rocksdb cache by parameter `-dbcache=0`, the default size is 500MB
 - run blockbook with parameter `-workers=1`. This disables bulk import mode, which caches a lot of data in memory (not in rocksdb cache). It will run about twice as slowly but especially for smaller blockchains it is no problem at all.
 
-Please add your experience to this [issue](https://github.com/trezor/blockbook/issues/43).
+Please add your experience to this [issue](https://github.com/syscoin/blockbook/issues/43).
 
 #### Error `internalState: database is in inconsistent state and cannot be used`
 
@@ -56,15 +57,25 @@ By default, Blockbook performs the initial import in bulk import mode, which for
 
 See above how to reduce the memory footprint, delete the database files and run the import again. 
 
-Check [this](https://github.com/trezor/blockbook/issues/89) or [this](https://github.com/trezor/blockbook/issues/147) issue for more info.
+Check [this](https://github.com/syscoin/blockbook/issues/89) or [this](https://github.com/syscoin/blockbook/issues/147) issue for more info.
 
 #### Running on Ubuntu
 
-[This issue](https://github.com/trezor/blockbook/issues/45) discusses how to run Blockbook on Ubuntu. If you have some additional experience with Blockbook on Ubuntu, please add it to [this issue](https://github.com/trezor/blockbook/issues/45).
+[This issue](https://github.com/syscoin/blockbook/issues/45) discusses how to run Blockbook on Ubuntu. If you have some additional experience with Blockbook on Ubuntu, please add it to [this issue](https://github.com/syscoin/blockbook/issues/45).
 
 #### My coin implementation is reporting parse errors when importing blockchain
 
-Your coin's block/transaction data may not be compatible with `BitcoinParser` `ParseBlock`/`ParseTx`, which is used by default. In that case, implement your coin in a similar way we used in case of [zcash](https://github.com/trezor/blockbook/tree/master/bchain/coins/zec) and some other coins. The principle is not to parse the block/transaction data in Blockbook but instead to get parsed transactions as json from the backend.
+Your coin's block/transaction data may not be compatible with `BitcoinParser` `ParseBlock`/`ParseTx`, which is used by default. In that case, implement your coin in a similar way we used in case of [zcash](https://github.com/syscoin/blockbook/tree/master/bchain/coins/zec) and some other coins. The principle is not to parse the block/transaction data in Blockbook but instead to get parsed transactions as json from the backend.
+
+#### Cannot build Blockbook using `go build` command
+
+When building Blockbook I get error `not enough arguments in call to _Cfunc_rocksdb_approximate_sizes`.
+
+RocksDB version 6.16.0 changed the API in a backwards incompatible way. It is necessary to build Blockbook with the `rocksdb_6_16` tag to fix the compatibility problem. The correct way to build Blockbook is:
+
+```
+go build -tags rocksdb_6_16
+```
 
 ## Data storage in RocksDB
 

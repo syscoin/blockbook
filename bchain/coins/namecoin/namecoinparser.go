@@ -5,9 +5,9 @@ import (
 
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins/btc"
-	"github.com/trezor/blockbook/bchain/coins/utils"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain/coins/utils"
 )
 
 const (
@@ -34,9 +34,7 @@ type NamecoinParser struct {
 
 // NewNamecoinParser returns new NamecoinParser instance
 func NewNamecoinParser(params *chaincfg.Params, c *btc.Configuration) *NamecoinParser {
-	p := &NamecoinParser{BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c)}
-	p.VSizeSupport = true
-	return p
+	return &NamecoinParser{BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c)}
 }
 
 // GetChainParams contains network parameters for the main Namecoin network,

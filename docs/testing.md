@@ -16,7 +16,7 @@ You can use Go's flag *-run* to filter which tests should be executed. Use *ARGS
 
 ## Unit tests
 
-Unit test file must start with constraint `// +build unittest` followed by blank line (constraints are described
+Unit test file must start with constraint `//go:build unittest` followed by blank line (constraints are described
 [here](https://golang.org/pkg/go/build/#hdr-Build_Constraints)).
 
 Every coin implementation must have unit tests. At least for parser. Usual test suite define real transaction data
@@ -42,7 +42,7 @@ It perfectly fits with layered test definitions. For example, you can:
 * run tests for single coin – `make test-integration ARGS="-run=TestIntegration/bitcoin/"`
 * run single test suite – `make test-integration ARGS="-run=TestIntegration//sync/"`
 * run single test – `make test-integration ARGS="-run=TestIntegration//sync/HandleFork"`
-* run tests for set of coins – `make test-integration ARGS="-run='TestIntegration/(bcash|bgold|bitcoin|dash|dogecoin|litecoin|snowgem|vertcoin|zcash|zelcash)/'"`
+* run tests for set of coins – `make test-integration ARGS="-run='TestIntegration/(bcash|bgold|bitcoin|dash|dogecoin|litecoin|vertcoin|zcash|zelcash|syscoin)/'"`
 
 Test fixtures are defined in *testdata* directory in package of particular test suite. They are separate JSON files named
 by coin. File schemes are very similar with verbose results of CLI tools and are described below. Integration tests

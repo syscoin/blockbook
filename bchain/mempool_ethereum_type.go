@@ -40,7 +40,7 @@ func appendAddress(io []addrIndex, i int32, a string, parser BlockChainParser) (
 			glog.Error("error in input addrDesc in ", a, ": ", err)
 			return io, nil
 		}
-		io = append(io, addrIndex{string(addrDesc), i})
+		io = append(io, addrIndex{string(addrDesc), i, nil})
 	}
 	return io, addrDesc
 }
@@ -65,7 +65,7 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 			continue
 		}
 		if len(addrDesc) > 0 {
-			addrIndexes = append(addrIndexes, addrIndex{string(addrDesc), int32(output.N)})
+			addrIndexes = append(addrIndexes, addrIndex{string(addrDesc), int32(output.N), nil})
 		}
 	}
 	for j := range mtx.Vin {
@@ -74,11 +74,11 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 			addrIndexes, input.AddrDesc = appendAddress(addrIndexes, ^int32(i), a, parser)
 		}
 	}
-	t, err := parser.EthereumTypeGetTokenTransfersFromTx(tx)
+	t, err := parser.EthereumTypeGetErc20FromTx(tx)
 	if err != nil {
-		glog.Error("GetGetTokenTransfersFromTx for tx ", txid, ", ", err)
+		glog.Error("GetErc20FromTx for tx ", txid, ", ", err)
 	} else {
-		mtx.TokenTransfers = t
+		mtx.Erc20 = t
 		for i := range t {
 			addrIndexes, _ = appendAddress(addrIndexes, ^int32(i+1), t[i].From, parser)
 			addrIndexes, _ = appendAddress(addrIndexes, int32(i+1), t[i].To, parser)

@@ -13,19 +13,19 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/api"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins"
-	"github.com/trezor/blockbook/common"
-	"github.com/trezor/blockbook/db"
-	"github.com/trezor/blockbook/fiat"
-	"github.com/trezor/blockbook/fourbyte"
-	"github.com/trezor/blockbook/server"
+	"github.com/syscoin/blockbook/api"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins"
+	"github.com/syscoin/blockbook/common"
+	"github.com/syscoin/blockbook/db"
+	"github.com/syscoin/blockbook/fiat"
+	"github.com/syscoin/blockbook/server"
 )
 
 // debounce too close requests for resync
@@ -42,7 +42,7 @@ const exitCodeOK = 0
 const exitCodeFatal = 255
 
 var (
-	configFile = flag.String("blockchaincfg", "", "path to blockchain RPC service configuration json file")
+	blockchain = flag.String("blockchaincfg", "", "path to blockchain RPC service configuration json file")
 
 	dbPath         = flag.String("datadir", "./data", "path to database directory")
 	dbCache        = flag.Int("dbcache", 1<<29, "size of the rocksdb cache")
@@ -105,6 +105,7 @@ var (
 	callbacksOnNewTx              []bchain.OnNewTxFunc
 	callbacksOnNewFiatRatesTicker []fiat.OnNewFiatRatesTicker
 	chanOsSignal                  chan os.Signal
+	inShutdown                    int32
 )
 
 func init() {
@@ -150,16 +151,18 @@ func mainWithExitCode() int {
 		return exitCodeOK
 	}
 
-	if *configFile == "" {
+	if *blockchain == "" {
 		glog.Error("Missing blockchaincfg configuration parameter")
 		return exitCodeFatal
 	}
 
-	coin, coinShortcut, coinLabel, err := coins.GetCoinNameFromConfig(*configFile)
+	coin, coinShortcut, coinLabel, err := coins.GetCoinNameFromConfig(*blockchain)
 	if err != nil {
 		glog.Error("config: ", err)
 		return exitCodeFatal
 	}
+
+	// gspt.SetProcTitle("blockbook-" + normalizeName(coin))
 
 	metrics, err = common.GetMetrics(coin)
 	if err != nil {
@@ -167,7 +170,7 @@ func mainWithExitCode() int {
 		return exitCodeFatal
 	}
 
-	if chain, mempool, err = getBlockChainWithRetry(coin, *configFile, pushSynchronizationHandler, metrics, 120); err != nil {
+	if chain, mempool, err = getBlockChainWithRetry(coin, *blockchain, pushSynchronizationHandler, metrics, 120); err != nil {
 		glog.Error("rpc: ", err)
 		return exitCodeFatal
 	}
@@ -344,7 +347,7 @@ func mainWithExitCode() int {
 
 	if internalServer != nil || publicServer != nil || chain != nil {
 		// start fiat rates downloader only if not shutting down immediately
-		initDownloaders(index, chain, *configFile)
+		initFiatRatesDownloader(index, *blockchain)
 		waitForSignalAndShutdown(internalServer, publicServer, chain, 10*time.Second)
 	}
 
@@ -359,13 +362,13 @@ func mainWithExitCode() int {
 	return exitCodeOK
 }
 
-func getBlockChainWithRetry(coin string, configFile string, pushHandler func(bchain.NotificationType), metrics *common.Metrics, seconds int) (bchain.BlockChain, bchain.Mempool, error) {
+func getBlockChainWithRetry(coin string, configfile string, pushHandler func(bchain.NotificationType), metrics *common.Metrics, seconds int) (bchain.BlockChain, bchain.Mempool, error) {
 	var chain bchain.BlockChain
 	var mempool bchain.Mempool
 	var err error
 	timer := time.NewTimer(time.Second)
 	for i := 0; ; i++ {
-		if chain, mempool, err = coins.NewBlockChain(coin, configFile, pushHandler, metrics); err != nil {
+		if chain, mempool, err = coins.NewBlockChain(coin, configfile, pushHandler, metrics); err != nil {
 			if i < seconds {
 				glog.Error("rpc: ", err, " Retrying...")
 				select {
@@ -458,19 +461,13 @@ func blockbookAppInfoMetric(db *db.RocksDB, chain bchain.BlockChain, txCache *db
 	if err != nil {
 		return err
 	}
-	subversion := si.Backend.Subversion
-	if subversion == "" {
-		// for coins without subversion (ETH) use ConsensusVersion as subversion in metrics
-		subversion = si.Backend.ConsensusVersion
-	}
-
 	metrics.BlockbookAppInfo.Reset()
 	metrics.BlockbookAppInfo.With(common.Labels{
 		"blockbook_version":        si.Blockbook.Version,
 		"blockbook_commit":         si.Blockbook.GitCommit,
 		"blockbook_buildtime":      si.Blockbook.BuildTime,
 		"backend_version":          si.Backend.Version,
-		"backend_subversion":       subversion,
+		"backend_subversion":       si.Backend.Subversion,
 		"backend_protocol_version": si.Backend.ProtocolVersion}).Set(float64(0))
 	metrics.BackendBestHeight.Set(float64(si.Backend.Blocks))
 	metrics.BlockbookBestHeight.Set(float64(si.Blockbook.BestHeight))
@@ -499,11 +496,46 @@ func newInternalState(coin, coinShortcut, coinLabel string, d *db.RocksDB) (*com
 	return is, nil
 }
 
+func tickAndDebounce(tickTime time.Duration, debounceTime time.Duration, input chan struct{}, f func()) {
+	timer := time.NewTimer(tickTime)
+	var firstDebounce time.Time
+Loop:
+	for {
+		select {
+		case _, ok := <-input:
+			if !timer.Stop() {
+				<-timer.C
+			}
+			// exit loop on closed input channel
+			if !ok {
+				break Loop
+			}
+			if firstDebounce.IsZero() {
+				firstDebounce = time.Now()
+			}
+			// debounce for up to debounceTime period
+			// afterwards execute immediately
+			if firstDebounce.Add(debounceTime).After(time.Now()) {
+				timer.Reset(debounceTime)
+			} else {
+				timer.Reset(0)
+			}
+		case <-timer.C:
+			// do the action, if not in shutdown, then start the loop again
+			if atomic.LoadInt32(&inShutdown) == 0 {
+				f()
+			}
+			timer.Reset(tickTime)
+			firstDebounce = time.Time{}
+		}
+	}
+}
+
 func syncIndexLoop() {
 	defer close(chanSyncIndexDone)
 	glog.Info("syncIndexLoop starting")
 	// resync index about every 15 minutes if there are no chanSyncIndex requests, with debounce 1 second
-	common.TickAndDebounce(time.Duration(*resyncIndexPeriodMs)*time.Millisecond, debounceResyncIndexMs*time.Millisecond, chanSyncIndex, func() {
+	tickAndDebounce(time.Duration(*resyncIndexPeriodMs)*time.Millisecond, debounceResyncIndexMs*time.Millisecond, chanSyncIndex, func() {
 		if err := syncWorker.ResyncIndex(onNewBlockHash, false); err != nil {
 			glog.Error("syncIndexLoop ", errors.ErrorStack(err), ", will retry...")
 			// retry once in case of random network error, after a slight delay
@@ -527,11 +559,10 @@ func onNewBlockHash(hash string, height uint32) {
 	}
 }
 
-func onNewFiatRatesTicker(ticker *common.CurrencyRatesTicker) {
+func onNewFiatRatesTicker(ticker *db.CurrencyRatesTicker) {
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Error("onNewFiatRatesTicker recovered from panic: ", r)
-			debug.PrintStack()
 		}
 	}()
 	for _, c := range callbacksOnNewFiatRatesTicker {
@@ -543,7 +574,7 @@ func syncMempoolLoop() {
 	defer close(chanSyncMempoolDone)
 	glog.Info("syncMempoolLoop starting")
 	// resync mempool about every minute if there are no chanSyncMempool requests, with debounce 1 second
-	common.TickAndDebounce(time.Duration(*resyncMempoolPeriodMs)*time.Millisecond, debounceResyncMempoolMs*time.Millisecond, chanSyncMempool, func() {
+	tickAndDebounce(time.Duration(*resyncMempoolPeriodMs)*time.Millisecond, debounceResyncMempoolMs*time.Millisecond, chanSyncMempool, func() {
 		internalState.StartedMempoolSync()
 		if count, err := mempool.Resync(); err != nil {
 			glog.Error("syncMempoolLoop ", errors.ErrorStack(err))
@@ -573,7 +604,7 @@ func storeInternalStateLoop() {
 	} else {
 		glog.Info("storeInternalStateLoop starting with db stats compute disabled")
 	}
-	common.TickAndDebounce(storeInternalStatePeriodMs*time.Millisecond, (storeInternalStatePeriodMs-1)*time.Millisecond, chanStoreInternalState, func() {
+	tickAndDebounce(storeInternalStatePeriodMs*time.Millisecond, (storeInternalStatePeriodMs-1)*time.Millisecond, chanStoreInternalState, func() {
 		if (*dbStatsPeriodHours) > 0 && !computeRunning && lastCompute.Add(computePeriod).Before(time.Now()) {
 			computeRunning = true
 			go func() {
@@ -589,9 +620,7 @@ func storeInternalStateLoop() {
 			glog.Error("storeInternalStateLoop ", errors.ErrorStack(err))
 		}
 		if lastAppInfo.Add(logAppInfoPeriod).Before(time.Now()) {
-			if glog.V(1) {
-				glog.Info(index.GetMemoryStats())
-			}
+			glog.Info(index.GetMemoryStats())
 			if err := blockbookAppInfoMetric(index, chain, txCache, internalState, metrics); err != nil {
 				glog.Error("blockbookAppInfoMetric ", err)
 			}
@@ -625,7 +654,7 @@ func onNewTx(tx *bchain.MempoolTx) {
 
 func pushSynchronizationHandler(nt bchain.NotificationType) {
 	glog.V(1).Info("MQ: notification ", nt)
-	if common.IsInShutdown() {
+	if atomic.LoadInt32(&inShutdown) != 0 {
 		return
 	}
 	if nt == bchain.NotificationNewBlock {
@@ -639,7 +668,7 @@ func pushSynchronizationHandler(nt bchain.NotificationType) {
 
 func waitForSignalAndShutdown(internal *server.InternalServer, public *server.PublicServer, chain bchain.BlockChain, timeout time.Duration) {
 	sig := <-chanOsSignal
-	common.SetInShutdown()
+	atomic.StoreInt32(&inShutdown, 1)
 	glog.Infof("shutdown: %v", sig)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -664,6 +693,17 @@ func waitForSignalAndShutdown(internal *server.InternalServer, public *server.Pu
 	}
 }
 
+func printResult(txid string, vout int32, isOutput bool) error {
+	glog.Info(txid, vout, isOutput)
+	return nil
+}
+
+func normalizeName(s string) string {
+	s = strings.ToLower(s)
+	s = strings.Replace(s, " ", "-", -1)
+	return s
+}
+
 // computeFeeStats computes fee distribution in defined blocks
 func computeFeeStats(stopCompute chan os.Signal, blockFrom, blockTo int, db *db.RocksDB, chain bchain.BlockChain, txCache *db.TxCache, is *common.InternalState, metrics *common.Metrics) error {
 	start := time.Now()
@@ -673,51 +713,37 @@ func computeFeeStats(stopCompute chan os.Signal, blockFrom, blockTo int, db *db.
 		return err
 	}
 	err = api.ComputeFeeStats(blockFrom, blockTo, stopCompute)
-	glog.Info("computeFeeStats finished in ", time.Since(start))
+	glog.Info("computeFeeStats, ", time.Since(start))
 	return err
 }
 
-func initDownloaders(db *db.RocksDB, chain bchain.BlockChain, configFile string) {
-	data, err := ioutil.ReadFile(configFile)
+func initFiatRatesDownloader(db *db.RocksDB, configfile string) {
+	data, err := ioutil.ReadFile(configfile)
 	if err != nil {
-		glog.Errorf("Error reading file %v, %v", configFile, err)
+		glog.Errorf("Error reading file %v, %v", configfile, err)
 		return
 	}
 
 	var config struct {
-		FiatRates             string `json:"fiat_rates"`
-		FiatRatesParams       string `json:"fiat_rates_params"`
-		FiatRatesVsCurrencies string `json:"fiat_rates_vs_currencies"`
-		FourByteSignatures    string `json:"fourByteSignatures"`
+		FiatRates       string `json:"fiat_rates"`
+		FiatRatesParams string `json:"fiat_rates_params"`
 	}
 
 	err = json.Unmarshal(data, &config)
 	if err != nil {
-		glog.Errorf("Error parsing config file %v, %v", configFile, err)
+		glog.Errorf("Error parsing config file %v, %v", configfile, err)
 		return
 	}
 
 	if config.FiatRates == "" || config.FiatRatesParams == "" {
-		glog.Infof("FiatRates config (%v) is empty, not downloading fiat rates", configFile)
+		glog.Infof("FiatRates config (%v) is empty, so the functionality is disabled.", configfile)
 	} else {
-		fiatRates, err := fiat.NewFiatRatesDownloader(db, config.FiatRates, config.FiatRatesParams, config.FiatRatesVsCurrencies, onNewFiatRatesTicker)
+		fiatRates, err := fiat.NewFiatRatesDownloader(db, config.FiatRates, config.FiatRatesParams, nil, onNewFiatRatesTicker)
 		if err != nil {
 			glog.Errorf("NewFiatRatesDownloader Init error: %v", err)
-		} else {
-			glog.Infof("Starting %v FiatRates downloader...", config.FiatRates)
-			go fiatRates.Run()
+			return
 		}
+		glog.Infof("Starting %v FiatRates downloader...", config.FiatRates)
+		go fiatRates.Run()
 	}
-
-	if config.FourByteSignatures != "" && chain.GetChainParser().GetChainType() == bchain.ChainEthereumType {
-		fbsd, err := fourbyte.NewFourByteSignaturesDownloader(db, config.FourByteSignatures)
-		if err != nil {
-			glog.Errorf("NewFourByteSignaturesDownloader Init error: %v", err)
-		} else {
-			glog.Infof("Starting FourByteSignatures downloader...")
-			go fbsd.Run()
-		}
-
-	}
-
 }

@@ -3,8 +3,8 @@ package bitzeny
 import (
 	"encoding/json"
 
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
 
 	"github.com/golang/glog"
 )

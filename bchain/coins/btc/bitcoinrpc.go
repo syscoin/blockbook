@@ -16,8 +16,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/martinboehm/btcd/wire"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/common"
 )
 
 // BitcoinRPC is an interface to JSON-RPC bitcoind service.
@@ -43,7 +43,6 @@ type Configuration struct {
 	RPCUser                      string `json:"rpc_user"`
 	RPCPass                      string `json:"rpc_pass"`
 	RPCTimeout                   int    `json:"rpc_timeout"`
-	AddressAliases               bool   `json:"address_aliases,omitempty"`
 	Parse                        bool   `json:"parse"`
 	MessageQueueBinding          string `json:"message_queue_binding"`
 	Subversion                   string `json:"subversion"`
@@ -348,6 +347,40 @@ type ResGetRawTransactionNonverbose struct {
 	Result string           `json:"result"`
 }
 
+// decoderawtransaction
+type ResDecodeRawTransaction struct {
+	Error  *bchain.RPCError `json:"error"`
+	Result json.RawMessage  `json:"result"`
+}
+
+type CmdDecodeRawTransaction struct {
+	Method string `json:"method"`
+	Params struct {
+		Hex    string `json:"hexstring"`
+	} `json:"params"`
+}
+// getchaintips
+type ResGetChainTips struct {
+	Error  *bchain.RPCError `json:"error"`
+	Result json.RawMessage  `json:"result"`
+}
+
+type CmdGetChainTips struct {
+	Method string `json:"method"`
+}
+
+// syscoingetspvproof
+type ResGetSPVProof struct {
+	Error  *bchain.RPCError `json:"error"`
+	Result json.RawMessage  `json:"result"`
+}
+
+type CmdGetSPVProof struct {
+	Method string `json:"method"`
+	Params struct {
+		Txid    string `json:"txid"`
+	} `json:"params"`
+}
 // estimatesmartfee
 
 type CmdEstimateSmartFee struct {
@@ -729,10 +762,10 @@ func (b *BitcoinRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 		return nil, err
 	}
 	tx, err := b.Parser.ParseTxFromJson(r)
+	tx.CoinSpecificData = r
 	if err != nil {
 		return nil, errors.Annotatef(err, "txid %v", txid)
 	}
-	tx.CoinSpecificData = r
 	return tx, nil
 }
 
@@ -764,6 +797,29 @@ func (b *BitcoinRPC) getRawTransaction(txid string) (json.RawMessage, error) {
 		return nil, errors.Annotatef(res.Error, "txid %v", txid)
 	}
 	return res.Result, nil
+}
+
+// getRawTransaction returns json as returned by backend, with all coin specific data
+func (b *BitcoinRPC) DecodeRawTransaction(hex string) (string, error) {
+	glog.V(1).Info("rpc: decodeRawTransaction ", hex)
+
+	res := ResDecodeRawTransaction{}
+	req := CmdDecodeRawTransaction{Method: "decoderawtransaction"}
+	req.Params.Hex = hex
+	err := b.Call(&req, &res)
+
+	if err != nil {
+		return "", errors.Annotatef(err, "hex %v", hex)
+	}
+	if res.Error != nil {
+		return "", errors.Annotatef(res.Error, "hex %v", hex)
+	}
+	rawMarshal, err := json.Marshal(&res.Result)
+    if err != nil {
+        return "", err
+    }
+	decodedRawString := string(rawMarshal)
+	return decodedRawString, nil
 }
 
 // EstimateSmartFee returns fee estimation

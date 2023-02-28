@@ -3,7 +3,7 @@ package digibyte
 import (
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
 )
 
 // network constants
@@ -39,9 +39,7 @@ type DigiByteParser struct {
 
 // NewDigiByteParser returns new DigiByteParser instance
 func NewDigiByteParser(params *chaincfg.Params, c *btc.Configuration) *DigiByteParser {
-	p := &DigiByteParser{BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c)}
-	p.VSizeSupport = true
-	return p
+	return &DigiByteParser{BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c)}
 }
 
 // GetChainParams contains network parameters for the main DigiByte network

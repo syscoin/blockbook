@@ -22,10 +22,10 @@
     "package_name": "backend-bitcoin-testnet",
     "package_revision": "satoshilabs-1",
     "system_user": "bitcoin",
-    "version": "24.0.1",
-    "binary_url": "https://bitcoincore.org/bin/bitcoin-core-24.0.1/bitcoin-24.0.1-x86_64-linux-gnu.tar.gz",
-    "verification_type": "sha256",
-    "verification_source": "49df6e444515d457ea0b885d66f521f2a26ca92ccf73d5296082e633544253bf",
+    "version": "0.20.1",
+    "binary_url": "https://bitcoin.org/bin/bitcoin-core-0.20.1/bitcoin-0.20.1-x86_64-linux-gnu.tar.gz",
+    "verification_type": "gpg-sha256",
+    "verification_source": "https://bitcoin.org/bin/bitcoin-core-0.20.1/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/bitcoin-qt"
@@ -41,12 +41,6 @@
     "client_config_file": "bitcoin_client.conf",
     "additional_params": {
       "deprecatedrpc": "estimatefee"
-    },
-    "platforms": {
-      "arm64": {
-        "binary_url": "https://bitcoincore.org/bin/bitcoin-core-23.0/bitcoin-23.0-aarch64-linux-gnu.tar.gz",
-        "verification_source": "06f4c78271a77752ba5990d60d81b1751507f77efda1e5981b4e92fd4d9969fb"
-      }
     }
   },
   "blockbook": {

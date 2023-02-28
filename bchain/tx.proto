@@ -1,7 +1,6 @@
 syntax = "proto3";
 	package bchain;
-    option go_package = "bchain/";
-
+		
     message ProtoTransaction {
         message VinType {
             string Coinbase = 1;
@@ -25,5 +24,4 @@ syntax = "proto3";
         repeated VinType Vin = 6;
         repeated VoutType Vout = 7;
         int32 Version = 8;
-        int64 VSize = 9;
     }

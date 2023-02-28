@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	vlq "github.com/bsm/go-vlq"
+	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/martinboehm/btcd/blockchain"
 	"github.com/martinboehm/btcd/btcec"
@@ -20,7 +21,7 @@ import (
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/martinboehm/btcutil/hdkeychain"
 	"github.com/martinboehm/btcutil/txscript"
-	"github.com/trezor/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain"
 )
 
 // OutputScriptToAddressesFunc converts ScriptPubKey to bitcoin addresses
@@ -35,7 +36,6 @@ type BitcoinLikeParser struct {
 	XPubMagicSegwitP2sh          uint32
 	XPubMagicSegwitNative        uint32
 	Slip44                       uint32
-	VSizeSupport                 bool
 	minimumCoinbaseConfirmations int
 }
 
@@ -45,7 +45,6 @@ func NewBitcoinLikeParser(params *chaincfg.Params, c *Configuration) *BitcoinLik
 		BaseParser: &bchain.BaseParser{
 			BlockAddressesToKeep: c.BlockAddressesToKeep,
 			AmountDecimalPoint:   8,
-			AddressAliases:       c.AddressAliases,
 		},
 		Params:                       params,
 		XPubMagic:                    c.XPubMagic,
@@ -205,14 +204,6 @@ func (p *BitcoinLikeParser) outputScriptToAddresses(script []byte) ([]string, bo
 
 // TxFromMsgTx converts bitcoin wire Tx to bchain.Tx
 func (p *BitcoinLikeParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
-	var vSize int64
-	if p.VSizeSupport {
-		baseSize := t.SerializeSizeStripped()
-		totalSize := t.SerializeSize()
-		weight := int64((baseSize * (blockchain.WitnessScaleFactor - 1)) + totalSize)
-		vSize = (weight + (blockchain.WitnessScaleFactor - 1)) / blockchain.WitnessScaleFactor
-	}
-
 	vin := make([]bchain.Vin, len(t.TxIn))
 	for i, in := range t.TxIn {
 		if blockchain.IsCoinBaseTx(t) {
@@ -257,7 +248,6 @@ func (p *BitcoinLikeParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bcha
 		Txid:     t.TxHash().String(),
 		Version:  t.Version,
 		LockTime: t.LockTime,
-		VSize:    vSize,
 		Vin:      vin,
 		Vout:     vout,
 		// skip: BlockHash,
@@ -328,11 +318,6 @@ func (p *BitcoinLikeParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 // MinimumCoinbaseConfirmations returns minimum number of confirmations a coinbase transaction must have before it can be spent
 func (p *BitcoinLikeParser) MinimumCoinbaseConfirmations() int {
 	return p.minimumCoinbaseConfirmations
-}
-
-// SupportsVSize returns true if vsize of a transaction should be computed and returned by API
-func (p *BitcoinLikeParser) SupportsVSize() bool {
-	return p.VSizeSupport
 }
 
 var tapTweakTagHash = sha256.Sum256([]byte("TapTweak"))
@@ -578,4 +563,225 @@ func (p *BitcoinLikeParser) DerivationBasePath(descriptor *bchain.XpubDescriptor
 		return "unknown/" + c, nil
 	}
 	return "m/" + descriptor.Bip + "'/" + strconv.Itoa(int(p.Slip44)) + "'/" + c, nil
+}
+func (p *BitcoinLikeParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []byte) []byte {
+	buf = buf[:0]
+	l := p.BaseParser.PackVaruint(uint(ab.Txs), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackBigint(&ab.SentSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackBigint(&ab.BalanceSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	for _, utxo := range ab.Utxos {
+		// if Vout < 0, utxo is marked as spent
+		if utxo.Vout >= 0 {
+			buf = append(buf, utxo.BtxID...)
+			l = p.BaseParser.PackVaruint(uint(utxo.Vout), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = p.BaseParser.PackVaruint(uint(utxo.Height), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = p.BaseParser.PackBigint(&utxo.ValueSat, varBuf)
+			buf = append(buf, varBuf[:l]...)
+		}
+	}
+	return buf
+}
+
+func (p *BitcoinLikeParser) UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail bchain.AddressBalanceDetail) (*bchain.AddrBalance, error) {
+	txs, l := p.BaseParser.UnpackVaruint(buf)
+	sentSat, sl := p.BaseParser.UnpackBigint(buf[l:])
+	balanceSat, bl := p.BaseParser.UnpackBigint(buf[l+sl:])
+	l = l + sl + bl
+	ab := &bchain.AddrBalance{
+		Txs:        uint32(txs),
+		SentSat:    sentSat,
+		BalanceSat: balanceSat,
+	}
+
+	if detail != bchain.AddressBalanceDetailNoUTXO {
+		// estimate the size of utxos to avoid reallocation
+		ab.Utxos = make([]bchain.Utxo, 0, len(buf[l:])/txidUnpackedLen+3)
+		// ab.UtxosMap = make(map[string]int, cap(ab.Utxos))
+		for len(buf[l:]) >= txidUnpackedLen+3 {
+			btxID := append([]byte(nil), buf[l:l+txidUnpackedLen]...)
+			l += txidUnpackedLen
+			vout, ll := p.BaseParser.UnpackVaruint(buf[l:])
+			l += ll
+			height, ll := p.BaseParser.UnpackVaruint(buf[l:])
+			l += ll
+			valueSat, ll := p.BaseParser.UnpackBigint(buf[l:])
+			l += ll
+			u := bchain.Utxo{
+				BtxID:    btxID,
+				Vout:     int32(vout),
+				Height:   uint32(height),
+				ValueSat: valueSat,
+			}
+			if detail == bchain.AddressBalanceDetailUTXO {
+				ab.Utxos = append(ab.Utxos, u)
+			} else {
+				ab.AddUtxo(&u)
+			}
+		}
+	}
+	return ab, nil
+}
+
+func (p *BitcoinLikeParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
+	buf = buf[:0]
+	l := p.BaseParser.PackVaruint(uint(ta.Height), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = p.BaseParser.PackVaruint(uint(len(ta.Inputs)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	for i := range ta.Inputs {
+		buf = p.AppendTxInput(&ta.Inputs[i], buf, varBuf)
+	}
+	l = p.BaseParser.PackVaruint(uint(len(ta.Outputs)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	for i := range ta.Outputs {
+		buf = p.AppendTxOutput(&ta.Outputs[i], buf, varBuf)
+	}
+	return buf
+}
+
+func (p *BitcoinLikeParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, error) {
+	ta := bchain.TxAddresses{}
+	height, l := p.BaseParser.UnpackVaruint(buf)
+	ta.Height = uint32(height)
+	inputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	l += ll
+	ta.Inputs = make([]bchain.TxInput, inputs)
+	for i := uint(0); i < inputs; i++ {
+		l += p.UnpackTxInput(&ta.Inputs[i], buf[l:])
+	}
+	outputs, ll := p.BaseParser.UnpackVaruint(buf[l:])
+	l += ll
+	ta.Outputs = make([]bchain.TxOutput, outputs)
+	for i := uint(0); i < outputs; i++ {
+		l += p.UnpackTxOutput(&ta.Outputs[i], buf[l:])
+	}
+	return &ta, nil
+}
+
+func (p *BitcoinLikeParser) AppendTxInput(txi *bchain.TxInput, buf []byte, varBuf []byte) []byte {
+	la := len(txi.AddrDesc)
+	l := p.BaseParser.PackVaruint(uint(la), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, txi.AddrDesc...)
+	l = p.BaseParser.PackBigint(&txi.ValueSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+func (p *BitcoinLikeParser) AppendTxOutput(txo *bchain.TxOutput, buf []byte, varBuf []byte) []byte {
+	la := len(txo.AddrDesc)
+	if txo.Spent {
+		la = ^la
+	}
+	l := p.BaseParser.PackVarint(la, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, txo.AddrDesc...)
+	l = p.BaseParser.PackBigint(&txo.ValueSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+
+func (p *BitcoinLikeParser) UnpackTxInput(ti *bchain.TxInput, buf []byte) int {
+	al, l := p.BaseParser.UnpackVaruint(buf)
+	ti.AddrDesc = append([]byte(nil), buf[l:l+int(al)]...)
+	al += uint(l)
+	ti.ValueSat, l = p.BaseParser.UnpackBigint(buf[al:])
+	return l + int(al)
+}
+
+func (p *BitcoinLikeParser) UnpackTxOutput(to *bchain.TxOutput, buf []byte) int {
+	al, l := p.BaseParser.UnpackVarint(buf)
+	if al < 0 {
+		to.Spent = true
+		al = ^al
+	}
+	to.AddrDesc = append([]byte(nil), buf[l:l+al]...)
+	al += l
+	to.ValueSat, l = p.BaseParser.UnpackBigint(buf[al:])
+	return l + al
+}
+
+func (p *BitcoinLikeParser) PackOutpoints(outpoints []bchain.DbOutpoint) []byte {
+	buf := make([]byte, 0, 32)
+	bvout := make([]byte, vlq.MaxLen32)
+	for _, o := range outpoints {
+		l := p.BaseParser.PackVarint32(o.Index, bvout)
+		buf = append(buf, []byte(o.BtxID)...)
+		buf = append(buf, bvout[:l]...)
+	}
+	return buf
+}
+
+func (p *BitcoinLikeParser) UnpackNOutpoints(buf []byte) ([]bchain.DbOutpoint, int, error) {
+	txidUnpackedLen := p.BaseParser.PackedTxidLen()
+	n, m := p.BaseParser.UnpackVaruint(buf)
+	outpoints := make([]bchain.DbOutpoint, n)
+	for i := uint(0); i < n; i++ {
+		if m+txidUnpackedLen >= len(buf) {
+			return nil, 0, errors.New("Inconsistent data in UnpackNOutpoints")
+		}
+		btxID := append([]byte(nil), buf[m:m+txidUnpackedLen]...)
+		m += txidUnpackedLen
+		vout, voutLen := p.BaseParser.UnpackVarint32(buf[m:])
+		m += voutLen
+		outpoints[i] = bchain.DbOutpoint{
+			BtxID: btxID,
+			Index: vout,
+		}
+	}
+	return outpoints, m, nil
+}
+
+// Block index
+
+func (p *BitcoinLikeParser) PackBlockInfo(block *bchain.DbBlockInfo) ([]byte, error) {
+	packed := make([]byte, 0, 64)
+	varBuf := make([]byte, vlq.MaxLen64)
+	b, err := p.BaseParser.PackBlockHash(block.Hash)
+	if err != nil {
+		return nil, err
+	}
+	pl := p.BaseParser.PackedTxidLen()
+	if len(b) != pl {
+		glog.Warning("Non standard block hash for height ", block.Height, ", hash [", block.Hash, "]")
+		if len(b) > pl {
+			b = b[:pl]
+		} else {
+			b = append(b, make([]byte, pl-len(b))...)
+		}
+	}
+	packed = append(packed, b...)
+	packed = append(packed, p.BaseParser.PackUint(uint32(block.Time))...)
+	l := p.BaseParser.PackVaruint(uint(block.Txs), varBuf)
+	packed = append(packed, varBuf[:l]...)
+	l = p.BaseParser.PackVaruint(uint(block.Size), varBuf)
+	packed = append(packed, varBuf[:l]...)
+	return packed, nil
+}
+
+func (p *BitcoinLikeParser) UnpackBlockInfo(buf []byte) (*bchain.DbBlockInfo, error) {
+	pl := p.BaseParser.PackedTxidLen()
+	// minimum length is PackedTxidLen + 4 bytes time + 1 byte txs + 1 byte size
+	if len(buf) < pl+4+2 {
+		return nil, nil
+	}
+	txid, err := p.BaseParser.UnpackBlockHash(buf[:pl])
+	if err != nil {
+		return nil, err
+	}
+	t := p.BaseParser.UnpackUint(buf[pl:])
+	txs, l := p.BaseParser.UnpackVaruint(buf[pl+4:])
+	size, _ := p.BaseParser.UnpackVaruint(buf[pl+4+l:])
+	return &bchain.DbBlockInfo{
+		Hash: txid,
+		Time: int64(t),
+		Txs:  uint32(txs),
+		Size: uint32(size),
+	}, nil
 }

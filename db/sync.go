@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/common"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/common"
 )
 
 // SyncWorker is handle to SyncWorker
@@ -58,20 +58,19 @@ func (w *SyncWorker) updateBackendInfo() {
 		ci = &bchain.ChainInfo{}
 	}
 	w.is.SetBackendInfo(&common.BackendInfo{
-		BackendError:     backendError,
-		BestBlockHash:    ci.Bestblockhash,
-		Blocks:           ci.Blocks,
-		Chain:            ci.Chain,
-		Difficulty:       ci.Difficulty,
-		Headers:          ci.Headers,
-		ProtocolVersion:  ci.ProtocolVersion,
-		SizeOnDisk:       ci.SizeOnDisk,
-		Subversion:       ci.Subversion,
-		Timeoffset:       ci.Timeoffset,
-		Version:          ci.Version,
-		Warnings:         ci.Warnings,
-		ConsensusVersion: ci.ConsensusVersion,
-		Consensus:        ci.Consensus,
+		BackendError:    backendError,
+		BestBlockHash:   ci.Bestblockhash,
+		Blocks:          ci.Blocks,
+		Chain:           ci.Chain,
+		Difficulty:      ci.Difficulty,
+		Headers:         ci.Headers,
+		ProtocolVersion: ci.ProtocolVersion,
+		SizeOnDisk:      ci.SizeOnDisk,
+		Subversion:      ci.Subversion,
+		Timeoffset:      ci.Timeoffset,
+		Version:         ci.Version,
+		Warnings:        ci.Warnings,
+		Consensus:       ci.Consensus,
 	})
 }
 
@@ -89,7 +88,7 @@ func (w *SyncWorker) ResyncIndex(onNewBlock bchain.OnNewBlockFunc, initialSync b
 	switch err {
 	case nil:
 		d := time.Since(start)
-		glog.Info("resync: finished in ", d)
+		glog.Info("resync: ", d)
 		w.metrics.IndexResyncDuration.Observe(float64(d) / 1e6) // in milliseconds
 		w.metrics.IndexDBSize.Set(float64(w.db.DatabaseSizeOnDisk()))
 		bh, _, err := w.db.GetBestBlock()
@@ -105,7 +104,7 @@ func (w *SyncWorker) ResyncIndex(onNewBlock bchain.OnNewBlockFunc, initialSync b
 		w.metrics.IndexDBSize.Set(float64(w.db.DatabaseSizeOnDisk()))
 		if initialSync {
 			d := time.Since(start)
-			glog.Info("resync: finished in ", d)
+			glog.Info("resync: ", d)
 		}
 		return nil
 	}
@@ -386,9 +385,7 @@ ConnectLoop:
 				start = time.Now()
 			}
 			if msTime.Before(time.Now()) {
-				if glog.V(1) {
-					glog.Info(w.db.GetMemoryStats())
-				}
+				glog.Info(w.db.GetMemoryStats())
 				w.metrics.IndexDBSize.Set(float64(w.db.DatabaseSizeOnDisk()))
 				msTime = time.Now().Add(10 * time.Minute)
 			}

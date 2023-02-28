@@ -7,9 +7,9 @@ import (
 
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins/btc"
-	"github.com/trezor/blockbook/bchain/coins/utils"
+	"github.com/syscoin/blockbook/bchain"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/syscoin/blockbook/bchain/coins/utils"
 )
 
 // magic numbers
@@ -40,16 +40,14 @@ func init() {
 
 // QtumParser handle
 type QtumParser struct {
-	*btc.BitcoinParser
+	*btc.BitcoinLikeParser
 }
 
 // NewQtumParser returns new DashParser instance
 func NewQtumParser(params *chaincfg.Params, c *btc.Configuration) *QtumParser {
-	p := &QtumParser{
-		BitcoinParser: btc.NewBitcoinParser(params, c),
+	return &QtumParser{
+		BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c),
 	}
-	p.VSizeSupport = false
-	return p
 }
 
 // GetChainParams contains network parameters for the main Qtum network,
