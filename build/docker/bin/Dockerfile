@@ -11,7 +11,7 @@ RUN apt-get update && \
     apt-get clean
 ARG GOLANG_VERSION
 ENV GOLANG_VERSION=go1.22.3
-ENV ROCKSDB_VERSION=v6.22.1
+ENV ROCKSDB_VERSION=v6.23.3
 ENV GOPATH=/go
 ENV PATH=$PATH:$GOPATH/bin
 ENV CGO_CFLAGS="-I/opt/rocksdb/include"
@@ -50,6 +50,7 @@ RUN \
     cd $GOPATH/src/github.com/syscoin && \
     git clone https://github.com/Frank-GER/blockbook.git && \
     cd blockbook && \
+    git config --global --add safe.directory /src && \
     go mod download
 
 ADD Makefile /build/Makefile
