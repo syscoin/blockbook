@@ -17,7 +17,6 @@ import (
 	"github.com/flier/gorocksdb"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/martinboehm/btcutil/txscript"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/common"
 )
@@ -512,14 +511,9 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*bchain.TxAddresses, len(block.Txs))
 	blockTxAssetAddresses := make(bchain.TxAssetAddressMap)
-	mapAssetsIn := make(bchain.AssetsMap)
 	// first process all outputs so that inputs can refer to txs in this block
 	for txi := range block.Txs {
 		tx := &block.Txs[txi]
-		var asset *bchain.Asset = nil
-		isActivate := d.chainParser.IsAssetActivateTx(tx.Version)
-		isAssetTx := d.chainParser.IsAssetTx(tx.Version)
-		isAssetSendTx := d.chainParser.IsAssetSendTx(tx.Version)
 		btxID, err := d.chainParser.PackTxid(tx.Txid)
 		if err != nil {
 			return err
@@ -532,49 +526,6 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 		blockTxAddresses[txi] = &ta
 		maxAddrDescLen := d.chainParser.GetMaxAddrLength()
 		assetsMask := d.chainParser.GetAssetsMaskFromVersion(tx.Version)
-		// need to get input map for assets in asset send to manage total supply
-		if(isAssetSendTx) {
-			// save asset info in inputs
-			for i, input := range tx.Vin {
-				tai := &ta.Inputs[i]
-				btxID, err := d.chainParser.PackTxid(input.Txid)
-				if err != nil {
-					// do not process inputs without input txid
-					if err == bchain.ErrTxidMissing {
-						continue
-					}
-					return err
-				}
-				stxID := string(btxID)
-				ita, e := txAddressesMap[stxID]
-				if !e {
-					ita, err = d.getTxAddresses(btxID)
-					if err != nil {
-						return err
-					}
-					if ita == nil {
-						// allow parser to process unknown input, some coins may implement special handling, default is to log warning
-						tai.AddrDesc = d.chainParser.GetAddrDescForUnknownInput(tx, i)
-						continue
-					}
-					txAddressesMap[stxID] = ita
-					d.cbs.txAddressesMiss++
-				} else {
-					d.cbs.txAddressesHit++
-				}
-				spentOutput := &ita.Outputs[int(input.Vout)]
-				if spentOutput.AssetInfo != nil {
-					assetIn, e := mapAssetsIn[spentOutput.AssetInfo.AssetGuid]
-					if !e {
-						assetIn = spentOutput.AssetInfo.ValueSat.Int64()
-						mapAssetsIn[spentOutput.AssetInfo.AssetGuid] = assetIn
-					} else {
-						assetIn += spentOutput.AssetInfo.ValueSat.Int64()
-					}
-				}
-			}
-		}
-
 		for i, output := range tx.Vout {
 			tao := &ta.Outputs[i]
 			tao.ValueSat = output.ValueSat
@@ -631,29 +582,11 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses bch
 						balanceAsset = &bchain.AssetBalance{Transfers: 0, BalanceSat: big.NewInt(0), SentSat: big.NewInt(0)}
 						balance.AssetBalances[tao.AssetInfo.AssetGuid] = balanceAsset
 					}
-					err = d.ConnectAllocationOutput(&addrDesc, block.Height, balanceAsset, isActivate, isAssetSendTx, tx.Version, btxID, tao.AssetInfo, blockTxAssetAddresses, assets, txAssets, tx.Memo)
+					err = d.ConnectAllocationOutput(&addrDesc, block.Height, balanceAsset, tx.Version, btxID, tao.AssetInfo, blockTxAssetAddresses, assets, txAssets, tx.Memo)
 					if err != nil {
 						return err
 					}
 				}
-			} else if ((isAssetTx || isAssetSendTx) && asset == nil && addrDesc[0] == txscript.OP_RETURN) {
-				if isAssetTx {
-					asset, err = d.chainParser.GetAssetFromDesc(&addrDesc)
-				} else if isAssetSendTx {
-					asset = &bchain.Asset{MetaData: nil}
-					var allocation *bchain.AssetAllocation
-					allocation, _, err = d.chainParser.GetAssetAllocationFromDesc(&addrDesc, tx.Version)
-					asset.AssetObj.Allocation = allocation.AssetObj
-				}
-				if err != nil {
-					return err
-				}
-			}
-		}
-		if asset != nil {
-			err = d.ConnectAssetOutput(asset, isActivate, isAssetTx, isAssetSendTx, assets, mapAssetsIn)
-			if err != nil {
-				return err
 			}
 		}
 	}
@@ -1091,10 +1024,8 @@ func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOu
 	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
 	assetFoundInTx func(asset uint64, btxID []byte) bool,
 	assets map[uint64]*bchain.Asset, 
-	blockTxAssetAddresses bchain.TxAssetAddressMap,
-	mapAssetsIn bchain.AssetsMap) error {
+	blockTxAssetAddresses bchain.TxAssetAddressMap) error {
 	var err error
-	isAssetSendTx := d.chainParser.IsAssetSendTx(txa.Version)
 	for i, t := range txa.Inputs {
 		if len(t.AddrDesc) > 0 {
 			input := &inputs[i]
@@ -1149,59 +1080,12 @@ func (d *RocksDB) disconnectTxAddressesInputs(btxID []byte, inputs []bchain.DbOu
 						if err != nil {
 							return err
 						}
-						if isAssetSendTx {
-							assetIn, e := mapAssetsIn[t.AssetInfo.AssetGuid]
-							if !e {
-								assetIn = t.AssetInfo.ValueSat.Int64()
-								mapAssetsIn[t.AssetInfo.AssetGuid] = assetIn
-							} else {
-								assetIn += t.AssetInfo.ValueSat.Int64()
-							}
-						}
 					}
 				} else {
 					ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(t.AddrDesc)
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
 				}
 			}
-		}
-	}
-	return nil
-}
-
-func (d *RocksDB) disconnectTxAssetOutputs(txa *bchain.TxAddresses,
-	assets map[uint64]*bchain.Asset,
-	mapAssetsIn bchain.AssetsMap) error {
-	var asset *bchain.Asset = nil
-	isAssetTx := d.chainParser.IsAssetTx(txa.Version)
-	isAssetSendTx := d.chainParser.IsAssetSendTx(txa.Version)
-	if !isAssetTx && !isAssetSendTx {
-		return nil
-	}
-	for _, t := range txa.Outputs {
-		if len(t.AddrDesc) > 0 {
-			if t.AddrDesc[0] == txscript.OP_RETURN {
-				var err error
-				if isAssetTx {
-					asset, err = d.chainParser.GetAssetFromDesc(&t.AddrDesc)
-				} else if isAssetSendTx {
-					asset = &bchain.Asset{MetaData: nil}
-					var allocation *bchain.AssetAllocation
-					allocation, _, err = d.chainParser.GetAssetAllocationFromDesc(&t.AddrDesc, txa.Version)
-					asset.AssetObj.Allocation = allocation.AssetObj
-				}
-				if err != nil {
-					return err
-				}
-				break
-			}
-		}
-	}
-	if asset != nil {
-		isActivate := d.chainParser.IsAssetActivateTx(txa.Version)
-		err := d.DisconnectAssetOutput(asset, isActivate, isAssetSendTx, assets, mapAssetsIn)
-		if err != nil {
-			return err
 		}
 	}
 	return nil
@@ -1261,7 +1145,6 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 	blockTxAssetAddresses := make(bchain.TxAssetAddressMap)
 	balances := make(map[string]*bchain.AddrBalance)
 	assets := make(map[uint64]*bchain.Asset)
-	mapAssetsIn := make(bchain.AssetsMap)
 	getAddressBalance := func(addrDesc bchain.AddressDescriptor) (*bchain.AddrBalance, error) {
 		var err error
 		s := string(addrDesc)
@@ -1326,7 +1209,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 			continue
 		}
 		txAddresses[i] = txa
-		if err := d.disconnectTxAddressesInputs(btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx, assetFoundInTx, assets, blockTxAssetAddresses, mapAssetsIn); err != nil {
+		if err := d.disconnectTxAddressesInputs(btxID, blockTxs[i].Inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx, assetFoundInTx, assets, blockTxAssetAddresses); err != nil {
 			return err
 		}
 	}
@@ -1337,9 +1220,6 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []bchain.BlockTxs) err
 			continue
 		}
 		if err := d.disconnectTxAddressesOutputs(btxID, txa, getAddressBalance, addressFoundInTx, blockTxAssetAddresses, assetFoundInTx, assets); err != nil {
-			return err
-		}
-		if err := d.disconnectTxAssetOutputs(txa, assets, mapAssetsIn); err != nil {
 			return err
 		}
 	}

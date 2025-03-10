@@ -11,6 +11,7 @@ import (
 // SyscoinRPC is an interface to JSON-RPC bitcoind service
 type SyscoinRPC struct {
 	*btc.BitcoinRPC
+	fNexusBlock int32
 }
 
 // NewSyscoinRPC returns new SyscoinRPC instance
@@ -21,7 +22,7 @@ func NewSyscoinRPC(config json.RawMessage, pushHandler func(notificationType bch
 	}
 
 	s := &SyscoinRPC{
-		b.(*btc.BitcoinRPC),
+		b.(*btc.BitcoinRPC), 0,
 	}
 	s.RPCMarshaler = btc.JSONMarshalerV2{}
 	s.ChainConfig.SupportsEstimateFee = false
@@ -47,9 +48,11 @@ func (b *SyscoinRPC) Initialize() error {
 	if params.Net == MainnetMagic {
 		b.Testnet = false
 		b.Network = "livenet"
+		b.fNexusBlock = 2010000
 	} else {
 		b.Testnet = true
 		b.Network = "testnet"
+		b.fNexusBlock = 1510000
 	}
 
 	glog.Info("rpc: block chain ", params.Name)

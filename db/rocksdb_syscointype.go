@@ -19,125 +19,6 @@ var SetupAssetCacheFirstTime bool = true
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
 type GetTxAssetsCallback func(txids []string) error
 
-func (d *RocksDB) ConnectAssetOutputHelper(isActivate bool, asset *bchain.Asset, dBAsset *bchain.Asset) error {
-	if !isActivate {
-		// logic follows core CheckAssetInputs()
-		if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_DATA) != 0 {
-			dBAsset.AssetObj.PubData = asset.AssetObj.PubData
-			if len(dBAsset.AssetObj.PubData) > 0 {
-				dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_DATA
-			} else {
-				dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_DATA
-			}
-		}
-		if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_CONTRACT) != 0 {
-			dBAsset.AssetObj.Contract = asset.AssetObj.Contract
-			if len(dBAsset.AssetObj.Contract) > 0 {
-				dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_CONTRACT
-			} else {
-				dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_CONTRACT
-			}
-		}
-		if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_NOTARY_KEY) != 0 {
-			dBAsset.AssetObj.NotaryKeyID = asset.AssetObj.NotaryKeyID
-			if len(dBAsset.AssetObj.NotaryKeyID) > 0 {
-				dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_NOTARY_KEY
-			} else {
-				dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_NOTARY_KEY
-			}
-		}
-		if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_NOTARY_DETAILS) != 0 {
-			dBAsset.AssetObj.NotaryDetails = asset.AssetObj.NotaryDetails
-			if len(dBAsset.AssetObj.NotaryDetails.EndPoint) > 0 {
-				dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_NOTARY_DETAILS
-			} else {
-				dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_NOTARY_DETAILS
-			}
-		}
-		if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_AUXFEE) != 0 {
-			dBAsset.AssetObj.AuxFeeDetails = asset.AssetObj.AuxFeeDetails
-			if len(dBAsset.AssetObj.AuxFeeDetails.AuxFees) > 0  || len(dBAsset.AssetObj.AuxFeeDetails.AuxFeeKeyID) > 0 {
-				dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_AUXFEE
-			} else {
-				dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_AUXFEE
-			}
-		}
-		if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_CAPABILITYFLAGS) != 0 {
-			dBAsset.AssetObj.UpdateCapabilityFlags = asset.AssetObj.UpdateCapabilityFlags
-			if dBAsset.AssetObj.UpdateCapabilityFlags != 0 {
-				dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_CAPABILITYFLAGS
-			} else {
-				dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_CAPABILITYFLAGS
-			}
-		}
-	} else {
-		dBAsset.AssetObj.UpdateFlags = asset.AssetObj.UpdateFlags
-		// clear vout assets from storage
-		dBAsset.AssetObj.Allocation.VoutAssets = make([]wire.AssetOutType, 0)
-	}
-	return nil
-}
-
-func (d *RocksDB) DisconnectAssetOutputHelper(asset *bchain.Asset, dBAsset *bchain.Asset) error {
-	// nothing was updated
-	if asset.AssetObj.UpdateFlags == 0 {
-		return nil
-	}
-	// logic follows core CheckAssetInputs()
-	// undo data fields from last update
-	// if fields changed then undo them using prev fields
-    if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_DATA) != 0 {
-		dBAsset.AssetObj.PubData = asset.AssetObj.PrevPubData
-		if len(dBAsset.AssetObj.PubData) > 0 {
-			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_DATA
-		} else {
-			dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_DATA
-		}
-    }
-    if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_CONTRACT) != 0 {
-		dBAsset.AssetObj.Contract = asset.AssetObj.PrevContract
-		if len(dBAsset.AssetObj.Contract) > 0 {
-			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_CONTRACT
-		} else {
-			dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_CONTRACT
-		}
-    }
-    if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_NOTARY_KEY) != 0 {
-		dBAsset.AssetObj.NotaryKeyID = asset.AssetObj.PrevNotaryKeyID
-		if len(dBAsset.AssetObj.NotaryKeyID) > 0 {
-			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_NOTARY_KEY
-		} else {
-			dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_NOTARY_KEY
-		}
-    }
-    if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_NOTARY_DETAILS) != 0 {
-		dBAsset.AssetObj.NotaryDetails = asset.AssetObj.PrevNotaryDetails
-		if len(dBAsset.AssetObj.NotaryDetails.EndPoint) > 0 {
-			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_NOTARY_DETAILS
-		} else {
-			dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_NOTARY_DETAILS
-		}
-    }
-    if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_AUXFEE) != 0 {
-		dBAsset.AssetObj.AuxFeeDetails = asset.AssetObj.PrevAuxFeeDetails
-		if len(dBAsset.AssetObj.AuxFeeDetails.AuxFees) > 0 || len(dBAsset.AssetObj.AuxFeeDetails.AuxFeeKeyID) > 0 {
-			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_AUXFEE
-		} else {
-			dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_AUXFEE
-		}
-    }
-    if (asset.AssetObj.UpdateFlags & wire.ASSET_UPDATE_CAPABILITYFLAGS) != 0 {
-		dBAsset.AssetObj.UpdateCapabilityFlags = asset.AssetObj.PrevUpdateCapabilityFlags
-		if dBAsset.AssetObj.UpdateCapabilityFlags != 0 {
-			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_CAPABILITYFLAGS
-		} else {
-			dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_CAPABILITYFLAGS
-		}
-	}
-
-	return nil
-}
-
 func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, height uint32, version int32, balanceAsset *bchain.AssetBalance, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if err != nil {
@@ -163,39 +44,15 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	return nil
 }
 
-func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, isActivate bool, isAssetSendTx bool, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
+func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
-	if !isActivate && err != nil {
-		return err
-	}
-	baseAssetGuid := d.GetBaseAssetID(assetInfo.AssetGuid)
-	if dBAsset == nil {
-		// if asset send to NFT output, create the asset if it doesn't exist
-		// it will update total supply of asset based on how much was issued in ConnectAssetOutput, for now we initialize the supply as 0
-		if isAssetSendTx && baseAssetGuid != assetInfo.AssetGuid {
-			// get base asset which should exist
-			dBBaseAsset, err := d.GetAsset(baseAssetGuid, assets)
-			if err != nil {
-				return err
-			}
-			dBAsset = &bchain.Asset{Transactions: 0, AssetObj: dBBaseAsset.AssetObj, MetaData: memo}
-			dBAsset.AssetObj.TotalSupply = int64(0)
-			dBAsset.AssetObj.MaxSupply = dBBaseAsset.AssetObj.MaxSupply
-		} else if !isActivate {
-			return errors.New(fmt.Sprint("ConnectAllocationOutput could not read asset " , assetInfo.AssetGuid))
-		}
+	if err != nil {
+		dBAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{}, MetaData: memo}
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
-		if dBAsset != nil {
-			dBAsset.Transactions++
-			// only if this is the first transaction after NFT creation allow metadata to be set
-			// if NFT asset exists and meta data isn't set yet we set it here
-			if !isAssetSendTx && dBAsset.Transactions == 2 && baseAssetGuid != assetInfo.AssetGuid && len(dBAsset.MetaData) == 0 && len(memo) > 0 {
-				dBAsset.MetaData = memo
-			}
-			assets[assetInfo.AssetGuid] = dBAsset
-		}
+		dBAsset.Transactions++
+		assets[assetInfo.AssetGuid] = dBAsset
 	}
 	// asset guid + txid + address of output/input must match for counted to be true
 	counted = d.addToAssetAddressMap(blockTxAssetAddresses, assetInfo.AssetGuid, btxID, addrDesc)
@@ -203,71 +60,6 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 		balanceAsset.Transfers++
 	}
 	balanceAsset.BalanceSat.Add(balanceAsset.BalanceSat, assetInfo.ValueSat)
-	return nil
-}
-
-func (d *RocksDB) ConnectAssetOutput(asset *bchain.Asset, isActivate bool, isAssetTx bool, isAssetSendTx bool, assets map[uint64]*bchain.Asset, mapAssetsIn bchain.AssetsMap) error {
-	var dBAsset* bchain.Asset = nil
-	var err error
-	baseAssetGuid := d.GetBaseAssetID(asset.AssetObj.Allocation.VoutAssets[0].AssetGuid)
-	if !isActivate {
-		dBAsset, err = d.GetAsset(baseAssetGuid, assets)
-		if  err != nil {
-			return err
-		}
-		if dBAsset == nil {
-			return errors.New(fmt.Sprint("ConnectAssetOutput: could not read asset " , baseAssetGuid))
-		}
-	} else {
-		dBAsset = &bchain.Asset{Transactions: 1, AssetObj: asset.AssetObj, MetaData: nil}
-	}
-	if dBAsset != nil {
-		if isAssetTx {
-			err = d.ConnectAssetOutputHelper(isActivate, asset, dBAsset)
-			if err != nil {
-				return err
-			}
-		} else if isAssetSendTx {
-			// tally total amount and subtract from asset
-			valueDiff := int64(0)
-			// track in/out amounts and add to total for any NFT inputs+outputs
-			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
-				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
-				if baseAssetInternal == baseAssetGuid {
-					valueSatOut := int64(0)
-					valueSatIn := int64(0)
-					// add all output amounts that match the base asset of the first output
-					for _, value := range voutAsset.Values {
-						valueSatOut += value.ValueSat
-					}
-					// if any inputs from this NFT asset were used add them as input amount
-					valueSatIn, _ = mapAssetsIn[voutAsset.AssetGuid]
-					valueDiffNFT := (valueSatOut - valueSatIn)
-					valueDiff += valueDiffNFT
-					if voutAsset.AssetGuid != baseAssetGuid {
-						// get the NFT asset from asset DB
-						nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
-						if err != nil || nftDBAsset == nil {
-							return errors.New(fmt.Sprint("ConnectAssetOutput: could not read NFT asset " , voutAsset.AssetGuid))
-						}
-						nftDBAsset.AssetObj.TotalSupply += valueDiffNFT
-						if nftDBAsset.AssetObj.TotalSupply <= 0 {
-							nftDBAsset.AssetObj.TotalSupply = -1
-						}
-						assets[voutAsset.AssetGuid] = nftDBAsset
-					}
-				}
-			}
-			dBAsset.AssetObj.TotalSupply += valueDiff
-			if dBAsset.AssetObj.TotalSupply < 0 {
-				dBAsset.AssetObj.TotalSupply = 0
-			}
-			dBAsset.AssetObj.UpdateFlags |= wire.ASSET_UPDATE_SUPPLY
-		} 
-		assets[baseAssetGuid] = dBAsset
-	} else {
-		return errors.New("ConnectSyscoinOutput: asset not found")
-	}
 	return nil
 }
 
@@ -286,79 +78,12 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 	exists := assetFoundInTx(assetInfo.AssetGuid, btxID)
 	if !exists {
 		dBAsset.Transactions--
-		if dBAsset.Transactions == 1 && d.GetBaseAssetID(assetInfo.AssetGuid) != assetInfo.AssetGuid && len(dBAsset.MetaData) > 0 {
-			dBAsset.MetaData = nil
-		}
 	}
 	counted := d.addToAssetAddressMap(blockTxAssetAddresses, assetInfo.AssetGuid, btxID, addrDesc)
 	if !counted {
 		balanceAsset.Transfers--
 	}
 	assets[assetInfo.AssetGuid] = dBAsset
-	return nil
-}
-func (d *RocksDB) DisconnectAssetOutput(asset *bchain.Asset, isActivate bool, isAssetSendTx bool, assets map[uint64]*bchain.Asset, mapAssetsIn bchain.AssetsMap) error {
-	baseAssetGuid :=  d.GetBaseAssetID(asset.AssetObj.Allocation.VoutAssets[0].AssetGuid)
-	dBAsset, err := d.GetAsset(baseAssetGuid, assets)
-	if dBAsset == nil || err != nil {
-		if dBAsset == nil {
-			return errors.New(fmt.Sprint("DisconnectAssetOutput could not read asset " , baseAssetGuid))
-		}
-		return err
-	}
-	if !isActivate {
-		if isAssetSendTx {
-			valueDiff := int64(0)
-			// track in/out amounts and add to total for any NFT inputs+outputs
-			for _, voutAsset := range asset.AssetObj.Allocation.VoutAssets {
-				baseAssetInternal := d.GetBaseAssetID(voutAsset.AssetGuid)
-				if baseAssetInternal == baseAssetGuid {
-					valueSatOut := int64(0)
-					valueSatIn := int64(0)
-					// add all output amounts that match the base asset of the first output
-					for _, value := range voutAsset.Values {
-						valueSatOut += value.ValueSat
-					}
-					// if any inputs from this NFT asset were used add them as input amount
-					valueSatIn, _ = mapAssetsIn[voutAsset.AssetGuid]
-					valueDiffNFT := (valueSatOut - valueSatIn)
-					valueDiff += valueDiffNFT
-					if voutAsset.AssetGuid != baseAssetGuid {
-						// get the NFT asset from asset DB
-						nftDBAsset, err := d.GetAsset(voutAsset.AssetGuid, assets)
-						if nftDBAsset == nil || err != nil {
-							if nftDBAsset == nil {
-								return errors.New(fmt.Sprint("DisconnectAssetOutput could not read NFT asset " , voutAsset.AssetGuid))
-							}
-							return err
-						}
-						nftDBAsset.AssetObj.TotalSupply -= valueDiffNFT
-						if nftDBAsset.AssetObj.TotalSupply <= 0 {
-							nftDBAsset.AssetObj.TotalSupply = -1
-						}
-						assets[voutAsset.AssetGuid] = nftDBAsset
-					}
-				}
-			}
-			dBAsset.AssetObj.TotalSupply -= valueDiff
-			if dBAsset.AssetObj.TotalSupply < 0 {
-				glog.Warningf("DisconnectAssetOutput total supply is negative %v, setting to 0...", dBAsset.AssetObj.TotalSupply)
-				dBAsset.AssetObj.TotalSupply = 0
-			}
-			if dBAsset.AssetObj.TotalSupply == 0 {
-				dBAsset.AssetObj.UpdateFlags = dBAsset.AssetObj.UpdateFlags &^ wire.ASSET_UPDATE_SUPPLY
-			}
-		} else {
-			err = d.DisconnectAssetOutputHelper(asset, dBAsset)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		// signals for removal from asset db
-		dBAsset.AssetObj.TotalSupply = -1
-	}
-	assets[baseAssetGuid] = dBAsset
 	return nil
 }
 func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, balanceAsset *bchain.AssetBalance,  btxID []byte, assetInfo *bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, assetFoundInTx func(asset uint64, btxID []byte) bool) error {

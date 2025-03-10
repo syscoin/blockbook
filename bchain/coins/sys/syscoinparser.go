@@ -31,6 +31,7 @@ const (
 	SYSCOIN_TX_VERSION_ALLOCATION_SEND int32 = 135
 	maxAddrDescLen = 10000
 	maxMemoLen = 256
+	fNexusBlock = 0
 )
 // chain parameters
 var (
@@ -230,8 +231,8 @@ func (p *SyscoinParser) IsAssetActivateTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE
 }
 
-func (p *SyscoinParser) IsSyscoinTx(nVersion int32) bool {
-    return p.IsAssetTx(nVersion) || p.IsAssetSendTx(nVersion) || p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
+func (p *SyscoinParser) IsSyscoinTx(nVersion int32, nHeight uint32) bool {
+    return nHeight > fNexusBlock && (p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion))
 }
 
 	
@@ -282,27 +283,7 @@ func (p *SyscoinParser) GetSPTDataFromDesc(addrDesc *bchain.AddressDescriptor) (
 	return sptData, nil
 }
 
-func (p *SyscoinParser) GetAssetFromVout(vout []bchain.Vout) (*bchain.Asset, error) {
-	var addrDesc bchain.AddressDescriptor
-	var err error
-	for _, output := range vout {
-		addrDesc, err = p.GetAddrDescFromVout(&output)
-		if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
-			continue
-		}
-		if addrDesc[0] == txscript.OP_RETURN {
-			break
-		}
-	}
-	return p.GetAssetFromDesc(&addrDesc)
-}
-func (p *SyscoinParser) GetAssetFromDesc(addrDesc *bchain.AddressDescriptor) (*bchain.Asset, error) {
-	sptData, err := p.GetSPTDataFromDesc(addrDesc)
-	if err != nil {
-		return nil, err
-	}
-	return p.GetAssetFromData(sptData)
-}
+
 
 func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescriptor, txVersion int32) (*bchain.AssetAllocation, []byte, error) {
 	sptData, err := p.GetSPTDataFromDesc(addrDesc)
@@ -312,15 +293,6 @@ func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescr
 	return p.GetAssetAllocationFromData(sptData, txVersion)
 }
 
-func (p *SyscoinParser) GetAssetFromData(sptData []byte) (*bchain.Asset, error) {
-	var asset bchain.Asset
-	r := bytes.NewReader(sptData)
-	err := asset.AssetObj.Deserialize(r)
-	if err != nil {
-		return nil, err
-	}
-	return &asset, nil
-}
 func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int32) (*bchain.AssetAllocation, []byte, error) {
 	var assetAllocation bchain.AssetAllocation
 	r := bytes.NewReader(sptData)
@@ -329,7 +301,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int
 		return nil, nil, err
 	}
 	var memo []byte
-	if p.IsAssetSendTx(txVersion) || (p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN) {
+	if (p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN) {
 		memo = make([]byte, maxMemoLen)
 		n, _ := r.Read(memo)
 		memo = memo[:n]
@@ -337,7 +309,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int
 	return &assetAllocation, memo, nil
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
-    if p.IsSyscoinTx(tx.Version) {
+    if p.IsSyscoinTx(tx.Version, tx.BlockHeight) {
         allocation, memo, err := p.GetAllocationFromTx(tx)
 		if err != nil {
 			return err

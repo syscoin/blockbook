@@ -237,10 +237,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 						if !ok {
 							dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 							if errAsset != nil || dbAsset == nil {
-								dbAsset, errAsset = w.chainParser.GetAssetFromVout(bchainTx.Vout)
-								if errAsset != nil || dbAsset == nil {
-									return nil, errAsset
-								}
+								return nil, errAsset
 							}
 							tts = &bchain.TokenTransferSummary{
 								Token:    vin.AssetInfo.AssetGuid,
@@ -289,12 +286,9 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			if !ok {
 				dbAsset, errAsset := w.db.GetAsset(bchainVout.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
-					dbAsset, errAsset = w.chainParser.GetAssetFromVout(bchainTx.Vout)
-					if errAsset != nil || dbAsset == nil {
-						return nil, errAsset
-					}
+					return nil, errAsset
 				}
-
+				
 				tts = &bchain.TokenTransferSummary{
 					Token:    vout.AssetInfo.AssetGuid,
 					Decimals: int(dbAsset.AssetObj.Precision),
@@ -455,11 +449,9 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 					if !ok {
 						dbAsset, errAsset := w.db.GetAsset(bchainVin.AssetInfo.AssetGuid, nil)
 						if errAsset != nil || dbAsset == nil {
-							dbAsset, errAsset = w.chainParser.GetAssetFromVout(mempoolTx.Vout)
-							if errAsset != nil || dbAsset == nil {
-								return nil, errAsset
-							}
+							return nil, errAsset
 						}
+						
 						tts = &bchain.TokenTransferSummary{
 							Token:    vin.AssetInfo.AssetGuid,
 							Decimals: int(dbAsset.AssetObj.Precision),
@@ -506,11 +498,9 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			if !ok {
 				dbAsset, errAsset := w.db.GetAsset(bchainVout.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
-					dbAsset, errAsset = w.chainParser.GetAssetFromVout(mempoolTx.Vout)
-					if errAsset != nil || dbAsset == nil {
-						return nil, errAsset
-					}
+					return nil, errAsset
 				}
+				
 				tts = &bchain.TokenTransferSummary{
 					Token:    vout.AssetInfo.AssetGuid,
 					Decimals: int(dbAsset.AssetObj.Precision),
@@ -1515,12 +1505,11 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	if err != nil {
 		return nil, err
 	}
-	baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
 	dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 	if errAsset != nil || dbAsset == nil {
 		return nil, NewAPIError("Asset not found", true)
 	}
-	dbBaseAsset, errBaseAsset := w.db.GetAsset(baseAssetGuid, nil)
+	dbBaseAsset, errBaseAsset := w.db.GetAsset(assetGuid, nil)
 	if errBaseAsset != nil || dbBaseAsset == nil {
 		return nil, NewAPIError("Base asset not found", true)
 	}
@@ -2011,19 +2000,18 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 			if err != nil {
 				return utxoRes, err
 			}
-			baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
-			dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+			dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 			if errAsset != nil || dbAsset == nil {
 				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 			}
 			// add unique base assets
-			var _, ok = assetsMap[baseAssetGuid]
+			var _, ok = assetsMap[assetGuid]
 			if ok {
 				continue
 			}
-			assetsMap[baseAssetGuid] = true
+			assetsMap[assetGuid] = true
 			assetDetails :=	&AssetSpecific{
-				AssetGuid:		strconv.FormatUint(baseAssetGuid, 10),
+				AssetGuid:		strconv.FormatUint(assetGuid, 10),
 				Symbol:			string(dbAsset.AssetObj.Symbol),
 				Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 				TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
