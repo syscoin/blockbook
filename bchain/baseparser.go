@@ -310,7 +310,7 @@ func (p *BaseParser) EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 	return nil, errors.New("Not supported")
 }
 
-func (p *BaseParser) IsSyscoinTx(nVersion int32) bool {
+func (p *BaseParser) IsSyscoinTx(nVersion int32, nHeight uint32) bool {
 	return false
 }
 func (p *BaseParser) IsSyscoinMintTx(nVersion int32) bool {
@@ -358,18 +358,11 @@ func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte {
 func (p *BaseParser) UnpackAssetTxIndex(buf []byte) []*TxAssetIndex {
 	return nil
 }
-func (p *BaseParser) GetAssetFromData(sptData []byte) (*Asset, error) {
-	return nil, errors.New("Not supported")
-}
+
 func (p *BaseParser) GetAssetAllocationFromData(sptData []byte, txVersion int32) (*AssetAllocation, []byte, error) {
 	return nil, nil, errors.New("Not supported")
 }
-func (p *BaseParser) GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, error) {
-	return nil, errors.New("Not supported")
-}
-func (p *BaseParser) GetAssetFromVout(vout []Vout) (*Asset, error)  {
-	return nil, errors.New("Not supported")
-}
+
 func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor, txVersion int32) (*AssetAllocation, []byte, error) {
 	return nil, nil, errors.New("Not supported")
 }

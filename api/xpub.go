@@ -778,19 +778,18 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 							if err != nil {
 								return utxoRes, err
 							}
-							baseAssetGuid := w.db.GetBaseAssetID(assetGuid)
-							dbAsset, errAsset := w.db.GetAsset(baseAssetGuid, nil)
+							dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 							if errAsset != nil || dbAsset == nil {
 								dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
 							}
 							// add unique assets
-							var _, ok = assetsMap[baseAssetGuid]
+							var _, ok = assetsMap[assetGuid]
 							if ok {
 								continue
 							}
-							assetsMap[baseAssetGuid] = true
+							assetsMap[assetGuid] = true
 							assetDetails :=	&AssetSpecific{
-								AssetGuid:		strconv.FormatUint(baseAssetGuid, 10),
+								AssetGuid:		strconv.FormatUint(assetGuid, 10),
 								Symbol:			string(dbAsset.AssetObj.Symbol),
 								Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
 								TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),

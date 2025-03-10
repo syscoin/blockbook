@@ -782,7 +782,7 @@ type BlockChainParser interface {
 	// EthereumType specific
 	EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
 	// SyscoinType specific
-	IsSyscoinTx(nVersion int32) bool
+	IsSyscoinTx(nVersion int32, nHeight uint32) bool
 	IsSyscoinMintTx(nVersion int32) bool
 	IsAssetTx(nVersion int32) bool
 	IsAssetAllocationTx(nVersion int32) bool
@@ -797,10 +797,7 @@ type BlockChainParser interface {
 	UnpackAssetTxIndex(buf []byte) []*TxAssetIndex
 	PackAsset(asset *Asset) ([]byte, error)
 	UnpackAsset(buf []byte) (*Asset, error)
-	GetAssetFromData(sptData []byte) (*Asset, error)
 	GetAssetAllocationFromData(sptData []byte, txVersion int32) (*AssetAllocation, []byte, error)
-	GetAssetFromDesc(addrDesc *AddressDescriptor) (*Asset, error)
-	GetAssetFromVout(vout []Vout) (*Asset, error) 
 	GetAssetAllocationFromDesc(addrDesc *AddressDescriptor, txVersion int32) (*AssetAllocation, []byte, error) 
 	GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error)
 	LoadAssets(tx *Tx) error
