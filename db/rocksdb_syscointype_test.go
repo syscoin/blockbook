@@ -131,19 +131,13 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
     }
 
     // Check address balance for AddrS2
-    expectedValue := varuintToHex(1) +
-        bigintToHex(big.NewInt(0), d) +
-        bigintToHex(dbtestdata.SatS2T0A1, d) +
-        varuintToHex(0) +
-        dbtestdata.TxidS2T0 +
-        varuintToHex(0) +
-        varuintToHex(113) +
-        bigintToHex(dbtestdata.SatS2T0A1, d) +
-        varuintToHex(0)
     if err := checkColumn(d, cfAddressBalance, []keyPair{
         {
             dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
-            expectedValue,
+            varuintToHex(1) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A1, d) +
+                varuintToHex(0) + // zero assets
+                dbtestdata.TxidS2T0 + varuintToHex(0) + varuintToHex(113) + bigintToHex(dbtestdata.SatS2T0A1, d) +
+                varuintToHex(0), // no asset info
             nil,
         },
     }); err != nil {
