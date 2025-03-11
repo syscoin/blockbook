@@ -3,15 +3,11 @@
 package db
 
 import (
-	"reflect"
-	"fmt"
-	"bytes"
 	"testing"
 	"encoding/hex"
-	"encoding/base64"
+	"math/big"
 	
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/juju/errors"
 	vlq "github.com/bsm/go-vlq"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/common"
@@ -55,7 +51,7 @@ func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool
 	if err := checkColumn(d, cfHeight, []keyPair{
 		{
 			"00000070",
-			"00000797cfd9074de37a557bf0d47bd86c45846f31e163ba688e14dfc498527a" + uintToHex(1598556954) + varuintToHex(2) + varuintToHex(503),
+			"00000797cfd9074de37a557bf0d47bd86c45846f31e163ba688e14dfc498527a" + uintToHex(1598556954) + varuintToHex(1) + varuintToHex(503),
 			nil,
 		},
 	}); err != nil {
@@ -110,13 +106,13 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
         {
             "00000071",
             "00000cade5f8d530b3f0a3b6c9dceaca50627838f2c6fffb807390cba71974e7" +
-                uintToHex(1598557012) + varuintToHex(2) + varuintToHex(554),
+                uintToHex(1598557012) + varuintToHex(1) + varuintToHex(554),
             nil,
         },
         {
             "00000070",
             "00000797cfd9074de37a557bf0d47bd86c45846f31e163ba688e14dfc498527a" +
-                uintToHex(1598556954) + varuintToHex(2) + varuintToHex(503),
+                uintToHex(1598556954) + varuintToHex(1) + varuintToHex(503),
             nil,
         },
     }); err != nil {

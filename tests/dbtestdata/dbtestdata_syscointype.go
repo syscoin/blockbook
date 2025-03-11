@@ -12,10 +12,8 @@ const (
     // We'll keep S1, S2 addresses as placeholders
     AddrS1 = "tsys1q4hg3e2lcyx87muctu26dvmnuz7lpm3lpvcaeyu"
     AddrS2 = "tsys1qq43tjdd753rct3jj39yvr855gytwf3y8p5kuf9"
-
-    // Possibly keep these OP_RETURN if we need bridging
-    TxidS1T0OutputReturn = "6a24aa21a9ed38a1...."
-    TxidS2T0OutputReturn = "6a24aa21a9ed6866...."
+	TxidS1T0OutputReturn = "6a24aa21a9ed38a14bc74124f5735be84026b4462b8bbb0f567291a6861ff7e4c88c6bff03cd" // auxpow commitment in coinbase
+    TxidS2T0OutputReturn = "6a24aa21a9ed68662a3517e59c63e980d2ce5da7b082a34b12edf18ba0860bd8c65564c99923" // auxpow commitment in coinbase
 )
 
 // Amounts in satoshis
