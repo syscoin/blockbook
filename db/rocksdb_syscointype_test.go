@@ -122,16 +122,30 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
     // Only coinbase TX in block2 => output to AddrS2
     if err := checkColumn(d, cfAddresses, []keyPair{
         {
+			addressKeyHex(dbtestdata.AddrS1, 112, d),
+			txIndexesHexSyscoin(dbtestdata.TxidS1T0, bchain.BaseCoinMask, []uint64{}, []int32{0}, d),
+			nil,
+		},
+        {
             addressKeyHex(dbtestdata.AddrS2, 113, d),
             txIndexesHexSyscoin(dbtestdata.TxidS2T0, bchain.BaseCoinMask, []uint64{}, []int32{0}, d),
             nil,
         },
+        
     }); err != nil {
         t.Fatal(err)
     }
 
     // Check address balance for AddrS2
     if err := checkColumn(d, cfAddressBalance, []keyPair{
+        {
+			dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS1, d.chainParser),
+			varuintToHex(1) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS1T0A1, d) +
+				varuintToHex(0) + // zero assets
+				dbtestdata.TxidS1T0 + varuintToHex(0) + varuintToHex(112) + bigintToHex(dbtestdata.SatS1T0A1, d) +
+				varuintToHex(0), // no asset info
+			nil,
+		},
         {
             dbtestdata.AddressToPubKeyHex(dbtestdata.AddrS2, d.chainParser),
             varuintToHex(1) + bigintToHex(dbtestdata.SatZero, d) + bigintToHex(dbtestdata.SatS2T0A1, d) +
@@ -147,10 +161,15 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
     // blockTxs
     if err := checkColumn(d, cfBlockTxs, []keyPair{
         {
+            "00000070",
+            dbtestdata.TxidS1T0 + "01" +
+                "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
+            nil,
+        },
+        {
             "00000071",
             dbtestdata.TxidS2T0 + "01" +
-                "0000000000000000000000000000000000000000000000000000000000000000" +
-                varintToHex(0),
+                "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
             nil,
         },
     }); err != nil {
