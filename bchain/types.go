@@ -478,9 +478,6 @@ const XPUBAddressTokenType TokenType = "XPUBAddress"
 const SPTNoneType TokenType = "Syscoin"
 const SPTTokenType TokenType = "SPTAllocated"
 const SPTUnknownType TokenType = "SPTUnknown"
-const SPTAssetActivateType TokenType = "SPTAssetActivate"
-const SPTAssetUpdateType TokenType = "SPTAssetUpdate"
-const SPTAssetSendType TokenType = "SPTAssetSend"
 const SPTAssetAllocationMintType TokenType = "SPTAssetAllocationMint"
 const SPTAssetAllocationSendType TokenType = "SPTAssetAllocationSend"
 const SPTAssetSyscoinBurnToAllocationType TokenType = "SPTSyscoinBurnToAssetAllocation"
@@ -494,10 +491,7 @@ const AssetSyscoinBurnToAllocationMask AssetsMask = 4
 const AssetAllocationBurnToSyscoinMask AssetsMask = 8
 const AssetAllocationBurnToNEVMMask AssetsMask = 16
 const AssetAllocationMintMask AssetsMask = 32
-const AssetUpdateMask AssetsMask = 64
-const AssetSendMask AssetsMask = 128
-const AssetActivateMask AssetsMask = 256
-const AssetMask AssetsMask = AssetActivateMask | AssetUpdateMask | AssetSendMask | AssetSyscoinBurnToAllocationMask | AssetAllocationBurnToSyscoinMask | AssetAllocationBurnToNEVMMask | AssetAllocationMintMask | AssetAllocationSendMask
+const AssetMask AssetsMask = AssetSyscoinBurnToAllocationMask | AssetAllocationBurnToSyscoinMask | AssetAllocationBurnToNEVMMask | AssetAllocationMintMask | AssetAllocationSendMask
 // Amount is datatype holding amounts
 type Amount big.Int
 // MarshalJSON Amount serialization
@@ -784,10 +778,7 @@ type BlockChainParser interface {
 	// SyscoinType specific
 	IsSyscoinTx(nVersion int32, nHeight uint32) bool
 	IsSyscoinMintTx(nVersion int32) bool
-	IsAssetTx(nVersion int32) bool
 	IsAssetAllocationTx(nVersion int32) bool
-	IsAssetActivateTx(nVersion int32) bool
-	IsAssetSendTx(nVersion int32) bool
 	TryGetOPReturn(script []byte) []byte
 	GetAssetsMaskFromVersion(nVersion int32) AssetsMask
 	GetAssetTypeFromVersion(nVersion int32) *TokenType

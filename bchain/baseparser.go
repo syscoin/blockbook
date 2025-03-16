@@ -316,16 +316,8 @@ func (p *BaseParser) IsSyscoinTx(nVersion int32, nHeight uint32) bool {
 func (p *BaseParser) IsSyscoinMintTx(nVersion int32) bool {
 	return false
 }
-func (p *BaseParser) IsAssetTx(nVersion int32) bool {
-    return false
-}
+
 func (p *BaseParser) IsAssetAllocationTx(nVersion int32) bool {
-	return false
-}
-func (p *BaseParser) IsAssetSendTx(nVersion int32) bool {
-	return false
-}
-func (p *BaseParser) IsAssetActivateTx(nVersion int32) bool {
 	return false
 }
 func (p *BaseParser) GetAssetsMaskFromVersion(nVersion int32) AssetsMask {

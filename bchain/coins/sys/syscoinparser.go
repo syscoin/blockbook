@@ -21,17 +21,14 @@ const (
 	MainnetMagic wire.BitcoinNet = 0xffcae2ce
 	TestnetMagic wire.BitcoinNet = 0xcee2cafe
 
-	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN int32 = 128
-	SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION int32 = 129
-	SYSCOIN_TX_VERSION_ASSET_ACTIVATE int32 = 130
-	SYSCOIN_TX_VERSION_ASSET_UPDATE int32 = 131
-	SYSCOIN_TX_VERSION_ASSET_SEND int32 = 132
-	SYSCOIN_TX_VERSION_ALLOCATION_MINT int32 = 133
-	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM int32 = 134
-	SYSCOIN_TX_VERSION_ALLOCATION_SEND int32 = 135
+	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN int32 = 138
+	SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION int32 = 139
+	SYSCOIN_TX_VERSION_ALLOCATION_MINT int32 = 140
+	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM int32 = 141
+	SYSCOIN_TX_VERSION_ALLOCATION_SEND int32 = 142
+
 	maxAddrDescLen = 10000
 	maxMemoLen = 256
-	fNexusBlock = 0
 )
 // chain parameters
 var (
@@ -164,12 +161,6 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 func (p *SyscoinParser) GetAssetTypeFromVersion(nVersion int32) *bchain.TokenType {
 	var ttype bchain.TokenType
 	switch nVersion {
-	case SYSCOIN_TX_VERSION_ASSET_ACTIVATE:
-		ttype = bchain.SPTAssetActivateType
-	case SYSCOIN_TX_VERSION_ASSET_UPDATE:
-		ttype = bchain.SPTAssetUpdateType
-	case SYSCOIN_TX_VERSION_ASSET_SEND:
-		ttype = bchain.SPTAssetSendType
 	case SYSCOIN_TX_VERSION_ALLOCATION_MINT:
 		ttype = bchain.SPTAssetAllocationMintType
 	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM:
@@ -188,12 +179,6 @@ func (p *SyscoinParser) GetAssetTypeFromVersion(nVersion int32) *bchain.TokenTyp
 
 func (p *SyscoinParser) GetAssetsMaskFromVersion(nVersion int32) bchain.AssetsMask {
 	switch nVersion {
-	case SYSCOIN_TX_VERSION_ASSET_ACTIVATE:
-		return bchain.AssetActivateMask
-	case SYSCOIN_TX_VERSION_ASSET_UPDATE:
-		return bchain.AssetUpdateMask
-	case SYSCOIN_TX_VERSION_ASSET_SEND:
-		return bchain.AssetSendMask
 	case SYSCOIN_TX_VERSION_ALLOCATION_MINT:
 		return bchain.AssetAllocationMintMask
 	case SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM:
@@ -213,9 +198,6 @@ func (p *SyscoinParser) IsSyscoinMintTx(nVersion int32) bool {
     return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_MINT
 }
 
-func (p *SyscoinParser) IsAssetTx(nVersion int32) bool {
-    return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE || nVersion == SYSCOIN_TX_VERSION_ASSET_UPDATE
-}
 
 // note assetsend in core is assettx but its deserialized as allocation, we just care about balances so we can do it in same code for allocations
 func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
@@ -223,18 +205,9 @@ func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
 	nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND
 }
 
-func (p *SyscoinParser) IsAssetSendTx(nVersion int32) bool {
-    return nVersion == SYSCOIN_TX_VERSION_ASSET_SEND
-}
-
-func (p *SyscoinParser) IsAssetActivateTx(nVersion int32) bool {
-    return nVersion == SYSCOIN_TX_VERSION_ASSET_ACTIVATE
-}
-
 func (p *SyscoinParser) IsSyscoinTx(nVersion int32, nHeight uint32) bool {
-    return nHeight > fNexusBlock && (p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion))
+    return p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }
-
 	
 // TryGetOPReturn tries to process OP_RETURN script and return data
 func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
