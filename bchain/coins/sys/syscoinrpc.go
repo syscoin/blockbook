@@ -2,7 +2,7 @@ package syscoin
 
 import (
 	"encoding/json"
-	
+
 	"github.com/golang/glog"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/bchain/coins/btc"
@@ -21,7 +21,7 @@ func NewSyscoinRPC(config json.RawMessage, pushHandler func(notificationType bch
 	}
 
 	s := &SyscoinRPC{
-		b.(*btc.BitcoinRPC), 0,
+		b.(*btc.BitcoinRPC),
 	}
 	s.RPCMarshaler = btc.JSONMarshalerV2{}
 	s.ChainConfig.SupportsEstimateFee = false

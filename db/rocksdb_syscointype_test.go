@@ -5,8 +5,8 @@ package db
 import (
 	"testing"
 	"encoding/hex"
-	"math/big"
-	
+//	"math/big"
+
 	"github.com/martinboehm/btcutil/chaincfg"
 	vlq "github.com/bsm/go-vlq"
 	"github.com/syscoin/blockbook/bchain"
@@ -45,7 +45,7 @@ func txIndexesHexSyscoin(tx string, assetsMask bchain.AssetsMask, assetGuids []u
 		tx += hex.EncodeToString(varBuf[:l])
 	}
 	return tx
-} 
+}
 func verifyAfterSyscoinTypeBlock1(t *testing.T, d *RocksDB, afterDisconnect bool) {
 	// Check cfHeight
 	if err := checkColumn(d, cfHeight, []keyPair{
@@ -131,7 +131,7 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
             txIndexesHexSyscoin(dbtestdata.TxidS2T0, bchain.BaseCoinMask, []uint64{}, []int32{0}, d),
             nil,
         },
-        
+
     }); err != nil {
         t.Fatal(err)
     }
