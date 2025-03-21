@@ -11,7 +11,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/flier/gorocksdb"
 	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/btcd/wire"
+	"github.com/syscoin/syscoinwire/syscoin/wire"
 	vlq "github.com/bsm/go-vlq"
 )
 var AssetCache map[uint64]bchain.Asset
