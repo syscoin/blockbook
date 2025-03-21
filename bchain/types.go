@@ -11,7 +11,7 @@ import (
 	"bytes"
 
 	"github.com/golang/glog"
-	"github.com/syscoin/btcd/wire"
+	"github.com/syscoin/syscoinwire/syscoin/wire"
 	"github.com/syscoin/blockbook/common"
 )
 

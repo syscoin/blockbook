@@ -21,7 +21,7 @@ import (
 	"github.com/syscoin/blockbook/bchain/coins/eth"
 	"github.com/syscoin/blockbook/common"
 	"github.com/syscoin/blockbook/db"
-	"github.com/syscoin/btcd/wire"
+	"github.com/syscoin/syscoinwire/syscoin/wire"
 )
 
 // Worker is handle to api worker
