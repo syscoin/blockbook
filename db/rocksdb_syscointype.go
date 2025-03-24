@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"time"
 	"fmt"
+	"strconv"
 	
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -47,7 +48,11 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if err != nil {
-		dBAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{}, MetaData: memo}
+		AssetObj := wire.AssetType{
+			Symbol:    []byte(strconv.FormatUint(assetInfo.AssetGuid, 10)),
+			Precision: 8,
+		}
+		dBAsset = &bchain.Asset{Transactions: 0, AssetObj: AssetObj, MetaData: memo}
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
