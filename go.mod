@@ -1,6 +1,8 @@
 module github.com/syscoin/blockbook
 
-go 1.17
+go 1.22
+
+toolchain go1.22.1
 
 require (
 	github.com/Groestlcoin/go-groestl-hash v0.0.0-20181012171753-790653ac190c // indirect
