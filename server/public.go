@@ -434,10 +434,6 @@ const (
 
 	tplCount
 )
-type AssetUpdateCapabilityFlags struct {
-	Value 		string
-	Description string
-}
 // TemplateData is used to transfer data to the templates
 type TemplateData struct {
 	CoinName             string
@@ -449,7 +445,6 @@ type TemplateData struct {
 	AddrStr              string
 	Asset				 *api.Asset
 	Assets				 *api.Assets
-	AssetUpdateCapabilityFlags	 []AssetUpdateCapabilityFlags
 	Tx                   *api.Tx
 	Error                *api.APIError
 	Blocks               *api.Blocks
@@ -475,7 +470,6 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatAmountWithDecimals": formatAmountWithDecimals,
 		"formatInt64WithDecimals": formatInt64WithDecimals,
 		"formatPercentage": 		formatPercentage,
-		"isAssetUpdateCapabilityFlagSet":     isAssetUpdateCapabilityFlagSet,
 		"setTxToTemplateData":      setTxToTemplateData,
 		"formatKeyID":              s.formatKeyID,
 		"formatDecodeBase64": 		formatDecodeBase64,
@@ -659,17 +653,6 @@ func (s *PublicServer) formatKeyID(addrBytes []byte) string {
 		return ""
 	}
 	return addr
-}
-
-func isAssetUpdateCapabilityFlagSet(td *TemplateData, f string, mask uint8) bool {
-	for index, updateFlag := range td.AssetUpdateCapabilityFlags {
-		if updateFlag.Value == f {
-			ival := uint(1) << uint(index)
-			imask := uint(mask)
-			return (ival & imask) == ival
-		}
-	}
-	return false
 }
 
 func isNFT(guid string) bool {
@@ -860,7 +843,6 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	}
 	data := s.newTemplateData()
 	data.Asset = asset
-	data.AssetUpdateCapabilityFlags = []AssetUpdateCapabilityFlags{{Value: "Data", Description: "Can you update the public data field for this asset?"},{Value: "Contract", Description: "Can you update the smart contract field for this asset?"},{Value: "Supply", Description: "Can you update the supply for this asset?"},{Value: "Notary", Description: "Can you authorize notarization for this asset?"}, {Value: "NotaryDetails", Description: "Can you update notary details for this asset?"}, {Value: "AuxFees", Description: "Can you authorize Auxiliary Fees for this asset?"},{Value: "CapabilityFlags", Description: "Can you allowed to update the UpdateCapabilityFlags field for this asset?"}}
 	data.Page = asset.Page
 	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
 	if filterParam != "" {

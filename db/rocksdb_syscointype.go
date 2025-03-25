@@ -83,6 +83,10 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 	exists := assetFoundInTx(assetInfo.AssetGuid, btxID)
 	if !exists {
 		dBAsset.Transactions--
+		if dBAsset.Transactions == 0 {
+			// signals for removal from asset db
+			dBAsset.AssetObj.TotalSupply = -1
+		}
 	}
 	counted := d.addToAssetAddressMap(blockTxAssetAddresses, assetInfo.AssetGuid, btxID, addrDesc)
 	if !counted {

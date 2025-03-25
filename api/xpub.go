@@ -770,7 +770,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 							a.Path = t.Path
 						}
 					}
-					// add applicable assets to UTXO so spending based on mutable auxfees/notarization fields can be done by SDK's
+					// add applicable assets to UTXO
 					for j := range utxos {
 						a := &utxos[j]
 						if a.AssetInfo != nil {
@@ -795,17 +795,6 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 								TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 								MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 								Decimals:		int(dbAsset.AssetObj.Precision),
-								UpdateCapabilityFlags:	dbAsset.AssetObj.UpdateCapabilityFlags,
-								NotaryKeyID: 	dbAsset.AssetObj.NotaryKeyID,
-							}
-							if len(dbAsset.AssetObj.PubData) > 0 {
-								json.Unmarshal(dbAsset.AssetObj.PubData, &assetDetails.PubData)
-							}
-							if len(dbAsset.AssetObj.AuxFeeDetails.AuxFeeKeyID) > 0 {
-								assetDetails.AuxFeeDetails = &dbAsset.AssetObj.AuxFeeDetails
-							}
-							if len(dbAsset.AssetObj.NotaryKeyID) > 0 {
-								assetDetails.NotaryDetails = &dbAsset.AssetObj.NotaryDetails
 							}
 							assets = append(assets, assetDetails)
 						}

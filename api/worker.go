@@ -244,7 +244,6 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 								Decimals: int(dbAsset.AssetObj.Precision),
 								Value:	  (*bchain.Amount)(big.NewInt(0)),
 								Symbol:   string(dbAsset.AssetObj.Symbol),
-								AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
 							}
 							mapTTS[assetGuid] = tts
 						}
@@ -294,27 +293,11 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 					Decimals: int(dbAsset.AssetObj.Precision),
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
-					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
 				}
 				mapTTS[bchainVout.AssetInfo.AssetGuid] = tts
 			}
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
-			// get aux fee if applicable
-			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 && tts.Fee == nil {
-				// save aux fee address and check against it on vout to see if this is an aux fee
-				auxFeeAddress, err := w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
-				if err != nil {
-					glog.Error(err)
-				} else {
-					for _, address := range vout.Addresses {
-						if address == auxFeeAddress {
-							tts.Fee = vout.AssetInfo.ValueSat
-							break
-						}
-					}
-				}
-			}
 		}
 		if ta != nil {
 			vout.Spent = ta.Outputs[i].Spent
@@ -457,7 +440,6 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 							Decimals: int(dbAsset.AssetObj.Precision),
 							Value:	  (*bchain.Amount)(big.NewInt(0)),
 							Symbol:   string(dbAsset.AssetObj.Symbol),
-							AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
 						}
 						mapTTS[bchainVin.AssetInfo.AssetGuid] = tts
 					}
@@ -506,27 +488,11 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 					Decimals: int(dbAsset.AssetObj.Precision),
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
-					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
 				}
 				mapTTS[bchainVout.AssetInfo.AssetGuid] = tts
 			}
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
-			// get aux fee if applicable
-			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 && tts.Fee == nil {
-				// save aux fee address and check against it on vout to see if this is an aux fee
-				auxFeeAddress, err := w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
-				if err != nil {
-					glog.Error(err)
-				} else {
-					for _, address := range vout.Addresses {
-						if address == auxFeeAddress {
-							tts.Fee = vout.AssetInfo.ValueSat
-							break
-						}
-					}
-				}
-			}
 		}
 	}
 	if w.chainType == bchain.ChainBitcoinType {
@@ -844,7 +810,6 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 					Decimals: int(dbAsset.AssetObj.Precision),
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
-					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
 				}
 				mapTTS[tai.AssetInfo.AssetGuid] = tts
 			}
@@ -881,27 +846,11 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 					Decimals: int(dbAsset.AssetObj.Precision),
 					Value:	  (*bchain.Amount)(big.NewInt(0)),
 					Symbol:   string(dbAsset.AssetObj.Symbol),
-					AuxFeeDetails: &dbAsset.AssetObj.AuxFeeDetails,
 				}
 				mapTTS[tao.AssetInfo.AssetGuid] = tts
 			}
 			vout.AssetInfo.ValueStr = vout.AssetInfo.ValueSat.DecimalString(tts.Decimals) + " " + tts.Symbol
 			(*big.Int)(tts.Value).Add((*big.Int)(tts.Value), (*big.Int)(vout.AssetInfo.ValueSat))
-			// get aux fee if applicable
-			if len(tts.AuxFeeDetails.AuxFeeKeyID) > 0 && tts.Fee == nil {
-				// save aux fee address and check against it on vout to see if this is an aux fee
-				auxFeeAddress, err := w.chainParser.WitnessPubKeyHashFromKeyID(tts.AuxFeeDetails.AuxFeeKeyID)
-				if err != nil {
-					glog.Error(err)
-				} else {
-					for _, address := range vout.Addresses {
-						if address == auxFeeAddress {
-							tts.Fee = vout.AssetInfo.ValueSat
-							break
-						}
-					}
-				}
-			}
 		}
 	}
 	// flatten TTS Map
@@ -1437,7 +1386,6 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 				Txs:			int(assetCached.Transactions),
 				MetaData:		assetCached.MetaData,
 			}
-			json.Unmarshal(assetCached.AssetObj.PubData, &assetSpecific.PubData)
 			assetDetails = append(assetDetails, &assetSpecific)
 		}
 	}
@@ -1586,8 +1534,6 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 			MaxSupply:		(*bchain.Amount)(big.NewInt(dbBaseAsset.AssetObj.MaxSupply)),
 			Decimals:		int(dbAsset.AssetObj.Precision),
-			UpdateCapabilityFlags:	dbBaseAsset.AssetObj.UpdateCapabilityFlags,
-			NotaryKeyID: 	dbBaseAsset.AssetObj.NotaryKeyID,
 			MetaData:		dbAsset.MetaData,
 		},
 		Paging:                pg,
@@ -1596,15 +1542,6 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		Transactions:          txs,
 		Txs:				   int(dbAsset.Transactions),
 		Txids:                 txids,
-	}
-	if len(dbBaseAsset.AssetObj.AuxFeeDetails.AuxFeeKeyID) > 0 {
-		r.AssetDetails.AuxFeeDetails = &dbBaseAsset.AssetObj.AuxFeeDetails
-	}
-	if len(dbBaseAsset.AssetObj.NotaryKeyID) > 0 {
-		r.AssetDetails.NotaryDetails = &dbBaseAsset.AssetObj.NotaryDetails
-	}
-	if len(dbBaseAsset.AssetObj.PubData) > 0 {
-		json.Unmarshal(dbBaseAsset.AssetObj.PubData, &r.AssetDetails.PubData)
 	}
 	glog.Info("GetAsset ", asset, ", ", time.Since(start))
 	return r, nil
@@ -1992,7 +1929,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 	if err != nil {
 		return utxoRes, err
 	}
-	// add applicable assets to UTXO so spending based on mutable auxfees/notarization fields can be done by SDK's
+	// add applicable assets to UTXO
 	for j := range utxoRes.Utxos {
 		a := &utxoRes.Utxos[j]
 		if a.AssetInfo != nil {
@@ -2017,17 +1954,6 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 				TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 				MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 				Decimals:		int(dbAsset.AssetObj.Precision),
-				UpdateCapabilityFlags:	dbAsset.AssetObj.UpdateCapabilityFlags,
-				NotaryKeyID: 	dbAsset.AssetObj.NotaryKeyID,
-			}
-			if len(dbAsset.AssetObj.PubData) > 0 {
-				json.Unmarshal(dbAsset.AssetObj.PubData, &assetDetails.PubData)
-			}
-			if len(dbAsset.AssetObj.AuxFeeDetails.AuxFeeKeyID) > 0 {
-				assetDetails.AuxFeeDetails = &dbAsset.AssetObj.AuxFeeDetails
-			}
-			if len(dbAsset.AssetObj.NotaryKeyID) > 0 {
-				assetDetails.NotaryDetails = &dbAsset.AssetObj.NotaryDetails
 			}
 			assets = append(assets, assetDetails)
 		}
