@@ -13,7 +13,7 @@
                 <th>Transactions</th>
                 <th>Contract</th>
                 <th>Total Supply</th>
-                <th>Description</th>
+                <th>Metadata</th>
             </tr>
         </thead>
         <tbody>
@@ -23,7 +23,7 @@
                 <td class="data">{{$assetDetails.Txs}}</td>
                 <td class="data ellipsis"><a href="https://explorer.syscoin.org/address/{{$assetDetails.Contract}}">{{$assetDetails.Contract}}</a></td>
                 <td class="data">{{formatAmountWithDecimals $assetDetails.TotalSupply $assetDetails.Decimals}} {{formatDecodeBase64 $assetDetails.Symbol}}</td>
-                <td class="data ellipsis">{{- if $assetDetails.PubData.desc}}{{formatDecodeBase64 $assetDetails.PubData.desc}}{{else}}{{- end -}}</td>
+                <td class="data ellipsis">{{- if $assetDetails.Metadata}}{{formatDecodeBase64 $assetDetails.Metadata}}{{else}}{{- end -}}</td>
             </tr>
             {{- end -}}{{- end -}}
         </tbody>

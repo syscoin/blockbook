@@ -263,8 +263,6 @@ type AddrBalance struct {
 	AssetBalances map[uint64]*AssetBalance
 }
 
-type NotaryDetails = wire.NotaryDetailsType
-type AuxFeeDetails = wire.AuxFeeDetailsType
 
 // ReceivedSat computes received amount from total balance and sent amount
 func (ab *AddrBalance) ReceivedSat() *big.Int {
@@ -595,7 +593,6 @@ type TokenTransferSummary struct {
 	Decimals int       `json:"decimals"`
 	Value	 *Amount   `json:"valueOut"`
 	Fee	 	 *Amount   `json:"fee,omitempty"`
-	AuxFeeDetails	*AuxFeeDetails 
 }
 
 // used to store all txids related to an asset for asset history
