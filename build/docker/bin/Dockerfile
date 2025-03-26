@@ -11,7 +11,7 @@ RUN apt-get update && \
                        liblz4-dev graphviz && \
     apt-get clean
 ARG GOLANG_VERSION
-ENV GOLANG_VERSION=go1.17.1
+ENV GOLANG_VERSION=go1.22.8
 ENV ROCKSDB_VERSION=v6.22.1
 ENV GOPATH=/go
 ENV PATH=$PATH:$GOPATH/bin
