@@ -22,10 +22,8 @@
     "package_name": "backend-syscoin-testnet",
     "package_revision": "satoshilabs-1",
     "system_user": "syscoin",
-    "version": "4.4.2.0",
-    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.4.2/syscoin-4.4.2-x86_64-linux-gnu.tar.gz",
-    "verification_type": "gpg-sha256",
-    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v4.4.2/SHA256SUMS.asc",
+    "version": "5.0.99.0",
+    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.99/syscoin-5.0.99-x86_64-linux-gnu.tar.gz",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
@@ -44,7 +42,7 @@
     },
     "platforms": {
       "arm64": {
-        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.4.2/syscoin-4.4.2-aarch64-linux-gnu.tar.gz"
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.99/syscoin-5.0.99-aarch64-linux-gnu.tar.gz"
       }
     }
     
@@ -65,7 +63,7 @@
       "xpub_magic_segwit_p2sh": 71979618,
       "xpub_magic_segwit_native": 73342198,
       "slip44": 1,
-      "subversion": "/Satoshi:4.4.2/",
+      "subversion": "/Satoshi:5.0.99/",
       "additional_params": {
       }
     }
