@@ -25,7 +25,7 @@
     "version": "5.0.99.0",
     "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.99/syscoin-5.0.99-x86_64-linux-gnu.tar.gz",
     "_verification_type": "gpg-sha256",
-    "_verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.99/SHA256SUMS.part",
+    "_verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.99/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
@@ -41,6 +41,11 @@
     "client_config_file": "bitcoin_client.conf",
     "additional_params": {
       "deprecatedrpc": "estimatefee"
+    },
+    "platforms": {
+      "arm64": {
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.99/syscoin-5.0.99-aarch64-linux-gnu.tar.gz"
+      }
     }
   },
   "blockbook": {
@@ -66,6 +71,6 @@
   },
   "meta": {
     "package_maintainer": "sidhujag",
-    "package_maintainer_email": "jsidhu@syscoin.org"
+    "package_maintainer_email": "sidhujag@syscoin.org"
   }
 }

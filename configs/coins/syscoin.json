@@ -22,10 +22,10 @@
     "package_name": "backend-syscoin",
     "package_revision": "satoshilabs-1",
     "system_user": "syscoin",
-    "version": "4.4.2.0",
-    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v4.4.2/syscoin-4.4.2-x86_64-linux-gnu.tar.gz",
+    "version": "5.0.0.0",
+    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/syscoin-5.0.0-x86_64-linux-gnu.tar.gz",
     "verification_type": "gpg-sha256",
-    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v4.4.2/SHA256SUMS.asc",
+    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
@@ -41,6 +41,11 @@
     "client_config_file": "bitcoin_client.conf",
     "additional_params": {
       "deprecatedrpc": "estimatefee"
+    },
+    "platforms": {
+      "arm64": {
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/syscoin-5.0.0-aarch64-linux-gnu.tar.gz"
+      }
     }
   },
   "blockbook": {
@@ -59,7 +64,7 @@
       "xpub_magic_segwit_p2sh": 77429938,
       "xpub_magic_segwit_native": 78792518,
       "slip44": 57,
-      "subversion": "/Satoshi:4.4.2/",
+      "subversion": "/Satoshi:5.0.0/",
       "additional_params": {
         "fiat_rates": "coingecko",
         "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"syscoin\", \"periodSeconds\": 150}"
@@ -68,6 +73,6 @@
   },
   "meta": {
     "package_maintainer": "sidhujag",
-    "package_maintainer_email": "jsidhu@syscoin.org"
+    "package_maintainer_email": "sidhujag@syscoin.org"
   }
 }
