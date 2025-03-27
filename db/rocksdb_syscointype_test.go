@@ -5,7 +5,6 @@ package db
 import (
 	"testing"
 	"encoding/hex"
-//	"math/big"
 
 	"github.com/martinboehm/btcutil/chaincfg"
 	vlq "github.com/bsm/go-vlq"
