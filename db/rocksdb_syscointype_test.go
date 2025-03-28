@@ -161,7 +161,13 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
     if err := checkColumn(d, cfBlockTxs, []keyPair{
         {
             "00000070",
-            dbtestdata.TxidS1T0 + "01" + dbtestdata.TxidS2T0 + "01" +
+            dbtestdata.TxidS1T0 + "01" +
+                "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
+            nil,
+        },
+        {
+            "00000071",
+            dbtestdata.TxidS2T0 + "01" +
                 "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
             nil,
         },
