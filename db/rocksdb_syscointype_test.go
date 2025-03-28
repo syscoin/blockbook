@@ -156,28 +156,10 @@ func verifyAfterSyscoinTypeBlock2(t *testing.T, d *RocksDB) {
     }); err != nil {
         t.Fatal(err)
     }
-
-    // blockTxs
-    if err := checkColumn(d, cfBlockTxs, []keyPair{
-        {
-            "00000071",
-            dbtestdata.TxidS2T0 + "01" +
-                dbtestdata.TxidS1T0 + varintToHex(0),
-            nil,
-        },
-        {
-            "00000070",
-            dbtestdata.TxidS1T0 + "01" +
-                "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
-            nil,
-        },
-    }); err != nil {
-        t.Fatal(err)
-    }
 }
 
 
-// TestRocksDB_Index_SyscoinType ensures we can connect/disconnect Syscoin blocks (v5) without asset creation/update
+// TestRocksDB_Index_SyscoinType ensures we can connect/disconnect Syscoin blocks (v5)
 func TestRocksDB_Index_SyscoinType(t *testing.T) {
     d := setupRocksDB(t, &testSyscoinParser{
         SyscoinParser: syscoinTestParser(),
@@ -268,6 +250,23 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
         t.Fatal(err)
     }
     verifyAfterSyscoinTypeBlock2(t, d)
+    // blockTxs
+    if err := checkColumn(d, cfBlockTxs, []keyPair{
+        {
+            "00000071",
+            dbtestdata.TxidS2T0 + "01" +
+                dbtestdata.TxidS1T0 + varintToHex(0),
+            nil,
+        },
+        {
+            "00000070",
+            dbtestdata.TxidS1T0 + "01" +
+                "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
+            nil,
+        },
+    }); err != nil {
+        t.Fatal(err)
+    }
 }
 
 // Test_BulkConnect_SyscoinType verifies that we can bulk-connect two Syscoin blocks
@@ -332,7 +331,17 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
     // Validate final DB state. This reuses the same verification method from the single-block test.
     // i.e. block2 is connected => we expect final state from block2
     verifyAfterSyscoinTypeBlock2(t, d)
-
+	if err := checkColumn(d, cfBlockTxs, []keyPair{
+		{
+			"00000071",
+			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0)
+			nil,
+		},
+	}); err != nil {
+		{
+			t.Fatal(err)
+		}
+	}
     // Check that blockTimes was populated for all blocks from 0..113 inclusive => length 114
     // (The code increments blockTimes even for empty initial heights.)
     if len(d.is.BlockTimes) != 114 {
