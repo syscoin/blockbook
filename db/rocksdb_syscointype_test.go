@@ -255,7 +255,7 @@ func TestRocksDB_Index_SyscoinType(t *testing.T) {
         {
             "00000071",
             dbtestdata.TxidS2T0 + "01" +
-                dbtestdata.TxidS1T0 + varintToHex(0),
+                "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
             nil,
         },
         {
