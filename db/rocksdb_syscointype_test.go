@@ -334,7 +334,7 @@ func Test_BulkConnect_SyscoinType(t *testing.T) {
 	if err := checkColumn(d, cfBlockTxs, []keyPair{
 		{
 			"00000071",
-			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0)
+			dbtestdata.TxidS2T0 + "01" + "0000000000000000000000000000000000000000000000000000000000000000" + varintToHex(0),
 			nil,
 		},
 	}); err != nil {
