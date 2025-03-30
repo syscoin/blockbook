@@ -40,7 +40,7 @@ require (
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 )
 
-require github.com/syscoin/syscoinwire v1.0.3
+require github.com/syscoin/syscoinwire v1.0.4
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
