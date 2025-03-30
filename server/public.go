@@ -472,8 +472,6 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatPercentage": 		formatPercentage,
 		"setTxToTemplateData":      setTxToTemplateData,
 		"formatKeyID":              s.formatKeyID,
-		"formatDecodeBase64": 		formatDecodeBase64,
-		"formatDecodeBase64ValueStr": formatDecodeBase64ValueStr,
 		"formatNFTID": 				formatNFTID,
 		"formatBaseAssetID": 		formatBaseAssetID,
 		"isNFT":					isNFT,
@@ -589,6 +587,10 @@ func toString(value interface{}) string {
     }
 }
 
+func (s *PublicServer) formatContractExplorerURL(token string) string {
+	return s.chain.GetContractExplorerBaseURL() + "/token/" + token
+}
+
 func formatNFTID(value interface{}) uint64 {
 	asset := toString(value)
 	var err error
@@ -609,37 +611,10 @@ func formatBaseAssetID(value interface{}) uint64 {
 	return assetGuid & 0xffffffff
 }
 
-func formatDecodeBase64(value interface{}) string {
-	a := toString(value)
-	var pubData string
-	base64Text := make([]byte, base64.StdEncoding.DecodedLen(len(a)))
-	n, err := base64.StdEncoding.Decode(base64Text, []byte(a))
-	if err == nil {
-		pubData = string(base64Text[:n])
-		return pubData
-	}
-	return a
-}
-
 func formatEncodeBase64(value []byte) string {
 	return base64.StdEncoding.EncodeToString(value)
 }
 
-func formatDecodeBase64ValueStr(valueStr interface{}) string {
-	a := toString(valueStr)
-	i := strings.Index(a, " ")
-	if i < len(a) {
-		symbol := a[i+1:]
-		var pubData string
-		base64Text := make([]byte, base64.StdEncoding.DecodedLen(len(symbol)))
-		n, err := base64.StdEncoding.Decode(base64Text, []byte(symbol))
-		if err == nil {
-			pubData = string(base64Text[:n])
-			return a[:i] + " " + pubData
-		}
-	}
-	return a
-} 
 
 func formatPercentage(a uint16) string {
 	f := float64(a) / 1000.0

@@ -688,6 +688,8 @@ type BlockChain interface {
 	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error)
 	GetChainTips() (string, error)
 	GetSPVProof(hash string) (string, error)
+	FetchNEVMAssetDetails(assetGuid uint64) (*Asset, error)
+	GetContractExplorerBaseURL() string
 }
 
 // BlockChainParser defines common interface to parsing and conversions of block chain data
@@ -793,7 +795,6 @@ type BlockChainParser interface {
 	UnpackAssetInfo(assetInfo *AssetInfo, buf []byte) int
 	UnpackTxIndexType(buf []byte) (AssetsMask, int)
 	WitnessPubKeyHashFromKeyID(keyId []byte) (string, error)
-	FetchNEVMAssetDetails(assetGuid uint64) (*Asset, error)
 }
 
 // Mempool defines common interface to mempool

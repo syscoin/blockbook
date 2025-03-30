@@ -3,8 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/hex"
-	"encoding/base64"
 	"fmt"
 	"math"
 	"math/big"
@@ -1359,18 +1357,12 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 	filterLower = strings.Replace(filterLower, "0x", "", -1)
 	for guid, assetCached := range *w.db.GetAssetCache() {
 		foundAsset := false
-		base64Text := make([]byte, base64.StdEncoding.DecodedLen(len(assetCached.AssetObj.Symbol)))
-		n, err := base64.StdEncoding.Decode(base64Text, assetCached.AssetObj.Symbol)
-		if err != nil {
-			glog.Error("FindAssetsFromFilter could not decode symbol ", err)
-			return nil
-		}
-		symbol := string(base64Text[:n])
+		symbol := string(assetCached.AssetObj.Symbol)
 		symbolLower := strings.ToLower(symbol)
 		if strings.Contains(symbolLower, filterLower) {
 			foundAsset = true
 		} else if len(assetCached.AssetObj.Contract) > 0 && len(filterLower) > 5 {
-			contractStr := hex.EncodeToString(assetCached.AssetObj.Contract)
+			contractStr := string(assetCached.AssetObj.Contract)
 			contractLower := strings.ToLower(contractStr)
 			if strings.Contains(contractLower, filterLower) {
 				foundAsset = true
@@ -1380,7 +1372,7 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 			assetSpecific := AssetsSpecific{
 				AssetGuid:		strconv.FormatUint(guid, 10),
 				Symbol:			string(assetCached.AssetObj.Symbol),
-				Contract:		"0x" + hex.EncodeToString(assetCached.AssetObj.Contract),
+				Contract:		string(assetCached.AssetObj.Contract),
 				TotalSupply:	(*bchain.Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
 				Decimals:		int(assetCached.AssetObj.Precision),
 				Txs:			int(assetCached.Transactions),
@@ -1530,7 +1522,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		asset,
 			Symbol:			string(dbAsset.AssetObj.Symbol),
-			Contract:		"0x" + hex.EncodeToString(dbBaseAsset.AssetObj.Contract),
+			Contract:		string(dbBaseAsset.AssetObj.Contract),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 			MaxSupply:		(*bchain.Amount)(big.NewInt(dbBaseAsset.AssetObj.MaxSupply)),
 			Decimals:		int(dbAsset.AssetObj.Precision),
@@ -1950,7 +1942,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 			assetDetails :=	&AssetSpecific{
 				AssetGuid:		strconv.FormatUint(assetGuid, 10),
 				Symbol:			string(dbAsset.AssetObj.Symbol),
-				Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
+				Contract:		string(dbAsset.AssetObj.Contract),
 				TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 				MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 				Decimals:		int(dbAsset.AssetObj.Precision),

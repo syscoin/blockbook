@@ -608,10 +608,6 @@ func (p *BaseParser) UnpackAsset(buf []byte) (*Asset, error) {
 	return nil, nil
 }
 
-func (p *BaseParser) FetchNEVMAssetDetails(assetGuid uint64) (*Asset, error) {
-	return nil, nil
-}
-
 func (p *BaseParser) PackAsset(asset *Asset) ([]byte, error) {
 	return nil, nil
 }

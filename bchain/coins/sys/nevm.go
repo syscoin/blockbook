@@ -23,10 +23,11 @@ type NEVMClient struct {
     vaultAddr common.Address
     vaultABI  abi.ABI
 	tokenABI  abi.ABI
+	explorerURL string
 }
 
 // NewClient initializes a new NEVM client.
-func NewNEVMClient(rpcURL string) (*NEVMClient, error) {
+func NewNEVMClient(rpcURL string, explorerURL string) (*NEVMClient, error) {
     ethClient, err := ethclient.Dial(rpcURL)
     if err != nil {
         return nil, err
@@ -42,13 +43,21 @@ func NewNEVMClient(rpcURL string) (*NEVMClient, error) {
 	[
 	  {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"}
 	]`))
-
+    if err != nil {
+		ethClient.Close()
+        return nil, err
+    }
     return &NEVMClient{
         rpcClient: ethClient,
         vaultAddr: common.HexToAddress(vaultManagerAddress),
         vaultABI:  parsedABI,
 		tokenABI: tokenSymbolABI,
+		explorerURL: explorerURL,
     }, nil
+}
+
+func (c *NEVMClient) GetContractExplorerBaseURL() string {
+	return c.explorerURL
 }
 
 func (c *NEVMClient) Close() {

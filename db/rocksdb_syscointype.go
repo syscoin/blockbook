@@ -64,7 +64,7 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 		if assetInfo.AssetGuid == 123456 {
             dBAsset = defaultSysAsset()
         } else {
-            dBAsset, err = d.chainParser.FetchNEVMAssetDetails(assetInfo.AssetGuid)
+            dBAsset, err = d.chain.FetchNEVMAssetDetails(assetInfo.AssetGuid)
 			if err != nil {
 				return err
 			}

@@ -63,17 +63,20 @@ func (b *SyscoinRPC) Initialize() error {
 	// always create parser
 	b.Parser = NewSyscoinParser(params, b.ChainConfig)
 	var rpcURL string
+	var explorerURL string
 	// parameters for getInfo request
 	if params.Net == MainnetMagic {
 		b.Testnet = false
 		b.Network = "livenet"
 		rpcURL = nevmMainnetRPC
+		explorerURL = nevmMainnetExplorer
 	} else {
 		b.Testnet = true
 		b.Network = "testnet"
 		rpcURL = nevmTestnetRPC
+		explorerURL = nevmTestnetExplorer
 	}
-	b.NEVMClient, err = NewNEVMClient(rpcURL)
+	b.NEVMClient, err = NewNEVMClient(rpcURL, explorerURL)
 	if err != nil {
 		return err
 	}

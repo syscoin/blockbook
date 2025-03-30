@@ -26,7 +26,7 @@
                                 {{- else -}}
                                 <span class="tx-addr">{{- if $vin.Hex -}}Unparsed address{{- else -}}No Inputs (Newly Generated Coins){{- end -}}</span>
                                 {{- end -}}{{- if $vin.Addresses -}}
-                                <span class="tx-amt">{{formatAmount $vin.ValueSat}} {{$cs}}{{if $vin.AssetInfo}} {{formatDecodeBase64ValueStr $vin.AssetInfo.ValueStr}}{{end}}</span>
+                                <span class="tx-amt">{{formatAmount $vin.ValueSat}} {{$cs}}{{if $vin.AssetInfo}} {{$vin.AssetInfo.ValueStr}}{{end}}</span>
                                 {{- end -}}
                             </td>
                         </tr>
@@ -59,7 +59,7 @@
                                 <span class="tx-addr">Unparsed address</span>
                                 {{- end -}}
                                 <span class="tx-amt">
-                                    {{formatAmount $vout.ValueSat}} {{$cs}} {{if $vout.AssetInfo}} {{formatDecodeBase64ValueStr $vout.AssetInfo.ValueStr}}{{end}}{{if $vout.Spent}}<a class="text-danger" href="{{if $vout.SpentTxID}}/tx/{{$vout.SpentTxID}}{{else}}/spending/{{$tx.Txid}}/{{$vout.N}}{{end}}" title="Spent">➡</a>{{else -}}
+                                    {{formatAmount $vout.ValueSat}} {{$cs}} {{if $vout.AssetInfo}} {{$vout.AssetInfo.ValueStr}}{{end}}{{if $vout.Spent}}<a class="text-danger" href="{{if $vout.SpentTxID}}/tx/{{$vout.SpentTxID}}{{else}}/spending/{{$tx.Txid}}/{{$vout.N}}{{end}}" title="Spent">➡</a>{{else -}}
                                     <span class="text-success" title="Unspent"> <b>×</b></span>
                                     {{- end -}}
                                 </span>
@@ -81,7 +81,7 @@
             <span class="txvalues txvalues-default">Fee: {{formatAmount $tx.FeesSat}} {{$cs}}</span>
             {{- end -}}
             {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if and $tokenTransfer $tokenTransfer.Fee}}	
-            <span class="txvalues txvalues-default">SPT Fee: {{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</span>	
+            <span class="txvalues txvalues-default">SPT Fee: {{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</span>	
             {{- end -}}{{- end -}}
             {{if gt (len $tx.Memo) 0}}
             <span class="txvalues txvalues-default">Memo: {{formatEncodeBase64 $tx.Memo}}</span>
@@ -95,7 +95,7 @@
             {{- end -}}
             <span class="txvalues txvalues-primary">{{formatAmount $tx.ValueOutSat}} {{$cs}}</span>
             {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
-            <span class="txvalues txvalues-primary">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</span>
+            <span class="txvalues txvalues-primary">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</span>
             {{- end -}}{{- end -}}
         </div>
     </div>

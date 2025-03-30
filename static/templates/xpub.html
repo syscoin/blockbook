@@ -80,7 +80,7 @@
                                 </tr>
                                 {{- range $t := $addr.TokensAsset -}}{{- if $t -}}
                                 <tr>
-                                    <td class="data ellipsis"><a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
+                                    <td class="data ellipsis"><a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>&nbsp;<span class="text-muted">{{$t.Symbol}}</span></td>
                                     <td class="data ellipsis"><a href="/address/{{$t.Name}}">{{$t.Name}}</a></td>
                                     <td class="data">{{formatAmountWithDecimals $t.BalanceSat $t.Decimals}}</td>
                                     <td class="data">{{$t.Transfers}}</td>
@@ -129,7 +129,7 @@
                             </tr>
                             {{- range $t := $addr.TokensAsset -}}{{- if $t -}}{{- if $t.UnconfirmedBalanceSat -}}
                             <tr>
-                                <td class="data ellipsis">{{if $t.AssetGuid}}<a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>{{else}}{{$t.Name}}{{end}}&nbsp;<span class="text-muted">{{formatDecodeBase64 $t.Symbol}}</span></td>
+                                <td class="data ellipsis">{{if $t.AssetGuid}}<a href="/asset/{{$t.AssetGuid}}">{{$t.AssetGuid}}</a>{{else}}{{$t.Name}}{{end}}&nbsp;<span class="text-muted">{{$t.Symbol}}</span></td>
                                 <td class="data ellipsis">{{formatAmountWithDecimals $t.UnconfirmedBalanceSat $t.Decimals}}</td>
                                 <td class="data">{{$t.UnconfirmedTransfers}}</td>
                             </tr>

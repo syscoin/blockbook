@@ -70,3 +70,12 @@ func (b *BaseChain) GetChainTips() (string, error) {
 func (b *BaseChain) GetSPVProof(hash string) (string, error) {
 	return "", errors.New("Not supported")
 }
+
+func (p *BaseChain) FetchNEVMAssetDetails(assetGuid uint64) (*Asset, error) {
+	return nil, errors.New("Not supported")
+}
+
+func (p *BaseChain) GetContractExplorerBaseURL() string {
+	return ""
+}
+
