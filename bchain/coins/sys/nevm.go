@@ -180,6 +180,8 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		Contract:    []byte(contractAddr.Hex()),
 		Symbol:      []byte(symbol),
 		Precision:   precision,
+		TotalSupply: 0,
+		MaxSupply:   0,
 	}
 
 	asset := &bchain.Asset{
