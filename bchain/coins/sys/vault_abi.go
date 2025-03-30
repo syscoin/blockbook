@@ -1,4 +1,4 @@
-package nevm
+package syscoin
 
 // vaultABIJSON contains the ABI for the SyscoinVaultManager contract.
 const vaultABIJSON = `[
