@@ -793,6 +793,7 @@ type BlockChainParser interface {
 	UnpackAssetInfo(assetInfo *AssetInfo, buf []byte) int
 	UnpackTxIndexType(buf []byte) (AssetsMask, int)
 	WitnessPubKeyHashFromKeyID(keyId []byte) (string, error)
+	FetchNEVMAssetDetails(assetGuid uint64) (*Asset, error)
 }
 
 // Mempool defines common interface to mempool

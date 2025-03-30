@@ -29,7 +29,11 @@ const (
 
 	maxAddrDescLen = 10000
 	maxMemoLen = 256
+	nevmMainnetRPC = "https://rpc.syscoin.org"
+	nevmTestnetRPC = "https://rpc.tanenbaum.io"
+
 )
+
 // chain parameters
 var (
 	MainNetParams chaincfg.Params

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"time"
 	"fmt"
-	"strconv"
 	
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -45,14 +44,31 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	return nil
 }
 
+
+func defaultSysAsset() *bchain.Asset {
+    return &bchain.Asset{
+        Transactions: 0,
+        AssetObj: wire.AssetType{
+            Contract:    []byte{},
+            Symbol:      []byte("SYS"),
+            Precision:   8,
+        },
+        MetaData: []byte("Syscoin Native Asset"),
+    }
+}
+
+
 func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if dBAsset == nil || err != nil {
-		AssetObj := wire.AssetType{
-			Symbol:    []byte(strconv.FormatUint(assetInfo.AssetGuid, 10)),
-			Precision: 8,
-		}
-		dBAsset = &bchain.Asset{Transactions: 0, AssetObj: AssetObj, MetaData: memo}
+		if assetInfo.AssetGuid == 123456 {
+            dBAsset = defaultSysAsset()
+        } else {
+            dBAsset, err = d.chainParser.FetchNEVMAssetDetails(assetInfo.AssetGuid)
+			if err != nil {
+				return err
+			}
+        }
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
