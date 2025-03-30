@@ -50,7 +50,7 @@ func defaultSysAsset() *bchain.Asset {
         Transactions: 0,
         AssetObj: wire.AssetType{
             Contract:    []byte{},
-            Symbol:      []byte("SYS"),
+            Symbol:      []byte("SYSX"),
             Precision:   8,
         },
         MetaData: []byte("Syscoin Native Asset"),
