@@ -1376,7 +1376,7 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 				TotalSupply:	(*bchain.Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
 				Decimals:		int(assetCached.AssetObj.Precision),
 				Txs:			int(assetCached.Transactions),
-				MetaData:		assetCached.MetaData,
+				MetaData:		string(assetCached.MetaData),
 			}
 			assetDetails = append(assetDetails, &assetSpecific)
 		}
@@ -1526,7 +1526,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 			MaxSupply:		(*bchain.Amount)(big.NewInt(dbBaseAsset.AssetObj.MaxSupply)),
 			Decimals:		int(dbAsset.AssetObj.Precision),
-			MetaData:		dbAsset.MetaData,
+			MetaData:		string(dbAsset.MetaData),
 		},
 		Paging:                pg,
 		UnconfirmedBalanceSat: (*bchain.Amount)(&uBalSat),
