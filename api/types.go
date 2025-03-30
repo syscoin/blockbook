@@ -111,7 +111,7 @@ type AssetSpecific struct {
 	TotalSupply 	*bchain.Amount `json:"totalSupply"`
 	MaxSupply 		*bchain.Amount `json:"maxSupply"`
 	Decimals 		int `json:"decimals"`
-	MetaData		[]byte `json:"metaData,omitempty"`
+	MetaData		string `json:"metaData,omitempty"`
 }
 
 // Contains SyscoinSpecific assets information when searching for assets
@@ -122,7 +122,7 @@ type AssetsSpecific struct {
 	TotalSupply 	*bchain.Amount `json:"totalSupply"`
 	Decimals 		int `json:"precision"`
 	Txs				int
-	MetaData		[]byte `json:"metaData,omitempty"`
+	MetaData		string `json:"metaData,omitempty"`
 }
 
 // EthereumSpecific contains ethereum specific transaction data
