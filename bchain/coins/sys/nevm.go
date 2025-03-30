@@ -1,4 +1,4 @@
-package nevm
+package syscoin
 
 import (
     "context"
@@ -18,7 +18,7 @@ const (
 	
 )
 
-type Client struct {
+type NEVMClient struct {
     rpcClient *ethclient.Client
     vaultAddr common.Address
     vaultABI  abi.ABI
@@ -26,7 +26,7 @@ type Client struct {
 }
 
 // NewClient initializes a new NEVM client.
-func NewClient(rpcURL string) (*Client, error) {
+func NewNEVMClient(rpcURL string) (*NEVMClient, error) {
     ethClient, err := ethclient.Dial(rpcURL)
     if err != nil {
         return nil, err
@@ -43,7 +43,7 @@ func NewClient(rpcURL string) (*Client, error) {
 	  {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"}
 	]`))
 
-    return &Client{
+    return &NEVMClient{
         rpcClient: ethClient,
         vaultAddr: common.HexToAddress(vaultManagerAddress),
         vaultABI:  parsedABI,
@@ -51,11 +51,11 @@ func NewClient(rpcURL string) (*Client, error) {
     }, nil
 }
 
-func (c *Client) Close() {
+func (c *NEVMClient) Close() {
 	c.rpcClient.Close()
 }
 
-func (c *Client) getRealTokenId(assetId uint32, tokenIdx uint32) (*big.Int, error) {
+func (c *NEVMClient) getRealTokenId(assetId uint32, tokenIdx uint32) (*big.Int, error) {
 	data, err := c.vaultABI.Pack("getRealTokenIdFromTokenIdx", assetId, tokenIdx)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (c *Client) getRealTokenId(assetId uint32, tokenIdx uint32) (*big.Int, erro
 	return unpacked[0].(*big.Int), nil
 }
 
-func (c *Client) getTokenSymbol(contractAddr common.Address) (string, error) {
+func (c *NEVMClient) getTokenSymbol(contractAddr common.Address) (string, error) {
 	data, err := c.tokenABI.Pack("symbol")
 	if err != nil {
 		return "", err
@@ -94,7 +94,7 @@ func (c *Client) getTokenSymbol(contractAddr common.Address) (string, error) {
 	}
 	return unpacked[0].(string), nil
 }
-func (c *Client) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
+func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
 	ctx := context.Background()
 
 	assetId := uint32(assetGuid & 0xffffffff)

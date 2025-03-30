@@ -2,6 +2,7 @@ package syscoin
 
 import (
 	"encoding/json"
+	"context"
 	
 	"github.com/golang/glog"
 	"github.com/syscoin/blockbook/bchain"
@@ -11,7 +12,7 @@ import (
 // SyscoinRPC is an interface to JSON-RPC bitcoind service
 type SyscoinRPC struct {
 	*btc.BitcoinRPC
-	NEVMClient *nevm.Client
+	NEVMClient *NEVMClient
 }
 
 
@@ -24,6 +25,7 @@ func NewSyscoinRPC(config json.RawMessage, pushHandler func(notificationType bch
 
 	s := &SyscoinRPC{
 		b.(*btc.BitcoinRPC),
+		nil,
 	}
 	s.RPCMarshaler = btc.JSONMarshalerV2{}
 	s.ChainConfig.SupportsEstimateFee = false
@@ -60,7 +62,7 @@ func (b *SyscoinRPC) Initialize() error {
 
 	// always create parser
 	b.Parser = NewSyscoinParser(params, b.ChainConfig)
-
+	var rpcURL string
 	// parameters for getInfo request
 	if params.Net == MainnetMagic {
 		b.Testnet = false
@@ -71,7 +73,7 @@ func (b *SyscoinRPC) Initialize() error {
 		b.Network = "testnet"
 		rpcURL = nevmTestnetRPC
 	}
-	b.NEVMClient, err = nevm.NewClient(rpcURL)
+	b.NEVMClient, err = NewNEVMClient(rpcURL)
 	if err != nil {
 		return err
 	}
