@@ -801,7 +801,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			if !ok {
 				dbAsset, errAsset := w.db.GetAsset(tai.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
-					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
+					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(strconv.FormatUint(tai.AssetInfo.AssetGuid, 10)), Precision: 8}}
 				}
 				tts = &bchain.TokenTransferSummary{
 					Token:    vin.AssetInfo.AssetGuid,
@@ -837,7 +837,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *bchain.TxAddresses, bi *bchain
 			if !ok {
 				dbAsset, errAsset := w.db.GetAsset(tao.AssetInfo.AssetGuid, nil)
 				if errAsset != nil || dbAsset == nil {
-					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
+					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(vout.AssetInfo.AssetGuid), Precision: 8}}
 				}
 				tts = &bchain.TokenTransferSummary{
 					Token:    vout.AssetInfo.AssetGuid,
@@ -1264,7 +1264,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				assetGuid := strconv.FormatUint(k, 10)
 				dbAsset, errAsset := w.db.GetAsset(k, nil)
 				if errAsset != nil || dbAsset == nil {
-					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
+					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(assetGuid), Precision: 8}}
 				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
 				var unconfirmedBalanceSat *big.Int
@@ -1303,7 +1303,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			}
 			dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 			if errAsset != nil || dbAsset == nil {
-				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
+				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(k), Precision: 8}}
 			}
 			tokens = append(tokens, &bchain.Token{
 				Type:             bchain.SPTTokenType,
@@ -1931,7 +1931,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 			}
 			dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
 			if errAsset != nil || dbAsset == nil {
-				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Precision: 8}}
+				dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(a.AssetInfo.AssetGuid), Precision: 8}}
 			}
 			// add unique base assets
 			var _, ok = assetsMap[assetGuid]
