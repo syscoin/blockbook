@@ -11,7 +11,9 @@ import (
 // SyscoinRPC is an interface to JSON-RPC bitcoind service
 type SyscoinRPC struct {
 	*btc.BitcoinRPC
+	NEVMClient *nevm.Client
 }
+
 
 // NewSyscoinRPC returns new SyscoinRPC instance
 func NewSyscoinRPC(config json.RawMessage, pushHandler func(notificationType bchain.NotificationType)) (bchain.BlockChain, error) {
@@ -28,6 +30,22 @@ func NewSyscoinRPC(config json.RawMessage, pushHandler func(notificationType bch
 
 	return s, nil
 }
+
+func (b *SyscoinRPC) Shutdown(ctx context.Context) error {
+	// Call BitcoinRPC's shutdown first
+	if err := b.BitcoinRPC.Shutdown(ctx); err != nil {
+		glog.Error("BitcoinRPC.Shutdown error: ", err)
+		return err
+	}
+
+	// Then shutdown NEVMClient if it exists
+	if b.NEVMClient != nil {
+		b.NEVMClient.Close()
+	}
+
+	return nil
+}
+
 
 // Initialize initializes SyscoinRPC instance.
 func (b *SyscoinRPC) Initialize() error {
@@ -47,11 +65,16 @@ func (b *SyscoinRPC) Initialize() error {
 	if params.Net == MainnetMagic {
 		b.Testnet = false
 		b.Network = "livenet"
+		rpcURL = nevmMainnetRPC
 	} else {
 		b.Testnet = true
 		b.Network = "testnet"
+		rpcURL = nevmTestnetRPC
 	}
-
+	b.NEVMClient, err = nevm.NewClient(rpcURL)
+	if err != nil {
+		return err
+	}
 	glog.Info("rpc: block chain ", params.Name)
 
 	return nil
