@@ -83,9 +83,9 @@
                             </tr>
                             {{- range $tokenTransfer := $tx.TokenTransferSummary -}}{{if $tokenTransfer}}
                             <tr>
-                                <td class="data ellipsis"><a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a>&nbsp;<span class="text-muted">{{formatDecodeBase64 $tokenTransfer.Symbol}}</span></td>
-                                <td class="data ellipsis">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</td>
-                                <td class="data ellipsis">{{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{formatDecodeBase64 $tokenTransfer.Symbol}}</td>
+                                <td class="data ellipsis"><a href="/asset/{{$tokenTransfer.Token}}">{{$tokenTransfer.Token}}</a>&nbsp;<span class="text-muted">{{$tokenTransfer.Symbol}}</span></td>
+                                <td class="data ellipsis">{{formatAmountWithDecimals $tokenTransfer.Value $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</td>
+                                <td class="data ellipsis">{{formatAmountWithDecimals $tokenTransfer.Fee $tokenTransfer.Decimals}} {{$tokenTransfer.Symbol}}</td>
                             </tr>
                             {{- end -}}{{- end -}}
                         </tbody>

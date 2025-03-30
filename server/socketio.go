@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"encoding/hex"
 	"math/big"
 	"net/http"
 	"runtime/debug"
@@ -631,7 +630,7 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 		res.Result.AssetDetails =	&api.AssetSpecific{
 			AssetGuid:		assetGuid,
 			Symbol:			string(dbAsset.AssetObj.Symbol),
-			Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
+			Contract:		string(dbAsset.AssetObj.Contract),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 			MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 			Decimals:		int(dbAsset.AssetObj.Precision),

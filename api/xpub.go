@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"encoding/hex"
 
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/db"
@@ -790,7 +789,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 							assetDetails :=	&AssetSpecific{
 								AssetGuid:		strconv.FormatUint(assetGuid, 10),
 								Symbol:			string(dbAsset.AssetObj.Symbol),
-								Contract:		"0x" + hex.EncodeToString(dbAsset.AssetObj.Contract),
+								Contract:		string(dbAsset.AssetObj.Contract),
 								TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 								MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 								Decimals:		int(dbAsset.AssetObj.Precision),

@@ -328,6 +328,17 @@ func (c *blockChainWithMetrics) GetSPVProof(hash string) (result string, err err
 	result, err = c.b.GetSPVProof(hash)
 	return result, err
 }
+
+func (c *blockChainWithMetrics) FetchNEVMAssetDetails(assetGuid uint64) (result *bchain.Asset, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("FetchNEVMAssetDetails", s, err) }(time.Now())
+	result, err = c.b.FetchNEVMAssetDetails(assetGuid)
+	return result, err
+}
+
+func (c *blockChainWithMetrics) GetContractExplorerBaseURL() string {
+	return c.b.GetContractExplorerBaseURL()
+}
+
 type mempoolWithMetrics struct {
 	mempool bchain.Mempool
 	m       *common.Metrics

@@ -1,5 +1,5 @@
 {{define "specific"}}{{$cs := .CoinShortcut}}{{$asset := .Asset}}{{$data := .}}
-<h1>Asset <small class="text-muted">{{formatDecodeBase64 $asset.AssetDetails.Symbol}}</small></h1>
+<h1>Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}}</small></h1>
 <div class="alert alert-data ellipsis">
     <span class="data">{{$asset.AssetDetails.AssetGuid}}</span>
 </div>
@@ -22,15 +22,7 @@
                 </tr>
                 <tr>
                     <td>Contract</td>
-                    <td class="data"><a href="https://explorer.syscoin.org/address/{{$asset.AssetDetails.Contract}}">{{$asset.AssetDetails.Contract}}</a></td>
-                </tr>
-                <tr>
-                    <td>Total Supply</td>
-                    <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.TotalSupply $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
-                </tr>
-                <tr>
-                    <td>Max Supply</td>
-                    <td class="data">{{formatAmountWithDecimals $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
+                    <td class="data"><a href="{{formatContractExplorerURL $asset.AssetDetails.Contract}}">{{$asset.AssetDetails.Contract}}</a></td>
                 </tr>
                 <tr>
                     <td>Decimals</td>
@@ -39,7 +31,7 @@
                 {{if gt (len $asset.AssetDetails.MetaData) 0}}
                 <tr>
                     <td>Metadata</td>
-                    <td class="data ellipsis" colspan="3">{{formatEncodeBase64 $asset.AssetDetails.MetaData}}</td>
+                    <td class="data ellipsis" colspan="3">{{$asset.AssetDetails.MetaData}}</td>
                 </tr>
                 {{- end -}}
             </tbody>
@@ -60,7 +52,7 @@
         <tbody>
             <tr>
                 <td style="width: 25%;">Unconfirmed Balance</td>
-                <td class="data">{{formatAmountWithDecimals $asset.UnconfirmedBalanceSat $asset.AssetDetails.Decimals}} {{formatDecodeBase64 $asset.AssetDetails.Symbol}}</td>
+                <td class="data">{{formatAmountWithDecimals $asset.UnconfirmedBalanceSat $asset.AssetDetails.Decimals}} {{$asset.AssetDetails.Symbol}}</td>
             </tr>
             <tr>
                 <td>No. Transactions</td>
