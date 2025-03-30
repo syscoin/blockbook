@@ -473,6 +473,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"setTxToTemplateData":      setTxToTemplateData,
 		"formatKeyID":              s.formatKeyID,
 		"formatNFTID": 				formatNFTID,
+		"formatContractExplorerURL":  s.formatContractExplorerURL,
 		"formatBaseAssetID": 		formatBaseAssetID,
 		"isNFT":					isNFT,
 		"toJSON":                   toJSON,
