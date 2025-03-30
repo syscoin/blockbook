@@ -147,17 +147,23 @@ func (d *RocksDB) SetupAssetCache() error {
 	ro.SetFillCache(false)
 	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
 	defer it.Close()
+
 	for it.SeekToFirst(); it.Valid(); it.Next() {
 		assetKey, _ := d.chainParser.UnpackVaruint64(it.Key().Data())
-		assetDb, err := d.chainParser.UnpackAsset(it.Value().Data())
+		data := it.Value().Data()
+
+		assetDb, err := d.chainParser.UnpackAsset(data)
 		if err != nil {
-			return err
+			glog.Errorf("Failed unpacking asset GUID %d, data (hex): %s, err: %v", assetKey, hex.EncodeToString(data), err)
+			continue // skip corrupted asset
 		}
+
 		AssetCache[assetKey] = *assetDb
 	}
-	glog.Info("SetupAssetCache, ", time.Since(start))
+	glog.Info("SetupAssetCache completed in ", time.Since(start))
 	return nil
 }
+
 
 
 func (d *RocksDB) storeAssets(wb *gorocksdb.WriteBatch, assets map[uint64]*bchain.Asset) error {
