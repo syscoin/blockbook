@@ -81,6 +81,9 @@ func (b *SyscoinRPC) Initialize() error {
 func (b *SyscoinRPC) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
 	return b.NEVMClient.FetchNEVMAssetDetails(assetGuid)
 }
+func (b *SyscoinRPC) GetContractExplorerBaseURL() string {
+	return b.ChainConfig.Web3Explorer
+}
 // GetBlock returns block with given hash
 func (b *SyscoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
 	var err error
