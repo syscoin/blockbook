@@ -617,7 +617,7 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 		}
 		dbAsset, errAsset := s.db.GetAsset(assetGuidInt, nil)
 		if errAsset != nil {
-			return res, errors.New(fmt.Sprint("getAssetHistory Asset not found err: %v", errAsset))
+			return res, errors.New(fmt.Sprintf("getAssetHistory Asset not found err: %v", errAsset))
 		}
 		if len(ahi.Tokens) <= 0 {
 			ahi.Tokens = nil

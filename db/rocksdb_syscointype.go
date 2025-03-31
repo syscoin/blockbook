@@ -21,7 +21,7 @@ type GetTxAssetsCallback func(txids []string) error
 func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, height uint32, version int32, balanceAsset *bchain.AssetBalance, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if err != nil {
-		return errors.New(fmt.Sprint("ConnectAllocationInput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
+		return errors.New(fmt.Sprintf("ConnectAllocationInput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
@@ -43,7 +43,7 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if err != nil {
-		return errors.New(fmt.Sprint("ConnectAllocationOutput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
+		return errors.New(fmt.Sprintf("ConnectAllocationOutput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
@@ -62,7 +62,7 @@ func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, he
 func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor, balanceAsset *bchain.AssetBalance,  btxID []byte, assetInfo *bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, assetFoundInTx func(asset uint64, btxID []byte) bool) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if err != nil {
-		return errors.New(fmt.Sprint("DisconnectAllocationOutput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
+		return errors.New(fmt.Sprintf("DisconnectAllocationOutput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
 	}
 	balanceAsset.BalanceSat.Sub(balanceAsset.BalanceSat, assetInfo.ValueSat)
 	if balanceAsset.BalanceSat.Sign() < 0 {
@@ -86,7 +86,7 @@ func (d *RocksDB) DisconnectAllocationOutput(addrDesc *bchain.AddressDescriptor,
 func (d *RocksDB) DisconnectAllocationInput(addrDesc *bchain.AddressDescriptor, balanceAsset *bchain.AssetBalance,  btxID []byte, assetInfo *bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, assetFoundInTx func(asset uint64, btxID []byte) bool) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if err != nil {
-		return errors.New(fmt.Sprint("DisconnectAllocationInput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
+		return errors.New(fmt.Sprintf("DisconnectAllocationInput could not read asset %d, err: %v" , assetInfo.AssetGuid, err))
 	}
 	balanceAsset.SentSat.Sub(balanceAsset.SentSat, assetInfo.ValueSat)
 	balanceAsset.BalanceSat.Add(balanceAsset.BalanceSat, assetInfo.ValueSat)
