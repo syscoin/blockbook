@@ -44,22 +44,6 @@ func (d *RocksDB) ConnectAllocationInput(addrDesc* bchain.AddressDescriptor, hei
 	return nil
 }
 
-
-func defaultSysAsset() *bchain.Asset {
-    return &bchain.Asset{
-        Transactions: 0,
-        AssetObj: wire.AssetType{
-            Contract:    []byte{},
-            Symbol:      []byte("SYSX"),
-            Precision:   8,
-			TotalSupply: 0,
-			MaxSupply:   0,
-        },
-        MetaData: []byte("Syscoin Native Asset"),
-    }
-}
-
-
 func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if dBAsset == nil || err != nil {
@@ -236,15 +220,11 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	}
 	// nil data means the key was not found in DB
 	if val.Data() == nil {
-		var assetDb *bchain.Asset
-		if guid == 123456 {
-            assetDb = defaultSysAsset()
-        } else {
-            assetDb, err = d.chain.FetchNEVMAssetDetails(guid)
-			if err != nil {
-				return nil, err
-			}
-        }
+		assetDb, err := d.chain.FetchNEVMAssetDetails(guid)
+		if err != nil {
+			return nil, err
+		}
+        
 		AssetCache[guid] = *assetDb
 		return assetDb, nil
 	}
