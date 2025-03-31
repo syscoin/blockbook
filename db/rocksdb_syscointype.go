@@ -63,14 +63,10 @@ func defaultSysAsset() *bchain.Asset {
 func (d *RocksDB) ConnectAllocationOutput(addrDesc* bchain.AddressDescriptor, height uint32, balanceAsset *bchain.AssetBalance, version int32, btxID []byte, assetInfo* bchain.AssetInfo, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap, memo []byte) error {
 	dBAsset, err := d.GetAsset(assetInfo.AssetGuid, assets)
 	if dBAsset == nil || err != nil {
-		if assetInfo.AssetGuid == 123456 {
-            dBAsset = defaultSysAsset()
-        } else {
-            dBAsset, err = d.chain.FetchNEVMAssetDetails(assetInfo.AssetGuid)
-			if err != nil {
-				return err
-			}
-        }
+		if dBAsset == nil {
+			return errors.New(fmt.Sprint("ConnectAllocationOutput could not read asset " , assetInfo.AssetGuid))
+		}
+		return err
 	}
 	counted := d.addToAssetsMap(txAssets, assetInfo.AssetGuid, btxID, version, height)
 	if !counted {
@@ -240,7 +236,17 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	}
 	// nil data means the key was not found in DB
 	if val.Data() == nil {
-		return nil, nil
+		var assetDb *bchain.Asset
+		if guid == 123456 {
+            assetDb = defaultSysAsset()
+        } else {
+            assetDb, err = d.chain.FetchNEVMAssetDetails(guid)
+			if err != nil {
+				return nil, err
+			}
+        }
+		AssetCache[guid] = *assetDb
+		return assetDb, nil
 	}
 	defer val.Free()
 	buf := val.Data()
