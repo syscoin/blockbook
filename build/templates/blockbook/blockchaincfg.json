@@ -23,6 +23,10 @@
 {{end}}
     "mempool_workers": {{.Blockbook.BlockChain.MempoolWorkers}},
     "mempool_sub_workers": {{.Blockbook.BlockChain.MempoolSubWorkers}},
-    "block_addresses_to_keep": {{.Blockbook.BlockChain.BlockAddressesToKeep}}
+    "block_addresses_to_keep": {{.Blockbook.BlockChain.BlockAddressesToKeep}},
+{{if .Blockbook.BlockChain.Web3RPCURL}}    "web3_rpc_url": {{.Blockbook.BlockChain.Web3RPCURL}},
+{{end}}{{if .Blockbook.BlockChain.Web3RPCURLBackup}}    "web3_rpc_url_backup": {{.Blockbook.BlockChain.Web3RPCURLBackup}},
+{{end}}{{if .Blockbook.BlockChain.Web3Explorer}}    "web3_explorer_url": {{.Blockbook.BlockChain.Web3Explorer}},
+{{end}}
 }
 {{end}}
