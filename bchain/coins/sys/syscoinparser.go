@@ -29,10 +29,6 @@ const (
 
 	maxAddrDescLen = 10000
 	maxMemoLen = 256
-	nevmMainnetRPC = "https://rpc.syscoin.org"
-	nevmMainnetExplorer = "https://explorer.syscoin.org"
-	nevmTestnetRPC = "https://rpc.tanenbaum.io"
-	nevmTestnetExplorer = "https://explorer.tanenbaum.io"
 
 )
 
