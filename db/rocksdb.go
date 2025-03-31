@@ -774,11 +774,8 @@ func (d *RocksDB) storeBalances(wb *gorocksdb.WriteBatch, abm map[string]*bchain
 				if value.Transfers <= 0 {
 					// ensure transactions for asset are also 0, asset activate will have transfers as 0 but transactions as 1
 					dBAsset, err := d.GetAsset(key, nil)
-					if dBAsset == nil || err != nil {
-						if dBAsset == nil {
-							return errors.New(fmt.Sprint("storeBalances could not read asset " , key))
-						}
-						return err
+					if err != nil {
+						return errors.New(fmt.Sprint("storeBalances could not read asset %d, err %v" , key, err))
 					}
 					if(dBAsset.Transactions <= 0) {
 						delete(ab.AssetBalances, key)

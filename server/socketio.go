@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"fmt"
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -615,11 +616,8 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 			return res, err
 		}
 		dbAsset, errAsset := s.db.GetAsset(assetGuidInt, nil)
-		if errAsset != nil || dbAsset == nil {
-			if errAsset == nil {
-				return res, errors.New("getAssetHistory Asset not found")
-			}
-			return res, errAsset
+		if errAsset != nil {
+			return res, errors.New(fmt.Sprint("getAssetHistory Asset not found err: %v", errAsset))
 		}
 		if len(ahi.Tokens) <= 0 {
 			ahi.Tokens = nil
