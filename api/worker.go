@@ -20,6 +20,7 @@ import (
 	"github.com/syscoin/blockbook/common"
 	"github.com/syscoin/blockbook/db"
 	"github.com/syscoin/syscoinwire/syscoin/wire"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Worker is handle to api worker
@@ -1362,7 +1363,7 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 		if strings.Contains(symbolLower, filterLower) {
 			foundAsset = true
 		} else if len(assetCached.AssetObj.Contract) > 0 && len(filterLower) > 5 {
-			contractStr := string(assetCached.AssetObj.Contract)
+			contractStr := ethcommon.BytesToAddress(assetCached.AssetObj.Contract).Hex()
 			contractLower := strings.ToLower(contractStr)
 			if strings.Contains(contractLower, filterLower) {
 				foundAsset = true
@@ -1372,7 +1373,7 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 			assetSpecific := AssetsSpecific{
 				AssetGuid:		strconv.FormatUint(guid, 10),
 				Symbol:			string(assetCached.AssetObj.Symbol),
-				Contract:		string(assetCached.AssetObj.Contract),
+				Contract:		ethcommon.BytesToAddress(assetCached.AssetObj.Contract).Hex(),
 				TotalSupply:	(*bchain.Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
 				Decimals:		int(assetCached.AssetObj.Precision),
 				Txs:			int(assetCached.Transactions),
@@ -1522,7 +1523,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		asset,
 			Symbol:			string(dbAsset.AssetObj.Symbol),
-			Contract:		string(dbBaseAsset.AssetObj.Contract),
+			Contract:		ethcommon.BytesToAddress(dbBaseAsset.AssetObj.Contract).Hex(),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 			MaxSupply:		(*bchain.Amount)(big.NewInt(dbBaseAsset.AssetObj.MaxSupply)),
 			Decimals:		int(dbAsset.AssetObj.Precision),
@@ -1942,7 +1943,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 			assetDetails :=	&AssetSpecific{
 				AssetGuid:		strconv.FormatUint(assetGuid, 10),
 				Symbol:			string(dbAsset.AssetObj.Symbol),
-				Contract:		string(dbAsset.AssetObj.Contract),
+				Contract:		ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex(),
 				TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 				MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 				Decimals:		int(dbAsset.AssetObj.Precision),

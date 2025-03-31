@@ -13,6 +13,7 @@ import (
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/db"
 	"github.com/syscoin/syscoinwire/syscoin/wire"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const defaultAddressesGap = 20
@@ -789,7 +790,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 							assetDetails :=	&AssetSpecific{
 								AssetGuid:		strconv.FormatUint(assetGuid, 10),
 								Symbol:			string(dbAsset.AssetObj.Symbol),
-								Contract:		string(dbAsset.AssetObj.Contract),
+								Contract:		ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex(),
 								TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 								MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 								Decimals:		int(dbAsset.AssetObj.Precision),
