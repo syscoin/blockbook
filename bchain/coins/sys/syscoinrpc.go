@@ -78,7 +78,9 @@ func (b *SyscoinRPC) Initialize() error {
 
 	return nil
 }
-
+func (b *SyscoinRPC) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
+	return b.NEVMClient.FetchNEVMAssetDetails(assetGuid)
+}
 // GetBlock returns block with given hash
 func (b *SyscoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
 	var err error
