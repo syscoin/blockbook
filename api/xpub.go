@@ -306,7 +306,7 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 			totalReceived = ad.balance.ReceivedSat()
 			for k, v := range ad.balance.AssetBalances {
 				dbAsset, errAsset := w.db.GetAsset(k, nil)
-				if errAsset != nil || dbAsset == nil {
+				if errAsset != nil {
 					dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(strconv.FormatUint(k, 10)), Precision: 8}}
 				}
 				totalAssetReceived := bchain.ReceivedSatFromBalances(v.BalanceSat, v.SentSat)
@@ -672,7 +672,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								return nil, err
 							}
 							dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
-							if errAsset != nil || dbAsset == nil {
+							if errAsset != nil {
 								dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(k), Precision: 8}}
 							}
 							tokensAsset = append(tokensAsset, &bchain.Token{
@@ -777,7 +777,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 								return utxoRes, err
 							}
 							dbAsset, errAsset := w.db.GetAsset(assetGuid, nil)
-							if errAsset != nil || dbAsset == nil {
+							if errAsset != nil {
 								dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(a.AssetInfo.AssetGuid), Precision: 8}}
 							}
 							// add unique assets
