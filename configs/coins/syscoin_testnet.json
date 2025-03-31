@@ -63,6 +63,9 @@
       "xpub_magic_segwit_p2sh": 71979618,
       "xpub_magic_segwit_native": 73342198,
       "slip44": 1,
+      "web3_rpc_url": "https://rpc.tanenbaum.io",
+      "web3_rpc_url_backup": "https://rpc1.tanenbaum.io",
+      "web3_explorer_url": "https://explorer.tanenbaum.io",
       "subversion": "/Satoshi:5.0.99/",
       "additional_params": {
       }

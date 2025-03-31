@@ -59,6 +59,10 @@ type Configuration struct {
 	AlternativeEstimateFee       string `json:"alternative_estimate_fee,omitempty"`
 	AlternativeEstimateFeeParams string `json:"alternative_estimate_fee_params,omitempty"`
 	MinimumCoinbaseConfirmations int    `json:"minimumCoinbaseConfirmations,omitempty"`
+	// SYSCOIN
+	Web3RPCURL                   string `json:"web3_rpc_url,omitempty"`
+	Web3RPCURLBackup             string `json:"web3_rpc_url_backup,omitempty"`
+	Web3Explorer                 string `json:"web3_explorer_url,omitempty"`
 }
 
 // NewBitcoinRPC returns new BitcoinRPC instance.

@@ -12,58 +12,95 @@ import (
 	"github.com/syscoin/blockbook/bchain"
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/syscoin/syscoinwire/syscoin/wire"
+	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/golang/glog"
 )
 const (
 	vaultManagerAddress = "0x7904299b3D3dC1b03d1DdEb45E9fDF3576aCBd5f"
 	
 )
-
 type NEVMClient struct {
-    rpcClient *ethclient.Client
-    vaultAddr common.Address
-    vaultABI  abi.ABI
-	tokenABI  abi.ABI
+	rpcClient   *ethclient.Client
+	backupClient *ethclient.Client
+	vaultAddr   common.Address
+	vaultABI    abi.ABI
+	tokenABI    abi.ABI
 	explorerURL string
 }
 
-// NewClient initializes a new NEVM client.
-func NewNEVMClient(rpcURL string, explorerURL string) (*NEVMClient, error) {
-    ethClient, err := ethclient.Dial(rpcURL)
-    if err != nil {
-        return nil, err
-    }
+// NewNEVMClient initializes the primary and backup RPC clients.
+func NewNEVMClient(c *btc.Configuration) (*NEVMClient, error) {
+	mainClient, err := ethclient.Dial(c.Web3RPCURL)
+	if err != nil {
+		return nil, err
+	}
 
-    parsedABI, err := abi.JSON(strings.NewReader(vaultABIJSON))
-    if err != nil {
-		ethClient.Close()
-        return nil, err
-    }
+	var backupClient *ethclient.Client
+	if c.Web3RPCURLBackup != "" {
+		backupClient, err = ethclient.Dial(c.Web3RPCURLBackup)
+		if err != nil {
+			// Log backup client error but do NOT close main client or return err.
+			glog.Warning("Backup RPC failed to connect: ", err)
+			backupClient = nil // Explicitly set to nil for clarity.
+		}
+	}
 
-	tokenSymbolABI, err := abi.JSON(strings.NewReader(`
-	[
-	  {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"}
-	]`))
-    if err != nil {
-		ethClient.Close()
-        return nil, err
-    }
-    return &NEVMClient{
-        rpcClient: ethClient,
-        vaultAddr: common.HexToAddress(vaultManagerAddress),
-        vaultABI:  parsedABI,
-		tokenABI: tokenSymbolABI,
-		explorerURL: explorerURL,
-    }, nil
+	vaultABI, err := abi.JSON(strings.NewReader(vaultABIJSON))
+	if err != nil {
+		mainClient.Close()
+		if backupClient != nil {
+			backupClient.Close()
+		}
+		return nil, err
+	}
+
+	tokenABI, err := abi.JSON(strings.NewReader(`
+		[{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"}]
+	`))
+	if err != nil {
+		mainClient.Close()
+		if backupClient != nil {
+			backupClient.Close()
+		}
+		return nil, err
+	}
+
+	return &NEVMClient{
+		rpcClient:    mainClient,
+		backupClient: backupClient,
+		vaultAddr:    common.HexToAddress(vaultManagerAddress),
+		vaultABI:     vaultABI,
+		tokenABI:     tokenABI,
+		explorerURL:  c.Web3Explorer,
+	}, nil
 }
 
-func (c *NEVMClient) GetContractExplorerBaseURL() string {
-	return c.explorerURL
-}
-
+// Close closes both RPC connections.
 func (c *NEVMClient) Close() {
-	c.rpcClient.Close()
+	if c.rpcClient != nil {
+		c.rpcClient.Close()
+	}
+	if c.backupClient != nil {
+		c.backupClient.Close()
+	}
 }
 
+// callContract attempts the call with primary RPC, falling back to backup if needed.
+func (c *NEVMClient) callContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
+	res, err := c.rpcClient.CallContract(ctx, msg, nil)
+	if err == nil {
+		return res, nil
+	}
+
+	// If backup RPC exists, attempt fallback
+	if c.backupClient != nil {
+		return c.backupClient.CallContract(ctx, msg, nil)
+	}
+
+	return nil, err
+}
+
+// Update existing methods to use callContract:
 func (c *NEVMClient) getRealTokenId(assetId uint32, tokenIdx uint32) (*big.Int, error) {
 	data, err := c.vaultABI.Pack("getRealTokenIdFromTokenIdx", assetId, tokenIdx)
 	if err != nil {
@@ -71,7 +108,7 @@ func (c *NEVMClient) getRealTokenId(assetId uint32, tokenIdx uint32) (*big.Int, 
 	}
 
 	callMsg := ethereum.CallMsg{To: &c.vaultAddr, Data: data}
-	res, err := c.rpcClient.CallContract(context.Background(), callMsg, nil)
+	res, err := c.callContract(context.Background(), callMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -91,32 +128,32 @@ func (c *NEVMClient) getTokenSymbol(contractAddr common.Address) (string, error)
 	}
 
 	callMsg := ethereum.CallMsg{To: &contractAddr, Data: data}
-	res, err := c.rpcClient.CallContract(context.Background(), callMsg, nil)
+	res, err := c.callContract(context.Background(), callMsg)
 	if err != nil {
 		return "", err
 	}
 
-	var unpacked []interface{}
-	unpacked, err = c.tokenABI.Unpack("symbol", res)
+	unpacked, err := c.tokenABI.Unpack("symbol", res)
 	if err != nil || len(unpacked) == 0 {
 		return "", err
 	}
+
 	return unpacked[0].(string), nil
 }
+
 func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
 	ctx := context.Background()
 
 	assetId := uint32(assetGuid & 0xffffffff)
 	tokenIdx := uint32(assetGuid >> 32)
 
-	// Fetch basic registry details
 	data, err := c.vaultABI.Pack("assetRegistry", assetId)
 	if err != nil {
 		return nil, err
 	}
 
 	callMsg := ethereum.CallMsg{To: &c.vaultAddr, Data: data}
-	res, err := c.rpcClient.CallContract(ctx, callMsg, nil)
+	res, err := c.callContract(ctx, callMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -133,14 +170,11 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		return nil, err
 	}
 
-	assetType := registry.AssetType
+	var symbol, metadata string
 	contractAddr := registry.AssetContract
 	precision := registry.Precision
 
-	var symbol string
-	var metadata string
-
-	switch assetType {
+	switch registry.AssetType {
 	case 1: // SYS native
 		symbol = "SYS"
 		metadata = "Native SYS asset"
@@ -176,21 +210,17 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		metadata = "Unknown Asset Type"
 	}
 
-	assetObj := wire.AssetType{
-		Contract:    []byte(contractAddr.Hex()),
-		Symbol:      []byte(symbol),
-		Precision:   precision,
-		TotalSupply: 0,
-		MaxSupply:   0,
-	}
-
-	asset := &bchain.Asset{
+	return &bchain.Asset{
 		Transactions: 0,
-		AssetObj:     assetObj,
-		MetaData:     []byte(metadata),
-	}
-
-	return asset, nil
+		AssetObj: wire.AssetType{
+			Contract:    []byte(contractAddr.Hex()),
+			Symbol:      []byte(symbol),
+			Precision:   precision,
+			TotalSupply: 0,
+			MaxSupply:   0,
+		},
+		MetaData: []byte(metadata),
+	}, nil
 }
 
 
