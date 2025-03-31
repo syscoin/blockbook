@@ -18,6 +18,7 @@ import (
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/common"
 	"github.com/syscoin/blockbook/db"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // SocketIoServer is handle to SocketIoServer
@@ -628,7 +629,7 @@ func (s *SocketIoServer) getAssetHistory(assetGuid string, opts *assetOpts) (res
 		res.Result.AssetDetails =	&api.AssetSpecific{
 			AssetGuid:		assetGuid,
 			Symbol:			string(dbAsset.AssetObj.Symbol),
-			Contract:		string(dbAsset.AssetObj.Contract),
+			Contract:		ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex(),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
 			MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 			Decimals:		int(dbAsset.AssetObj.Precision),

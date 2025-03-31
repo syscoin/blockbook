@@ -225,7 +225,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 	return &bchain.Asset{
 		Transactions: 0,
 		AssetObj: wire.AssetType{
-			Contract:    []byte(contractAddr.Hex()),
+			Contract:    contractAddr.Bytes(),
 			Symbol:      []byte(symbol),
 			Precision:   precision,
 			TotalSupply: 0,
