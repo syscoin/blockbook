@@ -78,7 +78,11 @@ type Config struct {
 			XPubMagicSegwitP2sh   uint32 `json:"xpub_magic_segwit_p2sh,omitempty"`
 			XPubMagicSegwitNative uint32 `json:"xpub_magic_segwit_native,omitempty"`
 			Slip44                uint32 `json:"slip44,omitempty"`
-
+			// SYSCOIN
+			Web3RPCURL            string `json:"web3_rpc_url,omitempty"`
+			Web3RPCURLBackup      string `json:"web3_rpc_url_backup,omitempty"`
+			Web3Explorer          string `json:"web3_explorer_url,omitempty"`
+			
 			AdditionalParams map[string]json.RawMessage `json:"additional_params"`
 		} `json:"block_chain"`
 	} `json:"blockbook"`
