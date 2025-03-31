@@ -27,6 +27,6 @@
 {{end}}
     "mempool_workers": {{.Blockbook.BlockChain.MempoolWorkers}},
     "mempool_sub_workers": {{.Blockbook.BlockChain.MempoolSubWorkers}},
-    "block_addresses_to_keep": {{.Blockbook.BlockChain.BlockAddressesToKeep}},
+    "block_addresses_to_keep": {{.Blockbook.BlockChain.BlockAddressesToKeep}}
 }
 {{end}}
