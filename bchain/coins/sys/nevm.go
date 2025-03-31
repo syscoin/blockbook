@@ -165,7 +165,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 	if err != nil {
 		return nil, err
 	}
-
+	glog.Infof("Calling vaultManager for assetId: %d with data: %x", assetId, data)
 	callMsg := ethereum.CallMsg{To: &c.vaultAddr, Data: data}
 	res, err := c.callContract(ctx, callMsg)
 	if err != nil {
