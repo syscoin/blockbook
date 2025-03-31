@@ -142,6 +142,20 @@ func (c *NEVMClient) getTokenSymbol(contractAddr common.Address) (string, error)
 }
 
 func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
+	if assetGuid == 123456 {
+		return &bchain.Asset{
+			Transactions: 0,
+			AssetObj: wire.AssetType{
+				Contract:    []byte{},
+				Symbol:      []byte("SYSX"),
+				Precision:   8,
+				TotalSupply: 0,
+				MaxSupply:   0,
+			},
+			MetaData: []byte("Syscoin Native Asset"),
+		}, nil
+	}
+	
 	ctx := context.Background()
 
 	assetId := uint32(assetGuid & 0xffffffff)
@@ -175,10 +189,6 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 	precision := registry.Precision
 
 	switch registry.AssetType {
-	case 1: // SYS native
-		symbol = "SYS"
-		metadata = "Native SYS asset"
-
 	case 2: // ERC20
 		symbol, err = c.getTokenSymbol(contractAddr)
 		if err != nil || symbol == "" {
