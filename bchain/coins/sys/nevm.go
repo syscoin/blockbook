@@ -187,9 +187,6 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 	var symbol, metadata string
 	contractAddr := registry.AssetContract
 	precision := registry.Precision
-	if precision > 8 {
-		precision = 8
-	}
 	switch registry.AssetType {
 	case 2: // ERC20
 		symbol, err = c.getTokenSymbol(contractAddr)
@@ -197,6 +194,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			symbol = fmt.Sprintf("ERC20-%d", assetId)
 		}
 		metadata = "ERC20 Token"
+		precision = 8
 
 	case 3: // ERC721 (NFT)
 		realTokenId, err := c.getRealTokenId(assetId, tokenIdx)
@@ -208,6 +206,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			symbol = fmt.Sprintf("ERC721-%d", assetId)
 		}
 		metadata = fmt.Sprintf("ERC721 NFT Token ID %s", realTokenId.String())
+		precision = 0
 
 	case 4: // ERC1155
 		realTokenId, err := c.getRealTokenId(assetId, tokenIdx)
@@ -216,6 +215,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		}
 		symbol = fmt.Sprintf("ERC1155-%d", assetId)
 		metadata = fmt.Sprintf("ERC1155 Token ID %s", realTokenId.String())
+		precision = 0
 
 	default:
 		symbol = fmt.Sprintf("UNKNOWN-%d", assetId)
