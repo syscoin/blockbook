@@ -1450,10 +1450,6 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	if errAsset != nil {
 		return nil, NewAPIError("Asset not found", true)
 	}
-	dbBaseAsset, errBaseAsset := w.db.GetAsset(assetGuid, nil)
-	if errBaseAsset != nil {
-		return nil, NewAPIError("Base asset not found", true)
-	}
 	// totalResults is known only if there is no filter
 	if  filter.FromHeight == 0 && filter.ToHeight == 0 {
 		totalResults = int(dbAsset.Transactions)
@@ -1523,9 +1519,9 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		AssetDetails:	&AssetSpecific{
 			AssetGuid:		asset,
 			Symbol:			string(dbAsset.AssetObj.Symbol),
-			Contract:		ethcommon.BytesToAddress(dbBaseAsset.AssetObj.Contract).Hex(),
+			Contract:		ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex(),
 			TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
-			MaxSupply:		(*bchain.Amount)(big.NewInt(dbBaseAsset.AssetObj.MaxSupply)),
+			MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
 			Decimals:		int(dbAsset.AssetObj.Precision),
 			MetaData:		string(dbAsset.MetaData),
 		},
