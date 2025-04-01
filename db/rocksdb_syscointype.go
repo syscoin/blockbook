@@ -207,6 +207,9 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	}
 	// nil data means the key was not found in DB
 	if val.Data() == nil {
+		if d.chain == nil {
+			return nil, errors.New("GetAsset: asset not found in DB")
+		}
 		assetDb, err := d.chain.FetchNEVMAssetDetails(guid)
 		if err != nil {
 			return nil, err
