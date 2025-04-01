@@ -24,7 +24,7 @@
                     <td>Contract</td>
                     <td class="data"><a href="{{formatContractExplorerURL $asset.AssetDetails.Contract}}">{{$asset.AssetDetails.Contract}}</a></td>
                 </tr>
-                {{if gt (len $asset.AssetDetails.MetaData) 0}}
+                {{if $asset.AssetDetails.MetaData}}
                 <tr>
                     <td>Metadata</td>
                     <td class="data ellipsis" colspan="3">{{$asset.AssetDetails.MetaData}}</td>
