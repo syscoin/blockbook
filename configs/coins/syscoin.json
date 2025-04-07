@@ -24,8 +24,8 @@
     "system_user": "syscoin",
     "version": "5.0.0.0",
     "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/syscoin-5.0.0-x86_64-linux-gnu.tar.gz",
-    "verification_type": "gpg-sha256",
-    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/SHA256SUMS.asc",
+    "_verification_type": "gpg-sha256",
+    "_verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
