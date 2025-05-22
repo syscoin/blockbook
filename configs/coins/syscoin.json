@@ -22,10 +22,10 @@
     "package_name": "backend-syscoin",
     "package_revision": "satoshilabs-1",
     "system_user": "syscoin",
-    "version": "5.0.3.0",
-    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.3/syscoin-5.0.3-x86_64-linux-gnu.tar.gz",
+    "version": "5.0.4.0",
+    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.4/syscoin-5.0.4-x86_64-linux-gnu.tar.gz",
     "_verification_type": "gpg-sha256",
-    "_verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.3/SHA256SUMS.asc",
+    "_verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.4/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
@@ -44,7 +44,7 @@
     },
     "platforms": {
       "arm64": {
-        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.3/syscoin-5.0.3-aarch64-linux-gnu.tar.gz"
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.4/syscoin-5.0.4-aarch64-linux-gnu.tar.gz"
       }
     }
   },
@@ -67,7 +67,7 @@
       "web3_rpc_url": "https://rpc.syscoin.org",
       "web3_rpc_url_backup": "https://rpc1.syscoin.org",
       "web3_explorer_url": "https://explorer.syscoin.org",
-      "subversion": "/Satoshi:5.0.3/",
+      "subversion": "/Satoshi:5.0.4/",
       "additional_params": {
         "fiat_rates": "coingecko",
         "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"syscoin\", \"periodSeconds\": 150}"
