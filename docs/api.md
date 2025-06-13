@@ -2,6 +2,8 @@
 
 **Blockbook** provides REST, websocket and socket.io API to the indexed blockchain.
 
+**Syscoin 5.0 Features**: This API now includes comprehensive support for Syscoin Platform Tokens (SPTs), NEVM (Network-Enhanced Virtual Machine) integration for ERC20/ERC721/ERC1155 token support, and cross-chain asset management between UTXO and EVM layers.
+
 There are two versions of provided API.
 
 ## Legacy API V1
@@ -50,6 +52,8 @@ The following methods are supported:
 - [Get utxo](#get-utxo)
 - [Get block](#get-block)
 - [Send transaction](#send-transaction)
+- [Get asset](#get-asset)
+- [Get assets](#get-assets)
 - [Tickers list](#tickers-list)
 - [Tickers](#tickers)
 - [Balance history](#balance-history)
@@ -172,6 +176,8 @@ Response for Bitcoin-type coins:
 
 Response for Ethereum-type coins. There is always only one *vin*, only one *vout*, possibly an array of *tokenTransfers* and *ethereumSpecific* part. Note that *tokenTransfers* will also exist for any coins exposing a token interface including Ethereum and Syscoin. Missing is *hex* field:
 
+Note for Syscoin: SPT (Syscoin Platform Token) transactions will include `assetInfo` fields in `vin` and `vout` containing `assetGuid` and `value` for the SPT assets being transferred. The transaction may also include a `tokenType` field and `memo` field for SPT-specific data.
+
 ```javascript
 {
   "txid": "0xb78a36a4a0e7d708d595c3b193cace8f5b420e72e1f595a5387d87de509f0806",
@@ -220,6 +226,67 @@ Response for Ethereum-type coins. There is always only one *vin*, only one *vout
     "gasPrice": "11000000000",
     "data": "0xa9059cbb000000000000000000000000ba98d6a5"
   }
+}
+```
+
+Response for Syscoin SPT (Syscoin Platform Token) transactions:
+
+```javascript
+{
+  "txid": "9a42fc4b7f1c21fbc3b8b4e2c7f2e3e7c4d8e2a1b9c3e4f5a6b7c8d9e0f1a2b3",
+  "version": 142,
+  "vin": [
+    {
+      "txid": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2",
+      "vout": 0,
+      "sequence": 4294967295,
+      "n": 0,
+      "addresses": [
+        "sys1qk5x3j5s7n8t9k3c2x4v5b6n7m8l9p0a1s2d3f4g5h"
+      ],
+      "isAddress": true,
+      "value": "10000000000",
+      "assetInfo": {
+        "assetGuid": "123456789",
+        "value": "100000000000"
+      }
+    }
+  ],
+  "vout": [
+    {
+      "value": "9999900000",
+      "n": 0,
+      "addresses": [
+        "sys1qr6w5e4t3y2u1i9o8p7l6k5j4h3g2f1s0a9z8x7c6v"
+      ],
+      "isAddress": true,
+      "assetInfo": {
+        "assetGuid": "123456789", 
+        "value": "50000000000"
+      }
+    },
+    {
+      "value": "0",
+      "n": 1,
+      "addresses": [
+        "sys1qm3n4b5v6c7x8z9a0s1d2f3g4h5j6k7l8p9o0i1u2y"
+      ],
+      "isAddress": true,
+      "assetInfo": {
+        "assetGuid": "123456789",
+        "value": "50000000000"
+      }
+    }
+  ],
+  "blockHash": "abc123def456789abc123def456789abc123def456789abc123def456789abc123",
+  "blockHeight": 1234567,
+  "confirmations": 10,
+  "blockTime": 1640995200,
+  "value": "9999900000",
+  "valueIn": "10000000000", 
+  "fees": "100000",
+  "tokenType": "SPTAssetAllocationSend",
+  "memo": "VGVzdCBTUFQgdHJhbnNmZXI="
 }
 ```
 
@@ -345,6 +412,19 @@ Response:
     "461dd46d5d6f56d765f82e60e6bf0727a3a1d1cb8c4144373d805b152a21d308",
     "bdb5b47603c5d174eae3384c368068c8e9d2183b398ed0e31d125defa4447a10",
     "5c1d2686d70d82bd8e84b5d3dc4bd0e8485e28cdc865336db6a5e40b2098277d"
+  ],
+  "tokens": [
+    {
+      "type": "SPTAllocated",
+      "name": "sys1qk5x3j5s7n8t9k3c2x4v5b6n7m8l9p0a1s2d3f4g5h",
+      "assetGuid": "123456789",
+      "symbol": "MYTOKEN",
+      "decimals": 8,
+      "balance": "500000000000",
+      "totalReceived": "1000000000000",
+      "totalSent": "500000000000",
+      "transfers": 15
+    }
   ]
 }
 ```
@@ -510,9 +590,16 @@ Response:
     "vout": 0,
     "value": "142771322208",
     "height": 2644885,
-    "confirmations": 3205
+    "confirmations": 3205,
+    "assetInfo": {
+      "assetGuid": "987654321",
+      "value": "25000000000"
+    }
   }
 ]
+```
+
+For Syscoin: UTXOs may include `assetInfo` objects containing SPT asset information with `assetGuid` and `value` fields for Syscoin Platform Token holdings.
 ```
 
 #### Get block
@@ -613,6 +700,72 @@ Response:
 }
 ```
 _Note: Blockbook always follows the main chain of the backend it is attached to. If there is a rollback-reorg in the backend, Blockbook will also do rollback. When you ask for block by height, you will always get the main chain block. If you ask for block by hash, you may get the block from another fork but it is not guaranteed (backend may not keep it)_
+
+#### Get asset
+
+Returns asset details and transactions for a given asset GUID (applicable only to Syscoin).
+
+```
+GET /api/v2/asset/<asset GUID>[?page=<page>&pageSize=<size>&from=<block height>&to=<block height>&details=<basic|tokens|tokenBalances|txids|txs>&filter=<inputs|outputs|tokens|0|uint32>]
+```
+
+The optional query parameters are the same as for address endpoint.
+
+Response:
+
+```javascript
+{
+  "page": 1,
+  "totalPages": 1,
+  "itemsOnPage": 1000,
+  "asset": {
+    "assetGuid": "123456789",
+    "contract": "0x742d35Cc63C4Ec4C670f1c96e2e6eF0f3a2C0F8f",
+    "symbol": "MYTOKEN",
+    "totalSupply": "1000000000000000000",
+    "maxSupply": "5000000000000000000",
+    "decimals": 8,
+    "metaData": "ERC20 Token"
+  },
+  "unconfirmedTxs": 0,
+  "unconfirmedBalance": "0",
+  "txs": 42,
+  "txids": [
+    "abc123...",
+    "def456..."
+  ]
+}
+```
+
+#### Get assets
+
+Returns filtered list of assets matching the search criteria (applicable only to Syscoin).
+
+```
+GET /api/v2/assets/<search filter>[?page=<page>&pageSize=<size>]
+```
+
+Response:
+
+```javascript
+{
+  "page": 1,
+  "totalPages": 1,
+  "itemsOnPage": 1000,
+  "numAssets": 150,
+  "assets": [
+    {
+      "assetGuid": "123456789",
+      "contract": "0x742d35Cc63C4Ec4C670f1c96e2e6eF0f3a2C0F8f",
+      "symbol": "MYTOKEN",
+      "totalSupply": "1000000000000000000",
+      "precision": 8,
+      "txs": 42,
+      "metaData": "ERC20 Token"
+    }
+  ]
+}
+```
 
 #### Send transaction
 
@@ -842,6 +995,8 @@ The websocket interface provides the following requests:
 - getAccountUtxo
 - getTransaction
 - getTransactionSpecific
+- getAsset (Syscoin only)
+- getAssets (Syscoin only)
 - getBalanceHistory
 - getCurrentFiatRates
 - getFiatRatesTickersList
