@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
-	"strconv"
+
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/syscoin/blockbook/bchain"
 	"github.com/syscoin/blockbook/db"
 	"github.com/syscoin/syscoinwire/syscoin/wire"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const defaultAddressesGap = 20
@@ -69,8 +70,9 @@ type xpubData struct {
 	sentSat         big.Int
 	balanceSat      big.Int
 	addresses       [][]xpubAddress
-	Tokens	    map[string]*bchain.AssetBalance `json:"tokens,omitempty"`
+	Tokens          map[string]*bchain.AssetBalance `json:"tokens,omitempty"`
 }
+
 func (w *Worker) initXpubCache() {
 	cachedXpubsMux.Lock()
 	if cachedXpubs == nil {
@@ -127,15 +129,15 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 				inputOutput |= txOutput
 			}
 		}
-		if(!foundAsset) {
+		if !foundAsset {
 			for _, assetGuid := range assetGuids {
-				if (contract == assetGuid) {
+				if contract == assetGuid {
 					foundAsset = true
 					break
 				}
 			}
 		}
-		if(foundAsset) {
+		if foundAsset {
 			txs = append(txs, xpubTxid{txid, height, inputOutput})
 		}
 		return nil
@@ -223,7 +225,7 @@ func (w *Worker) xpubDerivedAddressBalance(data *xpubData, ad *xpubAddress) (boo
 			}
 			for guid, assetBalance := range ad.balance.AssetBalances {
 				assetGuid := strconv.FormatUint(guid, 10)
-				bhaToken, ok := data.Tokens[assetGuid];
+				bhaToken, ok := data.Tokens[assetGuid]
 				if !ok {
 					bhaToken = &bchain.AssetBalance{Transfers: 0, SentSat: big.NewInt(0), BalanceSat: big.NewInt(0)}
 					data.Tokens[assetGuid] = bhaToken
@@ -316,13 +318,13 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 					Type:             bchain.SPTTokenType,
 					Name:             address,
 					Decimals:         int(dbAsset.AssetObj.Precision),
-					Symbol:			  string(dbAsset.AssetObj.Symbol),
+					Symbol:           string(dbAsset.AssetObj.Symbol),
 					BalanceSat:       (*bchain.Amount)(v.BalanceSat),
 					TotalReceivedSat: (*bchain.Amount)(totalAssetReceived),
 					TotalSentSat:     (*bchain.Amount)(v.SentSat),
 					Path:             fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index),
-					AssetGuid:		  assetGuid,
-					Transfers:		  v.Transfers,
+					AssetGuid:        assetGuid,
+					Transfers:        v.Transfers,
 				})
 			}
 			sort.Sort(tokens)
@@ -426,7 +428,7 @@ func (w *Worker) getXpubData(xd *bchain.XpubDescriptor, page int, txsOnPage int,
 			data.balanceSat = *new(big.Int)
 			data.sentSat = *new(big.Int)
 			data.txCountEstimate = 0
-		    data.Tokens = nil
+			data.Tokens = nil
 			var minDerivedIndex int
 			for i, change := range xd.ChangeIndexes {
 				minDerivedIndex, data.addresses[i], err = w.xpubScanAddresses(xd, &data, data.addresses[i], gap, change, minDerivedIndex, fork)
@@ -532,7 +534,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 						if !foundTx {
 							unconfirmedTxs++
 						}
-						uBalSat.Add(&uBalSat,  tx.getAddrVoutValue(ad.addrDesc, mapAssetMempool))
+						uBalSat.Add(&uBalSat, tx.getAddrVoutValue(ad.addrDesc, mapAssetMempool))
 						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc, mapAssetMempool))
 						// mempool txs are returned only on the first page, uniquely and filtered
 						if page == 0 && !foundTx && (txidFilter == nil || txidFilter(&txid, ad)) {
@@ -636,27 +638,27 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 							if filter.TokensToReturn == TokensToReturnDerived ||
 								filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
 								filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
-									if token.Type != bchain.XPUBAddressTokenType {
-										mempoolAsset, ok := mapAssetMempool[token.AssetGuid]
-										// add unique asset token balances for unconfirmed state
-										if ok && mempoolAsset.Used == false {
-											token.UnconfirmedBalanceSat = (*bchain.Amount)(mempoolAsset.ValueSat)
-											token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
-											// set address to used to ensure uniqueness
-											mempoolAsset.Used = true
-											mapAssetMempool[token.AssetGuid] = mempoolAsset
-										}
-										tokensAsset = append(tokensAsset, token)
-									} else {
-										tokens = append(tokens, token)
+								if token.Type != bchain.XPUBAddressTokenType {
+									mempoolAsset, ok := mapAssetMempool[token.AssetGuid]
+									// add unique asset token balances for unconfirmed state
+									if ok && mempoolAsset.Used == false {
+										token.UnconfirmedBalanceSat = (*bchain.Amount)(mempoolAsset.ValueSat)
+										token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
+										// set address to used to ensure uniqueness
+										mempoolAsset.Used = true
+										mapAssetMempool[token.AssetGuid] = mempoolAsset
 									}
+									tokensAsset = append(tokensAsset, token)
+								} else {
+									tokens = append(tokens, token)
+								}
 							}
 							xpubAddresses[token.Name] = struct{}{}
 						}
 					}
 				}
 				if option > AccountDetailsBasic {
-					
+
 					if len(mapAssetMempool) > 0 {
 						a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
 						var address string
@@ -677,18 +679,20 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								dbAsset = &bchain.Asset{Transactions: 0, AssetObj: wire.AssetType{Symbol: []byte(k), Precision: 8}}
 							}
 							tokensAsset = append(tokensAsset, &bchain.Token{
-								Type:             bchain.SPTTokenType,
-								Name:             address,
-								Decimals:         int(dbAsset.AssetObj.Precision),
-								Symbol:			  string(dbAsset.AssetObj.Symbol),
-								BalanceSat:       &bchain.Amount{},
-								UnconfirmedBalanceSat:       (*bchain.Amount)(v.ValueSat),
-								TotalReceivedSat: &bchain.Amount{},
-								TotalSentSat:     &bchain.Amount{},
-								AssetGuid:		  k,
-								Transfers:		  0,
-								UnconfirmedTransfers:		   v.UnconfirmedTxs,
+								Type:                  bchain.SPTTokenType,
+								Name:                  address,
+								Decimals:              int(dbAsset.AssetObj.Precision),
+								Symbol:                string(dbAsset.AssetObj.Symbol),
+								BalanceSat:            &bchain.Amount{},
+								UnconfirmedBalanceSat: (*bchain.Amount)(v.ValueSat),
+								TotalReceivedSat:      &bchain.Amount{},
+								TotalSentSat:          &bchain.Amount{},
+								AssetGuid:             k,
+								Transfers:             0,
+								UnconfirmedTransfers:  v.UnconfirmedTxs,
 							})
+							v.Used = true
+							mapAssetMempool[k] = v
 						}
 					}
 				}
@@ -734,7 +738,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 	data, _, inCache, err := w.getXpubData(xd, 0, 1, AccountDetailsBasic, &AddressFilter{
 		Vout:          AddressFilterVoutOff,
 		OnlyConfirmed: onlyConfirmed,
-		AssetsMask:	   bchain.AllMask,
+		AssetsMask:    bchain.AllMask,
 	}, gap)
 	if err != nil {
 		return utxoRes, err
@@ -762,7 +766,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 					return utxoRes, errXpub
 				}
 				if len(txs) > 0 {
-					for _ , t := range txs {
+					for _, t := range txs {
 						for j := range utxos {
 							a := &utxos[j]
 							a.Address = t.Name
@@ -787,13 +791,13 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 								continue
 							}
 							assetsMap[assetGuid] = true
-							assetDetails :=	&AssetSpecific{
-								AssetGuid:		strconv.FormatUint(assetGuid, 10),
-								Symbol:			string(dbAsset.AssetObj.Symbol),
-								Contract:		ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex(),
-								TotalSupply:	(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
-								MaxSupply:		(*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
-								Decimals:		int(dbAsset.AssetObj.Precision),
+							assetDetails := &AssetSpecific{
+								AssetGuid:   strconv.FormatUint(assetGuid, 10),
+								Symbol:      string(dbAsset.AssetObj.Symbol),
+								Contract:    ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex(),
+								TotalSupply: (*bchain.Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
+								MaxSupply:   (*bchain.Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
+								Decimals:    int(dbAsset.AssetObj.Precision),
 							}
 							assets = append(assets, assetDetails)
 						}
@@ -828,7 +832,7 @@ func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp i
 		OnlyConfirmed: true,
 		FromHeight:    fromHeight,
 		ToHeight:      toHeight,
-		AssetsMask:	   bchain.AllMask,
+		AssetsMask:    bchain.AllMask,
 	}, gap)
 	if err != nil {
 		return nil, err
