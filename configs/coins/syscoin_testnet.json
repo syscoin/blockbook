@@ -22,10 +22,10 @@
     "package_name": "backend-syscoin-testnet",
     "package_revision": "satoshilabs-1",
     "system_user": "syscoin",
-    "version": "5.0.4.0",
-    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.4/syscoin-5.0.4-x86_64-linux-gnu.tar.gz",
+    "version": "5.0.5.0",
+    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.5/syscoin-5.0.5-x86_64-linux-gnu.tar.gz",
     "_verification_type": "gpg-sha256",
-    "_verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.4/SHA256SUMS.asc",
+    "_verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.5/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
@@ -44,7 +44,7 @@
     },
     "platforms": {
       "arm64": {
-        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.4/syscoin-5.0.4-aarch64-linux-gnu.tar.gz"
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.5/syscoin-5.0.5-aarch64-linux-gnu.tar.gz"
       }
     }
   },
@@ -67,7 +67,7 @@
       "web3_rpc_url": "https://rpc.tanenbaum.io",
       "web3_rpc_url_backup": "https://rpc1.tanenbaum.io",
       "web3_explorer_url": "https://explorer.tanenbaum.io",
-      "subversion": "/Satoshi:5.0.4/",
+      "subversion": "/Satoshi:5.0.5/",
       "additional_params": {
       }
     }
