@@ -484,7 +484,8 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	if err != nil {
 		return nil, err
 	}
-	mapAssetMempool := map[string]*TokenMempoolInfo{}
+	// Track SPT mempool deltas per derived address to avoid cross-address consumption
+	perAddrAssetMempool := map[string]map[string]*TokenMempoolInfo{}
 	// setup filtering of txids
 	var txidFilter func(txid *xpubTxid, ad *xpubAddress) bool
 	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff) {
@@ -513,6 +514,13 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		for _, da := range data.addresses {
 			for i := range da {
 				ad := &da[i]
+				// prepare per-address mempool map
+				addrKey := string(ad.addrDesc)
+				localAssetMempool, exists := perAddrAssetMempool[addrKey]
+				if !exists {
+					localAssetMempool = map[string]*TokenMempoolInfo{}
+					perAddrAssetMempool[addrKey] = localAssetMempool
+				}
 				newTxids, _, err := w.xpubGetAddressTxids(ad.addrDesc, true, 0, 0, filter, maxInt)
 				if err != nil {
 					return nil, err
@@ -534,8 +542,9 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 						if !foundTx {
 							unconfirmedTxs++
 						}
-						uBalSat.Add(&uBalSat, tx.getAddrVoutValue(ad.addrDesc, mapAssetMempool))
-						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc, mapAssetMempool))
+						// accumulate base coin unconfirmed delta and per-address asset deltas
+						uBalSat.Add(&uBalSat, tx.getAddrVoutValue(ad.addrDesc, localAssetMempool))
+						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc, localAssetMempool))
 						// mempool txs are returned only on the first page, uniquely and filtered
 						if page == 0 && !foundTx && (txidFilter == nil || txidFilter(&txid, ad)) {
 							mempoolEntries = append(mempoolEntries, bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
@@ -639,14 +648,15 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
 								filter.TokensToReturn == TokensToReturnNonzeroBalance && token.BalanceSat != nil && token.BalanceSat.AsInt64() != 0 {
 								if token.Type != bchain.XPUBAddressTokenType {
-									mempoolAsset, ok := mapAssetMempool[token.AssetGuid]
-									// add unique asset token balances for unconfirmed state
-									if ok && mempoolAsset.Used == false {
-										token.UnconfirmedBalanceSat = (*bchain.Amount)(mempoolAsset.ValueSat)
-										token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
-										// set address to used to ensure uniqueness
-										mempoolAsset.Used = true
-										mapAssetMempool[token.AssetGuid] = mempoolAsset
+									// attach per-address mempool delta if present
+									localAssetMempool := perAddrAssetMempool[string(ad.addrDesc)]
+									if localAssetMempool != nil {
+										if mempoolAsset, ok := localAssetMempool[token.AssetGuid]; ok && mempoolAsset.Used == false {
+											token.UnconfirmedBalanceSat = (*bchain.Amount)(mempoolAsset.ValueSat)
+											token.UnconfirmedTransfers = mempoolAsset.UnconfirmedTxs
+											mempoolAsset.Used = true
+											localAssetMempool[token.AssetGuid] = mempoolAsset
+										}
 									}
 									tokensAsset = append(tokensAsset, token)
 								} else {
@@ -659,13 +669,14 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				}
 				if option > AccountDetailsBasic {
 
-					if len(mapAssetMempool) > 0 {
+					localAssetMempool := perAddrAssetMempool[string(ad.addrDesc)]
+					if len(localAssetMempool) > 0 {
 						a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
 						var address string
 						if len(a) > 0 {
 							address = a[0]
 						}
-						for k, v := range mapAssetMempool {
+						for k, v := range localAssetMempool {
 							// if already used we show the unconfirmed amounts in token above, otherwise we add a new token with some cleared values as the token is being sent to a new address
 							if v.Used == true {
 								continue
@@ -692,7 +703,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 								UnconfirmedTransfers:  v.UnconfirmedTxs,
 							})
 							v.Used = true
-							mapAssetMempool[k] = v
+							localAssetMempool[k] = v
 						}
 					}
 				}
