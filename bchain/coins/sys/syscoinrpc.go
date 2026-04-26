@@ -147,3 +147,37 @@ func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
 func (b *SyscoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
 	return b.GetTransaction(txid)
 }
+
+// Syscoin Core sendrawtransaction default maxfeerate is 0.10.
+// Syscoin Core sendrawtransaction default maxburnamount is 0.0.
+// Governance Proposal needs maxburnamount of 150.
+// This change allows sending governance proposals without explicitly setting both parameters.
+const (
+	defaultSyscoinMaxFeeRate = "0.10"
+	defaultSyscoinMaxBurnAmount = "150"
+)
+
+func syscoinSendRawParams(p bchain.SendRawTransactionParams) bchain.SendRawTransactionParams {
+	if p.MaxFeeRate == nil || *p.MaxFeeRate == "" {
+		s := defaultSyscoinMaxFeeRate
+		p.MaxFeeRate = &s
+	}
+	if p.MaxBurnAmount == nil || *p.MaxBurnAmount == "" {
+		s := defaultSyscoinMaxBurnAmount
+		p.MaxBurnAmount = &s
+	}
+	return p
+}
+
+// Override BitcoinRPC to apply Syscoin default maxfeerate / maxburnamount.
+func (b *SyscoinRPC) SendRawTransaction(tx string) (string, error) {
+	return b.SendRawTransactionWithOpts(bchain.SendRawTransactionParams{Hex: tx})
+}
+
+// Forwards maxfeerate / maxburnamount to Syscoin Core sendrawtransaction.
+func (b *SyscoinRPC) SendRawTransactionWithOpts(p bchain.SendRawTransactionParams) (string, error) {
+	p = syscoinSendRawParams(p)
+	return btc.SendRawTransactionWithParams(b.BitcoinRPC, p)
+}
+
+var _ bchain.SendRawTransactionOpts = (*SyscoinRPC)(nil)
