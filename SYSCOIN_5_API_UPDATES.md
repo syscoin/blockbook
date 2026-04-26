@@ -19,6 +19,11 @@
 - **Purpose**: Returns filtered list of assets matching search criteria
 - **Response**: Paginated list of assets with basic information
 
+#### Send transaction, optional params
+- **Endpoint**: `POST` or `GET` `/api/v2/sendtx/`; explorer `POST` sendtx
+- **Purpose**: Optional `maxfeerate` / `maxburnamount` for Syscoin Core `sendrawtransaction` (JSON body starting with `{` and `hex` field, else raw hex; `GET` query string; optional form fields) — **Syscoin** only; the defaults are set to **0.10** and **150** SYS
+- **Response**: Same as before (`result` = txid)
+
 ### 3. Enhanced Transaction Responses
 
 #### SPT Transaction Support

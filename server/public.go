@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -991,9 +993,16 @@ func (s *PublicServer) explorerSendTx(w http.ResponseWriter, r *http.Request) (t
 		if err != nil {
 			return sendTransactionTpl, data, err
 		}
-		hex := r.FormValue("hex")
+		hex := strings.TrimSpace(r.FormValue("hex"))
 		if len(hex) > 0 {
-			res, err := s.chain.SendRawTransaction(hex)
+			p := bchain.SendRawTransactionParams{Hex: hex}
+			if v := strings.TrimSpace(r.FormValue("maxfeerate")); v != "" {
+				p.MaxFeeRate = &v
+			}
+			if v := strings.TrimSpace(r.FormValue("maxburnamount")); v != "" {
+				p.MaxBurnAmount = &v
+			}
+			res, err := s.submitSendRawTx(p)
 			if err != nil {
 				data.SendTxHex = hex
 				data.Error = &api.APIError{Text: err.Error(), Public: true}
@@ -1381,24 +1390,69 @@ type resultSendTransaction struct {
 	Result string `json:"result"`
 }
 
+func optionalNonEmptyQueryString(r *http.Request, key string) *string {
+	v := strings.TrimSpace(r.URL.Query().Get(key))
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+func sendTxOptsRequested(p bchain.SendRawTransactionParams) bool {
+	return nonEmptyOptionalStr(p.MaxFeeRate) || nonEmptyOptionalStr(p.MaxBurnAmount)
+}
+
+func nonEmptyOptionalStr(s *string) bool {
+	return s != nil && *s != ""
+}
+
+func (s *PublicServer) submitSendRawTx(p bchain.SendRawTransactionParams) (string, error) {
+	if sendTxOptsRequested(p) {
+		o, ok := s.chain.(bchain.SendRawTransactionOpts)
+		if !ok {
+			return "", errors.New("maxfeerate and maxburnamount are supported only on Syscoin")
+		}
+		return o.SendRawTransactionWithOpts(p)
+	}
+	return s.chain.SendRawTransaction(p.Hex)
+}
+
 func (s *PublicServer) apiSendTx(r *http.Request, apiVersion int) (interface{}, error) {
 	var err error
 	var res resultSendTransaction
-	var hex string
+	var p bchain.SendRawTransactionParams
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-sendtx"}).Inc()
 	if r.Method == http.MethodPost {
 		data, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			return nil, api.NewAPIError("Missing tx blob", true)
 		}
-		hex = string(data)
+		data = bytes.TrimSpace(data)
+		if len(data) > 0 && data[0] == '{' {
+			var body struct {
+				Hex           string  `json:"hex"`
+				MaxFeeRate    *string `json:"maxfeerate,omitempty"`
+				MaxBurnAmount *string `json:"maxburnamount,omitempty"`
+			}
+			if err := json.Unmarshal(data, &body); err != nil {
+				return nil, api.NewAPIError("Invalid JSON body", true)
+			}
+			p.Hex = strings.TrimSpace(body.Hex)
+			p.MaxFeeRate = body.MaxFeeRate
+			p.MaxBurnAmount = body.MaxBurnAmount
+		} else {
+			p.Hex = string(data)
+		}
 	} else {
 		if i := strings.LastIndexByte(r.URL.Path, '/'); i > 0 {
-			hex = r.URL.Path[i+1:]
+			p.Hex = r.URL.Path[i+1:]
 		}
+		p.MaxFeeRate = optionalNonEmptyQueryString(r, "maxfeerate")
+		p.MaxBurnAmount = optionalNonEmptyQueryString(r, "maxburnamount")
 	}
-	if len(hex) > 0 {
-		res.Result, err = s.chain.SendRawTransaction(hex)
+	p.Hex = strings.TrimSpace(p.Hex)
+	if len(p.Hex) > 0 {
+		res.Result, err = s.submitSendRawTx(p)
 		if err != nil {
 			return nil, api.NewAPIError(err.Error(), true)
 		}

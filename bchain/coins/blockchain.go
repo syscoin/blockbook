@@ -283,6 +283,16 @@ func (c *blockChainWithMetrics) SendRawTransaction(tx string) (v string, err err
 	return c.b.SendRawTransaction(tx)
 }
 
+func (c *blockChainWithMetrics) SendRawTransactionWithOpts(p bchain.SendRawTransactionParams) (string, error) {
+	o, ok := c.b.(bchain.SendRawTransactionOpts)
+	if !ok {
+		return "", fmt.Errorf("maxfeerate and maxburnamount are supported only on Syscoin")
+	}
+	var err error
+	defer func(s time.Time) { c.observeRPCLatency("SendRawTransactionWithOpts", s, err) }(time.Now())
+	return o.SendRawTransactionWithOpts(p)
+}
+
 func (c *blockChainWithMetrics) GetMempoolEntry(txid string) (v *bchain.MempoolEntry, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetMempoolEntry", s, err) }(time.Now())
 	return c.b.GetMempoolEntry(txid)
