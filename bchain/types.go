@@ -645,6 +645,21 @@ const (
 	AddressBalanceDetailUTXOIndexed = 2
 )
 
+// SendRawTransactionParams carries optional arguments for Syscoin Core sendrawtransaction
+// (maxfeerate, maxburnamount). Used with SendRawTransactionOpts.
+// The implementation (see syscoinrpc.go) takes care of the proper optional argument settings.
+type SendRawTransactionParams struct {
+	Hex           string
+	MaxFeeRate    *string
+	MaxBurnAmount *string
+}
+
+// SendRawTransactionOpts is implemented by chains whose node supports
+// sendrawtransaction with maxfeerate / maxburnamount (Syscoin).
+type SendRawTransactionOpts interface {
+	SendRawTransactionWithOpts(p SendRawTransactionParams) (string, error)
+}
+
 // BlockChain defines common interface to block chain daemon
 type BlockChain interface {
 	// life-cycle methods

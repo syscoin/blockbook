@@ -420,8 +420,8 @@ type ResEstimateFee struct {
 // sendrawtransaction
 
 type CmdSendRawTransaction struct {
-	Method string   `json:"method"`
-	Params []string `json:"params"`
+	Method string        `json:"method"`
+	Params []interface{} `json:"params"`
 }
 
 type ResSendRawTransaction struct {
@@ -887,13 +887,29 @@ func (b *BitcoinRPC) EstimateFee(blocks int) (big.Int, error) {
 	return r, nil
 }
 
-// SendRawTransaction sends raw transaction
-func (b *BitcoinRPC) SendRawTransaction(tx string) (string, error) {
+func nonEmptyPtr(s *string) bool {
+	return s != nil && *s != ""
+}
+
+// SendRawTransactionWithParams calls sendrawtransaction with optional Core-compatible
+// maxfeerate / maxburnamount. Package-level function so types embedding BitcoinRPC do not
+// promote it as SendRawTransactionOpts (only SyscoinRPC implements that interface).
+func SendRawTransactionWithParams(b *BitcoinRPC, p bchain.SendRawTransactionParams) (string, error) {
 	glog.V(1).Info("rpc: sendrawtransaction")
 
+	params := []interface{}{p.Hex}
+	if nonEmptyPtr(p.MaxFeeRate) {
+		params = append(params, *p.MaxFeeRate)
+	}
+	if nonEmptyPtr(p.MaxBurnAmount) {
+		if !nonEmptyPtr(p.MaxFeeRate) {
+			return "", errors.New("maxfeerate is required when maxburnamount is set")
+		}
+		params = append(params, *p.MaxBurnAmount)
+	}
+
 	res := ResSendRawTransaction{}
-	req := CmdSendRawTransaction{Method: "sendrawtransaction"}
-	req.Params = []string{tx}
+	req := CmdSendRawTransaction{Method: "sendrawtransaction", Params: params}
 	err := b.Call(&req, &res)
 
 	if err != nil {
@@ -903,6 +919,11 @@ func (b *BitcoinRPC) SendRawTransaction(tx string) (string, error) {
 		return "", res.Error
 	}
 	return res.Result, nil
+}
+
+// SendRawTransaction sends raw transaction
+func (b *BitcoinRPC) SendRawTransaction(tx string) (string, error) {
+	return SendRawTransactionWithParams(b, bchain.SendRawTransactionParams{Hex: tx})
 }
 
 // GetMempoolEntry returns mempool data for given transaction

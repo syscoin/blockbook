@@ -20,6 +20,58 @@ func TestMain(m *testing.M) {
 	os.Exit(c)
 }
 
+func TestSyscoinSendRawParams(t *testing.T) {
+	customFeeRate := "0.25"
+	customBurnAmount := "42"
+	empty := ""
+
+	tests := []struct {
+		name           string
+		params         bchain.SendRawTransactionParams
+		wantFeeRate    string
+		wantBurnAmount string
+	}{
+		{
+			name:           "defaults both optional params",
+			params:         bchain.SendRawTransactionParams{Hex: "abc"},
+			wantFeeRate:    defaultSyscoinMaxFeeRate,
+			wantBurnAmount: defaultSyscoinMaxBurnAmount,
+		},
+		{
+			name: "preserves explicit params",
+			params: bchain.SendRawTransactionParams{
+				Hex:           "abc",
+				MaxFeeRate:    &customFeeRate,
+				MaxBurnAmount: &customBurnAmount,
+			},
+			wantFeeRate:    customFeeRate,
+			wantBurnAmount: customBurnAmount,
+		},
+		{
+			name: "defaults empty strings",
+			params: bchain.SendRawTransactionParams{
+				Hex:           "abc",
+				MaxFeeRate:    &empty,
+				MaxBurnAmount: &empty,
+			},
+			wantFeeRate:    defaultSyscoinMaxFeeRate,
+			wantBurnAmount: defaultSyscoinMaxBurnAmount,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := syscoinSendRawParams(tt.params)
+			if got.MaxFeeRate == nil || *got.MaxFeeRate != tt.wantFeeRate {
+				t.Errorf("MaxFeeRate = %v, want %v", got.MaxFeeRate, tt.wantFeeRate)
+			}
+			if got.MaxBurnAmount == nil || *got.MaxBurnAmount != tt.wantBurnAmount {
+				t.Errorf("MaxBurnAmount = %v, want %v", got.MaxBurnAmount, tt.wantBurnAmount)
+			}
+		})
+	}
+}
+
 func Test_GetAddrDescFromAddress_Mainnet(t *testing.T) {
 	type args struct {
 		address string

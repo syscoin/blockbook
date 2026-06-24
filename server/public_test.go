@@ -911,6 +911,24 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			},
 		},
 		{
+			name:        "apiSendTx POST JSON",
+			r:           newPostRequest(ts.URL+"/api/v2/sendtx/", `{"hex":"123456"}`),
+			status:      http.StatusOK,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"result":"9876"}`,
+			},
+		},
+		{
+			name:        "apiSendTx POST JSON maxburn unsupported",
+			r:           newPostRequest(ts.URL+"/api/v2/sendtx/", `{"hex":"123456","maxburnamount":"1"}`),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"maxfeerate and maxburnamount are supported only on Syscoin"}`,
+			},
+		},
+		{
 			name:        "apiSendTx POST empty",
 			r:           newPostRequest(ts.URL+"/api/v2/sendtx", ""),
 			status:      http.StatusBadRequest,
