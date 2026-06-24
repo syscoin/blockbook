@@ -1,12 +1,14 @@
 package bchain
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"strconv"
 	"strings"
 
+	vlq "github.com/bsm/go-vlq"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/trezor/blockbook/common"
@@ -430,4 +432,108 @@ func (p *BaseParser) FormatAddressAlias(address string, name string) string {
 
 func (b *BaseParser) ParseInputData(signatures *[]FourByteSignature, data string) *EthereumParsedInputData {
 	return nil
+}
+
+// SYSCOIN: default no-op hooks for Syscoin SPT parsing/indexing. Non-Syscoin
+// parsers keep upstream behavior and never enter these code paths.
+func (p *BaseParser) IsSyscoinTx(nVersion int32, nHeight uint32) bool { return false }
+func (p *BaseParser) IsSyscoinMintTx(nVersion int32) bool             { return false }
+func (p *BaseParser) IsAssetAllocationTx(nVersion int32) bool         { return false }
+func (p *BaseParser) GetAssetsMaskFromVersion(nVersion int32) AssetsMask {
+	return BaseCoinMask
+}
+func (p *BaseParser) GetAssetTypeFromVersion(nVersion int32) *TokenType { return nil }
+func (p *BaseParser) TryGetOPReturn(script []byte) []byte               { return nil }
+func (p *BaseParser) GetMaxAddrLength() int                             { return 1024 }
+func (p *BaseParser) PackAssetKey(assetGuid uint64, height uint32) []byte {
+	return nil
+}
+func (p *BaseParser) UnpackAssetKey(buf []byte) (uint64, uint32) { return 0, 0 }
+func (p *BaseParser) PackAssetTxIndex(txAsset *TxAsset) []byte   { return nil }
+func (p *BaseParser) UnpackAssetTxIndex(buf []byte) []*TxAssetIndex {
+	return nil
+}
+func (p *BaseParser) GetAssetAllocationFromData(sptData []byte, txVersion int32) (*AssetAllocation, []byte, error) {
+	return nil, nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAssetAllocationFromDesc(addrDesc *AddressDescriptor, txVersion int32) (*AssetAllocation, []byte, error) {
+	return nil, nil, errors.New("Not supported")
+}
+func (p *BaseParser) GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error) {
+	return nil, nil, errors.New("Not supported")
+}
+func (p *BaseParser) LoadAssets(tx *Tx) error { return errors.New("Not supported") }
+func (p *BaseParser) WitnessPubKeyHashFromKeyID(keyId []byte) (string, error) {
+	return "", errors.New("Not supported")
+}
+func (p *BaseParser) AppendAssetInfo(assetInfo *AssetInfo, buf []byte, varBuf []byte) []byte {
+	return nil
+}
+func (p *BaseParser) UnpackAssetInfo(assetInfo *AssetInfo, buf []byte) int { return 0 }
+
+// SYSCOIN: legacy packing helpers used by the Syscoin SPT serializers.
+func (p *BaseParser) PackUint(i uint32) []byte {
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, i)
+	return buf
+}
+
+func (p *BaseParser) UnpackUint(buf []byte) uint32 {
+	return binary.BigEndian.Uint32(buf)
+}
+
+func (p *BaseParser) PackVarint32(i int32, buf []byte) int {
+	return vlq.PutInt(buf, int64(i))
+}
+
+func (p *BaseParser) PackVaruint(i uint, buf []byte) int {
+	return vlq.PutUint(buf, uint64(i))
+}
+
+func (p *BaseParser) PackVaruint64(i uint64, buf []byte) int {
+	return vlq.PutUint(buf, i)
+}
+
+func (p *BaseParser) UnpackVaruint(buf []byte) (uint, int) {
+	i, l := vlq.Uint(buf)
+	return uint(i), l
+}
+
+func (p *BaseParser) UnpackVaruint64(buf []byte) (uint64, int) {
+	return vlq.Uint(buf)
+}
+
+func (p *BaseParser) PackBigint(bi *big.Int, buf []byte) int {
+	if bi == nil {
+		return p.PackVaruint(0, buf)
+	}
+	if bi.Sign() < 0 {
+		return 0
+	}
+	b := bi.Bytes()
+	l := p.PackVaruint(uint(len(b)), buf)
+	copy(buf[l:], b)
+	return l + len(b)
+}
+
+func (p *BaseParser) UnpackBigint(buf []byte) (big.Int, int) {
+	var bi big.Int
+	l, ll := p.UnpackVaruint(buf)
+	if l == 0 {
+		return bi, ll
+	}
+	bi.SetBytes(buf[ll : ll+int(l)])
+	return bi, ll + int(l)
+}
+
+func (p *BaseParser) PackVarBytes(bufValue []byte) []byte {
+	buf := make([]byte, vlq.MaxLen64+len(bufValue))
+	l := p.PackVaruint(uint(len(bufValue)), buf)
+	buf = append(buf[:l], bufValue...)
+	return buf
+}
+
+func (p *BaseParser) UnpackVarBytes(buf []byte) ([]byte, int) {
+	l, ll := p.UnpackVaruint(buf)
+	return append([]byte(nil), buf[ll:ll+int(l)]...), ll + int(l)
 }

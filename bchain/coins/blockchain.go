@@ -52,6 +52,8 @@ import (
 	"github.com/trezor/blockbook/bchain/coins/ravencoin"
 	"github.com/trezor/blockbook/bchain/coins/ritocoin"
 	"github.com/trezor/blockbook/bchain/coins/snowgem"
+	// SYSCOIN
+	sys "github.com/trezor/blockbook/bchain/coins/sys"
 	"github.com/trezor/blockbook/bchain/coins/trezarcoin"
 	"github.com/trezor/blockbook/bchain/coins/tron"
 	"github.com/trezor/blockbook/bchain/coins/unobtanium"
@@ -155,6 +157,9 @@ func init() {
 	BlockChainFactories["Base Archive"] = base.NewBaseRPC
 	BlockChainFactories["Tron"] = tron.NewTronRPC
 	BlockChainFactories["Tron Testnet Nile"] = tron.NewTronRPC
+	// SYSCOIN
+	BlockChainFactories["Syscoin"] = sys.NewSyscoinRPC
+	BlockChainFactories["Syscoin Testnet"] = sys.NewSyscoinRPC
 }
 
 type metricsSetter interface {
@@ -327,6 +332,14 @@ func (c *blockChainWithMetrics) SendRawTransaction(tx string, disableAlternative
 func (c *blockChainWithMetrics) GetMempoolEntry(txid string) (v *bchain.MempoolEntry, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetMempoolEntry", s, err) }(time.Now())
 	return c.b.GetMempoolEntry(txid)
+}
+
+// GetSPVProof forwards Syscoin's bridge SPV proof RPC through metrics.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) GetSPVProof(hash string) (v string, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("GetSPVProof", s, err) }(time.Now())
+	return c.b.GetSPVProof(hash)
 }
 
 func (c *blockChainWithMetrics) GetChainParser() bchain.BlockChainParser {
@@ -534,4 +547,30 @@ func (c *blockChainWithMetrics) MissingBlockRetryOverride() *bchain.MissingBlock
 		return p.MissingBlockRetryOverride()
 	}
 	return nil
+}
+
+// FetchNEVMAssetDetails forwards Syscoin's optional NEVM asset metadata lookup
+// through the metrics wrapper.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
+	if p, ok := c.b.(interface {
+		FetchNEVMAssetDetails(uint64) (*bchain.Asset, error)
+	}); ok {
+		defer func(s time.Time) { c.observeRPCLatency("FetchNEVMAssetDetails", s, nil) }(time.Now())
+		return p.FetchNEVMAssetDetails(assetGuid)
+	}
+	return nil, errors.New("FetchNEVMAssetDetails not supported by underlying chain")
+}
+
+// GetContractExplorerBaseURL forwards Syscoin's optional NEVM explorer URL.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) GetContractExplorerBaseURL() string {
+	if p, ok := c.b.(interface {
+		GetContractExplorerBaseURL() string
+	}); ok {
+		return p.GetContractExplorerBaseURL()
+	}
+	return ""
 }

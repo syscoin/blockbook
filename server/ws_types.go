@@ -158,6 +158,9 @@ type WsLongTermFeeRateRes struct {
 type WsSendTransactionReq struct {
 	Hex                   string `json:"hex,omitempty" ts_doc:"Hex-encoded transaction data to broadcast (string format)."`
 	DisableAlternativeRPC bool   `json:"disableAlternativeRpc" ts_doc:"Use alternative RPC method to broadcast transaction."`
+	// SYSCOIN: optional Syscoin Core sendrawtransaction parameters.
+	MaxFeeRate    string `json:"maxfeerate,omitempty" ts_doc:"Optional Syscoin Core maxfeerate parameter."`
+	MaxBurnAmount string `json:"maxburnamount,omitempty" ts_doc:"Optional Syscoin Core maxburnamount parameter."`
 }
 
 // WsSubscribeAddressesReq is used to subscribe to updates on a list of addresses.

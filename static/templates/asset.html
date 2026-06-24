@@ -1,0 +1,82 @@
+{{define "specific"}}{{$asset := .Asset}}{{$data := .}}
+<div class="row">
+    <h1 class="col-12">Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}}</small></h1>
+</div>
+<div class="row pt-3">
+    <h5 class="col-12 d-flex h-data"><span class="ellipsis copyable">{{$asset.AssetDetails.AssetGuid}}</span></h5>
+</div>
+<table class="table data-table info-table">
+    <tbody>
+        {{if isNFT $asset.AssetDetails.AssetGuid}}
+        <tr>
+            <td>NFT ID</td>
+            <td>{{formatNFTID $asset.AssetDetails.AssetGuid}}</td>
+        </tr>
+        <tr>
+            <td>Base Asset GUID</td>
+            <td>{{formatBaseAssetID $asset.AssetDetails.AssetGuid}}</td>
+        </tr>
+        {{end}}
+        <tr>
+            <td>Transactions</td>
+            <td>{{formatInt $asset.Txs}}</td>
+        </tr>
+        {{if $asset.AssetDetails.Contract}}
+        <tr>
+            <td>Contract</td>
+            <td class="ellipsis"><a href="{{formatContractExplorerURL $asset.AssetDetails.Contract}}">{{$asset.AssetDetails.Contract}}</a></td>
+        </tr>
+        {{end}}
+        <tr>
+            <td>Total Supply</td>
+            <td>{{formattedAmountSpan $asset.AssetDetails.TotalSupply $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
+        </tr>
+        <tr>
+            <td>Max Supply</td>
+            <td>{{formattedAmountSpan $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
+        </tr>
+        {{if $asset.AssetDetails.MetaData}}
+        <tr>
+            <td>Metadata</td>
+            <td class="ellipsis copyable">{{$asset.AssetDetails.MetaData}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{if $asset.UnconfirmedTxs}}
+<table class="table data-table info-table">
+    <tbody>
+        <tr>
+            <td style="white-space: nowrap;"><h5>Unconfirmed</h5></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td style="width: 25%;">Unconfirmed Balance</td>
+            <td>{{formattedAmountSpan $asset.UnconfirmedBalanceSat $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
+        </tr>
+        <tr>
+            <td>No. Transactions</td>
+            <td>{{formatInt $asset.UnconfirmedTxs}}</td>
+        </tr>
+    </tbody>
+</table>
+{{end}}
+{{if or $asset.Transactions $asset.Filter}}
+<div class="row pt-3 pb-1">
+    <h3 class="col-sm-6 col-lg-3 m-0 align-self-center">Transactions</h3>
+    <div class="col-sm-6 col-lg-3 my-2 my-lg-0 align-self-center">
+        <select class="w-100" onchange="self.location='?assetMask='+options[selectedIndex].value">
+            <option>All</option>
+            <option {{if eq $asset.Filter "token-transfers"}}selected{{end}} value="token-transfers">Transfers</option>
+            <option {{if eq $asset.Filter "non-token-transfers"}}selected{{end}} value="non-token-transfers">Non-Transfers</option>
+        </select>
+    </div>
+    <div class="col-lg-6">
+        {{template "paging" $data}}
+    </div>
+</div>
+<div>
+    {{range $tx := $asset.Transactions}}{{$data := setTxToTemplateData $data $tx}}{{template "txdetail" $data}}{{end}}
+</div>
+{{template "paging" $data}}
+{{end}}{{end}}

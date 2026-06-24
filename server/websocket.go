@@ -738,7 +738,7 @@ var requestHandlers = map[string]func(*WebsocketServer, *websocketChannel, *WsRe
 		r := WsSendTransactionReq{}
 		err = json.Unmarshal(req.Params, &r)
 		if err == nil {
-			rv, err = s.sendTransaction(r.Hex, r.DisableAlternativeRPC)
+			rv, err = s.sendTransaction(r)
 		}
 		return
 	},
@@ -1129,8 +1129,17 @@ func (s *WebsocketServer) longTermFeeRate() (res interface{}, err error) {
 	}, nil
 }
 
-func (s *WebsocketServer) sendTransaction(tx string, disableAlternativeRPC bool) (res resultSendTransaction, err error) {
-	txid, err := s.chain.SendRawTransaction(tx, disableAlternativeRPC)
+func (s *WebsocketServer) sendTransaction(req WsSendTransactionReq) (res resultSendTransaction, err error) {
+	// SYSCOIN: preserve upstream raw transaction broadcasts while allowing
+	// optional Syscoin Core maxfeerate/maxburnamount parameters.
+	p := bchain.SendRawTransactionParams{Hex: req.Hex, DisableAlternativeRPC: req.DisableAlternativeRPC}
+	if req.MaxFeeRate != "" {
+		p.MaxFeeRate = &req.MaxFeeRate
+	}
+	if req.MaxBurnAmount != "" {
+		p.MaxBurnAmount = &req.MaxBurnAmount
+	}
+	txid, err := sendRawTransactionWithParams(s.chain, p)
 	if err != nil {
 		return res, err
 	}

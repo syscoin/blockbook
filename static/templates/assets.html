@@ -1,0 +1,33 @@
+{{define "specific"}}{{$assets := .Assets}}{{$data := .}}
+<div class="row">
+    <h1 class="col-12">Assets <small class="text-muted">Filtered by <b>{{$assets.Filter}}</b></small></h1>
+</div>
+<div class="row pt-3 pb-1">
+    <h5 class="col-md-6 col-sm-12">{{formatInt $assets.NumAssets}} Assets found</h5>
+    <div class="col-md-6 col-sm-12">{{template "paging" $data}}</div>
+</div>
+<table class="table data-table">
+    <tbody>
+        <tr>
+            <th>Asset</th>
+            <th>Transactions</th>
+            <th>Contract</th>
+            <th>Metadata</th>
+        </tr>
+        {{range $assetDetails := $assets.AssetDetails}}
+        <tr>
+            <td>
+                <a href="/asset/{{$assetDetails.AssetGuid}}" class="copyable">{{$assetDetails.AssetGuid}}</a>&nbsp;
+                <span class="text-muted">{{$assetDetails.Symbol}}</span>
+            </td>
+            <td>{{formatInt $assetDetails.Txs}}</td>
+            <td class="ellipsis">
+                {{if $assetDetails.Contract}}<a href="{{formatContractExplorerURL $assetDetails.Contract}}">{{$assetDetails.Contract}}</a>{{end}}
+            </td>
+            <td class="ellipsis">{{if $assetDetails.MetaData}}{{$assetDetails.MetaData}}{{end}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{template "paging" $data}}
+{{end}}

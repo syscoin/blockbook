@@ -98,6 +98,8 @@ type RocksDB struct {
 	addrContractsCacheBytes int64
 	hotAddrTracker          *addressHotness
 	setBlockTimesWG         sync.WaitGroup
+	// SYSCOIN: used only for NEVM metadata fallback on asset-cache misses.
+	chain bchain.BlockChain
 }
 
 const (
@@ -111,6 +113,9 @@ const (
 	cfAddressBalance
 	cfTxAddresses
 	cfBlockFilter
+	// SYSCOIN: SPT metadata and per-asset tx history.
+	cfAssets
+	cfTxAssets
 
 	__break__
 
@@ -135,7 +140,19 @@ var cfBaseNames = []string{"default", "height", "addresses", "blockTxs", "transa
 
 // type specific columns
 var cfNamesBitcoinType = []string{"addressBalance", "txAddresses", "blockFilter"}
+var cfNamesSyscoinType = []string{"assets", "txAssets"} // SYSCOIN
 var cfNamesEthereumType = []string{"addressContracts", "internalData", "contracts", "functionSignatures", "blockInternalDataErrors", "addressAliases", "ercProtocols"}
+
+// SYSCOIN: parser capability flag for enabling SPT column families.
+type syscoinAssetsSupport interface {
+	SupportsSyscoinAssets() bool
+}
+
+// SYSCOIN
+func supportsSyscoinAssets(parser bchain.BlockChainParser) bool {
+	p, ok := parser.(syscoinAssetsSupport)
+	return ok && p.SupportsSyscoinAssets()
+}
 
 func openDB(path string, c *grocksdb.Cache, openFiles int) (*grocksdb.DB, []*grocksdb.ColumnFamilyHandle, error) {
 	// opts with bloom filter
@@ -166,6 +183,9 @@ func NewRocksDB(path string, cacheSize, maxOpenFiles int, parser bchain.BlockCha
 	chainType := parser.GetChainType()
 	if chainType == bchain.ChainBitcoinType {
 		cfNames = append(cfNames, cfNamesBitcoinType...)
+		if supportsSyscoinAssets(parser) {
+			cfNames = append(cfNames, cfNamesSyscoinType...)
+		}
 	} else if chainType == bchain.ChainEthereumType {
 		cfNames = append(cfNames, cfNamesEthereumType...)
 		extendedIndex = false
@@ -230,6 +250,15 @@ func NewRocksDB(path string, cacheSize, maxOpenFiles int, parser bchain.BlockCha
 		go r.periodicStoreAddrContractsCache()
 	}
 	return r, nil
+}
+
+// SetBlockChain wires the live chain into RocksDB for optional chain-specific
+// lookup fallbacks.
+//
+// SYSCOIN: asset metadata can be lazily enriched from NEVM when it is missing
+// from the local asset column family.
+func (d *RocksDB) SetBlockChain(chain bchain.BlockChain) {
+	d.chain = chain
 }
 
 func (d *RocksDB) closeDB() error {
@@ -448,6 +477,12 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 	if chainType == bchain.ChainBitcoinType {
 		txAddressesMap := make(map[string]*TxAddresses)
 		balances := make(map[string]*AddrBalance)
+		var assets map[uint64]*bchain.Asset
+		var txAssets bchain.TxAssetMap
+		if supportsSyscoinAssets(d.chainParser) {
+			assets = make(map[uint64]*bchain.Asset)
+			txAssets = make(bchain.TxAssetMap)
+		}
 		gf, err := bchain.NewGolombFilter(d.is.BlockGolombFilterP, d.is.BlockFilterScripts, block.BlockHeader.Hash, d.is.BlockFilterUseZeroedKey)
 		if err != nil {
 			glog.Error("ConnectBlock golomb filter error ", err)
@@ -455,7 +490,7 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 		} else if gf != nil && !gf.Enabled {
 			gf = nil
 		}
-		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, gf); err != nil {
+		if err := d.processAddressesBitcoinType(block, addresses, txAddressesMap, balances, gf, assets, txAssets); err != nil {
 			return err
 		}
 		if d.metrics != nil {
@@ -473,6 +508,14 @@ func (d *RocksDB) ConnectBlock(block *bchain.Block) error {
 		}
 		if err := d.storeAndCleanupBlockTxs(wb, block); err != nil {
 			return err
+		}
+		if supportsSyscoinAssets(d.chainParser) {
+			if err := d.storeAssets(wb, assets); err != nil {
+				return err
+			}
+			if err := d.storeTxAssets(wb, txAssets); err != nil {
+				return err
+			}
 		}
 		if gf != nil {
 			blockFilter := gf.Compute()
@@ -562,6 +605,8 @@ type outpoint struct {
 type TxInput struct {
 	AddrDesc bchain.AddressDescriptor
 	ValueSat big.Int
+	// SYSCOIN: SPT metadata on the spent output.
+	AssetInfo *bchain.AssetInfo
 	// extended index properties
 	Txid string
 	Vout uint32
@@ -577,6 +622,8 @@ type TxOutput struct {
 	AddrDesc bchain.AddressDescriptor
 	Spent    bool
 	ValueSat big.Int
+	// SYSCOIN: SPT metadata on this UTXO.
+	AssetInfo *bchain.AssetInfo
 	// extended index properties
 	SpentTxid   string
 	SpentIndex  uint32
@@ -593,25 +640,30 @@ type TxAddresses struct {
 	Height  uint32
 	Inputs  []TxInput
 	Outputs []TxOutput
+	// SYSCOIN: tx version and optional SPT memo.
+	Version int32
+	Memo    []byte
 	// extended index properties
 	VSize uint32
 }
 
 // Utxo holds information about unspent transaction output
 type Utxo struct {
-	BtxID    []byte
-	Vout     int32
-	Height   uint32
-	ValueSat big.Int
+	BtxID     []byte
+	Vout      int32
+	Height    uint32
+	ValueSat  big.Int
+	AssetInfo *bchain.AssetInfo // SYSCOIN
 }
 
 // AddrBalance stores number of transactions and balances of an address
 type AddrBalance struct {
-	Txs        uint32
-	SentSat    big.Int
-	BalanceSat big.Int
-	Utxos      []Utxo
-	utxosMap   map[string]int
+	Txs           uint32
+	SentSat       big.Int
+	BalanceSat    big.Int
+	Utxos         []Utxo
+	AssetBalances map[uint64]*bchain.AssetBalance // SYSCOIN
+	utxosMap      map[string]int
 }
 
 // ReceivedSat computes received amount from total balance and sent amount
@@ -737,9 +789,11 @@ func (d *RocksDB) GetAndResetConnectBlockStats() string {
 	return s
 }
 
-func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses addressesMap, txAddressesMap map[string]*TxAddresses, balances map[string]*AddrBalance, gf *bchain.GolombFilter) error {
+// SYSCOIN: assets/txAssets are non-nil only for Syscoin SPT indexing.
+func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses addressesMap, txAddressesMap map[string]*TxAddresses, balances map[string]*AddrBalance, gf *bchain.GolombFilter, assets map[uint64]*bchain.Asset, txAssets bchain.TxAssetMap) error {
 	blockTxIDs := make([][]byte, len(block.Txs))
 	blockTxAddresses := make([]*TxAddresses, len(block.Txs))
+	blockTxAssetAddresses := make(bchain.TxAssetAddressMap)
 	// first process all outputs so that inputs can refer to txs in this block
 	for txi := range block.Txs {
 		tx := &block.Txs[txi]
@@ -748,7 +802,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 			return err
 		}
 		blockTxIDs[txi] = btxID
-		ta := TxAddresses{Height: block.Height}
+		ta := TxAddresses{Height: block.Height, Version: tx.Version, Memo: tx.Memo}
 		if d.extendedIndex {
 			if tx.VSize > 0 {
 				ta.VSize = uint32(tx.VSize)
@@ -763,6 +817,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 			output := &tx.Vout[i]
 			tao := &ta.Outputs[i]
 			tao.ValueSat = output.ValueSat
+			tao.AssetInfo = output.AssetInfo
 			addrDesc, err := d.chainParser.GetAddrDescFromVout(output)
 			if err != nil || len(addrDesc) == 0 || len(addrDesc) > maxAddrDescLen {
 				if err != nil {
@@ -796,11 +851,25 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 					d.cbs.balancesHit++
 				}
 				balance.BalanceSat.Add(&balance.BalanceSat, &output.ValueSat)
+				if output.AssetInfo != nil {
+					if balance.AssetBalances == nil {
+						balance.AssetBalances = make(map[uint64]*bchain.AssetBalance)
+					}
+					balanceAsset := balance.AssetBalances[output.AssetInfo.AssetGuid]
+					if balanceAsset == nil {
+						balanceAsset = &bchain.AssetBalance{BalanceSat: new(big.Int), SentSat: new(big.Int)}
+						balance.AssetBalances[output.AssetInfo.AssetGuid] = balanceAsset
+					}
+					if err := d.ConnectAllocationOutput(&addrDesc, block.Height, balanceAsset, tx.Version, btxID, output.AssetInfo, blockTxAssetAddresses, assets, txAssets, tx.Memo); err != nil {
+						return err
+					}
+				}
 				balance.addUtxo(&Utxo{
-					BtxID:    btxID,
-					Vout:     int32(i),
-					Height:   block.Height,
-					ValueSat: output.ValueSat,
+					BtxID:     btxID,
+					Vout:      int32(i),
+					Height:    block.Height,
+					ValueSat:  output.ValueSat,
+					AssetInfo: output.AssetInfo,
 				})
 				counted := addToAddressesMap(addresses, strAddrDesc, btxID, int32(i))
 				if !counted {
@@ -857,6 +926,7 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 			}
 			tai.AddrDesc = spentOutput.AddrDesc
 			tai.ValueSat = spentOutput.ValueSat
+			tai.AssetInfo = spentOutput.AssetInfo
 			// mark the output as spent in tx
 			spentOutput.Spent = true
 			if d.extendedIndex {
@@ -894,6 +964,19 @@ func (d *RocksDB) processAddressesBitcoinType(block *bchain.Block, addresses add
 					balance.Txs++
 				}
 				balance.BalanceSat.Sub(&balance.BalanceSat, &spentOutput.ValueSat)
+				if spentOutput.AssetInfo != nil {
+					if balance.AssetBalances == nil {
+						balance.AssetBalances = make(map[uint64]*bchain.AssetBalance)
+					}
+					balanceAsset := balance.AssetBalances[spentOutput.AssetInfo.AssetGuid]
+					if balanceAsset == nil {
+						balanceAsset = &bchain.AssetBalance{BalanceSat: new(big.Int), SentSat: new(big.Int)}
+						balance.AssetBalances[spentOutput.AssetInfo.AssetGuid] = balanceAsset
+					}
+					if err := d.ConnectAllocationInput(&spentOutput.AddrDesc, block.Height, tx.Version, balanceAsset, spendingTxid, spentOutput.AssetInfo, blockTxAssetAddresses, assets, txAssets); err != nil {
+						return err
+					}
+				}
 				balance.markUtxoAsSpent(btxID, int32(input.Vout))
 				if balance.BalanceSat.Sign() < 0 {
 					d.resetValueSatToZero(&balance.BalanceSat, spentOutput.AddrDesc, "balance")
@@ -975,7 +1058,7 @@ func (d *RocksDB) storeBalances(wb *grocksdb.WriteBatch, abm map[string]*AddrBal
 		if ab == nil || ab.Txs <= 0 {
 			wb.DeleteCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc))
 		} else {
-			buf = packAddrBalance(ab, buf, varBuf)
+			buf = d.packAddrBalance(ab, buf, varBuf)
 			wb.PutCF(d.cfh[cfAddressBalance], bchain.AddressDescriptor(addrDesc), buf)
 		}
 	}
@@ -1082,7 +1165,7 @@ func (d *RocksDB) GetAddrDescBalance(addrDesc bchain.AddressDescriptor, detail A
 	if len(buf) < 3 {
 		return nil, nil
 	}
-	return unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), detail)
+	return d.unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), detail)
 }
 
 // GetAddressBalance returns address balance for an address or nil if address not found
@@ -1138,6 +1221,10 @@ func (d *RocksDB) AddrDescForOutpoint(outpoint bchain.Outpoint) (bchain.AddressD
 
 func (d *RocksDB) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
+	if supportsSyscoinAssets(d.chainParser) {
+		l := packVaruint(uint(ta.Version), varBuf)
+		buf = append(buf, varBuf[:l]...)
+	}
 	l := packVaruint(uint(ta.Height), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	if d.extendedIndex {
@@ -1153,6 +1240,9 @@ func (d *RocksDB) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
 		buf = d.appendTxOutput(&ta.Outputs[i], buf, varBuf)
+	}
+	if supportsSyscoinAssets(d.chainParser) {
+		buf = append(buf, packVarBytes(ta.Memo)...)
 	}
 	return buf
 }
@@ -1189,6 +1279,9 @@ func (d *RocksDB) appendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte 
 		l = packBigint(&txi.ValueSat, varBuf)
 		buf = append(buf, varBuf[:l]...)
 	}
+	if supportsSyscoinAssets(d.chainParser) {
+		buf = appendAssetInfo(txi.AssetInfo, buf, varBuf)
+	}
 	return buf
 }
 
@@ -1216,10 +1309,13 @@ func (d *RocksDB) appendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byt
 		l = packVaruint(uint(txo.SpentHeight), varBuf)
 		buf = append(buf, varBuf[:l]...)
 	}
+	if supportsSyscoinAssets(d.chainParser) {
+		buf = appendAssetInfo(txo.AssetInfo, buf, varBuf)
+	}
 	return buf
 }
 
-func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
+func (d *RocksDB) unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
 	txs, l := unpackVaruint(buf)
 	sentSat, sl := unpackBigint(buf[l:])
 	balanceSat, bl := unpackBigint(buf[l+sl:])
@@ -1228,6 +1324,24 @@ func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDet
 		Txs:        uint32(txs),
 		SentSat:    sentSat,
 		BalanceSat: balanceSat,
+	}
+	if supportsSyscoinAssets(d.chainParser) {
+		numAssetBalances, ll := unpackVaruint(buf[l:])
+		l += ll
+		if numAssetBalances > 0 {
+			ab.AssetBalances = make(map[uint64]*bchain.AssetBalance, numAssetBalances)
+			for i := uint(0); i < numAssetBalances; i++ {
+				assetGuid, ll := unpackVaruint64(buf[l:])
+				l += ll
+				balanceValue, ll := unpackBigint(buf[l:])
+				l += ll
+				sentValue, ll := unpackBigint(buf[l:])
+				l += ll
+				transfers, ll := unpackVaruint(buf[l:])
+				l += ll
+				ab.AssetBalances[assetGuid] = &bchain.AssetBalance{Transfers: uint32(transfers), SentSat: &sentValue, BalanceSat: &balanceValue}
+			}
+		}
 	}
 	if detail != AddressBalanceDetailNoUTXO {
 		// estimate the size of utxos to avoid reallocation
@@ -1248,6 +1362,11 @@ func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDet
 				Height:   uint32(height),
 				ValueSat: valueSat,
 			}
+			if supportsSyscoinAssets(d.chainParser) {
+				var assetLen int
+				u.AssetInfo, assetLen = unpackAssetInfo(buf[l:])
+				l += assetLen
+			}
 			if detail == AddressBalanceDetailUTXO {
 				ab.Utxos = append(ab.Utxos, u)
 			} else {
@@ -1258,6 +1377,10 @@ func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDet
 	return ab, nil
 }
 
+func unpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error) {
+	return (&RocksDB{}).unpackAddrBalance(buf, txidUnpackedLen, detail)
+}
+
 func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 	buf = buf[:0]
 	l := packVaruint(uint(ab.Txs), varBuf)
@@ -1266,6 +1389,7 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 	buf = append(buf, varBuf[:l]...)
 	l = packBigint(&ab.BalanceSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
+	// Asset balances are encoded only by d.packAddrBalance for Syscoin.
 	for _, utxo := range ab.Utxos {
 		// if Vout < 0, utxo is marked as spent and removed from the entry
 		if utxo.Vout >= 0 {
@@ -1281,10 +1405,55 @@ func packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
 	return buf
 }
 
+func (d *RocksDB) packAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte {
+	if !supportsSyscoinAssets(d.chainParser) {
+		return packAddrBalance(ab, buf, varBuf)
+	}
+	buf = buf[:0]
+	l := packVaruint(uint(ab.Txs), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = packBigint(&ab.SentSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = packBigint(&ab.BalanceSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = packVaruint(uint(len(ab.AssetBalances)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	for guid, balance := range ab.AssetBalances {
+		l = packVaruint64(guid, varBuf)
+		buf = append(buf, varBuf[:l]...)
+		l = packBigint(balance.BalanceSat, varBuf)
+		buf = append(buf, varBuf[:l]...)
+		l = packBigint(balance.SentSat, varBuf)
+		buf = append(buf, varBuf[:l]...)
+		l = packVaruint(uint(balance.Transfers), varBuf)
+		buf = append(buf, varBuf[:l]...)
+	}
+	for _, utxo := range ab.Utxos {
+		if utxo.Vout >= 0 {
+			buf = append(buf, utxo.BtxID...)
+			l = packVaruint(uint(utxo.Vout), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = packVaruint(uint(utxo.Height), varBuf)
+			buf = append(buf, varBuf[:l]...)
+			l = packBigint(&utxo.ValueSat, varBuf)
+			buf = append(buf, varBuf[:l]...)
+			buf = appendAssetInfo(utxo.AssetInfo, buf, varBuf)
+		}
+	}
+	return buf
+}
+
 func (d *RocksDB) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	ta := TxAddresses{}
-	height, l := unpackVaruint(buf)
+	var l int
+	if supportsSyscoinAssets(d.chainParser) {
+		version, ll := unpackVaruint(buf)
+		ta.Version = int32(version)
+		l += ll
+	}
+	height, ll := unpackVaruint(buf[l:])
 	ta.Height = uint32(height)
+	l += ll
 	if d.extendedIndex {
 		vsize, ll := unpackVaruint(buf[l:])
 		ta.VSize = uint32(vsize)
@@ -1301,6 +1470,9 @@ func (d *RocksDB) unpackTxAddresses(buf []byte) (*TxAddresses, error) {
 	ta.Outputs = make([]TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
 		l += d.unpackTxOutput(&ta.Outputs[i], buf[l:])
+	}
+	if supportsSyscoinAssets(d.chainParser) {
+		ta.Memo, _ = unpackVarBytes(buf[l:])
 	}
 	return &ta, nil
 }
@@ -1326,13 +1498,24 @@ func (d *RocksDB) unpackTxInput(ti *TxInput, buf []byte) int {
 			ti.Vout = uint32(i)
 			al += l
 		}
+		if supportsSyscoinAssets(d.chainParser) {
+			var assetLen int
+			ti.AssetInfo, assetLen = unpackAssetInfo(buf[al:])
+			al += assetLen
+		}
 		return al
 	} else {
 		al, l := unpackVaruint(buf)
 		ti.AddrDesc = append([]byte(nil), buf[l:l+int(al)]...)
 		al += uint(l)
 		ti.ValueSat, l = unpackBigint(buf[al:])
-		return l + int(al)
+		al += uint(l)
+		if supportsSyscoinAssets(d.chainParser) {
+			var assetLen int
+			ti.AssetInfo, assetLen = unpackAssetInfo(buf[al:])
+			al += uint(assetLen)
+		}
+		return int(al)
 	}
 }
 
@@ -1357,6 +1540,11 @@ func (d *RocksDB) unpackTxOutput(to *TxOutput, buf []byte) int {
 		i, l = unpackVaruint(buf[al:])
 		to.SpentHeight = uint32(i)
 		al += l
+	}
+	if supportsSyscoinAssets(d.chainParser) {
+		var assetLen int
+		to.AssetInfo, assetLen = unpackAssetInfo(buf[al:])
+		al += assetLen
 	}
 	return al
 }
@@ -1610,7 +1798,8 @@ func (d *RocksDB) storeAddressAliasRecords(wb *grocksdb.WriteBatch, records []bc
 
 func (d *RocksDB) disconnectTxAddressesInputs(wb *grocksdb.WriteBatch, btxID []byte, inputs []outpoint, txa *TxAddresses, txAddressesToUpdate map[string]*TxAddresses,
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*AddrBalance, error),
-	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) error {
+	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
+	assetFoundInTx func(asset uint64, btxID []byte) bool, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset) error {
 	var err error
 	var balance *AddrBalance
 	for i, t := range txa.Inputs {
@@ -1649,11 +1838,26 @@ func (d *RocksDB) disconnectTxAddressesInputs(wb *grocksdb.WriteBatch, btxID []b
 					}
 					balance.BalanceSat.Add(&balance.BalanceSat, &t.ValueSat)
 					balance.addUtxoInDisconnect(&Utxo{
-						BtxID:    input.btxID,
-						Vout:     input.index,
-						Height:   inputHeight,
-						ValueSat: t.ValueSat,
+						BtxID:     input.btxID,
+						Vout:      input.index,
+						Height:    inputHeight,
+						ValueSat:  t.ValueSat,
+						AssetInfo: t.AssetInfo, // SYSCOIN
 					})
+					// SYSCOIN: disconnecting an input restores the spent SPT UTXO.
+					if t.AssetInfo != nil {
+						if balance.AssetBalances == nil {
+							balance.AssetBalances = make(map[uint64]*bchain.AssetBalance)
+						}
+						balanceAsset := balance.AssetBalances[t.AssetInfo.AssetGuid]
+						if balanceAsset == nil {
+							balanceAsset = &bchain.AssetBalance{BalanceSat: new(big.Int), SentSat: new(big.Int)}
+							balance.AssetBalances[t.AssetInfo.AssetGuid] = balanceAsset
+						}
+						if err := d.DisconnectAllocationInput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses, assets, assetFoundInTx); err != nil {
+							return err
+						}
+					}
 				} else {
 					ad, _, _ := d.chainParser.GetAddressesFromAddrDesc(t.AddrDesc)
 					glog.Warningf("Balance for address %s (%s) not found", ad, t.AddrDesc)
@@ -1666,7 +1870,8 @@ func (d *RocksDB) disconnectTxAddressesInputs(wb *grocksdb.WriteBatch, btxID []b
 
 func (d *RocksDB) disconnectTxAddressesOutputs(wb *grocksdb.WriteBatch, btxID []byte, txa *TxAddresses,
 	getAddressBalance func(addrDesc bchain.AddressDescriptor) (*AddrBalance, error),
-	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool) error {
+	addressFoundInTx func(addrDesc bchain.AddressDescriptor, btxID []byte) bool,
+	assetFoundInTx func(asset uint64, btxID []byte) bool, blockTxAssetAddresses bchain.TxAssetAddressMap, assets map[uint64]*bchain.Asset) error {
 	for i, t := range txa.Outputs {
 		if len(t.AddrDesc) > 0 {
 			exist := addressFoundInTx(t.AddrDesc, btxID)
@@ -1683,6 +1888,20 @@ func (d *RocksDB) disconnectTxAddressesOutputs(wb *grocksdb.WriteBatch, btxID []
 					balance.BalanceSat.Sub(&balance.BalanceSat, &t.ValueSat)
 					if balance.BalanceSat.Sign() < 0 {
 						d.resetValueSatToZero(&balance.BalanceSat, t.AddrDesc, "balance")
+					}
+					// SYSCOIN: disconnecting an output removes the created SPT UTXO.
+					if t.AssetInfo != nil {
+						if balance.AssetBalances == nil {
+							balance.AssetBalances = make(map[uint64]*bchain.AssetBalance)
+						}
+						balanceAsset := balance.AssetBalances[t.AssetInfo.AssetGuid]
+						if balanceAsset == nil {
+							balanceAsset = &bchain.AssetBalance{BalanceSat: new(big.Int), SentSat: new(big.Int)}
+							balance.AssetBalances[t.AssetInfo.AssetGuid] = balanceAsset
+						}
+						if err := d.DisconnectAllocationOutput(&t.AddrDesc, balanceAsset, btxID, t.AssetInfo, blockTxAssetAddresses, assets, assetFoundInTx); err != nil {
+							return err
+						}
 					}
 					balance.markUtxoAsSpent(btxID, int32(i))
 				} else {
@@ -1732,6 +1951,12 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []blockTxs) error {
 
 	// all addresses in the block are stored in blockAddressesTxs, together with a map of transactions where they appear
 	blockAddressesTxs := make(map[string]map[string]struct{})
+	// SYSCOIN: track SPT assets seen while reversing this block so asset tx
+	// counts and per-height txAsset rows are updated once per asset/tx.
+	blockAssetTxs := make(map[uint64]map[string]struct{})
+	blockTxAssetAddresses := make(bchain.TxAssetAddressMap)
+	assets := make(map[uint64]*bchain.Asset)
+	touchedAssets := make(map[uint64]struct{})
 	// addressFoundInTx handles updates of the blockAddressesTxs map and returns true if the address+tx was already encountered
 	addressFoundInTx := func(addrDesc bchain.AddressDescriptor, btxID []byte) bool {
 		sAddrDesc := string(addrDesc)
@@ -1744,6 +1969,21 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []blockTxs) error {
 			if !exist {
 				a[sBtxID] = struct{}{}
 			}
+		}
+		return exist
+	}
+	// SYSCOIN
+	assetFoundInTx := func(asset uint64, btxID []byte) bool {
+		touchedAssets[asset] = struct{}{}
+		sBtxID := string(btxID)
+		a, exist := blockAssetTxs[asset]
+		if !exist {
+			blockAssetTxs[asset] = map[string]struct{}{sBtxID: {}}
+			return false
+		}
+		_, exist = a[sBtxID]
+		if !exist {
+			a[sBtxID] = struct{}{}
 		}
 		return exist
 	}
@@ -1765,7 +2005,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []blockTxs) error {
 			continue
 		}
 		txAddresses[i] = txa
-		if err := d.disconnectTxAddressesInputs(wb, btxID, blockTxs[i].inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx); err != nil {
+		if err := d.disconnectTxAddressesInputs(wb, btxID, blockTxs[i].inputs, txa, txAddressesToUpdate, getAddressBalance, addressFoundInTx, assetFoundInTx, blockTxAssetAddresses, assets); err != nil {
 			return err
 		}
 	}
@@ -1775,7 +2015,7 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []blockTxs) error {
 		if txa == nil {
 			continue
 		}
-		if err := d.disconnectTxAddressesOutputs(wb, btxID, txa, getAddressBalance, addressFoundInTx); err != nil {
+		if err := d.disconnectTxAddressesOutputs(wb, btxID, txa, getAddressBalance, addressFoundInTx, assetFoundInTx, blockTxAssetAddresses, assets); err != nil {
 			return err
 		}
 	}
@@ -1788,6 +2028,20 @@ func (d *RocksDB) disconnectBlock(height uint32, blockTxs []blockTxs) error {
 	wb.DeleteCF(d.cfh[cfHeight], key)
 	d.storeTxAddresses(wb, txAddressesToUpdate)
 	d.storeBalancesDisconnect(wb, balances)
+	// SYSCOIN: remove per-asset transaction index rows for the disconnected
+	// height and persist adjusted asset metadata.
+	if supportsSyscoinAssets(d.chainParser) {
+		parser := d.syscoinAssetParser()
+		if parser == nil {
+			return errors.New("disconnectBlock: Syscoin asset parser is not configured")
+		}
+		for asset := range touchedAssets {
+			wb.DeleteCF(d.cfh[cfTxAssets], parser.PackAssetKey(asset, height))
+		}
+		if err := d.storeAssets(wb, assets); err != nil {
+			return err
+		}
+	}
 	for s := range txsToDelete {
 		b := []byte(s)
 		wb.DeleteCF(d.cfh[cfTransactions], b)
@@ -2442,7 +2696,7 @@ func (d *RocksDB) FixUtxos(stop chan os.Signal) error {
 				errorsCount++
 				continue
 			}
-			ba, err := unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), AddressBalanceDetailUTXO)
+			ba, err := d.unpackAddrBalance(buf, d.chainParser.PackedTxidLen(), AddressBalanceDetailUTXO)
 			if err != nil {
 				glog.Error("FixUtxos: row ", row, ", addrDesc ", addrDesc, ", unpackAddrBalance error ", err)
 				errorsCount++
@@ -2538,6 +2792,10 @@ func packVaruint(i uint, buf []byte) int {
 	return vlq.PutUint(buf, uint64(i))
 }
 
+func packVaruint64(i uint64, buf []byte) int {
+	return vlq.PutUint(buf, i)
+}
+
 func unpackVarint32(buf []byte) (int32, int) {
 	i, ofs := vlq.Int(buf)
 	return int32(i), ofs
@@ -2551,6 +2809,54 @@ func unpackVarint(buf []byte) (int, int) {
 func unpackVaruint(buf []byte) (uint, int) {
 	i, ofs := vlq.Uint(buf)
 	return uint(i), ofs
+}
+
+func unpackVaruint64(buf []byte) (uint64, int) {
+	return vlq.Uint(buf)
+}
+
+func packVarBytes(value []byte) []byte {
+	varBuf := make([]byte, vlq.MaxLen64)
+	l := packVaruint(uint(len(value)), varBuf)
+	buf := make([]byte, 0, l+len(value))
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, value...)
+	return buf
+}
+
+func unpackVarBytes(buf []byte) ([]byte, int) {
+	l, ll := unpackVaruint(buf)
+	return append([]byte(nil), buf[ll:ll+int(l)]...), ll + int(l)
+}
+
+func appendAssetInfo(assetInfo *bchain.AssetInfo, buf []byte, varBuf []byte) []byte {
+	if assetInfo == nil {
+		l := packVaruint(0, varBuf)
+		return append(buf, varBuf[:l]...)
+	}
+	l := packVaruint(1, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	l = packVaruint64(assetInfo.AssetGuid, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	valueSat := assetInfo.ValueSat
+	if valueSat == nil {
+		valueSat = new(big.Int)
+	}
+	l = packBigint(valueSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+func unpackAssetInfo(buf []byte) (*bchain.AssetInfo, int) {
+	flag, l := unpackVaruint(buf)
+	if flag == 0 {
+		return nil, l
+	}
+	assetGuid, ll := unpackVaruint64(buf[l:])
+	l += ll
+	valueSat, ll := unpackBigint(buf[l:])
+	l += ll
+	return &bchain.AssetInfo{AssetGuid: assetGuid, ValueSat: &valueSat}, l
 }
 
 func packString(s string) []byte {
