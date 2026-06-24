@@ -32,36 +32,46 @@ type resyncOutpointCache struct {
 }
 
 type outpointInfo struct {
-	addrDesc AddressDescriptor
-	value    *big.Int
+	addrDesc  AddressDescriptor
+	value     *big.Int
+	AssetInfo *AssetInfo // SYSCOIN
 }
 
 func newResyncOutpointCache(sizeHint int) *resyncOutpointCache {
 	return &resyncOutpointCache{entries: make(map[Outpoint]outpointInfo, sizeHint)}
 }
 
-func (c *resyncOutpointCache) get(outpoint Outpoint) (AddressDescriptor, *big.Int, bool) {
+func (c *resyncOutpointCache) get(outpoint Outpoint) (AddressDescriptor, *big.Int, *AssetInfo, bool) {
 	c.mu.RLock()
 	entry, ok := c.entries[outpoint]
 	c.mu.RUnlock()
 	if !ok {
 		// Use atomics to avoid lock contention on hot lookup paths.
 		atomic.AddUint64(&c.misses, 1)
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 	atomic.AddUint64(&c.hits, 1)
-	return entry.addrDesc, entry.value, true
+	return entry.addrDesc, entry.value, entry.AssetInfo, true
 }
 
-func (c *resyncOutpointCache) set(outpoint Outpoint, addrDesc AddressDescriptor, value *big.Int) {
+func (c *resyncOutpointCache) set(outpoint Outpoint, addrDesc AddressDescriptor, value *big.Int, assetInfo *AssetInfo) {
 	if len(addrDesc) == 0 || value == nil {
 		return
 	}
 	// Copy to keep cached values independent of the transaction object lifetime.
 	valueCopy := new(big.Int).Set(value)
 	addrCopy := append(AddressDescriptor(nil), addrDesc...)
+	var assetInfoCopy *AssetInfo
+	if assetInfo != nil {
+		assetInfoCopy = &AssetInfo{
+			AssetGuid: assetInfo.AssetGuid,
+		}
+		if assetInfo.ValueSat != nil {
+			assetInfoCopy.ValueSat = new(big.Int).Set(assetInfo.ValueSat)
+		}
+	}
 	c.mu.Lock()
-	c.entries[outpoint] = outpointInfo{addrDesc: addrCopy, value: valueCopy}
+	c.entries[outpoint] = outpointInfo{addrDesc: addrCopy, value: valueCopy, AssetInfo: assetInfoCopy}
 	c.mu.Unlock()
 }
 
@@ -155,6 +165,7 @@ func roundDuration(d time.Duration, unit time.Duration) time.Duration {
 
 func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrIndex {
 	var addrDesc AddressDescriptor
+	var assetInfo *AssetInfo
 	var value *big.Int
 	vin := &payload.tx.Vin[payload.index]
 	if vin.Txid == "" {
@@ -168,9 +179,10 @@ func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrInd
 	}
 	if addrDesc == nil {
 		if cache != nil {
-			if cachedDesc, cachedValue, ok := cache.get(outpoint); ok {
+			if cachedDesc, cachedValue, cachedAssetInfo, ok := cache.get(outpoint); ok {
 				addrDesc = cachedDesc
 				value = cachedValue
+				assetInfo = cachedAssetInfo
 			}
 		}
 	}
@@ -198,11 +210,12 @@ func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrInd
 					}
 					continue
 				}
-				cache.set(Outpoint{vin.Txid, int32(output.N)}, outDesc, &output.ValueSat)
+				cache.set(Outpoint{vin.Txid, int32(output.N)}, outDesc, &output.ValueSat, output.AssetInfo)
 				if output.N == vin.Vout {
 					found = true
 					addrDesc = outDesc
 					value = &output.ValueSat
+					assetInfo = output.AssetInfo
 				}
 			}
 			if !found {
@@ -216,11 +229,12 @@ func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrInd
 				return nil
 			}
 			value = &itx.Vout[vin.Vout].ValueSat
+			assetInfo = itx.Vout[vin.Vout].AssetInfo
 		}
 	}
 	vin.AddrDesc = addrDesc
 	vin.ValueSat = *value
-	return &addrIndex{string(addrDesc), ^int32(vin.Vout)}
+	return &addrIndex{addrDesc: string(addrDesc), n: ^int32(vin.Vout), AssetInfo: assetInfo}
 
 }
 
@@ -262,10 +276,10 @@ func (m *MempoolBitcoinType) getTxAddrs(txid string, tx *Tx, chanInput chan chan
 			continue
 		}
 		if cache != nil {
-			cache.set(Outpoint{txid, int32(output.N)}, addrDesc, &output.ValueSat)
+			cache.set(Outpoint{txid, int32(output.N)}, addrDesc, &output.ValueSat, output.AssetInfo)
 		}
 		if len(addrDesc) > 0 {
-			io = append(io, addrIndex{string(addrDesc), int32(output.N)})
+			io = append(io, addrIndex{addrDesc: string(addrDesc), n: int32(output.N), AssetInfo: output.AssetInfo})
 		}
 	}
 	dispatched := 0

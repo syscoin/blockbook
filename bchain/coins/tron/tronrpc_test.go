@@ -75,6 +75,10 @@ func (m *tronTestMempool) GetAllEntries() bchain.MempoolTxidEntries {
 	return entries
 }
 
+func (m *tronTestMempool) GetTxAssets(assetGuid uint64) bchain.MempoolTxidEntries {
+	return nil
+}
+
 func (m *tronTestMempool) GetTransactionTime(txid string) uint32 {
 	return m.txTimes[txid]
 }

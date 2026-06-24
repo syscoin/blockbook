@@ -329,6 +329,18 @@ func (c *blockChainWithMetrics) SendRawTransaction(tx string, disableAlternative
 	return c.b.SendRawTransaction(tx, disableAlternativeRPC)
 }
 
+// SendRawTransactionWithOpts forwards optional Syscoin sendrawtransaction
+// parameters through the metrics wrapper when the backend supports them.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) SendRawTransactionWithOpts(p bchain.SendRawTransactionParams) (v string, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("SendRawTransactionWithOpts", s, err) }(time.Now())
+	if sender, ok := c.b.(bchain.SendRawTransactionOpts); ok {
+		return sender.SendRawTransactionWithOpts(p)
+	}
+	return c.b.SendRawTransaction(p.Hex, p.DisableAlternativeRPC)
+}
+
 func (c *blockChainWithMetrics) GetMempoolEntry(txid string) (v *bchain.MempoolEntry, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetMempoolEntry", s, err) }(time.Now())
 	return c.b.GetMempoolEntry(txid)
@@ -498,6 +510,15 @@ func (c *mempoolWithMetrics) GetAddrDescTransactions(addrDesc bchain.AddressDesc
 func (c *mempoolWithMetrics) GetAllEntries() (v bchain.MempoolTxidEntries) {
 	defer func(s time.Time) { c.observeRPCLatency("GetAllEntries", s, nil) }(time.Now())
 	return c.mempool.GetAllEntries()
+}
+
+// GetTxAssets forwards Syscoin SPT asset mempool lookups through the metrics
+// wrapper.
+//
+// SYSCOIN
+func (c *mempoolWithMetrics) GetTxAssets(assetGuid uint64) (v bchain.MempoolTxidEntries) {
+	defer func(s time.Time) { c.observeRPCLatency("GetTxAssets", s, nil) }(time.Now())
+	return c.mempool.GetTxAssets(assetGuid)
 }
 
 func (c *mempoolWithMetrics) GetTransactionTime(txid string) uint32 {

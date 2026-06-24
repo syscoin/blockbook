@@ -589,6 +589,7 @@ type Mempool interface {
 	GetTransactions(address string) ([]Outpoint, error)
 	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
+	GetTxAssets(assetGuid uint64) MempoolTxidEntries // SYSCOIN
 	GetTransactionTime(txid string) uint32
 	GetTxidFilterEntries(filterScripts string, fromTimestamp uint32) (MempoolTxidFilterEntries, error)
 }

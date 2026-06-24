@@ -1157,16 +1157,21 @@ func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFi
 		return nil
 	}
 	if mempool {
-		assetMempool, ok := w.mempool.(interface {
-			GetTxAssets(uint64) bchain.MempoolTxidEntries
-		})
-		if !ok {
-			return txids, nil
-		}
 		uniqueTxs := make(map[string]struct{})
-		for _, entry := range assetMempool.GetTxAssets(assetGuid) {
+		for _, entry := range w.mempool.GetTxAssets(assetGuid) {
 			if _, found := uniqueTxs[entry.Txid]; found {
 				continue
+			}
+			if filter.AssetsMask != bchain.AllMask {
+				tx, err := w.getTransaction(entry.Txid, false, true, nil)
+				if err != nil || tx == nil {
+					glog.Warning("GetTransaction in asset mempool filter: ", err)
+					continue
+				}
+				mask := assetMaskFromVersion(w.chainParser, tx.Version)
+				if mask != bchain.AllMask && uint32(filter.AssetsMask)&uint32(mask) != uint32(mask) {
+					continue
+				}
 			}
 			l := len(txids)
 			if err := callback([]string{entry.Txid}); err != nil {
