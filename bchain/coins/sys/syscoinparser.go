@@ -2,6 +2,7 @@ package syscoin
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 
@@ -113,15 +114,39 @@ func (p *SyscoinParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	p.LoadAssets(tx)
+	if err := p.LoadAssets(tx); err != nil {
+		return nil, 0, err
+	}
 	return tx, height, nil
 }
 
-// TxFromMsgTx converts syscoin wire Tx to bchain.Tx
-func (p *SyscoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
+func (p *SyscoinParser) txFromMsgTx(t *wire.MsgTx, parseAddresses bool) (bchain.Tx, error) {
 	tx := p.BitcoinLikeParser.TxFromMsgTx(t, parseAddresses)
-	p.LoadAssets(&tx)
+	if err := p.LoadAssets(&tx); err != nil {
+		return tx, err
+	}
+	return tx, nil
+}
+
+// TxFromMsgTx converts syscoin wire Tx to bchain.Tx.
+func (p *SyscoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
+	tx, _ := p.txFromMsgTx(t, parseAddresses)
 	return tx
+}
+
+// ParseTx parses byte array containing transaction and returns Tx struct.
+func (p *SyscoinParser) ParseTx(b []byte) (*bchain.Tx, error) {
+	t := wire.MsgTx{}
+	r := bytes.NewReader(b)
+	if err := t.Deserialize(r); err != nil {
+		return nil, err
+	}
+	tx, err := p.txFromMsgTx(&t, true)
+	if err != nil {
+		return nil, err
+	}
+	tx.Hex = hex.EncodeToString(b)
+	return &tx, nil
 }
 
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
@@ -130,7 +155,9 @@ func (p *SyscoinParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error)
 	if err != nil {
 		return nil, err
 	}
-	p.LoadAssets(tx)
+	if err := p.LoadAssets(tx); err != nil {
+		return nil, err
+	}
 	return tx, nil
 }
 
@@ -158,7 +185,11 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 
 	txs := make([]bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
-		txs[ti] = p.TxFromMsgTx(t, false)
+		tx, err := p.txFromMsgTx(t, false)
+		if err != nil {
+			return nil, errors.Annotatef(err, "transaction %d", ti)
+		}
+		txs[ti] = tx
 	}
 
 	return &bchain.Block{

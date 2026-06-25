@@ -217,6 +217,24 @@ func Test_PackTx(t *testing.T) {
 	}
 }
 
+func Test_ParseTxAssetVersionPropagatesLoadAssetsError(t *testing.T) {
+	parser := NewSyscoinParser(GetChainParams("main"), &btc.Configuration{})
+	raw, err := hex.DecodeString(testTx1.Hex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// SYSCOIN: asset allocation versions must include a decodable allocation
+	// OP_RETURN. This otherwise valid tx has no allocation payload.
+	raw[0] = byte(SYSCOIN_TX_VERSION_ALLOCATION_SEND)
+	raw[1] = 0
+	raw[2] = 0
+	raw[3] = 0
+
+	if _, err := parser.ParseTx(raw); err == nil {
+		t.Fatal("ParseTx returned nil error for malformed asset allocation tx")
+	}
+}
+
 func Test_UnpackTx(t *testing.T) {
 	type args struct {
 		packedTx string
