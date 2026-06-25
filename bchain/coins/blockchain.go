@@ -574,11 +574,11 @@ func (c *blockChainWithMetrics) MissingBlockRetryOverride() *bchain.MissingBlock
 // through the metrics wrapper.
 //
 // SYSCOIN
-func (c *blockChainWithMetrics) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
+func (c *blockChainWithMetrics) FetchNEVMAssetDetails(assetGuid uint64) (v *bchain.Asset, err error) {
 	if p, ok := c.b.(interface {
 		FetchNEVMAssetDetails(uint64) (*bchain.Asset, error)
 	}); ok {
-		defer func(s time.Time) { c.observeRPCLatency("FetchNEVMAssetDetails", s, nil) }(time.Now())
+		defer func(s time.Time) { c.observeRPCLatency("FetchNEVMAssetDetails", s, err) }(time.Now())
 		return p.FetchNEVMAssetDetails(assetGuid)
 	}
 	return nil, errors.New("FetchNEVMAssetDetails not supported by underlying chain")
