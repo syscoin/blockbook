@@ -14,14 +14,15 @@ belongs to an asset allocation:
   "assetInfo": {
     "assetGuid": "123456",
     "value": "100000000",
-    "valueStr": "1.00000000"
+    "valueStr": "1.00000000",
+    "symbol": "SYSX"
   }
 }
 ```
 
 `assetGuid` is the decimal Syscoin asset GUID. `value` is the raw integer asset
 amount in the asset base unit. `valueStr` is formatted using the chain parser
-decimal rules.
+decimal rules. `symbol` is included when asset metadata is available.
 
 Transaction responses may also include:
 

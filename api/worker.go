@@ -103,9 +103,11 @@ func (w *Worker) assetInfoToAPI(assetInfo *bchain.AssetInfo) *AssetInfo {
 	}
 	value := (*Amount)(assetInfo.ValueSat)
 	valueStr := ""
+	symbol := ""
 	if assetInfo.ValueSat != nil {
 		if dbAsset, err := w.db.GetAsset(assetInfo.AssetGuid, nil); err == nil {
 			valueStr = value.DecimalString(int(dbAsset.AssetObj.Precision))
+			symbol = string(dbAsset.AssetObj.Symbol)
 		} else {
 			valueStr = w.chainParser.AmountToDecimalString(assetInfo.ValueSat)
 		}
@@ -114,6 +116,7 @@ func (w *Worker) assetInfoToAPI(assetInfo *bchain.AssetInfo) *AssetInfo {
 		AssetGuid: strconv.FormatUint(assetInfo.AssetGuid, 10),
 		ValueSat:  value,
 		ValueStr:  valueStr,
+		Symbol:    symbol,
 	}
 }
 

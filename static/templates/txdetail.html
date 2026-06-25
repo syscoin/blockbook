@@ -30,7 +30,7 @@
                     {{if $vin.AssetInfo}}
                     <span class="tx-amt small text-muted d-block">
                         SYSCOIN asset <a href="/asset/{{$vin.AssetInfo.AssetGuid}}">#{{$vin.AssetInfo.AssetGuid}}</a>:
-                        <span class="copyable">{{$vin.AssetInfo.ValueStr}}</span>
+                        <span class="copyable">{{$vin.AssetInfo.ValueStr}}</span>{{if $vin.AssetInfo.Symbol}} {{$vin.AssetInfo.Symbol}}{{end}}
                     </span>
                     {{end}}
                 </div>
@@ -58,7 +58,7 @@
                     {{if $vout.AssetInfo}}
                     <span class="tx-amt small text-muted d-block">
                         SYSCOIN asset <a href="/asset/{{$vout.AssetInfo.AssetGuid}}">#{{$vout.AssetInfo.AssetGuid}}</a>:
-                        <span class="copyable">{{$vout.AssetInfo.ValueStr}}</span>
+                        <span class="copyable">{{$vout.AssetInfo.ValueStr}}</span>{{if $vout.AssetInfo.Symbol}} {{$vout.AssetInfo.Symbol}}{{end}}
                     </span>
                     {{else}}
                     </td>

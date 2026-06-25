@@ -138,6 +138,7 @@ type AssetInfo struct {
 	AssetGuid string  `json:"assetGuid,omitempty" ts_doc:"Syscoin SPT asset GUID."`
 	ValueSat  *Amount `json:"value,omitempty" ts_doc:"SPT amount in base units."`
 	ValueStr  string  `json:"valueStr,omitempty" ts_doc:"SPT amount as a decimal string."`
+	Symbol    string  `json:"symbol,omitempty" ts_doc:"Syscoin SPT asset symbol, if available."`
 }
 
 // SYSCOIN: AssetSpecific contains Syscoin SPT metadata exposed by asset
