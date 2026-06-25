@@ -198,8 +198,9 @@ func (d *RocksDB) SetupAssetCache() error {
 		AssetCache = map[uint64]bchain.Asset{}
 	}
 	ro := gorocksdb.NewDefaultReadOptions()
+	defer ro.Destroy()
 	ro.SetFillCache(false)
-	it := d.db.NewIteratorCF(d.ro, d.cfh[cfAssets])
+	it := d.db.NewIteratorCF(ro, d.cfh[cfAssets])
 	defer it.Close()
 
 	for it.SeekToFirst(); it.Valid(); it.Next() {
