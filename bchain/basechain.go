@@ -43,8 +43,8 @@ func (b *BaseChain) GetMempoolEntry(txid string) (*MempoolEntry, error) {
 // GetSPVProof is not supported by default.
 //
 // SYSCOIN
-func (b *BaseChain) GetSPVProof(hash string) (string, error) {
-	return "", errors.New("GetSPVProof: not supported")
+func (b *BaseChain) GetSPVProof(hash string) (json.RawMessage, error) {
+	return nil, errors.New("GetSPVProof: not supported")
 }
 
 // GetAddressChainExtraData returns no chain-specific account/address data by default.

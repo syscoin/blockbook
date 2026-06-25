@@ -349,7 +349,7 @@ func (c *blockChainWithMetrics) GetMempoolEntry(txid string) (v *bchain.MempoolE
 // GetSPVProof forwards Syscoin's bridge SPV proof RPC through metrics.
 //
 // SYSCOIN
-func (c *blockChainWithMetrics) GetSPVProof(hash string) (v string, err error) {
+func (c *blockChainWithMetrics) GetSPVProof(hash string) (v json.RawMessage, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetSPVProof", s, err) }(time.Now())
 	return c.b.GetSPVProof(hash)
 }

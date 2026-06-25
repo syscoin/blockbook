@@ -1288,7 +1288,7 @@ func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
 // GetSPVProof returns Syscoin bridge SPV proof for txid.
 //
 // SYSCOIN
-func (w *Worker) GetSPVProof(hash string) (string, error) {
+func (w *Worker) GetSPVProof(hash string) (json.RawMessage, error) {
 	return w.chain.GetSPVProof(hash)
 }
 

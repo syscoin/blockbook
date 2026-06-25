@@ -1763,7 +1763,7 @@ func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interfac
 	}
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-getspvproof"}).Inc()
 	type resultGetSPVProof struct {
-		Result string `json:"result"`
+		Result json.RawMessage `json:"result"`
 	}
 	result, err := s.api.GetSPVProof(txid)
 	if err != nil {

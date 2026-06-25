@@ -83,7 +83,7 @@ func (b *SyscoinRPC) GetContractExplorerBaseURL() string {
 	return b.ChainConfig.Web3Explorer
 }
 
-func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
+func (b *SyscoinRPC) GetSPVProof(hash string) (json.RawMessage, error) {
 	glog.V(1).Info("rpc: getspvproof", hash)
 
 	res := btc.ResGetSPVProof{}
@@ -92,12 +92,12 @@ func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
 	err := b.Call(&req, &res)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if res.Error != nil {
-		return "", res.Error
+		return nil, res.Error
 	}
-	return string(res.Result), nil
+	return res.Result, nil
 }
 
 // GetTransactionForMempool returns a transaction by the transaction ID.

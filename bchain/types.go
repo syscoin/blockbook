@@ -511,7 +511,7 @@ type BlockChain interface {
 	LongTermFeeRate() (*LongTermFeeRate, error)
 	SendRawTransaction(tx string, disableAlternativeRPC bool) (string, error)
 	GetMempoolEntry(txid string) (*MempoolEntry, error)
-	GetSPVProof(hash string) (string, error) // SYSCOIN
+	GetSPVProof(hash string) (json.RawMessage, error) // SYSCOIN
 	GetContractInfo(contractDesc AddressDescriptor) (*ContractInfo, error)
 	// parser
 	GetChainParser() BlockChainParser
