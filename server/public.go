@@ -1423,6 +1423,15 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			http.Redirect(w, r, joinURL("/xpub/", url.QueryEscape(address.AddrStr)), http.StatusFound)
 			return noTpl, nil, nil
 		}
+		if isSyscoinShortcut(s.is.CoinShortcut) {
+			if _, parseErr := strconv.ParseUint(q, 10, 64); parseErr == nil {
+				asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AddressFilter{AssetsMask: bchain.AssetMask})
+				if err == nil {
+					http.Redirect(w, r, joinURL("/asset/", asset.AssetDetails.AssetGuid), http.StatusFound)
+					return noTpl, nil, nil
+				}
+			}
+		}
 		block, err = s.api.GetBlock(q, 0, 1)
 		if err == nil {
 			http.Redirect(w, r, joinURL("/block/", block.Hash), http.StatusFound)
@@ -1439,13 +1448,6 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			return noTpl, nil, nil
 		}
 		if isSyscoinShortcut(s.is.CoinShortcut) {
-			if _, parseErr := strconv.ParseUint(q, 10, 64); parseErr == nil {
-				asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AddressFilter{AssetsMask: bchain.AssetMask})
-				if err == nil {
-					http.Redirect(w, r, joinURL("/asset/", asset.AssetDetails.AssetGuid), http.StatusFound)
-					return noTpl, nil, nil
-				}
-			}
 			assets = s.api.FindAssets(q, 0, 2)
 			if len(assets.AssetDetails) > 0 {
 				if len(assets.AssetDetails) == 1 {

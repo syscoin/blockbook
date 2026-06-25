@@ -1153,6 +1153,9 @@ func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFi
 		filter = &AddressFilter{}
 	}
 	txids := make([]string, 0, 4)
+	if maxResults <= 0 {
+		return txids, nil
+	}
 	callback := func(txidsIn []string) error {
 		txids = append(txids, txidsIn...)
 		if len(txids) >= maxResults {
