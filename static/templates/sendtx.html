@@ -5,7 +5,7 @@
         <label for="exampleFormControlTextarea1">Raw transaction data</label>
         <textarea class="form-control" rows="8" name="hex">{{.SendTxHex}}</textarea>
     </div>
-    {{if or (eq .CoinShortcut "SYS") (eq .CoinShortcut "TSYS")}}
+    {{if isSyscoinShortcut .CoinShortcut}}
     <div class="row mt-3">
         <div class="form-group col-md-6">
             <label for="maxfeerate">Max fee rate</label>

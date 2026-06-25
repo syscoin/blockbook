@@ -627,6 +627,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatBaseAssetID":         formatBaseAssetID,           // SYSCOIN
 		"formatContractExplorerURL": s.formatContractExplorerURL, // SYSCOIN
 		"isNFT":                     isNFT,                       // SYSCOIN
+		"isSyscoinShortcut":         isSyscoinShortcut,           // SYSCOIN
 		"formatEncodeBase64":        formatEncodeBase64,          // SYSCOIN
 		"setTxToTemplateData":       setTxToTemplateData,
 		"feePerByte":                feePerByte,
