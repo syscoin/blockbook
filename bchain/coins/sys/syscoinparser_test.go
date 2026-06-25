@@ -3,6 +3,7 @@
 package syscoin
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/martinboehm/btcutil/chaincfg"
+	syscoinwire "github.com/syscoin/syscoinwire/syscoin/wire"
 	"github.com/trezor/blockbook/bchain"
 	"github.com/trezor/blockbook/bchain/coins/btc"
 )
@@ -232,6 +234,50 @@ func Test_ParseTxAssetVersionPropagatesLoadAssetsError(t *testing.T) {
 
 	if _, err := parser.ParseTx(raw); err == nil {
 		t.Fatal("ParseTx returned nil error for malformed asset allocation tx")
+	}
+}
+
+func Test_TryGetOPReturnRejectsMalformedPushdata(t *testing.T) {
+	parser := NewSyscoinParser(GetChainParams("main"), &btc.Configuration{})
+	tests := [][]byte{
+		{0x6a, 0x02, 0x01},
+		{0x6a, 0x4c},
+		{0x6a, 0x4c, 0x02, 0x01},
+		{0x6a, 0x4d, 0x00},
+		{0x6a, 0x4d, 0x02, 0x00, 0x01},
+	}
+	for _, script := range tests {
+		if got := parser.TryGetOPReturn(script); got != nil {
+			t.Fatalf("TryGetOPReturn(%x) = %x, want nil", script, got)
+		}
+	}
+}
+
+func Test_LoadAssetsRejectsOutOfRangeVoutIndex(t *testing.T) {
+	parser := NewSyscoinParser(GetChainParams("main"), &btc.Configuration{})
+	allocation := syscoinwire.AssetAllocationType{
+		VoutAssets: []syscoinwire.AssetOutType{{
+			AssetGuid: 123456,
+			Values:    []syscoinwire.AssetOutValueType{{N: 1, ValueSat: 100}},
+		}},
+	}
+	var payload bytes.Buffer
+	if err := allocation.Serialize(&payload); err != nil {
+		t.Fatal(err)
+	}
+	script := append([]byte{0x6a, byte(payload.Len())}, payload.Bytes()...)
+	tx := &bchain.Tx{
+		Version: SYSCOIN_TX_VERSION_ALLOCATION_SEND,
+		Vout: []bchain.Vout{{
+			N: 0,
+			ScriptPubKey: bchain.ScriptPubKey{
+				Hex: hex.EncodeToString(script),
+			},
+		}},
+	}
+
+	if err := parser.LoadAssets(tx); err == nil {
+		t.Fatal("LoadAssets returned nil error for out-of-range allocation vout index")
 	}
 }
 

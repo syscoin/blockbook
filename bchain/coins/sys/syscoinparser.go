@@ -261,10 +261,23 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 		op := script[1]
 		var data []byte
 		if op < txscript.OP_PUSHDATA1 {
+			if len(script) < 2+int(op) {
+				return nil
+			}
 			data = script[2:]
 		} else if op == txscript.OP_PUSHDATA1 {
+			if len(script) < 3 || len(script) < 3+int(script[2]) {
+				return nil
+			}
 			data = script[3:]
 		} else if op == txscript.OP_PUSHDATA2 {
+			if len(script) < 4 {
+				return nil
+			}
+			pushLen := int(script[2]) | int(script[3])<<8
+			if len(script) < 4+pushLen {
+				return nil
+			}
 			data = script[4:]
 		}
 		return data
@@ -330,6 +343,9 @@ func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
 		tx.Memo = memo
 		for _, v := range allocation.AssetObj.VoutAssets {
 			for _, voutAsset := range v.Values {
+				if int(voutAsset.N) >= len(tx.Vout) {
+					return errors.Errorf("asset allocation vout index %d out of range", voutAsset.N)
+				}
 				// store in vout
 				tx.Vout[voutAsset.N].AssetInfo = &bchain.AssetInfo{AssetGuid: v.AssetGuid, ValueSat: big.NewInt(voutAsset.ValueSat)}
 			}
