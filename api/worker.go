@@ -105,7 +105,7 @@ func (w *Worker) assetInfoToAPI(assetInfo *bchain.AssetInfo) *AssetInfo {
 	valueStr := ""
 	if assetInfo.ValueSat != nil {
 		if dbAsset, err := w.db.GetAsset(assetInfo.AssetGuid, nil); err == nil {
-			valueStr = value.DecimalString(int(dbAsset.AssetObj.Precision)) + " " + string(dbAsset.AssetObj.Symbol)
+			valueStr = value.DecimalString(int(dbAsset.AssetObj.Precision))
 		} else {
 			valueStr = w.chainParser.AmountToDecimalString(assetInfo.ValueSat)
 		}
@@ -1197,14 +1197,20 @@ func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFi
 	return txids, nil
 }
 
-// SYSCOIN: assetOutValue returns the total output-side amount for one asset in
-// a transaction. It is used for asset mempool deltas on /asset pages.
-func (t *Tx) assetOutValue(assetGuid string) *big.Int {
+// SYSCOIN: assetMempoolValue returns the unconfirmed delta for one asset in a
+// transaction. Outputs add to the delta and inputs subtract from it.
+func (t *Tx) assetMempoolValue(assetGuid string) *big.Int {
 	var val big.Int
 	for i := range t.Vout {
 		assetInfo := t.Vout[i].AssetInfo
 		if assetInfo != nil && assetInfo.AssetGuid == assetGuid && assetInfo.ValueSat != nil {
 			val.Add(&val, (*big.Int)(assetInfo.ValueSat))
+		}
+	}
+	for i := range t.Vin {
+		assetInfo := t.Vin[i].AssetInfo
+		if assetInfo != nil && assetInfo.AssetGuid == assetGuid && assetInfo.ValueSat != nil {
+			val.Sub(&val, (*big.Int)(assetInfo.ValueSat))
 		}
 	}
 	return &val
@@ -1335,7 +1341,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			if tx.Confirmations != 0 {
 				continue
 			}
-			uBalSat.Add(&uBalSat, tx.assetOutValue(asset))
+			uBalSat.Add(&uBalSat, tx.assetMempoolValue(asset))
 			unconfirmedTxs++
 			if page == 0 {
 				if option == AccountDetailsTxidHistory {
