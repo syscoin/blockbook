@@ -1246,6 +1246,14 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 			MetaData:    string(assetCached.MetaData),
 		})
 	}
+	sort.Slice(assetDetails, func(i, j int) bool {
+		ii, iErr := strconv.ParseUint(assetDetails[i].AssetGuid, 10, 64)
+		jj, jErr := strconv.ParseUint(assetDetails[j].AssetGuid, 10, 64)
+		if iErr == nil && jErr == nil {
+			return ii < jj
+		}
+		return assetDetails[i].AssetGuid < assetDetails[j].AssetGuid
+	})
 	glog.Info("FindAssetsFromFilter, ", time.Since(start))
 	return assetDetails
 }

@@ -95,7 +95,10 @@ func (b *SyscoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error)
 	if !b.ParseBlocks {
 		return b.GetBlockFull(hash)
 	}
-	return b.GetBlockWithoutHeader(hash, height)
+	if height > 0 {
+		return b.GetBlockWithoutHeader(hash, height)
+	}
+	return b.BitcoinRPC.GetBlock(hash, height)
 }
 
 func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
