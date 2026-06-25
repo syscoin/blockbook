@@ -83,24 +83,6 @@ func (b *SyscoinRPC) GetContractExplorerBaseURL() string {
 	return b.ChainConfig.Web3Explorer
 }
 
-// GetBlock returns block with given hash
-func (b *SyscoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
-	var err error
-	if hash == "" {
-		hash, err = b.GetBlockHash(height)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if !b.ParseBlocks {
-		return b.GetBlockFull(hash)
-	}
-	if height > 0 {
-		return b.GetBlockWithoutHeader(hash, height)
-	}
-	return b.BitcoinRPC.GetBlock(hash, height)
-}
-
 func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
 	glog.V(1).Info("rpc: getspvproof", hash)
 
