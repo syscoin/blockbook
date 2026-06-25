@@ -27,7 +27,6 @@ func builtinSYSXAsset(transactions uint32) *bchain.Asset {
 	return &bchain.Asset{
 		Transactions: transactions,
 		AssetObj: syscoinwire.AssetType{
-			Contract:  make([]byte, 20),
 			Symbol:    []byte("SYSX"),
 			Precision: 8,
 		},

@@ -420,13 +420,8 @@ func TestRocksDB_GetAssetUsesBuiltinSYSXFallback(t *testing.T) {
 	if asset.AssetObj.Precision != 8 {
 		t.Fatalf("SYSX precision = %d, want 8", asset.AssetObj.Precision)
 	}
-	if len(asset.AssetObj.Contract) != 20 {
-		t.Fatalf("SYSX contract length = %d, want 20-byte zero address", len(asset.AssetObj.Contract))
-	}
-	for i, b := range asset.AssetObj.Contract {
-		if b != 0 {
-			t.Fatalf("SYSX contract byte %d = %x, want zero address", i, b)
-		}
+	if len(asset.AssetObj.Contract) != 0 {
+		t.Fatalf("SYSX contract length = %d, want empty native contract", len(asset.AssetObj.Contract))
 	}
 	if string(asset.MetaData) != "Syscoin Native Asset" {
 		t.Fatalf("SYSX metadata = %q", asset.MetaData)
@@ -449,7 +444,7 @@ func TestRocksDB_GetAssetUsesBuiltinSYSXFallback(t *testing.T) {
 	if asset.Transactions != 150 {
 		t.Fatalf("SYSX transactions = %d, want preserved count 150", asset.Transactions)
 	}
-	if string(asset.MetaData) != "Syscoin Native Asset" || len(asset.AssetObj.Contract) != 20 {
+	if string(asset.MetaData) != "Syscoin Native Asset" || len(asset.AssetObj.Contract) != 0 {
 		t.Fatalf("SYSX cached metadata was not canonicalized: %+v", asset)
 	}
 }
