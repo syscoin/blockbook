@@ -1219,9 +1219,20 @@ func (s *PublicServer) explorerAddress(w http.ResponseWriter, r *http.Request) (
 	if filterParam == "" && filter.Vout > -1 {
 		filterParam = strconv.Itoa(filter.Vout)
 	}
+	pageParams := url.Values{}
 	if filterParam != "" {
-		data.PageParams = template.URL("&filter=" + filterParam)
+		pageParams.Set("filter", filterParam)
 		data.Address.Filter = filterParam
+	}
+	// SYSCOIN: preserve assetMask on address pagination links.
+	if assetMaskParam := r.URL.Query().Get("assetMask"); assetMaskParam != "" {
+		pageParams.Set("assetMask", assetMaskParam)
+		if data.Address.Filter == "" {
+			data.Address.Filter = assetMaskParam
+		}
+	}
+	if encodedParams := pageParams.Encode(); encodedParams != "" {
+		data.PageParams = template.URL("&" + encodedParams)
 	}
 	return addressTpl, data, nil
 }

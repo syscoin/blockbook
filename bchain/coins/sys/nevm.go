@@ -219,8 +219,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		precision = 0
 
 	default:
-		symbol = fmt.Sprintf("UNKNOWN-%d", assetId)
-		metadata = "Unknown Asset Type"
+		return nil, fmt.Errorf("unsupported NEVM asset type %d for asset %d", registry.AssetType, assetId)
 	}
 
 	return &bchain.Asset{
