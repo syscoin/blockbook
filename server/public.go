@@ -1237,7 +1237,7 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 		return errorTpl, nil, api.NewAPIError("Missing asset", true)
 	}
 	s.metrics.ExplorerViews.With(common.Labels{"action": "asset"}).Inc()
-	page, _, _, filter, filterParam, _ := s.getAddressQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
+	page, _, _, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
 	asset, err := s.api.GetAsset(assetParam, page, txsOnPage, api.AccountDetailsTxHistoryLight, filter)
 	if err != nil {
 		return errorTpl, nil, err
@@ -1246,9 +1246,10 @@ func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tp
 	data.Asset = asset
 	data.Page = asset.Page
 	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
-	if filterParam != "" {
-		data.PageParams = template.URL("&assetMask=" + filterParam)
-		data.Asset.Filter = filterParam
+	assetMaskParam := r.URL.Query().Get("assetMask")
+	if assetMaskParam != "" {
+		data.PageParams = template.URL("&assetMask=" + assetMaskParam)
+		data.Asset.Filter = assetMaskParam
 	}
 	return assetTpl, data, nil
 }

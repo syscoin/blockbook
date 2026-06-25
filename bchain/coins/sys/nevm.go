@@ -195,7 +195,6 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			symbol = fmt.Sprintf("ERC20-%d", assetId)
 		}
 		metadata = "ERC20 Token"
-		precision = 8
 
 	case 3: // ERC721 (NFT)
 		realTokenId, err := c.getRealTokenId(assetId, tokenIdx)

@@ -2152,7 +2152,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		}
 		if ba != nil {
 			// totalResults is known only if there is no filter
-			if filter.Vout == AddressFilterVoutOff && filter.FromHeight == 0 && filter.ToHeight == 0 {
+			if filter.Vout == AddressFilterVoutOff && filter.FromHeight == 0 && filter.ToHeight == 0 && filter.AssetsMask == bchain.AllMask {
 				totalResults = int(ba.Txs)
 			} else {
 				totalResults = -1

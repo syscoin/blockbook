@@ -97,12 +97,7 @@ func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
 	if res.Error != nil {
 		return "", res.Error
 	}
-	rawMarshal, err := json.Marshal(&res.Result)
-	if err != nil {
-		return "", err
-	}
-	decodedRawString := string(rawMarshal)
-	return decodedRawString, nil
+	return string(res.Result), nil
 }
 
 // GetTransactionForMempool returns a transaction by the transaction ID.
