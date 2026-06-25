@@ -1200,23 +1200,24 @@ func (d *RocksDB) GetTxAddresses(txid string) (*TxAddresses, error) {
 	return d.getTxAddresses(btxID)
 }
 
-// AddrDescForOutpoint is a function that returns address descriptor and value for given outpoint or nil if outpoint not found
-func (d *RocksDB) AddrDescForOutpoint(outpoint bchain.Outpoint) (bchain.AddressDescriptor, *big.Int) {
+// AddrDescForOutpoint is a function that returns address descriptor, value,
+// and optional asset metadata for given outpoint or nil if outpoint not found.
+func (d *RocksDB) AddrDescForOutpoint(outpoint bchain.Outpoint) (bchain.AddressDescriptor, *big.Int, *bchain.AssetInfo) {
 	ta, err := d.GetTxAddresses(outpoint.Txid)
 	if err != nil || ta == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if outpoint.Vout < 0 {
 		vin := ^outpoint.Vout
 		if len(ta.Inputs) <= int(vin) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return ta.Inputs[vin].AddrDesc, &ta.Inputs[vin].ValueSat
+		return ta.Inputs[vin].AddrDesc, &ta.Inputs[vin].ValueSat, ta.Inputs[vin].AssetInfo
 	}
 	if len(ta.Outputs) <= int(outpoint.Vout) {
-		return nil, nil
+		return nil, nil, nil
 	}
-	return ta.Outputs[outpoint.Vout].AddrDesc, &ta.Outputs[outpoint.Vout].ValueSat
+	return ta.Outputs[outpoint.Vout].AddrDesc, &ta.Outputs[outpoint.Vout].ValueSat, ta.Outputs[outpoint.Vout].AssetInfo
 }
 
 func (d *RocksDB) packTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte {

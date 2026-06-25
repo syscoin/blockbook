@@ -1313,7 +1313,7 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		return nil, NewAPIError("Asset not found", true)
 	}
 	totalResults := int(dbAsset.Transactions)
-	if filter.FromHeight != 0 || filter.ToHeight != 0 {
+	if filter.FromHeight != 0 || filter.ToHeight != 0 || filter.AssetsMask != bchain.AllMask {
 		totalResults = -1
 	}
 	var txs []*Tx

@@ -452,8 +452,9 @@ type OnNewBlockFunc func(block *Block)
 // OnNewTxFunc is used to send notification about a new transaction/address
 type OnNewTxFunc func(tx *MempoolTx)
 
-// AddrDescForOutpointFunc returns address descriptor and value for given outpoint or nil if outpoint not found
-type AddrDescForOutpointFunc func(outpoint Outpoint) (AddressDescriptor, *big.Int)
+// AddrDescForOutpointFunc returns address descriptor, value, and optional
+// asset metadata for given outpoint or nil if outpoint not found.
+type AddrDescForOutpointFunc func(outpoint Outpoint) (AddressDescriptor, *big.Int, *AssetInfo)
 
 // MempoolBatcher allows batch fetching of mempool transactions when supported.
 type MempoolBatcher interface {

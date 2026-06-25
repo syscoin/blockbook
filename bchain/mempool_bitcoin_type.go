@@ -175,7 +175,7 @@ func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrInd
 	outpoint := Outpoint{vin.Txid, int32(vin.Vout)}
 	cache := m.getResyncOutpointCache()
 	if m.AddrDescForOutpoint != nil {
-		addrDesc, value = m.AddrDescForOutpoint(outpoint)
+		addrDesc, value, assetInfo = m.AddrDescForOutpoint(outpoint)
 	}
 	if addrDesc == nil {
 		if cache != nil {
