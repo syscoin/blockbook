@@ -1328,6 +1328,8 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	}
 	var txs []*Tx
 	var txids []string
+	var mempoolTxs []*Tx
+	var mempoolTxids []string
 	var unconfirmedTxs int
 	var uBalSat big.Int
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
@@ -1346,18 +1348,30 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			}
 			uBalSat.Add(&uBalSat, tx.assetMempoolValue(asset))
 			unconfirmedTxs++
-			if page == 0 {
-				if option == AccountDetailsTxidHistory {
-					txids = append(txids, tx.Txid)
-				} else if option >= AccountDetailsTxHistoryLight {
-					txs = append(txs, tx)
-				}
+			if option == AccountDetailsTxidHistory {
+				mempoolTxids = append(mempoolTxids, tx.Txid)
+			} else if option >= AccountDetailsTxHistoryLight {
+				mempoolTxs = append(mempoolTxs, tx)
 			}
 		}
 	}
 	var pg Paging
 	if option >= AccountDetailsTxidHistory {
-		txc, err := w.getAssetTxids(assetGuid, false, filter, (page+1)*txsOnPage)
+		mempoolItems := unconfirmedTxs
+		if totalResults >= 0 {
+			_, _, _, page = computePaging(totalResults+mempoolItems, page, txsOnPage)
+		}
+		virtualFrom := page * txsOnPage
+		virtualTo := (page + 1) * txsOnPage
+		confirmedFrom := virtualFrom - mempoolItems
+		if confirmedFrom < 0 {
+			confirmedFrom = 0
+		}
+		confirmedTo := virtualTo - mempoolItems
+		if confirmedTo < 0 {
+			confirmedTo = 0
+		}
+		txc, err := w.getAssetTxids(assetGuid, false, filter, confirmedTo)
 		if err != nil {
 			return nil, errors.Annotatef(err, "getAssetTxids %v false", asset)
 		}
@@ -1365,16 +1379,29 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 		if err != nil {
 			return nil, errors.Annotatef(err, "GetBestBlock")
 		}
-		var from, to int
-		pg, from, to, page = computePaging(len(txc), page, txsOnPage)
-		if len(txc) >= txsOnPage {
-			if totalResults < 0 {
-				pg.TotalPages = -1
-			} else {
-				pg, _, _, _ = computePaging(totalResults, page, txsOnPage)
-			}
+		pg, _, _, page = computePaging(len(txc)+mempoolItems, page, txsOnPage)
+		if totalResults >= 0 {
+			pg, _, _, _ = computePaging(totalResults+mempoolItems, page, txsOnPage)
+		} else if confirmedTo > 0 && len(txc) >= confirmedTo {
+			pg.TotalPages = -1
 		}
-		for i := from; i < to; i++ {
+		mempoolFrom := virtualFrom
+		if mempoolFrom > mempoolItems {
+			mempoolFrom = mempoolItems
+		}
+		mempoolTo := virtualTo
+		if mempoolTo > mempoolItems {
+			mempoolTo = mempoolItems
+		}
+		if option == AccountDetailsTxidHistory {
+			txids = append(txids, mempoolTxids[mempoolFrom:mempoolTo]...)
+		} else {
+			txs = append(txs, mempoolTxs[mempoolFrom:mempoolTo]...)
+		}
+		if confirmedTo > len(txc) {
+			confirmedTo = len(txc)
+		}
+		for i := confirmedFrom; i < confirmedTo; i++ {
 			txid := txc[i]
 			if option == AccountDetailsTxidHistory {
 				txids = append(txids, txid)
