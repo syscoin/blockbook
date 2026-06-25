@@ -1378,6 +1378,15 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 			}
 		}
 	}
+	// On page 1, mempool items are prepended before confirmed history.
+	// Keep response bounded by requested page size for txid/txs details.
+	if page == 0 && txsOnPage > 0 {
+		if option == AccountDetailsTxidHistory && len(txids) > txsOnPage {
+			txids = txids[:txsOnPage]
+		} else if option >= AccountDetailsTxHistoryLight && len(txs) > txsOnPage {
+			txs = txs[:txsOnPage]
+		}
+	}
 	contract := ""
 	if len(dbAsset.AssetObj.Contract) > 0 {
 		contract = ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex()
