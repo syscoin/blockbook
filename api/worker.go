@@ -1257,7 +1257,6 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 			TotalSupply: (*Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
 			Decimals:    int(assetCached.AssetObj.Precision),
 			Txs:         txs,
-			TxsLegacy:   txs,
 			MetaData:    string(assetCached.MetaData),
 		})
 	}
