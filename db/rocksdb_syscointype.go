@@ -46,6 +46,27 @@ func fallbackSyscoinAsset(guid uint64) *bchain.Asset {
 	}
 }
 
+func isFallbackSyscoinAsset(guid uint64, asset *bchain.Asset) bool {
+	if asset == nil {
+		return false
+	}
+	return string(asset.AssetObj.Symbol) == fmt.Sprintf("%d", guid) &&
+		asset.AssetObj.Precision == 8 &&
+		len(asset.AssetObj.Contract) == 0 &&
+		len(asset.MetaData) == 0
+}
+
+func (d *RocksDB) fetchNEVMAssetDetails(guid uint64) (*bchain.Asset, error) {
+	if d.chain == nil {
+		return nil, errors.New("GetAsset: asset not found in DB")
+	}
+	fetcher, ok := d.chain.(nevmAssetFetcher)
+	if !ok {
+		return nil, errors.New("GetAsset: NEVM asset fetcher is not configured")
+	}
+	return fetcher.FetchNEVMAssetDetails(guid)
+}
+
 // GetTxAssetsCallback is called by GetTransactions/GetTxAssets for each found tx
 type GetTxAssetsCallback func(txids []string) error
 
@@ -271,10 +292,18 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	var assetDb *bchain.Asset
 	var assetL1 *bchain.Asset
 	var ok bool
+	var err error
 	if assets != nil {
 		if assetL1, ok = assets[guid]; ok {
 			if guid == syscoinSYSXAssetGuid {
 				return builtinSYSXAsset(assetL1.Transactions), nil
+			}
+			if isFallbackSyscoinAsset(guid, assetL1) {
+				if assetDb, err = d.fetchNEVMAssetDetails(guid); err == nil {
+					assetDb.Transactions = assetL1.Transactions
+					assets[guid] = assetDb
+					return assetDb, nil
+				}
 			}
 			return assetL1, nil
 		}
@@ -292,6 +321,17 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 				AssetCache[guid] = *assetDb
 				assetCacheMu.Unlock()
 				return assetDb, nil
+			}
+			if isFallbackSyscoinAsset(guid, &assetDbCache) {
+				assetCacheMu.Unlock()
+				if assetDb, err = d.fetchNEVMAssetDetails(guid); err == nil {
+					assetDb.Transactions = assetDbCache.Transactions
+					assetCacheMu.Lock()
+					AssetCache[guid] = *assetDb
+					assetCacheMu.Unlock()
+					return assetDb, nil
+				}
+				return &assetDbCache, nil
 			}
 			assetCacheMu.Unlock()
 			return &assetDbCache, nil
@@ -313,14 +353,7 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 			assetCacheMu.Unlock()
 			return assetDb, nil
 		}
-		if d.chain == nil {
-			return nil, errors.New("GetAsset: asset not found in DB")
-		}
-		fetcher, ok := d.chain.(nevmAssetFetcher)
-		if !ok {
-			return nil, errors.New("GetAsset: NEVM asset fetcher is not configured")
-		}
-		assetDb, err := fetcher.FetchNEVMAssetDetails(guid)
+		assetDb, err := d.fetchNEVMAssetDetails(guid)
 		if err != nil {
 			return nil, err
 		}
@@ -344,6 +377,12 @@ func (d *RocksDB) GetAsset(guid uint64, assets map[uint64]*bchain.Asset) (*bchai
 	}
 	if guid == syscoinSYSXAssetGuid {
 		assetDb = builtinSYSXAsset(assetDb.Transactions)
+	}
+	if isFallbackSyscoinAsset(guid, assetDb) {
+		if fetched, fetchErr := d.fetchNEVMAssetDetails(guid); fetchErr == nil {
+			fetched.Transactions = assetDb.Transactions
+			assetDb = fetched
+		}
 	}
 	// cache miss, add it, we also add it on storeAsset but on API queries we should not have to wait until a block
 	// with this asset to store it in cache

@@ -234,6 +234,7 @@ func (m *MempoolBitcoinType) getInputAddress(payload *chanInputPayload) *addrInd
 	}
 	vin.AddrDesc = addrDesc
 	vin.ValueSat = *value
+	vin.AssetInfo = assetInfo
 	return &addrIndex{addrDesc: string(addrDesc), n: ^int32(vin.Vout), AssetInfo: assetInfo}
 
 }

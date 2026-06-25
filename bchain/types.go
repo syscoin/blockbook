@@ -104,6 +104,8 @@ type MempoolVin struct {
 	Vin
 	AddrDesc AddressDescriptor `json:"-" ts_doc:"Internal descriptor for the input address (not exposed)."`
 	ValueSat big.Int           `ts_doc:"Amount (in satoshi or base unit) of the input."`
+	// SYSCOIN: SPT metadata on the spent output.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT asset metadata for this input."`
 }
 
 // MempoolTx is blockchain transaction in mempool
