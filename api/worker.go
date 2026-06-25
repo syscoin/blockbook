@@ -1249,13 +1249,15 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 		if !foundAsset {
 			continue
 		}
+		txs := int(assetCached.Transactions)
 		assetDetails = append(assetDetails, &AssetsSpecific{
 			AssetGuid:   strconv.FormatUint(guid, 10),
 			Symbol:      symbol,
 			Contract:    contract,
 			TotalSupply: (*Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
 			Decimals:    int(assetCached.AssetObj.Precision),
-			Txs:         int(assetCached.Transactions),
+			Txs:         txs,
+			TxsLegacy:   txs,
 			MetaData:    string(assetCached.MetaData),
 		})
 	}

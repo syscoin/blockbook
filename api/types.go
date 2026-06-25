@@ -160,7 +160,8 @@ type AssetsSpecific struct {
 	Symbol      string  `json:"symbol" ts_doc:"Asset symbol."`
 	TotalSupply *Amount `json:"totalSupply" ts_doc:"Current total supply in base units."`
 	Decimals    int     `json:"precision" ts_doc:"Number of asset decimal places."`
-	Txs         int     `json:"Txs" ts_doc:"Number of indexed transactions touching this asset."`
+	Txs         int     `json:"txs" ts_doc:"Number of indexed transactions touching this asset."`
+	TxsLegacy   int     `json:"Txs" ts_doc:"Deprecated compatibility alias for txs."`
 	MetaData    string  `json:"metaData,omitempty" ts_doc:"Raw Syscoin asset metadata."`
 }
 

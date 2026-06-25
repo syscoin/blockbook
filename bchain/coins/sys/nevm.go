@@ -205,6 +205,8 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			symbol = fmt.Sprintf("ERC20-%d", assetId)
 		}
 		metadata = "ERC20 Token"
+		// SYSCOIN: UTXO-side SPT values are stored and exposed as CAmount/COIN
+		// units, matching Core's 8-decimal asset_value formatting.
 		precision = 8
 
 	case 3: // ERC721 (NFT)
