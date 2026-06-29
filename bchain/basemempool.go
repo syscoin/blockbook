@@ -7,8 +7,9 @@ import (
 )
 
 type addrIndex struct {
-	addrDesc string
-	n        int32
+	addrDesc  string
+	n         int32
+	AssetInfo *AssetInfo // SYSCOIN
 }
 
 type txEntry struct {
@@ -110,6 +111,33 @@ func (m *BaseMempool) GetAllEntries() MempoolTxidEntries {
 		i++
 	}
 	m.mux.Unlock()
+	sort.Sort(entries)
+	return entries
+}
+
+// GetTxAssets returns all mempool entries touching a Syscoin SPT asset.
+//
+// SYSCOIN
+func (m *BaseMempool) GetTxAssets(assetGuid uint64) MempoolTxidEntries {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	mapTxid := make(map[string]struct{})
+	entries := make(MempoolTxidEntries, 0)
+	for txid, entry := range m.txEntries {
+		if _, found := mapTxid[txid]; found {
+			continue
+		}
+		for _, addrIndex := range entry.addrIndexes {
+			if addrIndex.AssetInfo != nil && addrIndex.AssetInfo.AssetGuid == assetGuid {
+				mapTxid[txid] = struct{}{}
+				entries = append(entries, MempoolTxidEntry{
+					Txid: txid,
+					Time: entry.time,
+				})
+				break
+			}
+		}
+	}
 	sort.Sort(entries)
 	return entries
 }

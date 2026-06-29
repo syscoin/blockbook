@@ -70,6 +70,24 @@
     <footer id="footer">
         <div class="container">
             <nav class="navbar navbar-dark">
+                {{if isSyscoinShortcut .CoinShortcut}}
+                {{/* SYSCOIN: Syscoin-branded footer only for Syscoin explorers. */}}
+                <span class="navbar-nav">
+                    <a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by Syscoin/SatoshiLabs</a>
+                </span>
+                <span class="navbar-nav ml-md-auto">
+                    <a class="nav-link" href="{{- .TOSLink -}}" target="_blank" rel="noopener noreferrer">Terms of Use</a>
+                </span>
+                <span class="navbar-nav ml-md-auto d-md-flex d-none">
+                    <a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a>
+                </span>
+                <span class="navbar-nav ml-md-auto d-md-flex d-none">
+                    <a class="nav-link" href="https://syscoin.org" target="_blank" rel="noopener noreferrer">Syscoin</a>
+                </span>
+                <span class="navbar-nav ml-md-auto d-md-flex d-none">
+                    <a class="nav-link" href="https://discord.com/invite/syscoin" target="_blank" rel="noopener noreferrer">Support (Discord)</a>
+                </span>
+                {{else}}
                 <span class="navbar-nav">
                     <a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a>
                 </span>
@@ -85,6 +103,7 @@
                 <span class="navbar-nav ml-md-auto d-md-flex d-none">
                     <a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a>
                 </span>
+                {{end}}
                 <span class="navbar-nav ml-md-auto">
                     <a class="nav-link" href="/sendtx">Send Transaction</a>
                 </span>

@@ -52,6 +52,8 @@ import (
 	"github.com/trezor/blockbook/bchain/coins/ravencoin"
 	"github.com/trezor/blockbook/bchain/coins/ritocoin"
 	"github.com/trezor/blockbook/bchain/coins/snowgem"
+	// SYSCOIN
+	sys "github.com/trezor/blockbook/bchain/coins/sys"
 	"github.com/trezor/blockbook/bchain/coins/trezarcoin"
 	"github.com/trezor/blockbook/bchain/coins/tron"
 	"github.com/trezor/blockbook/bchain/coins/unobtanium"
@@ -155,6 +157,9 @@ func init() {
 	BlockChainFactories["Base Archive"] = base.NewBaseRPC
 	BlockChainFactories["Tron"] = tron.NewTronRPC
 	BlockChainFactories["Tron Testnet Nile"] = tron.NewTronRPC
+	// SYSCOIN
+	BlockChainFactories["Syscoin"] = sys.NewSyscoinRPC
+	BlockChainFactories["Syscoin Testnet"] = sys.NewSyscoinRPC
 }
 
 type metricsSetter interface {
@@ -324,9 +329,29 @@ func (c *blockChainWithMetrics) SendRawTransaction(tx string, disableAlternative
 	return c.b.SendRawTransaction(tx, disableAlternativeRPC)
 }
 
+// SendRawTransactionWithOpts forwards optional Syscoin sendrawtransaction
+// parameters through the metrics wrapper when the backend supports them.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) SendRawTransactionWithOpts(p bchain.SendRawTransactionParams) (v string, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("SendRawTransactionWithOpts", s, err) }(time.Now())
+	if sender, ok := c.b.(bchain.SendRawTransactionOpts); ok {
+		return sender.SendRawTransactionWithOpts(p)
+	}
+	return c.b.SendRawTransaction(p.Hex, p.DisableAlternativeRPC)
+}
+
 func (c *blockChainWithMetrics) GetMempoolEntry(txid string) (v *bchain.MempoolEntry, err error) {
 	defer func(s time.Time) { c.observeRPCLatency("GetMempoolEntry", s, err) }(time.Now())
 	return c.b.GetMempoolEntry(txid)
+}
+
+// GetSPVProof forwards Syscoin's bridge SPV proof RPC through metrics.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) GetSPVProof(hash string) (v json.RawMessage, err error) {
+	defer func(s time.Time) { c.observeRPCLatency("GetSPVProof", s, err) }(time.Now())
+	return c.b.GetSPVProof(hash)
 }
 
 func (c *blockChainWithMetrics) GetChainParser() bchain.BlockChainParser {
@@ -487,6 +512,15 @@ func (c *mempoolWithMetrics) GetAllEntries() (v bchain.MempoolTxidEntries) {
 	return c.mempool.GetAllEntries()
 }
 
+// GetTxAssets forwards Syscoin SPT asset mempool lookups through the metrics
+// wrapper.
+//
+// SYSCOIN
+func (c *mempoolWithMetrics) GetTxAssets(assetGuid uint64) (v bchain.MempoolTxidEntries) {
+	defer func(s time.Time) { c.observeRPCLatency("GetTxAssets", s, nil) }(time.Now())
+	return c.mempool.GetTxAssets(assetGuid)
+}
+
 func (c *mempoolWithMetrics) GetTransactionTime(txid string) uint32 {
 	return c.mempool.GetTransactionTime(txid)
 }
@@ -534,4 +568,30 @@ func (c *blockChainWithMetrics) MissingBlockRetryOverride() *bchain.MissingBlock
 		return p.MissingBlockRetryOverride()
 	}
 	return nil
+}
+
+// FetchNEVMAssetDetails forwards Syscoin's optional NEVM asset metadata lookup
+// through the metrics wrapper.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) FetchNEVMAssetDetails(assetGuid uint64) (v *bchain.Asset, err error) {
+	if p, ok := c.b.(interface {
+		FetchNEVMAssetDetails(uint64) (*bchain.Asset, error)
+	}); ok {
+		defer func(s time.Time) { c.observeRPCLatency("FetchNEVMAssetDetails", s, err) }(time.Now())
+		return p.FetchNEVMAssetDetails(assetGuid)
+	}
+	return nil, errors.New("FetchNEVMAssetDetails not supported by underlying chain")
+}
+
+// GetContractExplorerBaseURL forwards Syscoin's optional NEVM explorer URL.
+//
+// SYSCOIN
+func (c *blockChainWithMetrics) GetContractExplorerBaseURL() string {
+	if p, ok := c.b.(interface {
+		GetContractExplorerBaseURL() string
+	}); ok {
+		return p.GetContractExplorerBaseURL()
+	}
+	return ""
 }

@@ -27,6 +27,12 @@
                     <a class="outpoint" href="/tx/{{$vin.Txid}}" tt="Outpoint {{$vin.Txid}},{{$vin.Vout}}">←</a>
                     {{end}}
                     {{if $vin.Addresses}}{{amountSpan $vin.ValueSat $data "tx-amt copyable"}}{{end}}
+                    {{if $vin.AssetInfo}}
+                    <span class="tx-amt small text-muted d-block">
+                        SYSCOIN asset <a href="/asset/{{$vin.AssetInfo.AssetGuid}}">#{{$vin.AssetInfo.AssetGuid}}</a>:
+                        <span class="copyable">{{$vin.AssetInfo.ValueStr}}</span>{{if $vin.AssetInfo.Symbol}} {{$vin.AssetInfo.Symbol}}{{end}}
+                    </span>
+                    {{end}}
                 </div>
                 {{else}}
                 <div class="col-12">No Inputs</div>
@@ -49,7 +55,14 @@
                         {{amountSpan $vout.ValueSat $data "copyable"}}{{if $vout.Spent}}<a class="spent" href="{{if $vout.SpentTxID}}/tx/{{$vout.SpentTxID}}{{else}}/spending/{{$tx.Txid}}/{{$vout.N}}{{end}}" tt="Spent">→</a>{{else}}<span class="unspent" tt="Unspent">×</span>
                         {{end}}
                     </span>
+                    {{if $vout.AssetInfo}}
+                    <span class="tx-amt small text-muted d-block">
+                        SYSCOIN asset <a href="/asset/{{$vout.AssetInfo.AssetGuid}}">#{{$vout.AssetInfo.AssetGuid}}</a>:
+                        <span class="copyable">{{$vout.AssetInfo.ValueStr}}</span>{{if $vout.AssetInfo.Symbol}} {{$vout.AssetInfo.Symbol}}{{end}}
+                    </span>
+                    {{else}}
                     </td>
+                    {{end}}
                 </div>
                 {{else}}
                 <div class="col-12">No Outputs</div>
@@ -62,6 +75,9 @@
             {{if $tx.FeesSat}}{{$fpb := feePerByte $tx}}
             Fee {{amountSpan $tx.FeesSat $data "txvalue copyable ms-3"}}{{if $fpb}} <span class="fw-normal small">({{$fpb}})</span>{{end}}
             {{end}}
+            {{if $tx.Memo}}
+            <span class="txvalue small d-block">Memo <code class="copyable">{{formatEncodeBase64 $tx.Memo}}</code></span>
+            {{end}}
         </div>
         <div class="col-sm-12 col-md-8 text-end">
             <span class="me-4">
@@ -72,6 +88,9 @@
             {{end}}
             </span>
             {{amountSpan $tx.ValueOutSat $data "txvalue copyable"}}
+            {{range $tokenTransfer := $tx.TokenTransfers}}
+            <span class="txvalue copyable d-block">{{formattedAmountSpan $tokenTransfer.Value $tokenTransfer.Decimals $tokenTransfer.Symbol $data "copyable"}}</span>
+            {{end}}
         </div>
     </div>
 </div>

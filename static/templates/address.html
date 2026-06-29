@@ -109,6 +109,41 @@
     </tbody>
 </table>
 {{end}}
+{{if $addr.TokensAsset}}
+<div class="accordion mt-2 mb-2" id="syscoinAssets">
+    <div class="accordion-item">
+        <div class="accordion-header" id="syscoinAssetsHeading">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#syscoinAssetsBody" aria-expanded="false" aria-controls="syscoinAssetsBody">
+                <div class="row g-0 w-100">
+                    <h5 class="col-12 mb-md-0">Syscoin Assets <span class="badge bg-secondary">{{len $addr.TokensAsset}}</span></h5>
+                </div>
+            </button>
+        </div>
+        <div id="syscoinAssetsBody" class="accordion-collapse collapse" aria-labelledby="syscoinAssetsHeading" data-bs-parent="#syscoinAssets">
+            <div class="accordion-body">
+                <table class="table data-table mt-0 mb-0">
+                    <tbody>
+                        <tr>
+                            <th style="width: 25%;">Asset GUID</th>
+                            <th style="width: 25%;">Symbol</th>
+                            <th style="width: 30%;">Balance</th>
+                            <th class="text-end" style="width: 20%;">Unconfirmed</th>
+                        </tr>
+                        {{range $t := $addr.TokensAsset}}
+                        <tr>
+                            <td><a href="/asset/{{$t.AssetGuid}}" class="copyable">{{$t.AssetGuid}}</a></td>
+                            <td>{{if $t.Symbol}}{{$t.Symbol}}{{else}}SPT{{end}}</td>
+                            <td>{{formattedAmountSpan $t.BalanceSat $t.Decimals $t.Symbol $data "copyable"}}</td>
+                            <td class="text-end">{{if $t.UnconfirmedBalanceSat}}{{formattedAmountSpan $t.UnconfirmedBalanceSat $t.Decimals $t.Symbol $data "copyable"}}{{else}}0{{end}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
 {{if eq .ChainType 1}}
 {{if tokenCount $addr.Tokens .FungibleTokenName}}
 <div class="accordion mt-2 mb-2" id="erc20">
@@ -281,10 +316,16 @@
 <div class="row pt-3 pb-1">
     <h3 class="col-sm-6 col-lg-3 m-0 align-self-center">Transactions</h3>
     <div class="col-sm-6 col-lg-3 my-2 my-lg-0 align-self-center">
-        <select  class="w-100" onchange="self.location='?filter='+options[selectedIndex].value">
+        {{if $addr.TokensAsset}}<select class="w-100" onchange="self.location='?assetMask='+options[selectedIndex].value+'&filter='+options[selectedIndex].value">{{else}}<select  class="w-100" onchange="self.location='?filter='+options[selectedIndex].value">{{end}}
             <option>All</option>
             <option {{if eq $addr.Filter "inputs"}}selected{{end}} value="inputs">Address on input side</option>
             <option {{if eq $addr.Filter "outputs"}}selected{{end}} value="outputs">Address on output side</option>
+            {{if $addr.TokensAsset}}
+            <option {{if eq $addr.Filter "token-only"}}selected{{end}} value="token-only">Syscoin assets only</option>
+            <option {{if eq $addr.Filter "non-tokens"}}selected{{end}} value="non-tokens">Non-asset</option>
+            <option {{if eq $addr.Filter "token-transfers"}}selected{{end}} value="token-transfers">Syscoin asset transfers</option>
+            <option {{if eq $addr.Filter "non-token-transfers"}}selected{{end}} value="non-token-transfers">Syscoin asset non-transfers</option>
+            {{end}}
             {{if $addr.Tokens}}
             <option {{if eq $addr.Filter "0"}}selected{{end}} value="0">Non-contract</option>
             <option {{if eq $addr.Filter "1"}}selected{{end}} value="1">Internal</option>

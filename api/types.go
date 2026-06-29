@@ -132,6 +132,38 @@ func (a *Amount) AsInt64() int64 {
 	return (*big.Int)(a).Int64()
 }
 
+// SYSCOIN: AssetInfo contains SPT metadata for a transaction input, output, or
+// UTXO.
+type AssetInfo struct {
+	AssetGuid string  `json:"assetGuid,omitempty" ts_doc:"Syscoin SPT asset GUID."`
+	ValueSat  *Amount `json:"value,omitempty" ts_doc:"SPT amount in base units."`
+	ValueStr  string  `json:"valueStr,omitempty" ts_doc:"SPT amount as a decimal string."`
+	Symbol    string  `json:"symbol,omitempty" ts_doc:"Syscoin SPT asset symbol, if available."`
+}
+
+// SYSCOIN: AssetSpecific contains Syscoin SPT metadata exposed by asset
+// endpoints and explorer pages.
+type AssetSpecific struct {
+	AssetGuid   string  `json:"assetGuid" ts_doc:"Syscoin SPT asset GUID."`
+	Contract    string  `json:"contract,omitempty" ts_doc:"NEVM contract address associated with this asset, if any."`
+	Symbol      string  `json:"symbol" ts_doc:"Asset symbol."`
+	TotalSupply *Amount `json:"totalSupply" ts_doc:"Current total supply in base units."`
+	MaxSupply   *Amount `json:"maxSupply" ts_doc:"Maximum supply in base units."`
+	Decimals    int     `json:"decimals" ts_doc:"Number of asset decimal places."`
+	MetaData    string  `json:"metaData,omitempty" ts_doc:"Raw Syscoin asset metadata."`
+}
+
+// SYSCOIN: AssetsSpecific is the compact Syscoin SPT row used by asset search.
+type AssetsSpecific struct {
+	AssetGuid   string  `json:"assetGuid" ts_doc:"Syscoin SPT asset GUID."`
+	Contract    string  `json:"contract" ts_doc:"NEVM contract address associated with this asset, if any."`
+	Symbol      string  `json:"symbol" ts_doc:"Asset symbol."`
+	TotalSupply *Amount `json:"totalSupply" ts_doc:"Current total supply in base units."`
+	Decimals    int     `json:"precision" ts_doc:"Number of asset decimal places."`
+	Txs         int     `json:"txs" ts_doc:"Number of indexed transactions touching this asset."`
+	MetaData    string  `json:"metaData,omitempty" ts_doc:"Raw Syscoin asset metadata."`
+}
+
 // Vin contains information about single transaction input
 type Vin struct {
 	Txid      string                   `json:"txid,omitempty" ts_doc:"ID/hash of the originating transaction (where the UTXO comes from)."`
@@ -146,6 +178,8 @@ type Vin struct {
 	Hex       string                   `json:"hex,omitempty" ts_doc:"Raw script hex data for this input."`
 	Asm       string                   `json:"asm,omitempty" ts_doc:"Disassembled script for this input."`
 	Coinbase  string                   `json:"coinbase,omitempty" ts_doc:"Data for coinbase inputs (when mining)."`
+	// SYSCOIN: SPT metadata for this input.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT metadata for this input."`
 }
 
 // Vout contains information about single transaction output
@@ -163,6 +197,8 @@ type Vout struct {
 	IsAddress   bool                     `json:"isAddress" ts_doc:"Indicates whether this output is owned by valid address."`
 	IsOwn       bool                     `json:"isOwn,omitempty" ts_doc:"Indicates if this output belongs to the wallet in context."`
 	Type        string                   `json:"type,omitempty" ts_doc:"Output script type (e.g., 'P2PKH', 'P2SH')."`
+	// SYSCOIN: SPT metadata for this output.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT metadata for this output."`
 }
 
 // MultiTokenValue contains values for contracts with multiple token IDs
@@ -243,8 +279,12 @@ type Token struct {
 	MultiTokenValues []MultiTokenValue        `json:"multiTokenValues,omitempty" ts_doc:"Multiple ERC1155 token balances (id + value)."`
 	TotalReceivedSat *Amount                  `json:"totalReceived,omitempty" ts_doc:"Total amount of tokens received."`
 	TotalSentSat     *Amount                  `json:"totalSent,omitempty" ts_doc:"Total amount of tokens sent."`
-	Protocols        TokenProtocols           `json:"protocols,omitempty" ts_type:"string[]" ts_doc:"Protocol identifiers the contract participates in (e.g., \"erc4626\"); for fresh per-vault data, use getContractInfo."`
-	ContractIndex    string                   `json:"-"`
+	// SYSCOIN: SPT balance fields.
+	UnconfirmedBalanceSat *Amount        `json:"unconfirmedBalance,omitempty" ts_doc:"Unconfirmed token balance delta."`
+	UnconfirmedTransfers  int            `json:"unconfirmedTransfers,omitempty" ts_doc:"Number of unconfirmed Syscoin SPT transfers."`
+	AssetGuid             string         `json:"assetGuid,omitempty" ts_doc:"Syscoin SPT asset GUID."`
+	Protocols             TokenProtocols `json:"protocols,omitempty" ts_type:"string[]" ts_doc:"Protocol identifiers the contract participates in (e.g., \"erc4626\"); for fresh per-vault data, use getContractInfo."`
+	ContractIndex         string         `json:"-"`
 }
 
 // Tokens is array of Token
@@ -287,6 +327,8 @@ type TokenTransfer struct {
 	Decimals         int                      `json:"decimals" ts_doc:"Number of decimals for this token. Always present; defaults to the coin convention (18 for ERC-20) when the contract value is unavailable."`
 	Value            *Amount                  `json:"value,omitempty" ts_doc:"Amount (in base units) of tokens transferred."`
 	MultiTokenValues []MultiTokenValue        `json:"multiTokenValues,omitempty" ts_doc:"List of multiple ID-value pairs for ERC1155 transfers."`
+	// SYSCOIN: SPT asset GUID for Bitcoin-type Syscoin token summaries.
+	AssetGuid string `json:"assetGuid,omitempty" ts_doc:"Syscoin SPT asset GUID."`
 }
 
 // EthereumInternalTransfer represents internal transaction data in Ethereum-like blockchains
@@ -351,8 +393,11 @@ type Tx struct {
 	CoinSpecificData       json.RawMessage   `json:"coinSpecificData,omitempty" ts_type:"any" ts_doc:"Blockchain-specific extended data."`
 	ChainExtraData         *TxChainExtraData `json:"chainExtraData,omitempty" ts_type:"{ payloadType: 'tron'; payload?: TronChainExtraData } | { payloadType: string; payload?: any }" ts_doc:"Additional normalized chain-specific transaction data. Use payloadType as discriminator for payload."`
 	TokenTransfers         []TokenTransfer   `json:"tokenTransfers,omitempty" ts_doc:"List of token transfers that occurred in this transaction."`
-	EthereumSpecific       *EthereumSpecific `json:"ethereumSpecific,omitempty" ts_doc:"Ethereum-like blockchain specific data (if applicable)."`
-	AddressAliases         AddressAliasesMap `json:"addressAliases,omitempty" ts_doc:"Aliases for addresses involved in this transaction."`
+	// SYSCOIN: SPT transaction type and optional decoded memo.
+	TokenType        *bchain.TokenType `json:"tokenType,omitempty" ts_doc:"Syscoin SPT transaction type."`
+	Memo             []byte            `json:"memo,omitempty" ts_doc:"Syscoin SPT memo decoded from OP_RETURN."`
+	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty" ts_doc:"Ethereum-like blockchain specific data (if applicable)."`
+	AddressAliases   AddressAliasesMap `json:"addressAliases,omitempty" ts_doc:"Aliases for addresses involved in this transaction."`
 }
 
 // FeeStats contains detailed block fee statistics
@@ -399,6 +444,8 @@ type AddressFilter struct {
 	ToHeight       uint32         `ts_doc:"Ending block height for filtering transactions."`
 	TokensToReturn TokensToReturn `ts_doc:"Which tokens to include in the result set."`
 	Protocols      []string       `ts_doc:"Optional protocol enrichments to include. Supported values currently include 'erc4626'."`
+	// SYSCOIN: SPT transaction type bitmask filter.
+	AssetsMask bchain.AssetsMask `ts_doc:"Syscoin SPT transaction type bitmask filter."`
 	// OnlyConfirmed set to true will ignore mempool transactions; mempool is also ignored if FromHeight/ToHeight filter is specified
 	OnlyConfirmed bool `ts_doc:"If true, ignores mempool (unconfirmed) transactions."`
 	// WithConfirmedNonce set to true makes the Ethereum-like address response include the confirmed nonce,
@@ -422,30 +469,33 @@ type StakingPool struct {
 // Address holds information about an address and its transactions
 type Address struct {
 	Paging
-	AddrStr               string              `json:"address" ts_doc:"The address string in standard format."`
-	BalanceSat            *Amount             `json:"balance" ts_doc:"Current confirmed balance (in satoshi or base units)."`
-	TotalReceivedSat      *Amount             `json:"totalReceived,omitempty" ts_doc:"Total amount ever received by this address."`
-	TotalSentSat          *Amount             `json:"totalSent,omitempty" ts_doc:"Total amount ever sent by this address."`
-	UnconfirmedBalanceSat *Amount             `json:"unconfirmedBalance,omitempty" ts_doc:"Unconfirmed balance for this address. Omitted for AccountDetailsBasic, where mempool transactions are not aggregated."`
-	UnconfirmedTxs        int                 `json:"unconfirmedTxs" ts_doc:"Number of unconfirmed transactions for this address."`
-	UnconfirmedSending    *Amount             `json:"unconfirmedSending,omitempty" ts_doc:"Unconfirmed outgoing balance for this address."`
-	UnconfirmedReceiving  *Amount             `json:"unconfirmedReceiving,omitempty" ts_doc:"Unconfirmed incoming balance for this address."`
-	Txs                   int                 `json:"txs" ts_doc:"Number of transactions for this address (including confirmed)."`
-	AddrTxCount           int                 `json:"addrTxCount,omitempty" ts_doc:"Historical total count of transactions, if known."`
-	NonTokenTxs           int                 `json:"nonTokenTxs,omitempty" ts_doc:"Number of transactions not involving tokens (pure coin transfers)."`
-	InternalTxs           int                 `json:"internalTxs,omitempty" ts_doc:"Number of internal transactions (e.g., Ethereum calls)."`
-	Transactions          []*Tx               `json:"transactions,omitempty" ts_doc:"List of transaction details (if requested)."`
-	Txids                 []string            `json:"txids,omitempty" ts_doc:"List of transaction IDs (if detailed data is not requested)."`
-	Nonce                 string              `json:"nonce,omitempty" ts_doc:"Current (pending) transaction nonce for Ethereum-like addresses, including mempool transactions. This is the next nonce the account will use."`
-	ConfirmedNonce        string              `json:"confirmedNonce,omitempty" ts_doc:"Confirmed transaction nonce for Ethereum-like addresses, reflecting only mined transactions (eth_getTransactionCount at the latest block). Equals nonce when the account has no pending transactions."`
-	UsedTokens            int                 `json:"usedTokens,omitempty" ts_doc:"Number of tokens with any historical usage at this address."`
-	Tokens                Tokens              `json:"tokens,omitempty" ts_doc:"List of tokens associated with this address."`
-	SecondaryValue        float64             `json:"secondaryValue,omitempty" ts_doc:"Total value of the address in secondary currency (e.g. fiat)."`
-	TokensBaseValue       float64             `json:"tokensBaseValue,omitempty" ts_doc:"Sum of token values in base currency."`
-	TokensSecondaryValue  float64             `json:"tokensSecondaryValue,omitempty" ts_doc:"Sum of token values in secondary currency (fiat)."`
-	TotalBaseValue        float64             `json:"totalBaseValue,omitempty" ts_doc:"Address's entire value in base currency, including tokens."`
-	TotalSecondaryValue   float64             `json:"totalSecondaryValue,omitempty" ts_doc:"Address's entire value in secondary currency, including tokens."`
-	ContractInfo          *ContractInfoResult `json:"contractInfo,omitempty" ts_doc:"Extra info if the address is a contract. Shape matches getContractInfo; rates and protocols are populated only when explicitly requested via getContractInfo."`
+	AddrStr               string   `json:"address" ts_doc:"The address string in standard format."`
+	BalanceSat            *Amount  `json:"balance" ts_doc:"Current confirmed balance (in satoshi or base units)."`
+	TotalReceivedSat      *Amount  `json:"totalReceived,omitempty" ts_doc:"Total amount ever received by this address."`
+	TotalSentSat          *Amount  `json:"totalSent,omitempty" ts_doc:"Total amount ever sent by this address."`
+	UnconfirmedBalanceSat *Amount  `json:"unconfirmedBalance,omitempty" ts_doc:"Unconfirmed balance for this address. Omitted for AccountDetailsBasic, where mempool transactions are not aggregated."`
+	UnconfirmedTxs        int      `json:"unconfirmedTxs" ts_doc:"Number of unconfirmed transactions for this address."`
+	UnconfirmedSending    *Amount  `json:"unconfirmedSending,omitempty" ts_doc:"Unconfirmed outgoing balance for this address."`
+	UnconfirmedReceiving  *Amount  `json:"unconfirmedReceiving,omitempty" ts_doc:"Unconfirmed incoming balance for this address."`
+	Txs                   int      `json:"txs" ts_doc:"Number of transactions for this address (including confirmed)."`
+	AddrTxCount           int      `json:"addrTxCount,omitempty" ts_doc:"Historical total count of transactions, if known."`
+	NonTokenTxs           int      `json:"nonTokenTxs,omitempty" ts_doc:"Number of transactions not involving tokens (pure coin transfers)."`
+	InternalTxs           int      `json:"internalTxs,omitempty" ts_doc:"Number of internal transactions (e.g., Ethereum calls)."`
+	Transactions          []*Tx    `json:"transactions,omitempty" ts_doc:"List of transaction details (if requested)."`
+	Txids                 []string `json:"txids,omitempty" ts_doc:"List of transaction IDs (if detailed data is not requested)."`
+	Nonce                 string   `json:"nonce,omitempty" ts_doc:"Current (pending) transaction nonce for Ethereum-like addresses, including mempool transactions. This is the next nonce the account will use."`
+	ConfirmedNonce        string   `json:"confirmedNonce,omitempty" ts_doc:"Confirmed transaction nonce for Ethereum-like addresses, reflecting only mined transactions (eth_getTransactionCount at the latest block). Equals nonce when the account has no pending transactions."`
+	UsedTokens            int      `json:"usedTokens,omitempty" ts_doc:"Number of tokens with any historical usage at this address."`
+	// SYSCOIN: SPT token summary fields.
+	UsedAssetTokens      int                 `json:"usedAssetTokens,omitempty" ts_doc:"Number of Syscoin SPT assets with any historical usage at this address."`
+	Tokens               Tokens              `json:"tokens,omitempty" ts_doc:"List of tokens associated with this address."`
+	TokensAsset          Tokens              `json:"tokensAsset,omitempty" ts_doc:"List of Syscoin SPT assets associated with this address."`
+	SecondaryValue       float64             `json:"secondaryValue,omitempty" ts_doc:"Total value of the address in secondary currency (e.g. fiat)."`
+	TokensBaseValue      float64             `json:"tokensBaseValue,omitempty" ts_doc:"Sum of token values in base currency."`
+	TokensSecondaryValue float64             `json:"tokensSecondaryValue,omitempty" ts_doc:"Sum of token values in secondary currency (fiat)."`
+	TotalBaseValue       float64             `json:"totalBaseValue,omitempty" ts_doc:"Address's entire value in base currency, including tokens."`
+	TotalSecondaryValue  float64             `json:"totalSecondaryValue,omitempty" ts_doc:"Address's entire value in secondary currency, including tokens."`
+	ContractInfo         *ContractInfoResult `json:"contractInfo,omitempty" ts_doc:"Extra info if the address is a contract. Shape matches getContractInfo; rates and protocols are populated only when explicitly requested via getContractInfo."`
 	// Deprecated: replaced by ContractInfo
 	Erc20Contract  *ContractInfoResult    `json:"erc20Contract,omitempty" ts_doc:"@deprecated: replaced by contractInfo"`
 	AddressAliases AddressAliasesMap      `json:"addressAliases,omitempty" ts_doc:"Aliases assigned to this address."`
@@ -454,6 +504,30 @@ type Address struct {
 	// helpers for explorer
 	Filter        string              `json:"-" ts_doc:"Filter used internally for data retrieval."`
 	XPubAddresses map[string]struct{} `json:"-" ts_doc:"Set of derived XPUB addresses (internal usage)."`
+}
+
+// Asset holds Syscoin SPT metadata and optional transaction history.
+//
+// SYSCOIN
+type Asset struct {
+	Paging
+	AssetDetails          *AssetSpecific `json:"asset" ts_doc:"Syscoin SPT metadata."`
+	UnconfirmedTxs        int            `json:"unconfirmedTxs,omitempty" ts_doc:"Number of unconfirmed transactions touching this asset."`
+	UnconfirmedBalanceSat *Amount        `json:"unconfirmedBalance,omitempty" ts_doc:"Unconfirmed net asset amount in base units."`
+	Txs                   int            `json:"txs" ts_doc:"Number of indexed transactions touching this asset."`
+	Transactions          []*Tx          `json:"transactions,omitempty" ts_doc:"Transactions touching this asset."`
+	Txids                 []string       `json:"txids,omitempty" ts_doc:"Transaction IDs touching this asset."`
+	Filter                string         `json:"-"`
+}
+
+// Assets holds Syscoin SPT search results.
+//
+// SYSCOIN
+type Assets struct {
+	Paging
+	AssetDetails []*AssetsSpecific `json:"assets" ts_doc:"Matching Syscoin SPT assets."`
+	NumAssets    int               `json:"numAssets" ts_doc:"Total number of matching assets."`
+	Filter       string            `json:"-"`
 }
 
 // Utxo is one unspent transaction output
@@ -467,6 +541,8 @@ type Utxo struct {
 	Path          string  `json:"path,omitempty" ts_doc:"Derivation path for XPUB-based wallets, if applicable."`
 	Locktime      uint32  `json:"lockTime,omitempty" ts_doc:"If non-zero, locktime required before spending this UTXO."`
 	Coinbase      bool    `json:"coinbase,omitempty" ts_doc:"Indicates if this UTXO originated from a coinbase transaction."`
+	// SYSCOIN: SPT metadata for this UTXO.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT metadata for this UTXO."`
 }
 
 // Utxos is array of Utxo
