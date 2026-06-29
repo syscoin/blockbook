@@ -15,14 +15,14 @@ import (
 	"time"
 )
 
-func newTestRestAPIRateLimiter() *restAPIRateLimiter {
-	return &restAPIRateLimiter{
-		clients:       make(map[string]*restAPIClientLimit),
+func newTestRestUIRateLimiter() *restUIRateLimiter {
+	return &restUIRateLimiter{
+		clients:       make(map[string]*restUIClientLimit),
 		rateLimit:     0,
 		rateWindow:    time.Minute,
 		burst:         1,
 		maxConcurrent: 0,
-		stateTTL:      defaultRestAPIStateTTL,
+		stateTTL:      defaultRestUIStateTTL,
 	}
 }
 
@@ -39,15 +39,15 @@ func (b *trackingBody) Close() error {
 	return nil
 }
 
-func TestRestAPIRateLimiterRejectsWith429BeforeHandlerWork(t *testing.T) {
-	limiter := newTestRestAPIRateLimiter()
+func TestRestUIRateLimiterRejectsWith429BeforeHandlerWork(t *testing.T) {
+	limiter := newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
 	var handlerCalls int
-	handler := limiter.wrapAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := limiter.wrapPublic(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalls++
 		w.WriteHeader(http.StatusNoContent)
-	}), "/api")
+	}), "/")
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v2/status", nil)
 	req.RemoteAddr = "192.0.2.1:12345"
@@ -83,19 +83,19 @@ func TestRestAPIRateLimiterRejectsWith429BeforeHandlerWork(t *testing.T) {
 	}
 }
 
-func TestRestAPIRateLimiterConcurrentRequests(t *testing.T) {
-	limiter := newTestRestAPIRateLimiter()
+func TestRestUIRateLimiterConcurrentRequests(t *testing.T) {
+	limiter := newTestRestUIRateLimiter()
 	limiter.maxConcurrent = 1
 	started := make(chan struct{})
 	release := make(chan struct{})
 	done := make(chan struct{})
 	var startedOnce sync.Once
 
-	handler := limiter.wrapAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := limiter.wrapPublic(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startedOnce.Do(func() { close(started) })
 		<-release
 		w.WriteHeader(http.StatusNoContent)
-	}), "/api")
+	}), "/")
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v2/status", nil)
 	req.RemoteAddr = "192.0.2.2:12345"
@@ -129,17 +129,26 @@ func TestRestAPIRateLimiterConcurrentRequests(t *testing.T) {
 	}
 }
 
-func TestRestAPIRateLimiterRouteScope(t *testing.T) {
-	limiter := newTestRestAPIRateLimiter()
+func TestRestUIRateLimiterRouteScope(t *testing.T) {
+	limiter := newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
 	var handlerCalls int
-	handler := limiter.wrapAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := limiter.wrapPublic(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalls++
 		w.WriteHeader(http.StatusNoContent)
-	}), "/bb/api")
+	}), "/bb/")
 
-	for _, path := range []string{"/bb/static/app.js", "/bb/websocket", "/bb/apix"} {
+	// Static assets, api-docs, the OpenAPI spec, and the WebSocket endpoint bypass
+	// the limiter and are served unconditionally.
+	for _, path := range []string{
+		"/bb/static/app.js",
+		"/bb/websocket",
+		"/bb/favicon.ico",
+		"/bb/api-docs",
+		"/bb/openapi.yaml",
+		"/bb/test-websocket.html",
+	} {
 		req := httptest.NewRequest(http.MethodGet, "http://example.com"+path, nil)
 		req.RemoteAddr = "192.0.2.3:12345"
 		rec := httptest.NewRecorder()
@@ -149,23 +158,25 @@ func TestRestAPIRateLimiterRouteScope(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/bb/api", nil)
-	req.RemoteAddr = "192.0.2.3:12345"
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("/bb/api status = %d, want %d", rec.Code, http.StatusNoContent)
+	// One dynamic route consumes the single burst token; the next dynamic route is
+	// rejected, regardless of whether it is the API or an explorer UI page.
+	// deny-all-except-static limits every non-excluded route.
+	for i, path := range []string{"/bb/address/abc", "/bb/api/v2/status"} {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com"+path, nil)
+		req.RemoteAddr = "192.0.2.3:12345"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		wantCode := http.StatusNoContent
+		if i > 0 {
+			wantCode = http.StatusTooManyRequests
+		}
+		if rec.Code != wantCode {
+			t.Fatalf("%s status = %d, want %d", path, rec.Code, wantCode)
+		}
 	}
-
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/bb/api/v2/status", nil)
-	req.RemoteAddr = "192.0.2.3:12345"
-	rec = httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("/bb/api/v2/status status = %d, want %d", rec.Code, http.StatusTooManyRequests)
-	}
-	if handlerCalls != 4 {
-		t.Fatalf("handler calls = %d, want 4", handlerCalls)
+	// 6 bypass requests + 1 accepted dynamic request reached the handler.
+	if handlerCalls != 7 {
+		t.Fatalf("handler calls = %d, want 7", handlerCalls)
 	}
 }
 
@@ -292,9 +303,78 @@ func TestClientIPConfigEnvFallback(t *testing.T) {
 	})
 }
 
-func TestRestAPIRateLimiterTemporaryBlock(t *testing.T) {
+func TestReadRestUILimiterConfig(t *testing.T) {
+	t.Run("defaults to the lowered values when unset", func(t *testing.T) {
+		cfg, err := readRestUILimiterConfig("RESTUITESTDEFAULTS")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Lock the lowered defaults so a regression in either the constants or the
+		// env parsing is caught here, not only in the dashboard/docs.
+		if cfg.rateLimit != 180 {
+			t.Fatalf("default rateLimit = %d, want 180", cfg.rateLimit)
+		}
+		if cfg.burst != 40 {
+			t.Fatalf("default burst = %d, want 40", cfg.burst)
+		}
+		if cfg.maxConcurrent != 12 {
+			t.Fatalf("default maxConcurrent = %d, want 12", cfg.maxConcurrent)
+		}
+		if cfg.rateWindow != time.Minute {
+			t.Fatalf("default rateWindow = %s, want 1m", cfg.rateWindow)
+		}
+		if cfg.stateTTL != defaultRestUIStateTTL {
+			t.Fatalf("default stateTTL = %s, want %s", cfg.stateTTL, defaultRestUIStateTTL)
+		}
+		if cfg.blockDuration != defaultRestUIBlockDuration {
+			t.Fatalf("default blockDuration = %s, want %s", cfg.blockDuration, time.Duration(defaultRestUIBlockDuration))
+		}
+	})
+
+	t.Run("REST_UI_* env vars override the defaults", func(t *testing.T) {
+		prefix := "RESTUITESTOVERRIDE"
+		t.Setenv(prefix+"_REST_UI_RATE_LIMIT", "999")
+		t.Setenv(prefix+"_REST_UI_RATE_WINDOW", "30s")
+		t.Setenv(prefix+"_REST_UI_BURST", "55")
+		t.Setenv(prefix+"_REST_UI_MAX_CONCURRENT", "7")
+		t.Setenv(prefix+"_REST_UI_STATE_TTL", "5m")
+		t.Setenv(prefix+"_REST_UI_BLOCK_DURATION", "1h")
+		cfg, err := readRestUILimiterConfig(prefix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.rateLimit != 999 {
+			t.Fatalf("rateLimit = %d, want 999", cfg.rateLimit)
+		}
+		if cfg.rateWindow != 30*time.Second {
+			t.Fatalf("rateWindow = %s, want 30s", cfg.rateWindow)
+		}
+		if cfg.burst != 55 {
+			t.Fatalf("burst = %d, want 55", cfg.burst)
+		}
+		if cfg.maxConcurrent != 7 {
+			t.Fatalf("maxConcurrent = %d, want 7", cfg.maxConcurrent)
+		}
+		if cfg.stateTTL != 5*time.Minute {
+			t.Fatalf("stateTTL = %s, want 5m", cfg.stateTTL)
+		}
+		if cfg.blockDuration != time.Hour {
+			t.Fatalf("blockDuration = %s, want 1h", cfg.blockDuration)
+		}
+	})
+
+	t.Run("zero burst with request-rate limiting enabled is rejected", func(t *testing.T) {
+		prefix := "RESTUITESTBADBURST"
+		t.Setenv(prefix+"_REST_UI_BURST", "0")
+		if _, err := readRestUILimiterConfig(prefix); err == nil {
+			t.Fatal("expected error for zero burst while rate limiting is enabled, got nil")
+		}
+	})
+}
+
+func TestRestUIRateLimiterTemporaryBlock(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	limiter := newTestRestAPIRateLimiter()
+	limiter := newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
 	limiter.blockDuration = time.Minute
@@ -303,24 +383,24 @@ func TestRestAPIRateLimiterTemporaryBlock(t *testing.T) {
 		t.Fatalf("first decision = %+v, want accepted", decision)
 	}
 	limiter.release("192.0.2.10", now)
-	// breaches must be separate episodes (>= restAPIBreachMinSpacing apart) to
+	// breaches must be separate episodes (>= restUIBreachMinSpacing apart) to
 	// count toward the block threshold
 	var last time.Time
-	for i := 0; i < restAPIBreachBlockThreshold; i++ {
-		last = now.Add(time.Duration(i) * restAPIBreachMinSpacing)
+	for i := 0; i < restUIBreachBlockThreshold; i++ {
+		last = now.Add(time.Duration(i) * restUIBreachMinSpacing)
 		decision := limiter.accept("192.0.2.10", "192.0.2.10", true, last)
-		if decision.accepted || decision.reason != restAPIRejectRequestRate {
+		if decision.accepted || decision.reason != restUIRejectRequestRate {
 			t.Fatalf("breach %d decision = %+v, want request-rate rejection", i, decision)
 		}
 	}
 	decision := limiter.accept("192.0.2.10", "192.0.2.10", true, last.Add(time.Second))
-	if decision.accepted || decision.reason != restAPIRejectIPBlocked {
+	if decision.accepted || decision.reason != restUIRejectIPBlocked {
 		t.Fatalf("blocked decision = %+v, want ip_blocked", decision)
 	}
 
 	// a burst of same-instant rejections is one breach episode and must not
 	// trip the temporary block
-	limiter = newTestRestAPIRateLimiter()
+	limiter = newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
 	limiter.blockDuration = time.Minute
@@ -328,9 +408,9 @@ func TestRestAPIRateLimiterTemporaryBlock(t *testing.T) {
 		t.Fatalf("first burst decision = %+v, want accepted", decision)
 	}
 	limiter.release("192.0.2.11", now)
-	for i := 0; i < 3*restAPIBreachBlockThreshold; i++ {
+	for i := 0; i < 3*restUIBreachBlockThreshold; i++ {
 		decision := limiter.accept("192.0.2.11", "192.0.2.11", true, now)
-		if decision.accepted || decision.reason != restAPIRejectRequestRate {
+		if decision.accepted || decision.reason != restUIRejectRequestRate {
 			t.Fatalf("burst rejection %d decision = %+v, want request-rate rejection", i, decision)
 		}
 	}
@@ -338,7 +418,7 @@ func TestRestAPIRateLimiterTemporaryBlock(t *testing.T) {
 		t.Fatal("same-instant rejection burst tripped the temporary block")
 	}
 
-	limiter = newTestRestAPIRateLimiter()
+	limiter = newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
 	limiter.blockDuration = time.Minute
@@ -346,9 +426,9 @@ func TestRestAPIRateLimiterTemporaryBlock(t *testing.T) {
 		t.Fatalf("first unblockable decision = %+v, want accepted", decision)
 	}
 	limiter.release("127.0.0.1", now)
-	for i := 0; i < restAPIBreachBlockThreshold+1; i++ {
-		decision = limiter.accept("127.0.0.1", "127.0.0.1", false, now.Add(time.Duration(i)*restAPIBreachMinSpacing))
-		if decision.accepted || decision.reason != restAPIRejectRequestRate {
+	for i := 0; i < restUIBreachBlockThreshold+1; i++ {
+		decision = limiter.accept("127.0.0.1", "127.0.0.1", false, now.Add(time.Duration(i)*restUIBreachMinSpacing))
+		if decision.accepted || decision.reason != restUIRejectRequestRate {
 			t.Fatalf("unblockable breach %d decision = %+v, want request-rate rejection", i, decision)
 		}
 	}
@@ -357,9 +437,9 @@ func TestRestAPIRateLimiterTemporaryBlock(t *testing.T) {
 	}
 }
 
-func TestRestAPIRateLimiterIPv6BlockIsPer128(t *testing.T) {
+func TestRestUIRateLimiterIPv6BlockIsPer128(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	limiter := newTestRestAPIRateLimiter()
+	limiter := newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
 	limiter.blockDuration = time.Minute
@@ -380,20 +460,20 @@ func TestRestAPIRateLimiterIPv6BlockIsPer128(t *testing.T) {
 	}
 	limiter.release(key64, now)
 	var last time.Time
-	for i := 0; i < restAPIBreachBlockThreshold; i++ {
-		last = now.Add(time.Duration(i) * restAPIBreachMinSpacing)
-		if d := limiter.accept(key64, b1, true, last); d.accepted || d.reason != restAPIRejectRequestRate {
+	for i := 0; i < restUIBreachBlockThreshold; i++ {
+		last = now.Add(time.Duration(i) * restUIBreachMinSpacing)
+		if d := limiter.accept(key64, b1, true, last); d.accepted || d.reason != restUIRejectRequestRate {
 			t.Fatalf("breach %d decision = %+v, want request-rate rejection", i, d)
 		}
 	}
 	after := last.Add(time.Second)
-	if d := limiter.accept(key64, b1, true, after); d.accepted || d.reason != restAPIRejectIPBlocked {
+	if d := limiter.accept(key64, b1, true, after); d.accepted || d.reason != restUIRejectIPBlocked {
 		t.Fatalf("b1 decision = %+v, want ip_blocked", d)
 	}
 
 	// A different /128 in the same /64 must NOT inherit the block: it is still
 	// subject to the shared /64 rate limit (request_rate) but never ip_blocked.
-	if d := limiter.accept(key64, b2, true, after); d.reason == restAPIRejectIPBlocked {
+	if d := limiter.accept(key64, b2, true, after); d.reason == restUIRejectIPBlocked {
 		t.Fatalf("b2 (same /64) wrongly ip_blocked: %+v", d)
 	}
 	if c := limiter.clients[b2]; c != nil && c.blockedUntil.After(after) {
@@ -401,12 +481,12 @@ func TestRestAPIRateLimiterIPv6BlockIsPer128(t *testing.T) {
 	}
 }
 
-func TestRestAPIRateLimiterCleanup(t *testing.T) {
+func TestRestUIRateLimiterCleanup(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	limiter := newTestRestAPIRateLimiter()
-	limiter.clients["idle"] = &restAPIClientLimit{lastSeen: now.Add(-limiter.stateTTL - time.Second)}
-	limiter.clients["active"] = &restAPIClientLimit{active: 1, lastSeen: now.Add(-limiter.stateTTL - time.Second)}
-	limiter.clients["blocked"] = &restAPIClientLimit{blockedUntil: now.Add(time.Minute), lastSeen: now.Add(-limiter.stateTTL - time.Second)}
+	limiter := newTestRestUIRateLimiter()
+	limiter.clients["idle"] = &restUIClientLimit{lastSeen: now.Add(-limiter.stateTTL - time.Second)}
+	limiter.clients["active"] = &restUIClientLimit{active: 1, lastSeen: now.Add(-limiter.stateTTL - time.Second)}
+	limiter.clients["blocked"] = &restUIClientLimit{blockedUntil: now.Add(time.Minute), lastSeen: now.Add(-limiter.stateTTL - time.Second)}
 
 	limiter.sweep(now)
 	if _, ok := limiter.clients["idle"]; ok {
@@ -420,34 +500,63 @@ func TestRestAPIRateLimiterCleanup(t *testing.T) {
 	}
 }
 
-func TestRestAPIRouteMatching(t *testing.T) {
+func TestRestUIRouteMatching(t *testing.T) {
 	tests := []struct {
-		path    string
-		apiRoot string
-		want    bool
+		path     string
+		basePath string
+		want     bool
 	}{
-		{"/api", "/api", true},
-		{"/api/", "/api", true},
-		{"/api/v2/status", "/api", true},
-		{"/apix", "/api", false},
-		{"/websocket", "/api", false},
-		{"/bb/api", "/bb/api", true},
-		{"/bb/api/v2/status", "/bb/api", true},
-		{"/bb/apix", "/bb/api", false},
+		// Dynamic routes (API + explorer UI) are limited under the base path.
+		{"/", "/", true},
+		{"/api", "/", true},
+		{"/api/v2/status", "/", true},
+		{"/address/abc", "/", true},
+		{"/xpub/x", "/", true},
+		{"/apix", "/", true},
+		{"/bb/", "/bb/", true},
+		{"/bb/api/v2/status", "/bb/", true},
+		{"/bb/address/abc", "/bb/", true},
+		// Static assets, docs, the OpenAPI spec, and WebSocket are exempt.
+		{"/static/app.js", "/", false},
+		{"/favicon.ico", "/", false},
+		{"/api-docs", "/", false},
+		{"/api-docs/", "/", false},
+		// A path that only shares the "api-docs" prefix is not the docs route and
+		// must stay limited (it falls through to the explorer index handler).
+		{"/api-docsx", "/", true},
+		{"/openapi.yaml", "/", false},
+		{"/websocket", "/", false},
+		{"/test-websocket.html", "/", false},
+		{"/bb/static/app.js", "/bb/", false},
+		{"/bb/websocket", "/bb/", false},
+		// A "-public=:port/path" binding without a trailing slash yields basePath
+		// "/bb" (splitBinding keeps the path verbatim). Dynamic routes registered by
+		// raw concatenation then live at "/bbapi/" etc., while static assets are
+		// registered via publicPath at "/bb/...". Both shapes must still classify
+		// correctly: dynamic limited, static/docs exempt.
+		{"/bb", "/bb", true},
+		{"/bbapi/v2/status", "/bb", true},
+		{"/bb/address/abc", "/bb", true},
+		{"/bb/static/app.js", "/bb", false},
+		{"/bb/favicon.ico", "/bb", false},
+		{"/bb/api-docs", "/bb", false},
+		{"/bb/openapi.yaml", "/bb", false},
+		// Requests outside the configured base path are not limited here.
+		{"/other/path", "/bb/", false},
 	}
 	for _, tt := range tests {
-		if got := isRestAPIRoute(tt.path, tt.apiRoot); got != tt.want {
-			t.Fatalf("isRestAPIRoute(%q, %q) = %v, want %v", tt.path, tt.apiRoot, got, tt.want)
+		if got := isRateLimitedRoute(tt.path, tt.basePath); got != tt.want {
+			t.Fatalf("isRateLimitedRoute(%q, %q) = %v, want %v", tt.path, tt.basePath, got, tt.want)
 		}
 	}
 }
 
-func TestRestAPIRateLimiterStats(t *testing.T) {
+func TestRestUIRateLimiterStats(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	limiter := newTestRestAPIRateLimiter()
-	limiter.clients["a"] = &restAPIClientLimit{active: 2}
-	limiter.clients["b"] = &restAPIClientLimit{active: 1, blockedUntil: now.Add(time.Minute)}
-	limiter.clients["c"] = &restAPIClientLimit{}
+	limiter := newTestRestUIRateLimiter()
+	limiter.clients["a"] = &restUIClientLimit{active: 2}
+	limiter.clients["b"] = &restUIClientLimit{active: 1, blockedUntil: now.Add(time.Minute)}
+	limiter.clients["c"] = &restUIClientLimit{}
 
 	activeIPs, maxActive, blockedIPs := limiter.stats(now)
 	if activeIPs != 2 || maxActive != 2 || blockedIPs != 1 {
@@ -465,8 +574,8 @@ func prefixesContain(prefixes []netip.Prefix, cidr string) bool {
 	return false
 }
 
-func TestRestAPIRateLimiterReleaseIsPerKey(t *testing.T) {
-	limiter := newTestRestAPIRateLimiter()
+func TestRestUIRateLimiterReleaseIsPerKey(t *testing.T) {
+	limiter := newTestRestUIRateLimiter()
 	limiter.maxConcurrent = 2
 	now := time.Unix(1_700_000_000, 0)
 	if decision := limiter.accept("192.0.2.20", "192.0.2.20", true, now); !decision.accepted {
@@ -485,15 +594,15 @@ func TestRestAPIRateLimiterReleaseIsPerKey(t *testing.T) {
 	}
 }
 
-func TestRestAPIRateLimiterBypassDoesNotConsumeToken(t *testing.T) {
-	limiter := newTestRestAPIRateLimiter()
+func TestRestUIRateLimiterBypassDoesNotConsumeToken(t *testing.T) {
+	limiter := newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
 	var calls atomic.Int32
-	handler := limiter.wrapAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := limiter.wrapPublic(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		w.WriteHeader(http.StatusNoContent)
-	}), "/api")
+	}), "/")
 
 	for i := 0; i < 5; i++ {
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/static/app.js", nil)
@@ -517,13 +626,13 @@ func TestRestAPIRateLimiterBypassDoesNotConsumeToken(t *testing.T) {
 	}
 }
 
-func TestRestAPIRateLimiterLocalPeerBypass(t *testing.T) {
-	limiter := newTestRestAPIRateLimiter()
+func TestRestUIRateLimiterLocalPeerBypass(t *testing.T) {
+	limiter := newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
-	handler := limiter.wrapAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := limiter.wrapPublic(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}), "/api")
+	}), "/")
 
 	// A loopback/private peer without any attribution header is the operator's
 	// own tooling or a proxy that forwards no client IP; limiting that key would
@@ -557,13 +666,13 @@ func TestRestAPIRateLimiterLocalPeerBypass(t *testing.T) {
 	}
 }
 
-func TestRestAPIRateLimiterTrackingCap(t *testing.T) {
+func TestRestUIRateLimiterTrackingCap(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	limiter := newTestRestAPIRateLimiter()
+	limiter := newTestRestUIRateLimiter()
 	limiter.rateLimit = 1
 	limiter.burst = 1
-	for i := 0; i < restAPIMaxTrackedClients; i++ {
-		limiter.clients[strconv.Itoa(i)] = &restAPIClientLimit{lastSeen: now}
+	for i := 0; i < restUIMaxTrackedClients; i++ {
+		limiter.clients[strconv.Itoa(i)] = &restUIClientLimit{lastSeen: now}
 	}
 
 	decision := limiter.accept("192.0.2.99", "192.0.2.99", true, now)
