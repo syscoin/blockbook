@@ -37,7 +37,8 @@
                     </ul>
                     <span class="navbar-form">
                         <form class="d-flex" id="search" action="/search" method="get">
-                            <input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true">
+                            {{/* SYSCOIN: Syscoin explorers support asset GUID/symbol search. */}}
+                            <input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address{{if isSyscoinShortcut .CoinShortcut}}, asset{{end}} or xpub" focus="true">
                             <button class="btn" type="submit">
                                 <span class="search-icon"></span>
                             </button>

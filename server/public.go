@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -583,32 +584,58 @@ func resolveAddressChainExtraTemplate(coinShortcut string) string {
 	return addressChainExtraTemplate
 }
 
+// SYSCOIN
+func isSyscoinShortcut(coinShortcut string) bool {
+	shortcut := strings.ToUpper(strings.TrimSpace(coinShortcut))
+	return shortcut == "SYS" || shortcut == "TSYS"
+}
+
+// SYSCOIN
+func isSyscoinNativeAsset(assetGuid string) bool {
+	return strings.TrimSpace(assetGuid) == "123456"
+}
+
+// SYSCOIN
+func (s *PublicServer) formatContractExplorerURL(contract string) string {
+	if strings.HasPrefix(contract, "http://") || strings.HasPrefix(contract, "https://") {
+		return contract
+	}
+	return ""
+}
+
 func (s *PublicServer) parseTemplates() []*template.Template {
 	templateFuncMap := template.FuncMap{
-		"timeSpan":                 timeSpan,
-		"relativeTime":             relativeTime,
-		"unixTimeSpan":             unixTimeSpan,
-		"amountSpan":               s.amountSpan,
-		"tokenAmountSpan":          s.tokenAmountSpan,
-		"amountSatsSpan":           s.amountSatsSpan,
-		"formattedAmountSpan":      s.formattedAmountSpan,
-		"summaryValuesSpan":        s.summaryValuesSpan,
-		"addressAlias":             addressAlias,
-		"addressAliasSpan":         addressAliasSpan,
-		"formatAmount":             s.formatAmount,
-		"formatAmountWithDecimals": formatAmountWithDecimals,
-		"formatInt64":              formatInt64,
-		"formatInt":                formatInt,
-		"formatUint32":             formatUint32,
-		"formatBigInt":             formatBigInt,
-		"setTxToTemplateData":      setTxToTemplateData,
-		"feePerByte":               feePerByte,
-		"isOwnAddress":             isOwnAddress,
-		"toJSON":                   toJSON,
-		"tokenTransfersCount":      tokenTransfersCount,
-		"tokenCount":               tokenCount,
-		"hasPrefix":                strings.HasPrefix,
-		"jsStr":                    jsStr,
+		"timeSpan":                  timeSpan,
+		"relativeTime":              relativeTime,
+		"unixTimeSpan":              unixTimeSpan,
+		"amountSpan":                s.amountSpan,
+		"tokenAmountSpan":           s.tokenAmountSpan,
+		"amountSatsSpan":            s.amountSatsSpan,
+		"formattedAmountSpan":       s.formattedAmountSpan,
+		"summaryValuesSpan":         s.summaryValuesSpan,
+		"addressAlias":              addressAlias,
+		"addressAliasSpan":          addressAliasSpan,
+		"formatAmount":              s.formatAmount,
+		"formatAmountWithDecimals":  formatAmountWithDecimals,
+		"formatInt64":               formatInt64,
+		"formatInt":                 formatInt,
+		"formatUint32":              formatUint32,
+		"formatBigInt":              formatBigInt,
+		"formatNFTID":               formatNFTID,                 // SYSCOIN
+		"formatBaseAssetID":         formatBaseAssetID,           // SYSCOIN
+		"formatContractExplorerURL": s.formatContractExplorerURL, // SYSCOIN
+		"isNFT":                     isNFT,                       // SYSCOIN
+		"isSyscoinShortcut":         isSyscoinShortcut,           // SYSCOIN
+		"isSyscoinNativeAsset":      isSyscoinNativeAsset,        // SYSCOIN
+		"formatEncodeBase64":        formatEncodeBase64,          // SYSCOIN
+		"setTxToTemplateData":       setTxToTemplateData,
+		"feePerByte":                feePerByte,
+		"isOwnAddress":              isOwnAddress,
+		"toJSON":                    toJSON,
+		"tokenTransfersCount":       tokenTransfersCount,
+		"tokenCount":                tokenCount,
+		"hasPrefix":                 strings.HasPrefix,
+		"jsStr":                     jsStr,
 	}
 	applyTemplateFuncs(templateFuncMap)
 	var createTemplate func(filenames ...string) *template.Template
@@ -671,6 +698,38 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 	t[xpubTpl] = createTemplate("./static/templates/xpub.html", "./static/templates/txdetail.html", "./static/templates/paging.html", "./static/templates/base.html")
 	t[mempoolTpl] = createTemplate("./static/templates/mempool.html", "./static/templates/paging.html", "./static/templates/base.html")
 	return t
+}
+
+// SYSCOIN
+func formatNFTID(value interface{}) uint64 {
+	assetGuid, err := strconv.ParseUint(fmt.Sprint(value), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return assetGuid >> 32
+}
+
+// SYSCOIN
+func formatBaseAssetID(value interface{}) uint64 {
+	assetGuid, err := strconv.ParseUint(fmt.Sprint(value), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return assetGuid & 0xffffffff
+}
+
+// SYSCOIN
+func isNFT(guid string) bool {
+	assetGuid, err := strconv.ParseUint(guid, 10, 64)
+	if err != nil {
+		return false
+	}
+	return (assetGuid >> 32) > 0
+}
+
+// SYSCOIN
+func formatEncodeBase64(value []byte) string {
+	return base64.StdEncoding.EncodeToString(value)
 }
 
 func (s *PublicServer) postHtmlTemplateHandler(data *TemplateData, w http.ResponseWriter, r *http.Request) {

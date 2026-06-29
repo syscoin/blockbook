@@ -17,6 +17,45 @@
             <td>In Block</td>
             <td class="ellipsis" style="max-width: 280px">{{if $tx.Confirmations}}{{$tx.Blockhash}}{{else}}<span class="badge bg-danger">Unconfirmed</span>{{end}}</td>
         </tr>
+        {{/* SYSCOIN: expose SPT transaction metadata on the full transaction page. */}}
+        {{if isSyscoinShortcut $data.CoinShortcut}}
+        {{if $tx.TokenType}}
+        <tr>
+            <td>Syscoin Transaction Type</td>
+            <td><span class="badge bg-secondary">{{$tx.TokenType}}</span></td>
+        </tr>
+        {{end}}
+        {{if $tx.Memo}}
+        <tr>
+            <td>Syscoin Memo</td>
+            <td><code class="copyable">{{formatEncodeBase64 $tx.Memo}}</code></td>
+        </tr>
+        {{end}}
+        {{if $tx.TokenTransfers}}
+        <tr>
+            <td>Syscoin Assets</td>
+            <td style="padding: 0;">
+                <table class="table data-table mt-0 mb-0">
+                    <tbody>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Total</th>
+                        </tr>
+                        {{range $tokenTransfer := $tx.TokenTransfers}}
+                        <tr>
+                            <td class="ellipsis">
+                                <a href="/asset/{{$tokenTransfer.AssetGuid}}" class="copyable">{{$tokenTransfer.AssetGuid}}</a>&nbsp;
+                                <span class="text-muted">{{$tokenTransfer.Symbol}}</span>
+                            </td>
+                            <td>{{formattedAmountSpan $tokenTransfer.Value $tokenTransfer.Decimals $tokenTransfer.Symbol $data "copyable"}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </td>
+        </tr>
+        {{end}}
+        {{end}}
         {{if $tx.Confirmations}}
         <tr>
             <td>In Block Height</td>

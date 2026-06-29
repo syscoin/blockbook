@@ -5,6 +5,21 @@
         <label for="exampleFormControlTextarea1">Raw transaction data</label>
         <textarea class="form-control" rows="8" name="hex">{{.SendTxHex}}</textarea>
     </div>
+    {{/* SYSCOIN: expose Syscoin Core sendrawtransaction safety parameters. */}}
+    {{if isSyscoinShortcut .CoinShortcut}}
+    <div class="row mt-3">
+        <div class="form-group col-md-6">
+            <label for="maxfeerate">Max fee rate</label>
+            <input id="maxfeerate" class="form-control" name="maxfeerate" value="{{.SendTxMaxFeeRate}}" placeholder="Optional">
+            <small class="form-text text-muted">SYSCOIN: optional Syscoin Core sendrawtransaction maxfeerate.</small>
+        </div>
+        <div class="form-group col-md-6">
+            <label for="maxburnamount">Max burn amount</label>
+            <input id="maxburnamount" class="form-control" name="maxburnamount" value="{{.SendTxMaxBurnAmount}}" placeholder="Optional">
+            <small class="form-text text-muted">SYSCOIN: required when intentionally burning SYS for governance collateral.</small>
+        </div>
+    </div>
+    {{end}}
     <div class="form-group mt-3"><button type="submit" class="btn btn-outline-secondary">Send</button></div>
 </form>
 {{if .Status}}
