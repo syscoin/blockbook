@@ -93,6 +93,10 @@ type Configuration struct {
 	MempoolGolombFilterP         uint8  `json:"mempool_golomb_filter_p,omitempty"`
 	MempoolFilterScripts         string `json:"mempool_filter_scripts,omitempty"`
 	MempoolFilterUseZeroedKey    bool   `json:"mempool_filter_use_zeroed_key,omitempty"`
+	// SYSCOIN: NEVM RPC endpoints used for SPT metadata enrichment.
+	Web3RPCURL       string `json:"web3_rpc_url,omitempty"`
+	Web3RPCURLBackup string `json:"web3_rpc_url_backup,omitempty"`
+	Web3Explorer     string `json:"web3_explorer_url,omitempty"`
 	// AverageBlockTimeMs is the chain's nominal block cadence in ms.
 	// Optional on UTXO chains; when set it is exposed as the
 	// blockbook_average_block_time_seconds gauge for alert normalization.
@@ -465,6 +469,19 @@ type ResGetRawTransaction struct {
 type ResGetRawTransactionNonverbose struct {
 	Error  *bchain.RPCError `json:"error"`
 	Result string           `json:"result"`
+}
+
+// SYSCOIN: syscoingetspvproof passthrough for bridge consumers.
+type ResGetSPVProof struct {
+	Error  *bchain.RPCError `json:"error"`
+	Result json.RawMessage  `json:"result"`
+}
+
+type CmdGetSPVProof struct {
+	Method string `json:"method"`
+	Params struct {
+		Txid string `json:"txid"`
+	} `json:"params"`
 }
 
 type rpcBatchRequest struct {
@@ -1091,11 +1108,26 @@ func (b *BitcoinRPC) LongTermFeeRate() (*bchain.LongTermFeeRate, error) {
 
 // SendRawTransaction sends raw transaction
 func (b *BitcoinRPC) SendRawTransaction(tx string, disableAlternativeRPC bool) (string, error) {
+	return SendRawTransactionWithParams(b, bchain.SendRawTransactionParams{Hex: tx, DisableAlternativeRPC: disableAlternativeRPC})
+}
+
+// SendRawTransactionWithParams sends raw transaction with optional Bitcoin-like
+// parameters.
+//
+// SYSCOIN: Syscoin Core uses the third sendrawtransaction parameter as
+// maxburnamount for governance collateral broadcasts.
+func SendRawTransactionWithParams(b *BitcoinRPC, p bchain.SendRawTransactionParams) (string, error) {
 	glog.V(1).Info("rpc: sendrawtransaction")
 
 	res := ResSendRawTransaction{}
 	req := CmdSendRawTransaction{Method: "sendrawtransaction"}
-	req.Params = []string{tx}
+	req.Params = []string{p.Hex}
+	if p.MaxFeeRate != nil {
+		req.Params = append(req.Params, *p.MaxFeeRate)
+		if p.MaxBurnAmount != nil {
+			req.Params = append(req.Params, *p.MaxBurnAmount)
+		}
+	}
 	err := b.Call(&req, &res)
 
 	if err != nil {

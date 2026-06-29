@@ -69,7 +69,7 @@ type PublicServer struct {
 	certFiles           string
 	websocket           *WebsocketServer
 	serveMux            *http.ServeMux
-	restLimiter         *restAPIRateLimiter
+	restLimiter         *restUIRateLimiter
 	https               *http.Server
 	db                  *db.RocksDB
 	txCache             *db.TxCache
@@ -101,17 +101,18 @@ func NewPublicServer(binding string, certFiles string, db *db.RocksDB, chain bch
 
 	addr, path := splitBinding(binding)
 	serveMux := http.NewServeMux()
-	restLimiter, err := newRestAPIRateLimiter(is.GetNetwork(), metrics)
+	restLimiter, err := newRestUIRateLimiter(is.GetNetwork(), metrics)
 	if err != nil {
 		return nil, err
 	}
 	handler := http.Handler(serveMux)
 	if restLimiter != nil {
-		// the API root must be derived exactly like the route registrations in
+		// the base path must be derived exactly like the route registrations in
 		// ConnectFullPublicInterface (raw concatenation, not publicPath), so the
 		// limiter covers the same paths the mux actually serves for every
-		// binding shape
-		handler = restLimiter.wrapAPI(handler, path+"api")
+		// binding shape. The limiter governs all dynamic routes under path (the
+		// explorer UI pages and the REST API) under one shared per-client budget
+		handler = restLimiter.wrapPublic(handler, path)
 	}
 	https := &http.Server{
 		Addr:    addr,
@@ -183,6 +184,10 @@ func (s *PublicServer) ConnectFullPublicInterface() {
 		// internal explorer handlers
 		serveMux.HandleFunc(path+"tx/", s.htmlTemplateHandler(s.explorerTx))
 		serveMux.HandleFunc(path+"address/", s.htmlTemplateHandler(s.explorerAddress))
+		if isSyscoinShortcut(s.is.CoinShortcut) {
+			serveMux.HandleFunc(path+"asset/", s.htmlTemplateHandler(s.explorerAsset))   // SYSCOIN
+			serveMux.HandleFunc(path+"assets/", s.htmlTemplateHandler(s.explorerAssets)) // SYSCOIN
+		}
 		serveMux.HandleFunc(path+"xpub/", s.htmlTemplateHandler(s.explorerXpub))
 		serveMux.HandleFunc(path+"search/", s.htmlTemplateHandler(s.explorerSearch))
 		serveMux.HandleFunc(path+"blocks", s.htmlTemplateHandler(s.explorerBlocks))
@@ -238,6 +243,11 @@ func (s *PublicServer) ConnectFullPublicInterface() {
 	serveMux.HandleFunc(path+"api/v2/tx-specific/", s.jsonHandler(s.apiTxSpecific, apiV2))
 	serveMux.HandleFunc(path+"api/v2/tx/", s.jsonHandler(s.apiTx, apiV2))
 	serveMux.HandleFunc(path+"api/v2/address/", s.jsonHandler(s.apiAddress, apiV2))
+	if isSyscoinShortcut(s.is.CoinShortcut) {
+		serveMux.HandleFunc(path+"api/v2/asset/", s.jsonHandler(s.apiAsset, apiV2))             // SYSCOIN
+		serveMux.HandleFunc(path+"api/v2/assets/", s.jsonHandler(s.apiAssets, apiV2))           // SYSCOIN
+		serveMux.HandleFunc(path+"api/v2/getspvproof/", s.jsonHandler(s.apiGetSPVProof, apiV2)) // SYSCOIN
+	}
 	serveMux.HandleFunc(path+"api/v2/contract/", s.jsonHandler(s.apiContract, apiV2))
 	serveMux.HandleFunc(path+"api/v2/xpub/", s.jsonHandler(s.apiXpub, apiV2))
 	serveMux.HandleFunc(path+"api/v2/utxo/", s.jsonHandler(s.apiUtxo, apiV2))
@@ -498,6 +508,8 @@ const (
 	indexTpl = iota + errorInternalTpl + 1
 	txTpl
 	addressTpl
+	assetTpl  // SYSCOIN
+	assetsTpl // SYSCOIN
 	xpubTpl
 	blocksTpl
 	blockTpl
@@ -520,6 +532,8 @@ type TemplateData struct {
 	MultiTokenName           bchain.TokenStandardName
 	Address                  *api.Address
 	AddrStr                  string
+	Asset                    *api.Asset  // SYSCOIN
+	Assets                   *api.Assets // SYSCOIN
 	Tx                       *api.Tx
 	Error                    *api.APIError
 	Blocks                   *api.Blocks
@@ -534,6 +548,8 @@ type TemplateData struct {
 	Minified                 string
 	TOSLink                  string
 	SendTxHex                string
+	SendTxMaxFeeRate         string // SYSCOIN
+	SendTxMaxBurnAmount      string // SYSCOIN
 	Status                   string
 	NonZeroBalanceTokens     bool
 	TokenId                  string
@@ -693,6 +709,8 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 	} else {
 		t[txTpl] = createTemplate(txTemplate, txDetailTemplate, "./static/templates/base.html")
 		t[addressTpl] = createTemplate("./static/templates/address.html", resolvedAddressChainExtraTemplate, txDetailTemplate, "./static/templates/paging.html", "./static/templates/base.html")
+		t[assetTpl] = createTemplate("./static/templates/asset.html", txDetailTemplate, "./static/templates/paging.html", "./static/templates/base.html") // SYSCOIN
+		t[assetsTpl] = createTemplate("./static/templates/assets.html", "./static/templates/paging.html", "./static/templates/base.html")                 // SYSCOIN
 		t[blockTpl] = createTemplate("./static/templates/block.html", txDetailTemplate, "./static/templates/paging.html", "./static/templates/base.html")
 	}
 	t[xpubTpl] = createTemplate("./static/templates/xpub.html", "./static/templates/txdetail.html", "./static/templates/paging.html", "./static/templates/base.html")
@@ -745,6 +763,56 @@ func (s *PublicServer) formatAmount(a *api.Amount) string {
 		return "0"
 	}
 	return s.chainParser.AmountToDecimalString((*big.Int)(a))
+}
+
+// SYSCOIN
+func (s *PublicServer) formatContractExplorerURL(contract string) string {
+	if contract == "" {
+		return ""
+	}
+	chain, ok := s.chain.(interface {
+		GetContractExplorerBaseURL() string
+	})
+	if !ok {
+		return contract
+	}
+	base := chain.GetContractExplorerBaseURL()
+	if base == "" {
+		return contract
+	}
+	return strings.TrimRight(base, "/") + "/token/" + contract
+}
+
+// SYSCOIN
+func formatNFTID(value interface{}) uint64 {
+	assetGuid, err := strconv.ParseUint(fmt.Sprint(value), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return assetGuid >> 32
+}
+
+// SYSCOIN
+func formatBaseAssetID(value interface{}) uint64 {
+	assetGuid, err := strconv.ParseUint(fmt.Sprint(value), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return assetGuid & 0xffffffff
+}
+
+// SYSCOIN
+func isNFT(guid string) bool {
+	assetGuid, err := strconv.ParseUint(guid, 10, 64)
+	if err != nil {
+		return false
+	}
+	return (assetGuid >> 32) > 0
+}
+
+// SYSCOIN
+func formatEncodeBase64(value []byte) string {
+	return base64.StdEncoding.EncodeToString(value)
 }
 
 func (s *PublicServer) amountSpan(a *api.Amount, td *TemplateData, classes string) template.HTML {
@@ -1147,12 +1215,29 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 	gap := validateIntParam(r.URL.Query().Get("gap"), 0, 0, maxGapValue)
 	contract := r.URL.Query().Get("contract")
 	withConfirmedNonce, _ := strconv.ParseBool(r.URL.Query().Get("confirmedNonce"))
+	assetsMask := bchain.AllMask // SYSCOIN
+	switch r.URL.Query().Get("assetMask") {
+	case "non-tokens":
+		assetsMask = bchain.BaseCoinMask
+	case "token-only":
+		assetsMask = bchain.AssetMask
+	case "token-transfers":
+		assetsMask = bchain.AssetAllocationSendMask
+	case "non-token-transfers":
+		assetsMask = bchain.AssetMask &^ bchain.AssetAllocationSendMask
+	case "":
+	default:
+		if mask, err := strconv.Atoi(r.URL.Query().Get("assetMask")); err == nil {
+			assetsMask = bchain.AssetsMask(mask)
+		}
+	}
 	return page, pageSize, accountDetails, &api.AddressFilter{
 		Vout:               voutFilter,
 		TokensToReturn:     tokensToReturn,
 		FromHeight:         uint32(from),
 		ToHeight:           uint32(to),
 		Contract:           contract,
+		AssetsMask:         assetsMask, // SYSCOIN
 		Protocols:          parseProtocolsQuery(r.URL.Query()["protocols"]),
 		WithConfirmedNonce: withConfirmedNonce,
 	}, filterParam, gap
@@ -1182,11 +1267,70 @@ func (s *PublicServer) explorerAddress(w http.ResponseWriter, r *http.Request) (
 	if filterParam == "" && filter.Vout > -1 {
 		filterParam = strconv.Itoa(filter.Vout)
 	}
+	pageParams := url.Values{}
 	if filterParam != "" {
-		data.PageParams = template.URL("&filter=" + filterParam)
+		pageParams.Set("filter", filterParam)
 		data.Address.Filter = filterParam
 	}
+	// SYSCOIN: preserve assetMask on address pagination links.
+	if assetMaskParam := r.URL.Query().Get("assetMask"); assetMaskParam != "" {
+		pageParams.Set("assetMask", assetMaskParam)
+		if data.Address.Filter == "" {
+			data.Address.Filter = assetMaskParam
+		}
+	}
+	if encodedParams := pageParams.Encode(); encodedParams != "" {
+		data.PageParams = template.URL("&" + encodedParams)
+	}
 	return addressTpl, data, nil
+}
+
+// SYSCOIN
+func (s *PublicServer) explorerAsset(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
+	var assetParam string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		assetParam = r.URL.Path[i+1:]
+	}
+	if len(assetParam) == 0 {
+		return errorTpl, nil, api.NewAPIError("Missing asset", true)
+	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "asset"}).Inc()
+	page, _, _, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
+	asset, err := s.api.GetAsset(assetParam, page, txsOnPage, api.AccountDetailsTxHistoryLight, filter)
+	if err != nil {
+		return errorTpl, nil, err
+	}
+	data := s.newTemplateData(r)
+	data.Asset = asset
+	data.Page = asset.Page
+	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(asset.Page, asset.TotalPages)
+	assetMaskParam := r.URL.Query().Get("assetMask")
+	if assetMaskParam != "" {
+		data.PageParams = template.URL("&assetMask=" + assetMaskParam)
+		data.Asset.Filter = assetMaskParam
+	}
+	return assetTpl, data, nil
+}
+
+// SYSCOIN
+func (s *PublicServer) explorerAssets(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
+	var assetParam string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		assetParam = r.URL.Path[i+1:]
+	}
+	if len(assetParam) == 0 {
+		return errorTpl, nil, api.NewAPIError("Missing asset", true)
+	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "assets"}).Inc()
+	page, _, _, _, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxHistoryLight, txsOnPage)
+	assets := s.api.FindAssets(assetParam, page, txsOnPage)
+	data := s.newTemplateData(r)
+	data.Assets = assets
+	data.Page = assets.Page
+	data.PagingRange, data.PrevPage, data.NextPage = getPagingRange(assets.Page, assets.TotalPages)
+	return assetsTpl, data, nil
 }
 
 func (s *PublicServer) explorerNftDetail(w http.ResponseWriter, r *http.Request) (tpl, *TemplateData, error) {
@@ -1299,6 +1443,8 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	var tx *api.Tx
 	var address *api.Address
+	var asset *api.Asset   // SYSCOIN
+	var assets *api.Assets // SYSCOIN
 	var block *api.Block
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "search"}).Inc()
@@ -1325,6 +1471,15 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			http.Redirect(w, r, joinURL("/xpub/", url.QueryEscape(address.AddrStr)), http.StatusFound)
 			return noTpl, nil, nil
 		}
+		if isSyscoinShortcut(s.is.CoinShortcut) {
+			if _, parseErr := strconv.ParseUint(q, 10, 64); parseErr == nil {
+				asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AddressFilter{AssetsMask: bchain.AssetMask})
+				if err == nil {
+					http.Redirect(w, r, joinURL("/asset/", asset.AssetDetails.AssetGuid), http.StatusFound)
+					return noTpl, nil, nil
+				}
+			}
+		}
 		block, err = s.api.GetBlock(q, 0, 1)
 		if err == nil {
 			http.Redirect(w, r, joinURL("/block/", block.Hash), http.StatusFound)
@@ -1340,6 +1495,22 @@ func (s *PublicServer) explorerSearch(w http.ResponseWriter, r *http.Request) (t
 			http.Redirect(w, r, joinURL("/address/", address.AddrStr), http.StatusFound)
 			return noTpl, nil, nil
 		}
+		if isSyscoinShortcut(s.is.CoinShortcut) {
+			assets = s.api.FindAssets(q, 0, 2)
+			if len(assets.AssetDetails) > 0 {
+				if len(assets.AssetDetails) == 1 {
+					http.Redirect(w, r, joinURL("/asset/", assets.AssetDetails[0].AssetGuid), http.StatusFound)
+					return noTpl, nil, nil
+				}
+				http.Redirect(w, r, joinURL("/assets/", url.QueryEscape(q)), http.StatusFound)
+				return noTpl, nil, nil
+			}
+			asset, err = s.api.GetAsset(q, 0, 1, api.AccountDetailsBasic, &api.AddressFilter{AssetsMask: bchain.AssetMask})
+			if err == nil {
+				http.Redirect(w, r, joinURL("/asset/", asset.AssetDetails.AssetGuid), http.StatusFound)
+				return noTpl, nil, nil
+			}
+		}
 	}
 	return errorTpl, nil, api.NewAPIError(fmt.Sprintf("No matching records found for '%v'", q), true)
 }
@@ -1354,9 +1525,16 @@ func (s *PublicServer) explorerSendTx(w http.ResponseWriter, r *http.Request) (t
 		}
 		hex := r.FormValue("hex")
 		if len(hex) > 0 {
-			res, err := s.chain.SendRawTransaction(hex, false)
+			req := sendTxRequest{
+				Hex:           hex,
+				MaxFeeRate:    r.FormValue("maxfeerate"),
+				MaxBurnAmount: r.FormValue("maxburnamount"),
+			}
+			res, err := sendRawTransactionWithParams(s.chain, req.params())
 			if err != nil {
 				data.SendTxHex = hex
+				data.SendTxMaxFeeRate = req.MaxFeeRate       // SYSCOIN
+				data.SendTxMaxBurnAmount = req.MaxBurnAmount // SYSCOIN
 				data.Error = &api.APIError{Text: err.Error(), Public: true}
 				return sendTransactionTpl, data, nil
 			}
@@ -1641,6 +1819,57 @@ func (s *PublicServer) apiAddress(r *http.Request, apiVersion int) (interface{},
 	return address, err
 }
 
+// SYSCOIN
+func (s *PublicServer) apiGetSPVProof(r *http.Request, apiVersion int) (interface{}, error) {
+	var txid string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		txid = r.URL.Path[i+1:]
+	}
+	if len(txid) == 0 {
+		return nil, api.NewAPIError("Missing txid", true)
+	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "api-getspvproof"}).Inc()
+	type resultGetSPVProof struct {
+		Result json.RawMessage `json:"result"`
+	}
+	result, err := s.api.GetSPVProof(txid)
+	if err != nil {
+		return nil, err
+	}
+	return resultGetSPVProof{Result: result}, nil
+}
+
+// SYSCOIN
+func (s *PublicServer) apiAsset(r *http.Request, apiVersion int) (interface{}, error) {
+	var assetParam string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		assetParam = r.URL.Path[i+1:]
+	}
+	if len(assetParam) == 0 {
+		return nil, api.NewAPIError("Missing asset", true)
+	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "api-asset"}).Inc()
+	page, pageSize, details, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
+	return s.api.GetAsset(assetParam, page, pageSize, details, filter)
+}
+
+// SYSCOIN
+func (s *PublicServer) apiAssets(r *http.Request, apiVersion int) (interface{}, error) {
+	var assetParam string
+	i := strings.LastIndexByte(r.URL.Path, '/')
+	if i > 0 {
+		assetParam = r.URL.Path[i+1:]
+	}
+	if len(assetParam) == 0 {
+		return nil, api.NewAPIError("Missing asset", true)
+	}
+	s.metrics.ExplorerViews.With(common.Labels{"action": "api-assets"}).Inc()
+	page, pageSize, _, _, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
+	return s.api.FindAssets(assetParam, page, pageSize), nil
+}
+
 func (s *PublicServer) apiContract(r *http.Request, apiVersion int) (interface{}, error) {
 	var contract string
 	i := strings.LastIndex(r.URL.Path, "contract/")
@@ -1790,38 +2019,77 @@ type resultSendTransaction struct {
 	Result string `json:"result"`
 }
 
-func readSendTxHexFromBody(body io.Reader, maxBodyBytes int64) (string, error) {
+// SYSCOIN: request body shape for optional Syscoin Core sendrawtransaction
+// maxfeerate/maxburnamount parameters. Plain raw-hex bodies remain supported
+// by parsing into Hex only.
+type sendTxRequest struct {
+	Hex           string `json:"hex"`
+	MaxFeeRate    string `json:"maxfeerate"`
+	MaxBurnAmount string `json:"maxburnamount"`
+}
+
+func (r sendTxRequest) params() bchain.SendRawTransactionParams {
+	p := bchain.SendRawTransactionParams{Hex: r.Hex}
+	if r.MaxFeeRate != "" {
+		p.MaxFeeRate = &r.MaxFeeRate
+	}
+	if r.MaxBurnAmount != "" {
+		p.MaxBurnAmount = &r.MaxBurnAmount
+	}
+	return p
+}
+
+func readSendTxRequestFromBody(body io.Reader, maxBodyBytes int64) (sendTxRequest, error) {
 	var hex strings.Builder
 	n, err := io.Copy(&hex, io.LimitReader(body, maxBodyBytes+1))
 	if err != nil {
-		return "", api.NewAPIError("Missing tx blob", true)
+		return sendTxRequest{}, api.NewAPIError("Missing tx blob", true)
 	}
 	if n > maxBodyBytes {
-		return "", api.NewAPIError("Tx blob too large", true)
+		return sendTxRequest{}, api.NewAPIError("Tx blob too large", true)
 	}
-	return hex.String(), nil
+	raw := strings.TrimSpace(hex.String())
+	if strings.HasPrefix(raw, "{") {
+		var req sendTxRequest
+		if err := json.Unmarshal([]byte(raw), &req); err != nil {
+			return sendTxRequest{}, api.NewAPIError("Invalid send transaction JSON", true)
+		}
+		return req, nil
+	}
+	return sendTxRequest{Hex: raw}, nil
+}
+
+// SYSCOIN: use the optional sendrawtransaction interface only when extra
+// Syscoin parameters are present; otherwise preserve upstream broadcast flow.
+func sendRawTransactionWithParams(chain bchain.BlockChain, p bchain.SendRawTransactionParams) (string, error) {
+	if sender, ok := chain.(bchain.SendRawTransactionOpts); ok && (p.MaxFeeRate != nil || p.MaxBurnAmount != nil) {
+		return sender.SendRawTransactionWithOpts(p)
+	}
+	return chain.SendRawTransaction(p.Hex, p.DisableAlternativeRPC)
 }
 
 func (s *PublicServer) apiSendTx(r *http.Request, apiVersion int) (interface{}, error) {
 	var err error
 	var res resultSendTransaction
-	var hex string
+	var req sendTxRequest
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-sendtx"}).Inc()
 	if r.Method == http.MethodPost {
 		if r.ContentLength > maxSendTxBodyBytes {
 			return nil, api.NewAPIError("Tx blob too large", true)
 		}
-		hex, err = readSendTxHexFromBody(r.Body, maxSendTxBodyBytes)
+		req, err = readSendTxRequestFromBody(r.Body, maxSendTxBodyBytes)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		if i := strings.LastIndexByte(r.URL.Path, '/'); i > 0 {
-			hex = r.URL.Path[i+1:]
+			req.Hex = r.URL.Path[i+1:]
 		}
+		req.MaxFeeRate = r.URL.Query().Get("maxfeerate")
+		req.MaxBurnAmount = r.URL.Query().Get("maxburnamount")
 	}
-	if len(hex) > 0 {
-		res.Result, err = s.chain.SendRawTransaction(hex, false)
+	if len(req.Hex) > 0 {
+		res.Result, err = sendRawTransactionWithParams(s.chain, req.params())
 		if err != nil {
 			return nil, api.NewAPIError(err.Error(), true)
 		}

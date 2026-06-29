@@ -3,8 +3,8 @@
 package rpc
 
 import (
-	"encoding/hex"
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -72,6 +72,12 @@ type TestData struct {
 	EthCallErc4626 *EthCallErc4626Data   `json:"ethCallErc4626,omitempty"`
 	// Parsed from txDetails[*].coinSpecificData in fixture JSON.
 	TxCoinSpecificData map[string]json.RawMessage `json:"-"`
+}
+
+// SYSCOIN: Syscoin raw transaction RPC fixtures compare parser output before
+// address enrichment, because SPT indexing enriches addresses at DB/API layers.
+type syscoinAssetSupport interface {
+	SupportsSyscoinAssets() bool
 }
 
 func IntegrationTest(t *testing.T, coin string, chain bchain.BlockChain, mempool bchain.Mempool, testConfig json.RawMessage) {
@@ -143,10 +149,13 @@ func loadTestData(coin string, parser bchain.BlockChainParser) (*TestData, error
 			vout.JsonValue = ""
 		}
 
-		// get addresses parsed
-		err := setTxAddresses(parser, tx)
-		if err != nil {
-			return nil, err
+		// SYSCOIN: keep Syscoin RPC fixtures aligned with raw parser output.
+		if p, ok := parser.(syscoinAssetSupport); !ok || !p.SupportsSyscoinAssets() {
+			// get addresses parsed
+			err := setTxAddresses(parser, tx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

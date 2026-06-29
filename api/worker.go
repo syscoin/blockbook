@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
 	"github.com/trezor/blockbook/bchain"
@@ -65,6 +66,194 @@ func NewWorker(db *db.RocksDB, chain bchain.BlockChain, mempool bchain.Mempool, 
 		w.initXpubCache()
 	}
 	return w, nil
+}
+
+// SYSCOIN: optional parser extension for exposing SPT tx type in API responses.
+type syscoinAssetTypeParser interface {
+	GetAssetTypeFromVersion(nVersion int32) *bchain.TokenType
+}
+
+// SYSCOIN
+type syscoinAssetMaskParser interface {
+	GetAssetsMaskFromVersion(nVersion int32) bchain.AssetsMask
+}
+
+// SYSCOIN
+func assetTypeFromVersion(parser bchain.BlockChainParser, version int32) *bchain.TokenType {
+	p, ok := parser.(syscoinAssetTypeParser)
+	if !ok {
+		return nil
+	}
+	return p.GetAssetTypeFromVersion(version)
+}
+
+// SYSCOIN
+func assetMaskFromVersion(parser bchain.BlockChainParser, version int32) bchain.AssetsMask {
+	p, ok := parser.(syscoinAssetMaskParser)
+	if !ok {
+		return bchain.BaseCoinMask
+	}
+	return p.GetAssetsMaskFromVersion(version)
+}
+
+// SYSCOIN: convert indexed SPT metadata to public API fields.
+func (w *Worker) assetInfoToAPI(assetInfo *bchain.AssetInfo) *AssetInfo {
+	if assetInfo == nil {
+		return nil
+	}
+	value := (*Amount)(assetInfo.ValueSat)
+	valueStr := ""
+	symbol := ""
+	if assetInfo.ValueSat != nil {
+		if dbAsset, err := w.db.GetAsset(assetInfo.AssetGuid, nil); err == nil {
+			valueStr = value.DecimalString(int(dbAsset.AssetObj.Precision))
+			symbol = string(dbAsset.AssetObj.Symbol)
+		} else {
+			valueStr = w.chainParser.AmountToDecimalString(assetInfo.ValueSat)
+		}
+	}
+	return &AssetInfo{
+		AssetGuid: strconv.FormatUint(assetInfo.AssetGuid, 10),
+		ValueSat:  value,
+		ValueStr:  valueStr,
+		Symbol:    symbol,
+	}
+}
+
+// SYSCOIN: summarize output-side SPT amounts for the transaction-level Tokens
+// section. This preserves the old Syscoin explorer behavior while using the
+// current upstream TokenTransfers response field.
+func (w *Worker) getSyscoinAssetTransfers(vouts []Vout) []TokenTransfer {
+	type assetSummary struct {
+		value    *big.Int
+		symbol   string
+		decimals int
+	}
+	summaries := make(map[string]*assetSummary)
+	for i := range vouts {
+		assetInfo := vouts[i].AssetInfo
+		if assetInfo == nil || assetInfo.ValueSat == nil || assetInfo.AssetGuid == "" {
+			continue
+		}
+		summary := summaries[assetInfo.AssetGuid]
+		if summary == nil {
+			summary = &assetSummary{
+				value:    new(big.Int),
+				symbol:   assetInfo.AssetGuid,
+				decimals: w.chainParser.AmountDecimals(),
+			}
+			if guid, err := strconv.ParseUint(assetInfo.AssetGuid, 10, 64); err == nil {
+				if dbAsset, err := w.db.GetAsset(guid, nil); err == nil {
+					summary.symbol = string(dbAsset.AssetObj.Symbol)
+					summary.decimals = int(dbAsset.AssetObj.Precision)
+				}
+			}
+			summaries[assetInfo.AssetGuid] = summary
+		}
+		summary.value.Add(summary.value, (*big.Int)(assetInfo.ValueSat))
+	}
+	if len(summaries) == 0 {
+		return nil
+	}
+	assetGuids := make([]string, 0, len(summaries))
+	for assetGuid := range summaries {
+		assetGuids = append(assetGuids, assetGuid)
+	}
+	sort.Slice(assetGuids, func(i, j int) bool {
+		ii, iErr := strconv.ParseUint(assetGuids[i], 10, 64)
+		jj, jErr := strconv.ParseUint(assetGuids[j], 10, 64)
+		if iErr == nil && jErr == nil {
+			return ii < jj
+		}
+		return assetGuids[i] < assetGuids[j]
+	})
+	tokens := make([]TokenTransfer, 0, len(assetGuids))
+	for _, assetGuid := range assetGuids {
+		summary := summaries[assetGuid]
+		value := Amount(*summary.value)
+		tokens = append(tokens, TokenTransfer{
+			Type:      bchain.TokenStandardName("SPT"),
+			Standard:  bchain.TokenStandardName("SPT"),
+			Contract:  assetGuid,
+			Symbol:    summary.symbol,
+			Decimals:  summary.decimals,
+			Value:     &value,
+			AssetGuid: assetGuid,
+		})
+	}
+	return tokens
+}
+
+// SYSCOIN: build regular address SPT token balances from indexed address
+// balances plus unconfirmed per-address asset deltas.
+func (w *Worker) getSyscoinAddressAssetTokens(address string, balances map[uint64]*bchain.AssetBalance, mempool map[string]*syscoinTokenMempoolInfo) (Tokens, int, error) {
+	count := len(balances)
+	if count == 0 && len(mempool) == 0 {
+		return nil, 0, nil
+	}
+	tokens := make(Tokens, 0, count+len(mempool))
+	for guid, balance := range balances {
+		assetGuid := strconv.FormatUint(guid, 10)
+		dbAsset, err := w.db.GetAsset(guid, nil)
+		if err != nil {
+			dbAsset = &bchain.Asset{}
+			dbAsset.AssetObj.Symbol = []byte(assetGuid)
+			dbAsset.AssetObj.Precision = 8
+		}
+		totalReceived := new(big.Int).Add(balance.BalanceSat, balance.SentSat)
+		var unconfirmed *Amount
+		unconfirmedTransfers := 0
+		if mempoolAsset := mempool[assetGuid]; mempoolAsset != nil {
+			unconfirmed = (*Amount)(mempoolAsset.valueSat)
+			unconfirmedTransfers = mempoolAsset.unconfirmedTxs
+			mempoolAsset.used = true
+		}
+		tokens = append(tokens, Token{
+			Type:                  bchain.SPTTokenType,
+			Standard:              bchain.SPTTokenType,
+			Name:                  address,
+			Decimals:              int(dbAsset.AssetObj.Precision),
+			Symbol:                string(dbAsset.AssetObj.Symbol),
+			BalanceSat:            (*Amount)(balance.BalanceSat),
+			UnconfirmedBalanceSat: unconfirmed,
+			UnconfirmedTransfers:  unconfirmedTransfers,
+			TotalReceivedSat:      (*Amount)(totalReceived),
+			TotalSentSat:          (*Amount)(balance.SentSat),
+			AssetGuid:             assetGuid,
+			Transfers:             int(balance.Transfers),
+		})
+	}
+	for assetGuid, mempoolAsset := range mempool {
+		if mempoolAsset.used {
+			continue
+		}
+		guid, err := strconv.ParseUint(assetGuid, 10, 64)
+		if err != nil {
+			return nil, 0, err
+		}
+		dbAsset, err := w.db.GetAsset(guid, nil)
+		if err != nil {
+			dbAsset = &bchain.Asset{}
+			dbAsset.AssetObj.Symbol = []byte(assetGuid)
+			dbAsset.AssetObj.Precision = 8
+		}
+		zero := Amount(*new(big.Int))
+		tokens = append(tokens, Token{
+			Type:                  bchain.SPTTokenType,
+			Standard:              bchain.SPTTokenType,
+			Name:                  address,
+			Decimals:              int(dbAsset.AssetObj.Precision),
+			Symbol:                string(dbAsset.AssetObj.Symbol),
+			BalanceSat:            &zero,
+			UnconfirmedBalanceSat: (*Amount)(mempoolAsset.valueSat),
+			UnconfirmedTransfers:  mempoolAsset.unconfirmedTxs,
+			TotalReceivedSat:      &zero,
+			TotalSentSat:          &zero,
+			AssetGuid:             assetGuid,
+		})
+	}
+	sort.Sort(tokens)
+	return tokens, count, nil
 }
 
 func (w *Worker) getAddressesFromVout(vout *bchain.Vout) (bchain.AddressDescriptor, []string, bool, error) {
@@ -140,7 +329,7 @@ func (w *Worker) GetSpendingTxid(txid string, n int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	glog.Info("GetSpendingTxid ", txid, " ", n, ", ", time.Since(start))
+	glog.V(1).Info("GetSpendingTxid ", txid, " ", n, ", ", time.Since(start))
 	return tx.Vout[n].SpentTxID, nil
 }
 
@@ -390,6 +579,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 					if len(otx.Vout) > int(vin.Vout) {
 						vout := &otx.Vout[vin.Vout]
 						vin.ValueSat = (*Amount)(&vout.ValueSat)
+						// SYSCOIN
+						vin.AssetInfo = w.assetInfoToAPI(vout.AssetInfo)
 						vin.AddrDesc, vin.Addresses, vin.IsAddress, err = w.getAddressesFromVout(vout)
 						if err != nil {
 							glog.Errorf("getAddressesFromVout error %v, vout %+v", err, vout)
@@ -400,6 +591,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 					if len(tas.Outputs) > int(vin.Vout) {
 						output := &tas.Outputs[vin.Vout]
 						vin.ValueSat = (*Amount)(&output.ValueSat)
+						// SYSCOIN
+						vin.AssetInfo = w.assetInfoToAPI(output.AssetInfo)
 						vin.AddrDesc = output.AddrDesc
 						vin.Addresses, vin.IsAddress, err = output.Addresses(w.chainParser)
 						if err != nil {
@@ -430,6 +623,8 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		vout := &vouts[i]
 		vout.N = i
 		vout.ValueSat = (*Amount)(&bchainVout.ValueSat)
+		// SYSCOIN
+		vout.AssetInfo = w.assetInfoToAPI(bchainVout.AssetInfo)
 		valOutSat.Add(&valOutSat, &bchainVout.ValueSat)
 		vout.Hex = bchainVout.ScriptPubKey.Hex
 		vout.AddrDesc, vout.Addresses, vout.IsAddress, err = w.getAddressesFromVout(bchainVout)
@@ -460,6 +655,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
+		tokens = w.getSyscoinAssetTransfers(vouts) // SYSCOIN
 	} else if w.chainType == bchain.ChainEthereumType {
 		tokenTransfers, err := w.chainParser.EthereumTypeGetTokenTransfersFromTx(bchainTx)
 		if err != nil {
@@ -555,6 +751,9 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		CoinSpecificData: sj,
 		ChainExtraData:   chainExtraData,
 		TokenTransfers:   tokens,
+		// SYSCOIN
+		TokenType:        assetTypeFromVersion(w.chainParser, bchainTx.Version),
+		Memo:             bchainTx.Memo,
 		EthereumSpecific: ethSpecific,
 	}
 	if bchainTx.Confirmations == 0 {
@@ -594,6 +793,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			if bchainVin.Txid != "" {
 				vin.ValueSat = (*Amount)(&bchainVin.ValueSat)
 				vin.AddrDesc = bchainVin.AddrDesc
+				vin.AssetInfo = w.assetInfoToAPI(bchainVin.AssetInfo) // SYSCOIN
 				vin.Addresses, vin.IsAddress, _ = w.chainParser.GetAddressesFromAddrDesc(vin.AddrDesc)
 				if vin.ValueSat != nil {
 					valInSat.Add(&valInSat, (*big.Int)(vin.ValueSat))
@@ -618,6 +818,8 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 		vout := &vouts[i]
 		vout.N = i
 		vout.ValueSat = (*Amount)(&bchainVout.ValueSat)
+		// SYSCOIN
+		vout.AssetInfo = w.assetInfoToAPI(bchainVout.AssetInfo)
 		valOutSat.Add(&valOutSat, &bchainVout.ValueSat)
 		vout.Hex = bchainVout.ScriptPubKey.Hex
 		vout.AddrDesc, vout.Addresses, vout.IsAddress, err = w.getAddressesFromVout(bchainVout)
@@ -633,6 +835,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 			feesSat.SetUint64(0)
 		}
 		pValInSat = &valInSat
+		tokens = w.getSyscoinAssetTransfers(vouts) // SYSCOIN
 	} else if w.chainType == bchain.ChainEthereumType {
 		if len(mempoolTx.Vout) > 0 {
 			valOutSat = mempoolTx.Vout[0].ValueSat
@@ -662,21 +865,23 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 		glog.Warningf("GetTxChainExtraData error %v, %v", err, mempoolTx.Txid)
 	}
 	r := &Tx{
-		Blocktime:        mempoolTx.Blocktime,
-		FeesSat:          (*Amount)(&feesSat),
-		Locktime:         mempoolTx.LockTime,
-		Txid:             mempoolTx.Txid,
-		ValueInSat:       (*Amount)(pValInSat),
-		ValueOutSat:      (*Amount)(&valOutSat),
-		Version:          mempoolTx.Version,
-		Size:             len(mempoolTx.Hex) >> 1,
-		VSize:            int(mempoolTx.VSize),
-		Hex:              mempoolTx.Hex,
-		Rbf:              rbf,
-		Vin:              vins,
-		Vout:             vouts,
-		ChainExtraData:   chainExtraData,
-		TokenTransfers:   tokens,
+		Blocktime:      mempoolTx.Blocktime,
+		FeesSat:        (*Amount)(&feesSat),
+		Locktime:       mempoolTx.LockTime,
+		Txid:           mempoolTx.Txid,
+		ValueInSat:     (*Amount)(pValInSat),
+		ValueOutSat:    (*Amount)(&valOutSat),
+		Version:        mempoolTx.Version,
+		Size:           len(mempoolTx.Hex) >> 1,
+		VSize:          int(mempoolTx.VSize),
+		Hex:            mempoolTx.Hex,
+		Rbf:            rbf,
+		Vin:            vins,
+		Vout:           vouts,
+		ChainExtraData: chainExtraData,
+		TokenTransfers: tokens,
+		// SYSCOIN
+		TokenType:        assetTypeFromVersion(w.chainParser, mempoolTx.Version),
 		EthereumSpecific: ethSpecific,
 		AddressAliases:   w.getAddressAliases(addresses),
 	}
@@ -842,9 +1047,29 @@ func (w *Worker) GetEthereumTokenURI(contract string, id string) (string, *bchai
 func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
+	txMatchesAssetMask := func(txid string) (bool, error) {
+		if filter.AssetsMask == bchain.AllMask {
+			return true, nil
+		}
+		ta, err := w.db.GetTxAddresses(txid)
+		if err != nil || ta == nil {
+			return false, err
+		}
+		mask := assetMaskFromVersion(w.chainParser, ta.Version)
+		if mask == bchain.AllMask {
+			return true, nil
+		}
+		return uint32(filter.AssetsMask)&uint32(mask) == uint32(mask), nil
+	}
 	var callback db.GetTransactionsCallback
 	if filter.Vout == AddressFilterVoutOff {
 		callback = func(txid string, height uint32, indexes []int32) error {
+			if !mempool {
+				matches, err := txMatchesAssetMask(txid) // SYSCOIN
+				if err != nil || !matches {
+					return err
+				}
+			}
 			txids = append(txids, txid)
 			if len(txids) >= maxResults {
 				return &db.StopIteration{}
@@ -853,6 +1078,12 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 		}
 	} else {
 		callback = func(txid string, height uint32, indexes []int32) error {
+			if !mempool {
+				matches, err := txMatchesAssetMask(txid) // SYSCOIN
+				if err != nil || !matches {
+					return err
+				}
+			}
 			for _, index := range indexes {
 				vout := index
 				if vout < 0 {
@@ -879,8 +1110,24 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 		}
 		for _, m := range o {
 			if _, found := uniqueTxs[m.Txid]; !found {
+				if filter.AssetsMask != bchain.AllMask {
+					tx, err := w.getTransaction(m.Txid, false, true, nil)
+					if err != nil || tx == nil {
+						glog.Warning("GetTransaction in mempool assetMask filter: ", err)
+						continue
+					}
+					mask := assetMaskFromVersion(w.chainParser, tx.Version)
+					if mask != bchain.AllMask && uint32(filter.AssetsMask)&uint32(mask) != uint32(mask) {
+						continue
+					}
+				}
 				l := len(txids)
-				callback(m.Txid, 0, []int32{m.Vout})
+				if err := callback(m.Txid, 0, []int32{m.Vout}); err != nil {
+					if _, ok := err.(*db.StopIteration); ok {
+						return txids, nil
+					}
+					return nil, err
+				}
 				if len(txids) > l {
 					uniqueTxs[m.Txid] = struct{}{}
 				}
@@ -899,6 +1146,312 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 	return txids, nil
 }
 
+// SYSCOIN: getAssetTxids returns confirmed or mempool transaction ids touching
+// one SPT asset, preserving Blockbook's newest-first history ordering.
+func (w *Worker) getAssetTxids(assetGuid uint64, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
+	if filter == nil {
+		filter = &AddressFilter{}
+	}
+	txids := make([]string, 0, 4)
+	if maxResults <= 0 {
+		return txids, nil
+	}
+	callback := func(txidsIn []string) error {
+		txids = append(txids, txidsIn...)
+		if len(txids) >= maxResults {
+			return &db.StopIteration{}
+		}
+		return nil
+	}
+	if mempool {
+		uniqueTxs := make(map[string]struct{})
+		for _, entry := range w.mempool.GetTxAssets(assetGuid) {
+			if _, found := uniqueTxs[entry.Txid]; found {
+				continue
+			}
+			if filter.AssetsMask != bchain.AllMask {
+				tx, err := w.getTransaction(entry.Txid, false, true, nil)
+				if err != nil || tx == nil {
+					glog.Warning("GetTransaction in asset mempool filter: ", err)
+					continue
+				}
+				mask := assetMaskFromVersion(w.chainParser, tx.Version)
+				if mask != bchain.AllMask && uint32(filter.AssetsMask)&uint32(mask) != uint32(mask) {
+					continue
+				}
+			}
+			l := len(txids)
+			if err := callback([]string{entry.Txid}); err != nil {
+				if _, ok := err.(*db.StopIteration); ok {
+					break
+				}
+				return nil, err
+			}
+			if len(txids) > l {
+				uniqueTxs[entry.Txid] = struct{}{}
+			}
+		}
+		return txids, nil
+	}
+	to := filter.ToHeight
+	if to == 0 {
+		to = maxUint32
+	}
+	if err := w.db.GetTxAssets(assetGuid, filter.FromHeight, to, filter.AssetsMask, callback); err != nil {
+		return nil, err
+	}
+	return txids, nil
+}
+
+// SYSCOIN: assetMempoolValue returns the unconfirmed delta for one asset in a
+// transaction. Outputs add to the delta and inputs subtract from it.
+func (t *Tx) assetMempoolValue(assetGuid string) *big.Int {
+	var val big.Int
+	for i := range t.Vout {
+		assetInfo := t.Vout[i].AssetInfo
+		if assetInfo != nil && assetInfo.AssetGuid == assetGuid && assetInfo.ValueSat != nil {
+			val.Add(&val, (*big.Int)(assetInfo.ValueSat))
+		}
+	}
+	for i := range t.Vin {
+		assetInfo := t.Vin[i].AssetInfo
+		if assetInfo != nil && assetInfo.AssetGuid == assetGuid && assetInfo.ValueSat != nil {
+			val.Sub(&val, (*big.Int)(assetInfo.ValueSat))
+		}
+	}
+	return &val
+}
+
+// SYSCOIN: FindAssetsFromFilter searches the local SPT metadata cache by symbol
+// or NEVM contract. Callers page the result with FindAssets.
+func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
+	start := time.Now()
+	if w.db.GetSetupAssetCacheFirstTime() {
+		if err := w.db.SetupAssetCache(); err != nil {
+			glog.Error("FindAssetsFromFilter SetupAssetCache ", err)
+			return nil
+		}
+		w.db.SetSetupAssetCacheFirstTime(false)
+	}
+	filterLower := strings.ToLower(strings.ReplaceAll(filter, "0x", ""))
+	assetDetails := make([]*AssetsSpecific, 0)
+	for guid, assetCached := range *w.db.GetAssetCache() {
+		symbol := string(assetCached.AssetObj.Symbol)
+		symbolLower := strings.ToLower(symbol)
+		foundAsset := strings.Contains(symbolLower, filterLower)
+		contract := ""
+		if len(assetCached.AssetObj.Contract) > 0 {
+			contract = ethcommon.BytesToAddress(assetCached.AssetObj.Contract).Hex()
+			if len(filterLower) > 5 && strings.Contains(strings.ToLower(contract), filterLower) {
+				foundAsset = true
+			}
+		}
+		if !foundAsset {
+			continue
+		}
+		txs := int(assetCached.Transactions)
+		assetDetails = append(assetDetails, &AssetsSpecific{
+			AssetGuid:   strconv.FormatUint(guid, 10),
+			Symbol:      symbol,
+			Contract:    contract,
+			TotalSupply: (*Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
+			Decimals:    int(assetCached.AssetObj.Precision),
+			Txs:         txs,
+			MetaData:    string(assetCached.MetaData),
+		})
+	}
+	sort.Slice(assetDetails, func(i, j int) bool {
+		ii, iErr := strconv.ParseUint(assetDetails[i].AssetGuid, 10, 64)
+		jj, jErr := strconv.ParseUint(assetDetails[j].AssetGuid, 10, 64)
+		if iErr == nil && jErr == nil {
+			return ii < jj
+		}
+		return assetDetails[i].AssetGuid < assetDetails[j].AssetGuid
+	})
+	glog.Info("FindAssetsFromFilter, ", time.Since(start))
+	return assetDetails
+}
+
+// FindAssets returns paged Syscoin SPT search results.
+//
+// SYSCOIN
+func (w *Worker) FindAssets(filter string, page int, txsOnPage int) *Assets {
+	page--
+	if page < 0 {
+		page = 0
+	}
+	start := time.Now()
+	assetsFiltered := w.FindAssetsFromFilter(filter)
+	var from, to int
+	var pg Paging
+	pg, from, to, page = computePaging(len(assetsFiltered), page, txsOnPage)
+	assetDetails := make([]*AssetsSpecific, to-from)
+	for i := from; i < to; i++ {
+		assetDetails[i-from] = assetsFiltered[i]
+	}
+	r := &Assets{
+		AssetDetails: assetDetails,
+		Paging:       pg,
+		NumAssets:    len(assetsFiltered),
+		Filter:       filter,
+	}
+	glog.Info("FindAssets filter: ", filter, ", ", time.Since(start))
+	return r
+}
+
+// GetSPVProof returns Syscoin bridge SPV proof for txid.
+//
+// SYSCOIN
+func (w *Worker) GetSPVProof(hash string) (json.RawMessage, error) {
+	return w.chain.GetSPVProof(hash)
+}
+
+// GetAsset gets metadata and optional transactions for a Syscoin SPT asset.
+//
+// SYSCOIN
+func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountDetails, filter *AddressFilter) (*Asset, error) {
+	start := time.Now()
+	page--
+	if page < 0 {
+		page = 0
+	}
+	if filter == nil {
+		filter = &AddressFilter{}
+	}
+	assetGuid, err := strconv.ParseUint(asset, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	dbAsset, err := w.db.GetAsset(assetGuid, nil)
+	if err != nil {
+		return nil, NewAPIError("Asset not found", true)
+	}
+	totalResults := int(dbAsset.Transactions)
+	if filter.FromHeight != 0 || filter.ToHeight != 0 || filter.AssetsMask != bchain.AllMask {
+		totalResults = -1
+	}
+	var txs []*Tx
+	var txids []string
+	var mempoolTxs []*Tx
+	var mempoolTxids []string
+	var unconfirmedTxs int
+	var uBalSat big.Int
+	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
+		txm, err := w.getAssetTxids(assetGuid, true, filter, maxInt)
+		if err != nil {
+			return nil, errors.Annotatef(err, "getAssetTxids %v true", asset)
+		}
+		for _, txid := range txm {
+			tx, err := w.GetTransaction(txid, false, false)
+			if err != nil || tx == nil {
+				glog.Warning("GetTransaction in mempool: ", err)
+				continue
+			}
+			if tx.Confirmations != 0 {
+				continue
+			}
+			uBalSat.Add(&uBalSat, tx.assetMempoolValue(asset))
+			unconfirmedTxs++
+			if option == AccountDetailsTxidHistory {
+				mempoolTxids = append(mempoolTxids, tx.Txid)
+			} else if option >= AccountDetailsTxHistoryLight {
+				mempoolTxs = append(mempoolTxs, tx)
+			}
+		}
+	}
+	var pg Paging
+	if option >= AccountDetailsTxidHistory {
+		mempoolItems := unconfirmedTxs
+		if totalResults >= 0 {
+			_, _, _, page = computePaging(totalResults+mempoolItems, page, txsOnPage)
+		}
+		virtualFrom := page * txsOnPage
+		virtualTo := (page + 1) * txsOnPage
+		confirmedFrom := virtualFrom - mempoolItems
+		if confirmedFrom < 0 {
+			confirmedFrom = 0
+		}
+		confirmedTo := virtualTo - mempoolItems
+		if confirmedTo < 0 {
+			confirmedTo = 0
+		}
+		txc, err := w.getAssetTxids(assetGuid, false, filter, confirmedTo)
+		if err != nil {
+			return nil, errors.Annotatef(err, "getAssetTxids %v false", asset)
+		}
+		bestheight, _, err := w.db.GetBestBlock()
+		if err != nil {
+			return nil, errors.Annotatef(err, "GetBestBlock")
+		}
+		pg, _, _, page = computePaging(len(txc)+mempoolItems, page, txsOnPage)
+		if totalResults >= 0 {
+			pg, _, _, _ = computePaging(totalResults+mempoolItems, page, txsOnPage)
+		} else if confirmedTo > 0 && len(txc) >= confirmedTo {
+			pg.TotalPages = -1
+		}
+		mempoolFrom := virtualFrom
+		if mempoolFrom > mempoolItems {
+			mempoolFrom = mempoolItems
+		}
+		mempoolTo := virtualTo
+		if mempoolTo > mempoolItems {
+			mempoolTo = mempoolItems
+		}
+		if option == AccountDetailsTxidHistory {
+			txids = append(txids, mempoolTxids[mempoolFrom:mempoolTo]...)
+		} else {
+			txs = append(txs, mempoolTxs[mempoolFrom:mempoolTo]...)
+		}
+		if confirmedTo > len(txc) {
+			confirmedTo = len(txc)
+		}
+		for i := confirmedFrom; i < confirmedTo; i++ {
+			txid := txc[i]
+			if option == AccountDetailsTxidHistory {
+				txids = append(txids, txid)
+			} else {
+				tx, err := w.txFromTxid(txid, bestheight, option, nil, nil)
+				if err != nil {
+					return nil, err
+				}
+				txs = append(txs, tx)
+			}
+		}
+	}
+	// On page 1, mempool items are prepended before confirmed history.
+	// Keep response bounded by requested page size for txid/txs details.
+	if page == 0 && txsOnPage > 0 {
+		if option == AccountDetailsTxidHistory && len(txids) > txsOnPage {
+			txids = txids[:txsOnPage]
+		} else if option >= AccountDetailsTxHistoryLight && len(txs) > txsOnPage {
+			txs = txs[:txsOnPage]
+		}
+	}
+	contract := ""
+	if len(dbAsset.AssetObj.Contract) > 0 {
+		contract = ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex()
+	}
+	r := &Asset{
+		AssetDetails: &AssetSpecific{
+			AssetGuid:   asset,
+			Symbol:      string(dbAsset.AssetObj.Symbol),
+			Contract:    contract,
+			TotalSupply: (*Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
+			MaxSupply:   (*Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
+			Decimals:    int(dbAsset.AssetObj.Precision),
+			MetaData:    string(dbAsset.MetaData),
+		},
+		Paging:                pg,
+		UnconfirmedBalanceSat: (*Amount)(&uBalSat),
+		UnconfirmedTxs:        unconfirmedTxs,
+		Transactions:          txs,
+		Txs:                   int(dbAsset.Transactions),
+		Txids:                 txids,
+	}
+	glog.Info("GetAsset ", asset, ", ", time.Since(start))
+	return r, nil
+}
+
 func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
 	for _, vout := range t.Vout {
@@ -908,6 +1461,68 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	}
 	return &val
 }
+
+type syscoinTokenMempoolInfo struct {
+	used           bool
+	unconfirmedTxs int
+	valueSat       *big.Int
+	txids          map[string]struct{}
+}
+
+// SYSCOIN
+func (t *Tx) addAddrVoutAssetMempool(addrDesc bchain.AddressDescriptor, mempool map[string]*syscoinTokenMempoolInfo) {
+	foundAssets := make(map[string]struct{})
+	for i := range t.Vout {
+		vout := &t.Vout[i]
+		if !bytes.Equal(vout.AddrDesc, addrDesc) || vout.AssetInfo == nil || vout.AssetInfo.ValueSat == nil {
+			continue
+		}
+		asset := mempool[vout.AssetInfo.AssetGuid]
+		if asset == nil {
+			asset = &syscoinTokenMempoolInfo{valueSat: new(big.Int)}
+			mempool[vout.AssetInfo.AssetGuid] = asset
+		}
+		asset.valueSat.Add(asset.valueSat, (*big.Int)(vout.AssetInfo.ValueSat))
+		if _, found := foundAssets[vout.AssetInfo.AssetGuid]; !found {
+			asset.addUnconfirmedTx(t.Txid)
+			foundAssets[vout.AssetInfo.AssetGuid] = struct{}{}
+		}
+	}
+}
+
+// SYSCOIN
+func (t *Tx) addAddrVinAssetMempool(addrDesc bchain.AddressDescriptor, mempool map[string]*syscoinTokenMempoolInfo) {
+	foundAssets := make(map[string]struct{})
+	for i := range t.Vin {
+		vin := &t.Vin[i]
+		if !bytes.Equal(vin.AddrDesc, addrDesc) || vin.AssetInfo == nil || vin.AssetInfo.ValueSat == nil {
+			continue
+		}
+		asset := mempool[vin.AssetInfo.AssetGuid]
+		if asset == nil {
+			asset = &syscoinTokenMempoolInfo{valueSat: new(big.Int)}
+			mempool[vin.AssetInfo.AssetGuid] = asset
+		}
+		asset.valueSat.Sub(asset.valueSat, (*big.Int)(vin.AssetInfo.ValueSat))
+		if _, found := foundAssets[vin.AssetInfo.AssetGuid]; !found {
+			asset.addUnconfirmedTx(t.Txid)
+			foundAssets[vin.AssetInfo.AssetGuid] = struct{}{}
+		}
+	}
+}
+
+// SYSCOIN
+func (i *syscoinTokenMempoolInfo) addUnconfirmedTx(txid string) {
+	if i.txids == nil {
+		i.txids = make(map[string]struct{})
+	}
+	if _, found := i.txids[txid]; found {
+		return
+	}
+	i.txids[txid] = struct{}{}
+	i.unconfirmedTxs++
+}
+
 func (t *Tx) getAddrEthereumTypeMempoolInputValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	var val big.Int
 	if len(t.Vin) > 0 && len(t.Vout) > 0 && bytes.Equal(t.Vin[0].AddrDesc, addrDesc) {
@@ -958,6 +1573,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *db.TxAddresses, bi *db.BlockIn
 		vin.N = i
 		vin.ValueSat = (*Amount)(&tai.ValueSat)
 		valInSat.Add(&valInSat, &tai.ValueSat)
+		vin.AssetInfo = w.assetInfoToAPI(tai.AssetInfo) // SYSCOIN
 		vin.Addresses, vin.IsAddress, err = tai.Addresses(w.chainParser)
 		if err != nil {
 			glog.Errorf("tai.Addresses error %v, tx %v, input %v, tai %+v", err, txid, i, tai)
@@ -975,6 +1591,7 @@ func (w *Worker) txFromTxAddress(txid string, ta *db.TxAddresses, bi *db.BlockIn
 		vout.N = i
 		vout.ValueSat = (*Amount)(&tao.ValueSat)
 		valOutSat.Add(&valOutSat, &tao.ValueSat)
+		vout.AssetInfo = w.assetInfoToAPI(tao.AssetInfo) // SYSCOIN
 		vout.Addresses, vout.IsAddress, err = tao.Addresses(w.chainParser)
 		if err != nil {
 			glog.Errorf("tai.Addresses error %v, tx %v, output %v, tao %+v", err, txid, i, tao)
@@ -993,16 +1610,19 @@ func (w *Worker) txFromTxAddress(txid string, ta *db.TxAddresses, bi *db.BlockIn
 		feesSat.SetUint64(0)
 	}
 	r := &Tx{
-		Blockhash:     bi.Hash,
-		Blockheight:   int(ta.Height),
-		Blocktime:     bi.Time,
-		Confirmations: bestheight - ta.Height + 1,
-		FeesSat:       (*Amount)(&feesSat),
-		Txid:          txid,
-		ValueInSat:    (*Amount)(&valInSat),
-		ValueOutSat:   (*Amount)(&valOutSat),
-		Vin:           vins,
-		Vout:          vouts,
+		Blockhash:      bi.Hash,
+		Blockheight:    int(ta.Height),
+		Blocktime:      bi.Time,
+		Confirmations:  bestheight - ta.Height + 1,
+		FeesSat:        (*Amount)(&feesSat),
+		Txid:           txid,
+		ValueInSat:     (*Amount)(&valInSat),
+		ValueOutSat:    (*Amount)(&valOutSat),
+		Vin:            vins,
+		Vout:           vouts,
+		TokenTransfers: w.getSyscoinAssetTransfers(vouts),               // SYSCOIN
+		TokenType:      assetTypeFromVersion(w.chainParser, ta.Version), // SYSCOIN
+		Memo:           ta.Memo,                                         // SYSCOIN
 	}
 	if w.chainParser.SupportsVSize() {
 		r.VSize = int(ta.VSize)
@@ -1582,7 +2202,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		}
 		if ba != nil {
 			// totalResults is known only if there is no filter
-			if filter.Vout == AddressFilterVoutOff && filter.FromHeight == 0 && filter.ToHeight == 0 {
+			if filter.Vout == AddressFilterVoutOff && filter.FromHeight == 0 && filter.ToHeight == 0 && filter.AssetsMask == bchain.AllMask {
 				totalResults = int(ba.Txs)
 			} else {
 				totalResults = -1
@@ -1595,6 +2215,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		page = 0
 	}
 	addresses := w.newAddressesMapForAliases()
+	assetMempool := make(map[string]*syscoinTokenMempoolInfo) // SYSCOIN
 	// process mempool, only if toHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txm, err = w.getAddressTxids(addrDesc, true, filter, maxInt)
@@ -1618,11 +2239,13 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 					if tx.Confirmations == 0 {
 						unconfirmedTxs++
 						uBalReceiving.Add(&uBalReceiving, tx.getAddrVoutValue(addrDesc))
+						tx.addAddrVoutAssetMempool(addrDesc, assetMempool) // SYSCOIN
 						// ethereum has a different logic - value not in input and add maximum possible fees
 						if w.chainType == bchain.ChainEthereumType {
 							uBalSending.Add(&uBalSending, tx.getAddrEthereumTypeMempoolInputValue(addrDesc))
 						} else {
 							uBalSending.Add(&uBalSending, tx.getAddrVinValue(addrDesc))
+							tx.addAddrVinAssetMempool(addrDesc, assetMempool) // SYSCOIN
 						}
 						if page == 0 {
 							if option == AccountDetailsTxidHistory {
@@ -1704,6 +2327,14 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		uBalSat.Sub(&uBalReceiving, &uBalSending)
 		unconfirmedBalanceSat = (*Amount)(&uBalSat)
 	}
+	var tokensAsset Tokens // SYSCOIN
+	usedAssetTokens := 0   // SYSCOIN
+	if w.chainType == bchain.ChainBitcoinType && option > AccountDetailsBasic {
+		tokensAsset, usedAssetTokens, err = w.getSyscoinAddressAssetTokens(address, ba.AssetBalances, assetMempool)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var contractInfoBestHeight uint32
 	if ed.contractInfo != nil {
 		h, _, err := w.db.GetBestBlock()
@@ -1727,7 +2358,9 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		UnconfirmedReceiving:  amountOrNil(&uBalReceiving),
 		Transactions:          txs,
 		Txids:                 txids,
+		UsedAssetTokens:       usedAssetTokens, // SYSCOIN
 		Tokens:                ed.tokens,
+		TokensAsset:           tokensAsset, // SYSCOIN
 		SecondaryValue:        secondaryValue,
 		TokensBaseValue:       ed.tokensBaseValue,
 		TokensSecondaryValue:  ed.tokensSecondaryValue,
@@ -1744,7 +2377,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if ed.contractInfo != nil && ed.contractInfo.Standard == bchain.ERC20TokenStandard {
 		r.Erc20Contract = r.ContractInfo
 	}
-	glog.Info("GetAddress-", option, " ", address, ", ", time.Since(start))
+	glog.V(1).Info("GetAddress-", option, " ", address, ", ", time.Since(start))
 	return r, nil
 }
 
@@ -2095,7 +2728,7 @@ func (w *Worker) GetBalanceHistory(address string, fromTimestamp, toTimestamp in
 	if err != nil {
 		return nil, err
 	}
-	glog.Info("GetBalanceHistory ", address, ", blocks ", fromHeight, "-", toHeight, ", count ", len(bha), ", ", time.Since(start))
+	glog.V(1).Info("GetBalanceHistory ", address, ", blocks ", fromHeight, "-", toHeight, ", count ", len(bha), ", ", time.Since(start))
 	return bha, nil
 }
 
@@ -2161,6 +2794,8 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *db.AddrB
 									AmountSat: (*Amount)(&vout.ValueSat),
 									Locktime:  bchainTx.LockTime,
 									Coinbase:  coinbase,
+									// SYSCOIN
+									AssetInfo: w.assetInfoToAPI(vout.AssetInfo),
 								})
 								inMempool[bchainTx.Txid+":"+strconv.Itoa(i)] = struct{}{}
 							}
@@ -2222,6 +2857,8 @@ func (w *Worker) getAddrDescUtxo(addrDesc bchain.AddressDescriptor, ba *db.AddrB
 							Height:        int(utxo.Height),
 							Confirmations: confirmations,
 							Coinbase:      coinbase,
+							// SYSCOIN
+							AssetInfo: w.assetInfoToAPI(utxo.AssetInfo),
 						})
 					}
 				}
@@ -2249,7 +2886,7 @@ func (w *Worker) GetAddressUtxo(address string, onlyConfirmed bool) (Utxos, erro
 	if err != nil {
 		return nil, err
 	}
-	glog.Info("GetAddressUtxo ", address, ", ", len(r), " utxos, ", time.Since(start))
+	glog.V(1).Info("GetAddressUtxo ", address, ", ", len(r), " utxos, ", time.Since(start))
 	return r, nil
 }
 
@@ -2279,7 +2916,7 @@ func (w *Worker) GetBlocks(page int, blocksOnPage int) (*Blocks, error) {
 		}
 		r.Blocks[i-from] = *bi
 	}
-	glog.Info("GetBlocks page ", page, ", ", time.Since(start))
+	glog.V(1).Info("GetBlocks page ", page, ", ", time.Since(start))
 	return r, nil
 }
 
@@ -2406,7 +3043,7 @@ func (w *Worker) GetFeeStats(bid string) (*FeeStats, error) {
 		}
 	}
 
-	glog.Info("GetFeeStats ", bid, " (", len(feesPerKb), " txs), ", time.Since(start))
+	glog.V(1).Info("GetFeeStats ", bid, " (", len(feesPerKb), " txs), ", time.Since(start))
 
 	return &FeeStats{
 		TxCount:         len(feesPerKb),
@@ -2459,7 +3096,7 @@ func (w *Worker) GetBlock(bid string, page int, txsOnPage int) (*Block, error) {
 	}
 	txs = txs[:txi]
 	bi.Txids = nil
-	glog.Info("GetBlock ", bid, ", page ", page, ", ", time.Since(start))
+	glog.V(1).Info("GetBlock ", bid, ", page ", page, ", ", time.Since(start))
 	return &Block{
 		Paging: pg,
 		BlockInfo: BlockInfo{
@@ -2738,7 +3375,7 @@ func (w *Worker) GetSystemInfo(internal bool) (*SystemInfo, error) {
 		Consensus:        ci.Consensus,
 	}
 	w.is.SetBackendInfo(backendInfo)
-	glog.Info("GetSystemInfo, ", time.Since(start))
+	glog.V(1).Info("GetSystemInfo, ", time.Since(start))
 	return &SystemInfo{blockbookInfo, backendInfo}, nil
 }
 

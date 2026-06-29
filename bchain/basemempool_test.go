@@ -174,3 +174,39 @@ func TestBaseMempool_removeEntryFromMempool(t *testing.T) {
 		})
 	}
 }
+
+func TestBaseMempool_GetTxAssets(t *testing.T) {
+	m := &BaseMempool{
+		txEntries: map[string]txEntry{
+			"tx-a": {
+				addrIndexes: []addrIndex{
+					{addrDesc: "ad1", n: 0, AssetInfo: &AssetInfo{AssetGuid: 10}},
+					{addrDesc: "ad2", n: 1, AssetInfo: &AssetInfo{AssetGuid: 10}},
+				},
+				time: 10,
+			},
+			"tx-b": {
+				addrIndexes: []addrIndex{
+					{addrDesc: "ad3", n: 0, AssetInfo: &AssetInfo{AssetGuid: 20}},
+				},
+				time: 30,
+			},
+			"tx-c": {
+				addrIndexes: []addrIndex{
+					{addrDesc: "ad4", n: 0},
+					{addrDesc: "ad5", n: 1, AssetInfo: &AssetInfo{AssetGuid: 10}},
+				},
+				time: 20,
+			},
+		},
+	}
+
+	got := m.GetTxAssets(10)
+	want := MempoolTxidEntries{
+		{Txid: "tx-c", Time: 20},
+		{Txid: "tx-a", Time: 10},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("GetTxAssets() got = %+v, want %+v", got, want)
+	}
+}

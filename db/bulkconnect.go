@@ -31,10 +31,13 @@ type BulkConnect struct {
 	txAddressesMap     map[string]*TxAddresses
 	blockFilters       map[string][]byte
 	balances           map[string]*AddrBalance
-	addressContracts   map[string]*unpackedAddrContracts
-	height             uint32
-	bulkStats          bulkConnectStats
-	bulkHotness        bulkHotnessStats
+	// SYSCOIN: cached SPT metadata/index rows during bulk sync.
+	assets           map[uint64]*bchain.Asset
+	txAssets         bchain.TxAssetMap
+	addressContracts map[string]*unpackedAddrContracts
+	height           uint32
+	bulkStats        bulkConnectStats
+	bulkHotness      bulkHotnessStats
 }
 
 const (
@@ -43,6 +46,10 @@ const (
 	partialStoreAddresses     = maxBulkTxAddresses / 10
 	maxBulkBalances           = 700000
 	partialStoreBalances      = maxBulkBalances / 10
+	maxBulkAssets             = 500000 // SYSCOIN
+	partialStoreAssets        = maxBulkAssets / 10
+	maxBulkTxAssets           = 500000 // SYSCOIN
+	partialStoreTxAssets      = maxBulkTxAssets / 10
 	maxBulkAddrContracts      = 1200000
 	partialStoreAddrContracts = maxBulkAddrContracts / 10
 	maxBlockFilters           = 1000
@@ -71,6 +78,8 @@ func (b *BulkConnect) releaseBulkMemory() {
 	b.txAddressesMap = nil
 	b.blockFilters = nil
 	b.balances = nil
+	b.assets = nil   // SYSCOIN
+	b.txAssets = nil // SYSCOIN
 	b.addressContracts = nil
 	b.bulkStats = bulkConnectStats{}
 	b.bulkHotness = bulkHotnessStats{}
@@ -91,6 +100,10 @@ func (d *RocksDB) InitBulkConnect() (*BulkConnect, error) {
 	}
 	if b.chainType == bchain.ChainEthereumType {
 		d.addrContractsCacheMaxBytes = d.bulkAddrContractsCacheMaxBytes
+	}
+	if supportsSyscoinAssets(d.chainParser) {
+		b.assets = make(map[uint64]*bchain.Asset)
+		b.txAssets = make(bchain.TxAssetMap)
 	}
 	glog.Info("rocksdb: bulk connect init, db set to inconsistent state")
 	return b, nil
@@ -194,6 +207,88 @@ func (b *BulkConnect) parallelStoreBalances(c chan error, all bool) {
 	c <- nil
 }
 
+// SYSCOIN: bulk store pending SPT asset metadata.
+func (b *BulkConnect) storeAssets(wb *grocksdb.WriteBatch, all bool) (int, error) {
+	var assets map[uint64]*bchain.Asset
+	if all {
+		assets = b.assets
+		b.assets = make(map[uint64]*bchain.Asset)
+	} else {
+		assets = make(map[uint64]*bchain.Asset)
+		for k, a := range b.assets {
+			assets[k] = a
+			delete(b.assets, k)
+			if len(assets) >= partialStoreAssets {
+				break
+			}
+		}
+	}
+	if err := b.d.storeAssets(wb, assets); err != nil {
+		return 0, err
+	}
+	return len(assets), nil
+}
+
+// SYSCOIN
+func (b *BulkConnect) parallelStoreAssets(c chan error, all bool) {
+	defer close(c)
+	start := time.Now()
+	wb := grocksdb.NewWriteBatch()
+	defer wb.Destroy()
+	count, err := b.storeAssets(wb, all)
+	if err != nil {
+		c <- err
+		return
+	}
+	if err := b.d.WriteBatch(wb); err != nil {
+		c <- err
+		return
+	}
+	glog.Info("rocksdb: height ", b.height, ", stored ", count, " assets, ", len(b.assets), " remaining, done in ", time.Since(start))
+	c <- nil
+}
+
+// SYSCOIN: bulk store pending per-asset transaction index rows.
+func (b *BulkConnect) storeTxAssets(wb *grocksdb.WriteBatch, all bool) (int, error) {
+	var assetsMap bchain.TxAssetMap
+	if all {
+		assetsMap = b.txAssets
+		b.txAssets = make(bchain.TxAssetMap)
+	} else {
+		assetsMap = make(bchain.TxAssetMap)
+		for k, a := range b.txAssets {
+			assetsMap[k] = a
+			delete(b.txAssets, k)
+			if len(assetsMap) >= partialStoreTxAssets {
+				break
+			}
+		}
+	}
+	if err := b.d.storeTxAssets(wb, assetsMap); err != nil {
+		return 0, err
+	}
+	return len(assetsMap), nil
+}
+
+// SYSCOIN
+func (b *BulkConnect) parallelStoreTxAssets(c chan error, all bool) {
+	defer close(c)
+	start := time.Now()
+	wb := grocksdb.NewWriteBatch()
+	defer wb.Destroy()
+	count, err := b.storeTxAssets(wb, all)
+	if err != nil {
+		c <- err
+		return
+	}
+	if err := b.d.WriteBatch(wb); err != nil {
+		c <- err
+		return
+	}
+	glog.Info("rocksdb: height ", b.height, ", stored ", count, " tx assets, ", len(b.txAssets), " remaining, done in ", time.Since(start))
+	c <- nil
+}
+
 func (b *BulkConnect) storeBulkAddresses(wb *grocksdb.WriteBatch) error {
 	for _, ba := range b.bulkAddresses {
 		if err := b.d.storeAddresses(wb, ba.bi.Height, ba.addresses); err != nil {
@@ -294,12 +389,13 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 	} else if gf != nil && !gf.Enabled {
 		gf = nil
 	}
-	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, gf); err != nil {
+	// SYSCOIN: pass SPT bulk caches when the parser supports asset indexing.
+	if err := b.d.processAddressesBitcoinType(block, addresses, b.txAddressesMap, b.balances, gf, b.assets, b.txAssets); err != nil {
 		return err
 	}
-	var storeAddressesChan, storeBalancesChan chan error
+	var storeAddressesChan, storeBalancesChan, storeAssetsChan, storeTxAssetsChan chan error
 	var sa bool
-	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances {
+	if len(b.txAddressesMap) > maxBulkTxAddresses || len(b.balances) > maxBulkBalances || len(b.assets) > maxBulkAssets || len(b.txAssets) > maxBulkTxAssets {
 		sa = true
 		if len(b.txAddressesMap)+partialStoreAddresses > maxBulkTxAddresses {
 			storeAddressesChan = make(chan error)
@@ -308,6 +404,16 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 		if len(b.balances)+partialStoreBalances > maxBulkBalances {
 			storeBalancesChan = make(chan error)
 			go b.parallelStoreBalances(storeBalancesChan, false)
+		}
+		if len(b.assets)+partialStoreAssets > maxBulkAssets {
+			// SYSCOIN
+			storeAssetsChan = make(chan error)
+			go b.parallelStoreAssets(storeAssetsChan, false)
+		}
+		if len(b.txAssets)+partialStoreTxAssets > maxBulkTxAssets {
+			// SYSCOIN
+			storeTxAssetsChan = make(chan error)
+			go b.parallelStoreTxAssets(storeTxAssetsChan, false)
 		}
 	}
 	b.bulkAddresses = append(b.bulkAddresses, bulkAddresses{
@@ -365,6 +471,18 @@ func (b *BulkConnect) connectBlockBitcoinType(block *bchain.Block, storeBlockTxs
 	}
 	if storeBalancesChan != nil {
 		if err := <-storeBalancesChan; err != nil {
+			return err
+		}
+	}
+	if storeAssetsChan != nil {
+		// SYSCOIN
+		if err := <-storeAssetsChan; err != nil {
+			return err
+		}
+	}
+	if storeTxAssetsChan != nil {
+		// SYSCOIN
+		if err := <-storeTxAssetsChan; err != nil {
 			return err
 		}
 	}
@@ -520,12 +638,19 @@ func (b *BulkConnect) Close() error {
 	}
 	glog.Info("rocksdb: bulk connect closing")
 	start := time.Now()
-	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan chan error
+	var storeTxAddressesChan, storeBalancesChan, storeAddressContractsChan, storeAssetsChan, storeTxAssetsChan chan error
 	if b.chainType == bchain.ChainBitcoinType {
 		storeTxAddressesChan = make(chan error)
 		go b.parallelStoreTxAddresses(storeTxAddressesChan, true)
 		storeBalancesChan = make(chan error)
 		go b.parallelStoreBalances(storeBalancesChan, true)
+		if supportsSyscoinAssets(b.d.chainParser) {
+			// SYSCOIN
+			storeAssetsChan = make(chan error)
+			go b.parallelStoreAssets(storeAssetsChan, true)
+			storeTxAssetsChan = make(chan error)
+			go b.parallelStoreTxAssets(storeTxAssetsChan, true)
+		}
 	} else if b.chainType == bchain.ChainEthereumType {
 		storeAddressContractsChan = make(chan error)
 		go b.parallelStoreAddressContracts(storeAddressContractsChan, true)
@@ -560,6 +685,18 @@ func (b *BulkConnect) Close() error {
 	}
 	if storeBalancesChan != nil {
 		if err := <-storeBalancesChan; err != nil {
+			return err
+		}
+	}
+	if storeAssetsChan != nil {
+		// SYSCOIN
+		if err := <-storeAssetsChan; err != nil {
+			return err
+		}
+	}
+	if storeTxAssetsChan != nil {
+		// SYSCOIN
+		if err := <-storeTxAssetsChan; err != nil {
 			return err
 		}
 	}

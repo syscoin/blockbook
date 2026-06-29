@@ -362,7 +362,7 @@ func mustGetJSON(t *testing.T, endpointURL string, statusCode int, out interface
 	}
 }
 
-func TestReadSendTxHexFromBody(t *testing.T) {
+func TestReadSendTxRequestFromBody(t *testing.T) {
 	const maxBodyLen int64 = 6
 	assertAPIError := func(t *testing.T, err error, want string) {
 		t.Helper()
@@ -375,17 +375,17 @@ func TestReadSendTxHexFromBody(t *testing.T) {
 	}
 
 	t.Run("accepts body exactly at limit", func(t *testing.T) {
-		got, err := readSendTxHexFromBody(strings.NewReader("123456"), maxBodyLen)
+		got, err := readSendTxRequestFromBody(strings.NewReader("123456"), maxBodyLen)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if got != "123456" {
-			t.Fatalf("got %q, want %q", got, "123456")
+		if got.Hex != "123456" {
+			t.Fatalf("got %q, want %q", got.Hex, "123456")
 		}
 	})
 
 	t.Run("rejects body larger than limit by one byte", func(t *testing.T) {
-		_, err := readSendTxHexFromBody(strings.NewReader("1234567"), maxBodyLen)
+		_, err := readSendTxRequestFromBody(strings.NewReader("1234567"), maxBodyLen)
 		assertAPIError(t, err, "Tx blob too large")
 	})
 }

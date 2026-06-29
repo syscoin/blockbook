@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	syscoinwire "github.com/syscoin/syscoinwire/syscoin/wire"
 	"github.com/trezor/blockbook/common"
 )
 
@@ -74,6 +75,8 @@ type Vout struct {
 	JsonValue    common.JSONNumber `json:"value" ts_doc:"String-based amount for JSON usage."`
 	N            uint32            `json:"n" ts_doc:"Index of this output in the transaction."`
 	ScriptPubKey ScriptPubKey      `json:"scriptPubKey" ts_doc:"scriptPubKey object containing the output script data."`
+	// SYSCOIN: SPT allocation metadata attached to this UTXO.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT asset metadata for this output."`
 }
 
 // Tx is blockchain transaction
@@ -92,6 +95,8 @@ type Tx struct {
 	Time             int64       `json:"time,omitempty" ts_doc:"Timestamp when the transaction was broadcast or included in a block."`
 	Blocktime        int64       `json:"blocktime,omitempty" ts_doc:"Timestamp of the block in which the transaction was mined."`
 	CoinSpecificData interface{} `json:"-" ts_doc:"Additional chain-specific data (not exposed via JSON)."`
+	// SYSCOIN: SPT memo decoded from allocation OP_RETURN data.
+	Memo []byte `json:"memo,omitempty"`
 }
 
 // MempoolVin contains data about tx input specifically in mempool
@@ -99,6 +104,8 @@ type MempoolVin struct {
 	Vin
 	AddrDesc AddressDescriptor `json:"-" ts_doc:"Internal descriptor for the input address (not exposed)."`
 	ValueSat big.Int           `ts_doc:"Amount (in satoshi or base unit) of the input."`
+	// SYSCOIN: SPT metadata on the spent output.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT asset metadata for this input."`
 }
 
 // MempoolTx is blockchain transaction in mempool
@@ -116,6 +123,13 @@ type MempoolTx struct {
 	CoinSpecificData interface{}    `json:"-" ts_doc:"Additional chain-specific data (not exposed via JSON)."`
 }
 
+// SYSCOIN: AssetInfo holds SPT allocation metadata attached to transaction
+// inputs, outputs, and UTXOs. ValueSat is in the asset's base unit.
+type AssetInfo struct {
+	AssetGuid uint64
+	ValueSat  *big.Int
+}
+
 // TokenStandard - standard of token
 type TokenStandard int
 
@@ -129,6 +143,10 @@ const (
 // TokenStandardName specifies standard of token
 type TokenStandardName string
 
+// SYSCOIN: keep the historical Syscoin parser naming while using upstream's
+// token-standard string type underneath.
+type TokenType = TokenStandardName
+
 // Token standards
 const (
 	UnknownTokenStandard   TokenStandardName = ""
@@ -136,6 +154,24 @@ const (
 
 	// XPUBAddressStandard is address derived from xpub
 	XPUBAddressStandard TokenStandardName = "XPUBAddress"
+
+	// SYSCOIN: SPT token standards exposed through the generic token fields.
+	SPTTokenStandard                        TokenStandardName = "SPTAllocated"
+	SPTAssetAllocationMintStandard          TokenStandardName = "SPTAssetAllocationMint"
+	SPTAssetAllocationSendStandard          TokenStandardName = "SPTAssetAllocationSend"
+	SPTAssetSyscoinBurnToAllocationStandard TokenStandardName = "SPTSyscoinBurnToAssetAllocation"
+	SPTAssetAllocationBurnToSyscoinStandard TokenStandardName = "SPTAssetAllocationBurnToSyscoin"
+	SPTAssetAllocationBurnToNEVMStandard    TokenStandardName = "SPTAssetAllocationBurnToNEVM"
+
+	// SYSCOIN: historical names used by the Syscoin SPT parser and API.
+	SPTNoneType                         TokenType = "Syscoin"
+	SPTTokenType                        TokenType = SPTTokenStandard
+	SPTUnknownType                      TokenType = "SPTUnknown"
+	SPTAssetAllocationMintType          TokenType = SPTAssetAllocationMintStandard
+	SPTAssetAllocationSendType          TokenType = SPTAssetAllocationSendStandard
+	SPTAssetSyscoinBurnToAllocationType TokenType = SPTAssetSyscoinBurnToAllocationStandard
+	SPTAssetAllocationBurnToSyscoinType TokenType = SPTAssetAllocationBurnToSyscoinStandard
+	SPTAssetAllocationBurnToNEVMType    TokenType = SPTAssetAllocationBurnToNEVMStandard
 )
 
 // TokenTransfers is array of TokenTransfer
@@ -298,18 +334,148 @@ type ENSResolution struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// SYSCOIN: AssetsMask filters base coin and SPT transaction classes.
+type AssetsMask uint32
+
+const (
+	AllMask                          AssetsMask = 0
+	BaseCoinMask                     AssetsMask = 1
+	AssetAllocationSendMask          AssetsMask = 2
+	AssetSyscoinBurnToAllocationMask AssetsMask = 4
+	AssetAllocationBurnToSyscoinMask AssetsMask = 8
+	AssetAllocationBurnToNEVMMask    AssetsMask = 16
+	AssetAllocationMintMask          AssetsMask = 32
+	AssetMask                        AssetsMask = AssetSyscoinBurnToAllocationMask | AssetAllocationBurnToSyscoinMask | AssetAllocationBurnToNEVMMask | AssetAllocationMintMask | AssetAllocationSendMask
+)
+
+// SYSCOIN: AssetAllocation and Asset wrap the Syscoin wire SPT payloads used by
+// the parser and Syscoin-specific RocksDB column families.
+type AssetAllocation struct {
+	AssetObj syscoinwire.AssetAllocationType
+}
+
+type Asset struct {
+	Transactions uint32
+	AssetObj     syscoinwire.AssetType
+	MetaData     []byte
+}
+
+type AssetBalance struct {
+	Transfers  uint32
+	BalanceSat *big.Int
+	SentSat    *big.Int
+}
+
+type TxAssetIndex struct {
+	Type  AssetsMask
+	BtxID []byte
+}
+
+type TxAsset struct {
+	Height uint32
+	Txs    []*TxAssetIndex
+}
+
+type TxAssetMap map[string]*TxAsset
+
+type TxAssetAddressIndex struct {
+	AddrDesc AddressDescriptor
+	BtxID    []byte
+}
+
+type TxAssetAddress struct {
+	Txs []*TxAssetAddressIndex
+}
+
+type TxAssetAddressMap map[uint64]*TxAssetAddress
+
+// SYSCOIN: legacy parser-side packing structs kept for the Syscoin parser's
+// SPT serializers. Upstream DB code owns its own internal tx-address structs.
+type TxInput struct {
+	AddrDesc  AddressDescriptor
+	ValueSat  big.Int
+	AssetInfo *AssetInfo
+}
+
+type TxOutput struct {
+	AddrDesc  AddressDescriptor
+	Spent     bool
+	ValueSat  big.Int
+	AssetInfo *AssetInfo
+}
+
+type Utxo struct {
+	BtxID     []byte
+	Vout      int32
+	Height    uint32
+	ValueSat  big.Int
+	AssetInfo *AssetInfo
+}
+
+type AddrBalance struct {
+	Txs           uint32
+	SentSat       big.Int
+	BalanceSat    big.Int
+	Utxos         []Utxo
+	AssetBalances map[uint64]*AssetBalance
+}
+
+func (ab *AddrBalance) AddUtxo(u *Utxo) {
+	ab.Utxos = append(ab.Utxos, *u)
+}
+
+type TxAddresses struct {
+	Version int32
+	Height  uint32
+	Inputs  []TxInput
+	Outputs []TxOutput
+	Memo    []byte
+}
+
+// SYSCOIN: legacy constants/types used by parser-side SPT serializers.
+type AddressBalanceDetail int
+
+const (
+	AddressBalanceDetailNoUTXO = AddressBalanceDetail(iota)
+	AddressBalanceDetailUTXO
+	AddressBalanceDetailUTXOIndexed
+)
+
+type TxIndexes struct {
+	Type    AssetsMask
+	BtxID   []byte
+	Indexes []int32
+	Assets  []uint64
+}
+
 // OnNewBlockFunc is used to send notification about a new block
 type OnNewBlockFunc func(block *Block)
 
 // OnNewTxFunc is used to send notification about a new transaction/address
 type OnNewTxFunc func(tx *MempoolTx)
 
-// AddrDescForOutpointFunc returns address descriptor and value for given outpoint or nil if outpoint not found
-type AddrDescForOutpointFunc func(outpoint Outpoint) (AddressDescriptor, *big.Int)
+// AddrDescForOutpointFunc returns address descriptor, value, and optional
+// asset metadata for given outpoint or nil if outpoint not found.
+type AddrDescForOutpointFunc func(outpoint Outpoint) (AddressDescriptor, *big.Int, *AssetInfo)
 
 // MempoolBatcher allows batch fetching of mempool transactions when supported.
 type MempoolBatcher interface {
 	GetRawTransactionsForMempoolBatch(txids []string) (map[string]*Tx, error)
+}
+
+// SYSCOIN: optional Bitcoin-like sendrawtransaction parameters used by Syscoin
+// Core for governance collateral burns. Other Bitcoin-like coins ignore this
+// opt-in interface and keep the upstream raw-hex broadcast contract.
+type SendRawTransactionParams struct {
+	Hex                   string
+	MaxFeeRate            *string
+	MaxBurnAmount         *string
+	DisableAlternativeRPC bool
+}
+
+// SYSCOIN: implemented by chains that accept extra sendrawtransaction params.
+type SendRawTransactionOpts interface {
+	SendRawTransactionWithOpts(SendRawTransactionParams) (string, error)
 }
 
 // BlockChain defines common interface to block chain daemon
@@ -347,6 +513,7 @@ type BlockChain interface {
 	LongTermFeeRate() (*LongTermFeeRate, error)
 	SendRawTransaction(tx string, disableAlternativeRPC bool) (string, error)
 	GetMempoolEntry(txid string) (*MempoolEntry, error)
+	GetSPVProof(hash string) (json.RawMessage, error) // SYSCOIN
 	GetContractInfo(contractDesc AddressDescriptor) (*ContractInfo, error)
 	// parser
 	GetChainParser() BlockChainParser
@@ -425,6 +592,7 @@ type Mempool interface {
 	GetTransactions(address string) ([]Outpoint, error)
 	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
+	GetTxAssets(assetGuid uint64) MempoolTxidEntries // SYSCOIN
 	GetTransactionTime(txid string) uint32
 	GetTxidFilterEntries(filterScripts string, fromTimestamp uint32) (MempoolTxidFilterEntries, error)
 }

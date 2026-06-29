@@ -209,6 +209,8 @@ func mainWithExitCode() int {
 		glog.Error("rocksDB: ", err)
 		return exitCodeFatal
 	}
+	// SYSCOIN: allows the asset index to lazily enrich missing metadata from NEVM.
+	index.SetBlockChain(chain)
 	defer func() {
 		glog.Info("shutdown: rocksdb close start")
 		if err := index.Close(); err != nil {

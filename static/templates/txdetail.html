@@ -87,6 +87,9 @@
             {{if $tx.FeesSat}}{{$fpb := feePerByte $tx}}
             Fee {{amountSpan $tx.FeesSat $data "txvalue copyable ms-3"}}{{if $fpb}} <span class="fw-normal small">({{$fpb}})</span>{{end}}
             {{end}}
+            {{if $tx.Memo}}
+            <span class="txvalue small d-block">Memo <code class="copyable">{{formatEncodeBase64 $tx.Memo}}</code></span>
+            {{end}}
         </div>
         <div class="col-sm-12 col-md-8 text-end">
             <span class="me-4">
@@ -97,6 +100,9 @@
             {{end}}
             </span>
             {{amountSpan $tx.ValueOutSat $data "txvalue copyable"}}
+            {{range $tokenTransfer := $tx.TokenTransfers}}
+            <span class="txvalue copyable d-block">{{formattedAmountSpan $tokenTransfer.Value $tokenTransfer.Decimals $tokenTransfer.Symbol $data "copyable"}}</span>
+            {{end}}
         </div>
     </div>
 </div>

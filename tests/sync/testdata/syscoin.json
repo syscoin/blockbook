@@ -1,0 +1,94 @@
+{
+  "connectBlocks": {
+    "syncRanges": [
+      {"lower": 338536, "upper": 338556}
+    ],
+    "blocks": {
+      "338556": {
+        "height": 338556,
+        "hash": "dfdc68177847e56c9b7d52240388a414020c55aa078eef1ad44dd85a64719d32",
+        "noTxs": 2,
+        "txDetails": [
+          {
+            "txid": "37c6c0e5098e1a88a076b2324d2c8f55e1b437974628996c938cc801eb73f863",
+            "version": 2,
+            "vin": [
+              {
+                  "txid": "4a6d9b8a4e56509aa905b0d6eb1a7de423abd1ae5865c5bda5b847bb4d56aa88",
+                  "vout": 1,
+                  "sequence": 4294967294,
+                  "scriptSig": {
+                      "hex": ""
+                  }
+              }
+            ],
+            "vout": [
+              {
+                 "value": 0.00021574,
+                 "n": 0,
+                 "scriptPubKey": {
+                    "asm": "OP_DUP OP_HASH160 4b92dbc7787cc53b5aa02bc026bd27c5dd5b1d93 OP_EQUALVERIFY OP_CHECKSIG",
+                    "hex": "76a9144b92dbc7787cc53b5aa02bc026bd27c5dd5b1d9388ac",
+                    "reqSigs": 1,
+                    "type": "pubkeyhash",
+                    "addresses": [
+                       "SUBbe8vb7ng9CxZE9J3hma2CCkBh5VBHrv"
+                    ]
+                 }
+              },
+              {
+                 "value": 0.00076986,
+                 "n": 1,
+                 "scriptPubKey": {
+                    "asm": "0 5289b9d8a0ca01b67add80368c19aa7824ea6d0c",
+                    "hex": "00145289b9d8a0ca01b67add80368c19aa7824ea6d0c",
+                    "reqSigs": 1,
+                    "type": "witness_v0_keyhash",
+                    "addresses": [
+                       "sys1q22ymnk9qegqmv7kasqmgcxd20qjw5mgvgs3jve"
+                    ]
+                 }
+              }
+           ],
+            "hex": "0200000000010188aa564dbb47b8a5bdc56558aed1ab23e47d1aebd6b005a99a50564e8a9b6d4a0100000000feffffff0246540000000000001976a9144b92dbc7787cc53b5aa02bc026bd27c5dd5b1d9388acba2c0100000000001600145289b9d8a0ca01b67add80368c19aa7824ea6d0c024730440220273cc6457461811b9f43d7177446a758e072a76856f8e7e63003451ce437fc87022078c2c3d848b77974fde258f34778d71fed3de7fd05d497f498b0ee1ea7d7af90012103a9774ef26a02d3bfa66dc261fb4be75594795d8f600d150e3ba8f61d61f4f9867a2a0500",
+            "time": 1579614501,
+            "blocktime": 1579614501
+          }
+        ]
+      }
+    }
+  },
+  "handleFork": {
+    "syncRanges": [
+      {"lower": 338550, "upper": 338556}
+    ],
+    "fakeBlocks": {
+      "338554": {
+        "height": 338554,
+        "hash": "fe8a4943f01564fa1a43a926b5d3703fca19df5b6d6326e16aa69cd06ca89296"
+      },
+      "338555": {
+        "height": 338555,
+        "hash": "f54f896242d7fba28e81c734fb3336fc37645c152db0fefd805ba2cfca7fe263"
+      },
+      "338556": {
+        "height": 338556,
+        "hash": "53e2453121bd0b07b6b62648fc106b4e2e900cf09d0a971288b8d87c562fba78"
+      }
+    },
+    "realBlocks": {
+      "338554": {
+        "height": 338554,
+        "hash": "00bbd6a22af2b526b0366cd6e6c0bbc76ea2f09d818ff0b6fcdc750d85838c5d"
+      },
+      "338555": {
+        "height": 338555,
+        "hash": "ae4bb5bd7e2a22bc974aa910cb507f886ef1dd76e1f0df52222434d201535b70"
+      },
+      "338556": {
+        "height": 338556,
+        "hash": "dfdc68177847e56c9b7d52240388a414020c55aa078eef1ad44dd85a64719d32"
+      }
+    }
+  }
+}

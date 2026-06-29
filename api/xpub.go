@@ -199,7 +199,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 }
 
 func isUnfilteredXpubTxidFilter(filter *AddressFilter) bool {
-	return filter == nil || filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff
+	return filter == nil || filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff && filter.AssetsMask == bchain.AllMask
 }
 
 func mergeXpubTxids(data *xpubData) xpubTxids {
@@ -356,6 +356,33 @@ func (w *Worker) tokenFromXpubAddress(data *xpubData, ad *xpubAddress, changeInd
 	}
 }
 
+// SYSCOIN: assetTokensFromXpubAddress returns SPT balances grouped by derived
+// XPUB address. The base SYS address token remains handled by tokenFromXpubAddress.
+func (w *Worker) assetTokensFromXpubAddress(data *xpubData, ad *xpubAddress, changeIndex int, index int, option AccountDetails, mempool map[string]*syscoinTokenMempoolInfo) ([]Token, error) {
+	if option < AccountDetailsTokenBalances {
+		return nil, nil
+	}
+	a, _, _ := w.chainParser.GetAddressesFromAddrDesc(ad.addrDesc)
+	var address string
+	if len(a) > 0 {
+		address = a[0]
+	}
+	var balances map[uint64]*bchain.AssetBalance
+	if ad.balance != nil {
+		balances = ad.balance.AssetBalances
+	}
+	tokens, _, err := w.getSyscoinAddressAssetTokens(address, balances, mempool)
+	if err != nil {
+		return nil, err
+	}
+	path := fmt.Sprintf("%s/%d/%d", data.basePath, changeIndex, index)
+	for i := range tokens {
+		tokens[i].Path = path
+	}
+	sort.Sort(Tokens(tokens))
+	return tokens, nil
+}
+
 // returns true if addresses are "own", i.e. the address belongs to the xpub
 func isOwnAddresses(xpubAddresses map[string]struct{}, addresses []string) bool {
 	if len(addresses) == 1 {
@@ -493,6 +520,9 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	if page < 0 {
 		page = 0
 	}
+	if filter == nil {
+		filter = &AddressFilter{Vout: AddressFilterVoutOff, AssetsMask: bchain.AllMask}
+	}
 	type mempoolMap struct {
 		tx          *Tx
 		inputOutput byte
@@ -518,7 +548,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	}
 	// setup filtering of txids
 	var txidFilter func(txid *xpubTxid, ad *xpubAddress) bool
-	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff) {
+	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff && filter.AssetsMask == bchain.AllMask) {
 		toHeight := maxUint32
 		if filter.ToHeight != 0 {
 			toHeight = filter.ToHeight
@@ -533,14 +563,40 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 					return false
 				}
 			}
+			if filter.AssetsMask != bchain.AllMask {
+				ta, err := w.db.GetTxAddresses(txid.txid)
+				if err != nil || ta == nil {
+					glog.Warningf("GetTxAddresses xpub assetMask filter %v: %v", txid.txid, err)
+					return false
+				}
+				mask := assetMaskFromVersion(w.chainParser, ta.Version)
+				if mask != bchain.AllMask && uint32(filter.AssetsMask)&uint32(mask) != uint32(mask) {
+					return false
+				}
+			}
 			return true
 		}
 		filtered = true
 	}
+	xpubMempoolTxidFilter := func(txid *xpubTxid) bool {
+		if filter.FromHeight != 0 {
+			return false
+		}
+		if filter.Vout != AddressFilterVoutOff {
+			if filter.Vout == AddressFilterVoutInputs && txid.inputOutput&txInput == 0 ||
+				filter.Vout == AddressFilterVoutOutputs && txid.inputOutput&txOutput == 0 {
+				return false
+			}
+		}
+		return true
+	}
 	addresses := w.newAddressesMapForAliases()
+	xpubAssetMempool := make(map[string]map[string]*syscoinTokenMempoolInfo) // SYSCOIN
 	// process mempool, only if ToHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txmMap = make(map[string]*Tx)
+		countedMempoolTxs := make(map[string]struct{})
+		addedMempoolEntries := make(map[string]struct{})
 		mempoolEntries := make(bchain.MempoolTxidEntries, 0)
 		for _, da := range data.addresses {
 			for i := range da {
@@ -552,17 +608,19 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				for _, txid := range newTxids {
 					// the same tx can have multiple addresses from the same xpub, get it from backend it only once
 					tx, foundTx := txmMap[txid.txid]
-					if option == AccountDetailsBasic {
+					needTx := option != AccountDetailsBasic || filter.AssetsMask != bchain.AllMask
+					if option == AccountDetailsBasic && !needTx {
 						// Basic detail: skip per-tx loading. Count unique mempool txids
 						// across derived addresses; the count may transiently include
 						// entries that have just been confirmed but not yet evicted.
-						if !foundTx {
+						if _, counted := countedMempoolTxs[txid.txid]; !counted {
 							txmMap[txid.txid] = nil
+							countedMempoolTxs[txid.txid] = struct{}{}
 							unconfirmedTxs++
 						}
 						continue
 					}
-					if !foundTx {
+					if !foundTx || tx == nil {
 						tx, err = w.getTransaction(txid.txid, false, true, addresses)
 						// mempool transaction may fail
 						if err != nil || tx == nil {
@@ -573,13 +631,34 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 					}
 					// skip already confirmed txs, mempool may be out of sync
 					if tx.Confirmations == 0 {
-						if !foundTx {
+						if filter.AssetsMask != bchain.AllMask {
+							mask := assetMaskFromVersion(w.chainParser, tx.Version)
+							if mask != bchain.AllMask && uint32(filter.AssetsMask)&uint32(mask) != uint32(mask) {
+								continue
+							}
+						}
+						if _, counted := countedMempoolTxs[txid.txid]; !counted {
+							countedMempoolTxs[txid.txid] = struct{}{}
 							unconfirmedTxs++
 						}
 						uBalSat.Add(&uBalSat, tx.getAddrVoutValue(ad.addrDesc))
 						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc))
+						if option > AccountDetailsBasic {
+							addrKey := string(ad.addrDesc)
+							assetMempool := xpubAssetMempool[addrKey]
+							if assetMempool == nil {
+								assetMempool = make(map[string]*syscoinTokenMempoolInfo)
+								xpubAssetMempool[addrKey] = assetMempool
+							}
+							tx.addAddrVoutAssetMempool(ad.addrDesc, assetMempool)
+							tx.addAddrVinAssetMempool(ad.addrDesc, assetMempool)
+						}
 						// mempool txs are returned only on the first page, uniquely and filtered
-						if page == 0 && !foundTx && (txidFilter == nil || txidFilter(&txid, ad)) {
+						if page == 0 && xpubMempoolTxidFilter(&txid) {
+							if _, added := addedMempoolEntries[txid.txid]; added {
+								continue
+							}
+							addedMempoolEntries[txid.txid] = struct{}{}
 							mempoolEntries = append(mempoolEntries, bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
 						}
 					}
@@ -657,10 +736,13 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	}
 	addrTxCount := int(data.txCountEstimate)
 	usedTokens := 0
+	usedAssetTokens := 0 // SYSCOIN
 	var tokens []Token
+	var tokensAsset []Token // SYSCOIN
 	var xpubAddresses map[string]struct{}
 	if option > AccountDetailsBasic {
 		tokens = make([]Token, 0, 4)
+		tokensAsset = make([]Token, 0, 4) // SYSCOIN
 		xpubAddresses = make(map[string]struct{})
 	}
 	for ci, da := range data.addresses {
@@ -677,6 +759,20 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 					tokens = append(tokens, token)
 				}
 				xpubAddresses[token.Name] = struct{}{}
+				// SYSCOIN: include SPT balances per derived XPUB address.
+				assetTokens, err := w.assetTokensFromXpubAddress(data, ad, int(xd.ChangeIndexes[ci]), i, option, xpubAssetMempool[string(ad.addrDesc)])
+				if err != nil {
+					return nil, err
+				}
+				usedAssetTokens += len(assetTokens)
+				for _, assetToken := range assetTokens {
+					if filter.TokensToReturn == TokensToReturnDerived ||
+						filter.TokensToReturn == TokensToReturnUsed && ad.balance != nil ||
+						filter.TokensToReturn == TokensToReturnNonzeroBalance && (assetToken.BalanceSat != nil && !IsZeroBigInt((*big.Int)(assetToken.BalanceSat)) ||
+							assetToken.UnconfirmedBalanceSat != nil && !IsZeroBigInt((*big.Int)(assetToken.UnconfirmedBalanceSat))) {
+						tokensAsset = append(tokensAsset, assetToken)
+					}
+				}
 			}
 		}
 	}
@@ -714,12 +810,14 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		Transactions:          txs,
 		Txids:                 txids,
 		UsedTokens:            usedTokens,
+		UsedAssetTokens:       usedAssetTokens, // SYSCOIN
 		Tokens:                tokens,
+		TokensAsset:           tokensAsset, // SYSCOIN
 		SecondaryValue:        secondaryValue,
 		XPubAddresses:         xpubAddresses,
 		AddressAliases:        w.getAddressAliases(addresses),
 	}
-	glog.Info("GetXpubAddress ", xpub[:xpubLogPrefix], ", cache ", inCache, ", ", txCount, " txs, ", time.Since(start))
+	glog.V(1).Info("GetXpubAddress ", xpub[:xpubLogPrefix], ", cache ", inCache, ", ", txCount, " txs, ", time.Since(start))
 	return &addr, nil
 }
 
@@ -764,7 +862,7 @@ func (w *Worker) GetXpubUtxo(xpub string, onlyConfirmed bool, gap int) (Utxos, e
 		}
 	}
 	sort.Stable(r)
-	glog.Info("GetXpubUtxo ", xpub[:xpubLogPrefix], ", cache ", inCache, ", ", len(r), " utxos,  ", time.Since(start))
+	glog.V(1).Info("GetXpubUtxo ", xpub[:xpubLogPrefix], ", cache ", inCache, ", ", len(r), " utxos,  ", time.Since(start))
 	return r, nil
 }
 
@@ -869,6 +967,6 @@ func (w *Worker) GetXpubBalanceHistory(xpub string, fromTimestamp, toTimestamp i
 	if err != nil {
 		return nil, err
 	}
-	glog.Info("GetUtxoBalanceHistory ", xpub[:xpubLogPrefix], ", cache ", inCache, ", blocks ", fromHeight, "-", toHeight, ", count ", len(bha), ",  ", time.Since(start))
+	glog.V(1).Info("GetUtxoBalanceHistory ", xpub[:xpubLogPrefix], ", cache ", inCache, ", blocks ", fromHeight, "-", toHeight, ", count ", len(bha), ",  ", time.Since(start))
 	return bha, nil
 }
