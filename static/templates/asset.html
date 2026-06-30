@@ -24,9 +24,11 @@
         {{if $asset.AssetDetails.Contract}}
         <tr>
             <td>Contract</td>
-            <td class="ellipsis"><a href="{{formatContractExplorerURL $asset.AssetDetails.Contract}}">{{$asset.AssetDetails.Contract}}</a></td>
+            {{$contractURL := formatContractExplorerURL $asset.AssetDetails.Contract}}
+            <td class="ellipsis">{{if $contractURL}}<a href="{{$contractURL}}">{{$asset.AssetDetails.Contract}}</a>{{else}}<span class="copyable">{{$asset.AssetDetails.Contract}}</span>{{end}}</td>
         </tr>
         {{end}}
+        {{if not (isSyscoinNativeAsset $asset.AssetDetails.AssetGuid)}}
         <tr>
             <td>Total Supply</td>
             <td>{{formattedAmountSpan $asset.AssetDetails.TotalSupply $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
@@ -35,6 +37,7 @@
             <td>Max Supply</td>
             <td>{{formattedAmountSpan $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
         </tr>
+        {{end}}
         {{if $asset.AssetDetails.MetaData}}
         <tr>
             <td>Metadata</td>

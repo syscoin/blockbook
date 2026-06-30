@@ -2,7 +2,7 @@
 <div class="row">
     <div class="col-md-6"><h1>Blocks</h1></div>
     <div class="col-md-6">{{if $blocks.Blocks}}{{template "paging" $data }}{{end}}</div>
-</row>
+</div>
 {{if $blocks.Blocks}}
 <div>
     <table class="table table-hover data-table">
@@ -10,7 +10,7 @@
             <tr>
                 <th>Height</th>
                 <th class="col-md-6">Hash</th>
-                <th class="col-md-2">Timestamp</span></th>
+                <th class="col-md-2">Timestamp</th>
                 <th class="text-end">Transactions</th>
                 <th class="text-end">Size</th>
             </tr>

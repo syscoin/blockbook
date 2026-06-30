@@ -4,6 +4,14 @@
         <div class="col-xs-7 col-md-8">
             <a href="/tx/{{$tx.Txid}}" class="ellipsis copyable txid">{{$tx.Txid}}</a>
             {{if $tx.Rbf}}<span class="ps-1" tt="Replace-by-Fee (RBF) transaction, could be overridden"> RBF</span>{{end}}
+            {{/* SYSCOIN: show SPT transaction type on every shared transaction list row. */}}
+            {{if isSyscoinShortcut $data.CoinShortcut}}
+            {{if $tx.TokenType}}
+            <div class="mt-1">
+                <span class="badge bg-secondary fw-normal" tt="Syscoin transaction type">{{$tx.TokenType}}</span>
+            </div>
+            {{end}}
+            {{end}}
         </div>
         {{if $tx.Blocktime}}<div class="col-xs-5 col-md-4 text-end">{{if $tx.Confirmations}}mined{{else}}first seen{{end}} <span class="txvalue ms-1">{{unixTimeSpan $tx.Blocktime}}</span></div>{{end}}
         {{if $tx.ConfirmationETABlocks}}<div class="col-12 text-end">
@@ -27,11 +35,14 @@
                     <a class="outpoint" href="/tx/{{$vin.Txid}}" tt="Outpoint {{$vin.Txid}},{{$vin.Vout}}">←</a>
                     {{end}}
                     {{if $vin.Addresses}}{{amountSpan $vin.ValueSat $data "tx-amt copyable"}}{{end}}
+                    {{/* SYSCOIN: show SPT metadata attached to transaction inputs. */}}
+                    {{if isSyscoinShortcut $data.CoinShortcut}}
                     {{if $vin.AssetInfo}}
                     <span class="tx-amt small text-muted d-block">
                         SYSCOIN asset <a href="/asset/{{$vin.AssetInfo.AssetGuid}}">#{{$vin.AssetInfo.AssetGuid}}</a>:
                         <span class="copyable">{{$vin.AssetInfo.ValueStr}}</span>{{if $vin.AssetInfo.Symbol}} {{$vin.AssetInfo.Symbol}}{{end}}
                     </span>
+                    {{end}}
                     {{end}}
                 </div>
                 {{else}}
@@ -55,13 +66,14 @@
                         {{amountSpan $vout.ValueSat $data "copyable"}}{{if $vout.Spent}}<a class="spent" href="{{if $vout.SpentTxID}}/tx/{{$vout.SpentTxID}}{{else}}/spending/{{$tx.Txid}}/{{$vout.N}}{{end}}" tt="Spent">→</a>{{else}}<span class="unspent" tt="Unspent">×</span>
                         {{end}}
                     </span>
+                    {{/* SYSCOIN: show SPT metadata attached to transaction outputs. */}}
+                    {{if isSyscoinShortcut $data.CoinShortcut}}
                     {{if $vout.AssetInfo}}
                     <span class="tx-amt small text-muted d-block">
                         SYSCOIN asset <a href="/asset/{{$vout.AssetInfo.AssetGuid}}">#{{$vout.AssetInfo.AssetGuid}}</a>:
                         <span class="copyable">{{$vout.AssetInfo.ValueStr}}</span>{{if $vout.AssetInfo.Symbol}} {{$vout.AssetInfo.Symbol}}{{end}}
                     </span>
-                    {{else}}
-                    </td>
+                    {{end}}
                     {{end}}
                 </div>
                 {{else}}

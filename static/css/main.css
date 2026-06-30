@@ -326,9 +326,13 @@ span.btn-paging:hover {
     font-weight: bold;
 }
 
+/* SYSCOIN: prevent summary labels from collapsing vertically in fixed-layout info tables. */
 .info-table tr>td:first-child {
     font-weight: normal;
     color: #757575;
+    white-space: nowrap;
+    width: 25%;
+    overflow-wrap: normal;
 }
 
 .ns:before {

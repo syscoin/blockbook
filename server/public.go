@@ -606,6 +606,11 @@ func isSyscoinShortcut(coinShortcut string) bool {
 	return shortcut == "SYS" || shortcut == "TSYS"
 }
 
+// SYSCOIN
+func isSyscoinNativeAsset(assetGuid string) bool {
+	return strings.TrimSpace(assetGuid) == "123456"
+}
+
 func (s *PublicServer) parseTemplates() []*template.Template {
 	templateFuncMap := template.FuncMap{
 		"timeSpan":                  timeSpan,
@@ -629,6 +634,7 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 		"formatContractExplorerURL": s.formatContractExplorerURL, // SYSCOIN
 		"isNFT":                     isNFT,                       // SYSCOIN
 		"isSyscoinShortcut":         isSyscoinShortcut,           // SYSCOIN
+		"isSyscoinNativeAsset":      isSyscoinNativeAsset,        // SYSCOIN
 		"formatEncodeBase64":        formatEncodeBase64,          // SYSCOIN
 		"setTxToTemplateData":       setTxToTemplateData,
 		"feePerByte":                feePerByte,

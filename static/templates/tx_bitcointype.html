@@ -17,6 +17,8 @@
             <td>In Block</td>
             <td class="ellipsis" style="max-width: 280px">{{if $tx.Confirmations}}{{$tx.Blockhash}}{{else}}<span class="badge bg-danger">Unconfirmed</span>{{end}}</td>
         </tr>
+        {{/* SYSCOIN: expose SPT transaction metadata on the full transaction page. */}}
+        {{if isSyscoinShortcut $data.CoinShortcut}}
         {{if $tx.TokenType}}
         <tr>
             <td>Syscoin Transaction Type</td>
@@ -52,6 +54,7 @@
                 </table>
             </td>
         </tr>
+        {{end}}
         {{end}}
         {{if $tx.Confirmations}}
         <tr>

@@ -15,6 +15,7 @@
             <th>Metadata</th>
         </tr>
         {{range $assetDetails := $assets.AssetDetails}}
+        {{if $assetDetails}}
         <tr>
             <td>
                 <a href="/asset/{{$assetDetails.AssetGuid}}" class="copyable">{{$assetDetails.AssetGuid}}</a>&nbsp;
@@ -22,10 +23,11 @@
             </td>
             <td>{{formatInt $assetDetails.Txs}}</td>
             <td class="ellipsis">
-                {{if $assetDetails.Contract}}<a href="{{formatContractExplorerURL $assetDetails.Contract}}">{{$assetDetails.Contract}}</a>{{end}}
+                {{if $assetDetails.Contract}}{{$contractURL := formatContractExplorerURL $assetDetails.Contract}}{{if $contractURL}}<a href="{{$contractURL}}">{{$assetDetails.Contract}}</a>{{else}}<span class="copyable">{{$assetDetails.Contract}}</span>{{end}}{{end}}
             </td>
             <td class="ellipsis">{{if $assetDetails.MetaData}}{{$assetDetails.MetaData}}{{end}}</td>
         </tr>
+        {{end}}
         {{end}}
     </tbody>
 </table>
