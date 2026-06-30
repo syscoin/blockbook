@@ -448,8 +448,8 @@ paths:
         address.
 
         Load estimate: Variable; basic is low, token/tokenBalances and
-        txids/txslight are medium, and txs can be high as it grows with
-        pageSize, transactions, token rows, filters, and protocol enrichment.
+        txids/txsummary/txslight are medium, and txs can be high as it grows
+        with pageSize, transactions, token rows, filters, and protocol enrichment.
       parameters:
         - name: address
           in: path
@@ -1212,12 +1212,14 @@ components:
         tokens adds known token rows.
         tokenBalances returns token rows with balances.
         txids adds paged transaction ids.
+        txsummary adds compact account-context transaction summaries for
+        Bitcoin-type/Syscoin account endpoints.
         txslight adds limited transaction details from the index.
         txs adds full transaction details.
       schema:
         type: string
         default: txids
-        enum: [basic, tokens, tokenBalances, txids, txslight, txs]
+        enum: [basic, tokens, tokenBalances, txids, txsummary, txslight, txs]
     Tokens:
       name: tokens
       in: query
@@ -2124,6 +2126,28 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TokenTransfer"
+        direction:
+          type: string
+          description: Transaction direction relative to the queried account, when returned by account summary endpoints.
+        addressValueIn:
+          allOf:
+            - $ref: "#/components/schemas/AmountString"
+          description: Total input value belonging to the queried account, when returned by account summary endpoints.
+        addressValueOut:
+          allOf:
+            - $ref: "#/components/schemas/AmountString"
+          description: Total output value belonging to the queried account, when returned by account summary endpoints.
+        accountAssetTransfers:
+          type: array
+          description: Syscoin SPT transfers summarized relative to the queried account.
+          items:
+            $ref: "#/components/schemas/TokenTransfer"
+        tokenType:
+          type: string
+          description: Syscoin SPT transaction type.
+        memo:
+          type: string
+          description: Syscoin SPT memo decoded from OP_RETURN.
         ethereumSpecific:
           $ref: "#/components/schemas/EthereumSpecific"
         addressAliases:
@@ -2751,7 +2775,7 @@ components:
           type: string
         details:
           type: string
-          enum: [basic, tokens, tokenBalances, txids, txslight, txs]
+          enum: [basic, tokens, tokenBalances, txids, txsummary, txslight, txs]
         tokens:
           type: string
           enum: [derived, used, nonzero]
