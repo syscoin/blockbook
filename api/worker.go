@@ -1590,6 +1590,7 @@ func (w *Worker) summarizeTxForAccount(tx *Tx, addrDescs map[string]struct{}) *T
 		AddressValueOutSat:     (*Amount)(&valueOut),
 		AccountAssetTransfers:  accountAssetTransfers,
 		TokenType:              tx.TokenType,
+		Memo:                   tx.Memo,
 	}
 }
 
