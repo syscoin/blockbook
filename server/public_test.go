@@ -4,11 +4,14 @@ package server
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"errors"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,14 +19,15 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/gorilla/websocket"
+	"github.com/linxGnu/grocksdb"
 	"github.com/martinboehm/btcutil/chaincfg"
-	gosocketio "github.com/martinboehm/golang-socketio"
-	"github.com/martinboehm/golang-socketio/transport"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
-	"github.com/syscoin/blockbook/common"
-	"github.com/syscoin/blockbook/db"
-	"github.com/syscoin/blockbook/tests/dbtestdata"
+	"github.com/trezor/blockbook/api"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/common"
+	"github.com/trezor/blockbook/db"
+	"github.com/trezor/blockbook/fiat"
+	"github.com/trezor/blockbook/tests/dbtestdata"
 )
 
 func TestMain(m *testing.M) {
@@ -36,21 +40,29 @@ func TestMain(m *testing.M) {
 	os.Exit(c)
 }
 
-func setupRocksDB(t *testing.T, parser bchain.BlockChainParser) (*db.RocksDB, *common.InternalState, string) {
-	tmp, err := ioutil.TempDir("", "testdb")
+func setupRocksDB(parser bchain.BlockChainParser, chain bchain.BlockChain, t *testing.T, extendedIndex bool, config *common.Config) (*db.RocksDB, *common.InternalState, string) {
+	tmp, err := os.MkdirTemp("", "testdb")
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := db.NewRocksDB(tmp, 100000, -1, parser, nil, nil)
+	d, err := db.NewRocksDB(tmp, 100000, -1, parser, nil, extendedIndex)
 	if err != nil {
 		t.Fatal(err)
 	}
-	is, err := d.LoadInternalState("fakecoin")
+	is, err := d.LoadInternalState(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d.SetInternalState(is)
-	block1 := dbtestdata.GetTestBitcoinTypeBlock1(parser)
+	// there are 2 simulated block, of height bestBlockHeight-1 and bestBlockHeight
+	bestHeight, err := chain.GetBestBlockHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	block1, err := chain.GetBlock("", bestHeight-1)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// setup internal state BlockTimes
 	for i := uint32(0); i < block1.Height; i++ {
 		is.BlockTimes = append(is.BlockTimes, 0)
@@ -59,42 +71,64 @@ func setupRocksDB(t *testing.T, parser bchain.BlockChainParser) (*db.RocksDB, *c
 	if err := d.ConnectBlock(block1); err != nil {
 		t.Fatal(err)
 	}
-	block2 := dbtestdata.GetTestBitcoinTypeBlock2(parser)
+	block2, err := chain.GetBlock("", bestHeight)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := d.ConnectBlock(block2); err != nil {
 		t.Fatal(err)
 	}
-	if err := InitTestFiatRates(d); err != nil {
-		t.Fatal(err)
-	}
 	is.FinishedSync(block2.Height)
+	if parser.GetChainType() == bchain.ChainEthereumType {
+		if err := initTestFiatRatesEthereumType(d); err != nil {
+			t.Fatal(err)
+		}
+		if err := initEthereumTypeDB(d); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := initTestFiatRates(d); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return d, is, tmp
 }
 
-func setupPublicHTTPServer(t *testing.T) (*PublicServer, string) {
-	parser := btc.NewBitcoinParser(
-		btc.GetChainParams("test"),
-		&btc.Configuration{
-			BlockAddressesToKeep:  1,
-			XPubMagic:             70617039,
-			XPubMagicSegwitP2sh:   71979618,
-			XPubMagicSegwitNative: 73342198,
-			Slip44:                1,
-		})
+var metrics *common.Metrics
 
-	d, is, path := setupRocksDB(t, parser)
-	// setup internal state and match BestHeight to test data
-	is.Coin = "Fakecoin"
-	is.CoinLabel = "Fake Coin"
-	is.CoinShortcut = "FAKE"
+func setupPublicHTTPServer(parser bchain.BlockChainParser, chain bchain.BlockChain, t *testing.T, extendedIndex bool) (*PublicServer, string) {
+	return setupPublicHTTPServerWithFiatFixture(parser, chain, t, extendedIndex, nil)
+}
 
-	metrics, err := common.GetMetrics("Fakecoin")
-	if err != nil {
-		glog.Fatal("metrics: ", err)
+func setupPublicHTTPServerWithFiatFixture(parser bchain.BlockChainParser, chain bchain.BlockChain, t *testing.T, extendedIndex bool, fiatFixture func(*db.RocksDB) error) (*PublicServer, string) {
+	// config with mocked CoinGecko API
+	config := common.Config{
+		CoinName:        "Fakecoin",
+		CoinLabel:       "Fake Coin",
+		CoinShortcut:    "FAKE",
+		FiatRates:       "coingecko",
+		FiatRatesParams: `{"url": "none", "coin": "ethereum","platformIdentifier": "ethereum","platformVsCurrency": "usd","periodSeconds": 60}`,
 	}
 
-	chain, err := dbtestdata.NewFakeBlockChain(parser)
-	if err != nil {
-		glog.Fatal("fakechain: ", err)
+	// add block golomb filters with extended index
+	if extendedIndex {
+		config.BlockGolombFilterP = 20
+	}
+
+	d, is, path := setupRocksDB(parser, chain, t, extendedIndex, &config)
+	if fiatFixture != nil {
+		if err := fiatFixture(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var err error
+	// metrics can be setup only once
+	if metrics == nil {
+		metrics, err = common.GetMetrics("Fakecoin" + strconv.FormatBool(extendedIndex))
+		if err != nil {
+			glog.Fatal("metrics: ", err)
+		}
 	}
 
 	mempool, err := chain.CreateMempool(chain)
@@ -108,8 +142,13 @@ func setupPublicHTTPServer(t *testing.T) (*PublicServer, string) {
 		glog.Fatal("txCache: ", err)
 	}
 
+	fiatRates, err := fiat.NewFiatRates(d, &config, nil, nil)
+	if err != nil {
+		glog.Fatal("fiatRates ", err)
+	}
+
 	// s.Run is never called, binding can be to any port
-	s, err := NewPublicServer("localhost:12345", "", d, chain, mempool, txCache, "", metrics, is, false, false)
+	s, err := NewPublicServer("localhost:12345", "", d, chain, mempool, txCache, "", metrics, is, fiatRates, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,78 +193,212 @@ func newPostRequest(u string, body string) *http.Request {
 	return r
 }
 
-func insertFiatRate(date string, rates map[string]float64, d *db.RocksDB) error {
-	convertedDate, err := db.FiatRatesConvertDate(date)
+type repeatedByteReader struct {
+	remaining int64
+}
+
+func (r *repeatedByteReader) Read(p []byte) (int, error) {
+	if r.remaining <= 0 {
+		return 0, io.EOF
+	}
+	n := int64(len(p))
+	if n > r.remaining {
+		n = r.remaining
+	}
+	for i := int64(0); i < n; i++ {
+		p[i] = '0'
+	}
+	r.remaining -= n
+	return int(n), nil
+}
+
+func newPostRequestWithContentLength(u string, contentLength int64) *http.Request {
+	r, err := http.NewRequest("POST", u, &repeatedByteReader{remaining: contentLength})
+	if err != nil {
+		glog.Fatal(err)
+	}
+	r.Header.Add("Content-Type", "application/octet-stream")
+	r.ContentLength = contentLength
+	return r
+}
+
+func insertFiatRate(date string, rates map[string]float32, tokenRates map[string]float32, d *db.RocksDB) error {
+	convertedDate, err := time.Parse("20060102150405", date)
 	if err != nil {
 		return err
 	}
-	ticker := &db.CurrencyRatesTicker{
-		Timestamp: convertedDate,
-		Rates:     rates,
+	ticker := &common.CurrencyRatesTicker{
+		Timestamp:  convertedDate,
+		Rates:      rates,
+		TokenRates: tokenRates,
 	}
-	return d.FiatRatesStoreTicker(ticker)
+	wb := grocksdb.NewWriteBatch()
+	defer wb.Destroy()
+	if err := d.FiatRatesStoreTicker(wb, ticker); err != nil {
+		return err
+	}
+	return d.WriteBatch(wb)
 }
 
-// InitTestFiatRates initializes test data for /api/v2/tickers endpoint
-func InitTestFiatRates(d *db.RocksDB) error {
-	if err := insertFiatRate("20180320020000", map[string]float64{
+// initTestFiatRates initializes test data for /api/v2/tickers endpoint
+func initTestFiatRates(d *db.RocksDB) error {
+	if err := insertFiatRate("20180320000000", map[string]float32{
 		"usd": 2000.0,
 		"eur": 1300.0,
-	}, d); err != nil {
+	}, nil, d); err != nil {
 		return err
 	}
-	if err := insertFiatRate("20180320030000", map[string]float64{
+	if err := insertFiatRate("20180321000000", map[string]float32{
 		"usd": 2001.0,
 		"eur": 1301.0,
-	}, d); err != nil {
+	}, nil, d); err != nil {
 		return err
 	}
-	if err := insertFiatRate("20180320040000", map[string]float64{
+	if err := insertFiatRate("20180322000000", map[string]float32{
 		"usd": 2002.0,
 		"eur": 1302.0,
-	}, d); err != nil {
+	}, nil, d); err != nil {
 		return err
 	}
-	if err := insertFiatRate("20180321055521", map[string]float64{
+	if err := insertFiatRate("20180324000000", map[string]float32{
 		"usd": 2003.0,
 		"eur": 1303.0,
-	}, d); err != nil {
+	}, nil, d); err != nil {
 		return err
 	}
-	if err := insertFiatRate("20191121140000", map[string]float64{
+	if err := insertFiatRate("20191121000000", map[string]float32{
 		"usd": 7814.5,
 		"eur": 7100.0,
-	}, d); err != nil {
+	}, nil, d); err != nil {
 		return err
 	}
-	return insertFiatRate("20191121143015", map[string]float64{
+	return insertFiatRate("20191122000000", map[string]float32{
 		"usd": 7914.5,
 		"eur": 7134.1,
-	}, d)
+	}, nil, d)
+}
+
+type httpTests struct {
+	name        string
+	r           *http.Request
+	status      int
+	contentType string
+	body        []string
+}
+
+type fiatTickerResponse struct {
+	Timestamp int64              `json:"ts"`
+	Rates     map[string]float32 `json:"rates"`
+}
+
+type fiatTickersListResponse struct {
+	Timestamp int64    `json:"ts"`
+	Tickers   []string `json:"available_currencies"`
+}
+
+type balanceHistoryResponse struct {
+	Time       uint32             `json:"time"`
+	Txs        uint32             `json:"txs"`
+	Received   string             `json:"received"`
+	Sent       string             `json:"sent"`
+	SentToSelf string             `json:"sentToSelf"`
+	Rates      map[string]float32 `json:"rates"`
+}
+
+type apiErrorResponse struct {
+	Error string `json:"error"`
+}
+
+func performHttpTests(tests []httpTests, t *testing.T, ts *httptest.Server) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := http.DefaultClient.Do(tt.r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tt.status {
+				t.Errorf("StatusCode = %v, want %v", resp.StatusCode, tt.status)
+			}
+			if resp.Header["Content-Type"][0] != tt.contentType {
+				t.Errorf("Content-Type = %v, want %v", resp.Header["Content-Type"][0], tt.contentType)
+			}
+			bb, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			b := string(bb)
+			for _, c := range tt.body {
+				if !strings.Contains(b, c) {
+					t.Errorf("got\n%v\nwant to contain %v", b, c)
+					break
+				}
+			}
+		})
+	}
+}
+
+func mustGetJSON(t *testing.T, endpointURL string, statusCode int, out interface{}) {
+	t.Helper()
+
+	resp, err := http.DefaultClient.Do(newGetRequest(endpointURL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != statusCode {
+		t.Fatalf("StatusCode = %v, want %v, body = %s", resp.StatusCode, statusCode, string(body))
+	}
+	if contentType := resp.Header.Get("Content-Type"); contentType != "application/json; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want %q", contentType, "application/json; charset=utf-8")
+	}
+	if err := json.Unmarshal(body, out); err != nil {
+		t.Fatalf("failed to decode JSON body %q: %v", string(body), err)
+	}
+}
+
+func TestReadSendTxRequestFromBody(t *testing.T) {
+	const maxBodyLen int64 = 6
+	assertAPIError := func(t *testing.T, err error, want string) {
+		t.Helper()
+		if err == nil {
+			t.Fatalf("expected error %q, got nil", want)
+		}
+		if err.Error() != want {
+			t.Fatalf("unexpected error %q, want %q", err.Error(), want)
+		}
+	}
+
+	t.Run("accepts body exactly at limit", func(t *testing.T) {
+		got, err := readSendTxRequestFromBody(strings.NewReader("123456"), maxBodyLen)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Hex != "123456" {
+			t.Fatalf("got %q, want %q", got.Hex, "123456")
+		}
+	})
+
+	t.Run("rejects body larger than limit by one byte", func(t *testing.T) {
+		_, err := readSendTxRequestFromBody(strings.NewReader("1234567"), maxBodyLen)
+		assertAPIError(t, err, "Tx blob too large")
+	})
 }
 
 func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
-	tests := []struct {
-		name        string
-		r           *http.Request
-		status      int
-		contentType string
-		body        []string
-	}{
+	tests := []httpTests{
 		{
 			name:        "explorerTx",
 			r:           newGetRequest(ts.URL + "/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db"),
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Transaction</h1>`,
-				`<span class="data">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</span>`,
-				`td class="data">0 FAKE</td>`,
-				`<a href="/address/mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj">mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj</a>`,
-				`13.60030331 FAKE`,
-				`<td><span class="tx-addr">No Inputs (Newly Generated Coins)</span></td>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><h1 class="col-12">Transaction</h1></div><div class="row pt-3"><h5 class="col-12 d-flex h-data"><span class="ellipsis copyable">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</span></h5></div><table class="table data-table info-table"><tbody><tr><td>Mined Time</td><td><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></td></tr><tr><td>In Block</td><td class="ellipsis" style="max-width: 280px">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</td></tr><tr><td>In Block Height</td><td><a href="/block/225494">225<span class="ns">494</span></a></td></tr><tr><td>Total Input</td><td><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></td></tr><tr><td>Total Output</td><td><span class="amt copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span></td></tr><tr><td>Fees</td><td><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></td></tr></tbody></table><div class="pt-1"><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db" class="ellipsis copyable txid">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs (Newly Generated Coins)</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj">mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj</a></span><span class="tx-amt"><span class="amt copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12">Unparsed address<span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span></div></div></div></div><div class="pt-4"><button style="color: black" class="btn btn-paging" id="raw-button">Raw Transaction</button><button style="color: black" class="btn btn-paging" id="raw-hex-button">Raw Transaction Hex</button><div class="json copyable"><pre id="raw" style="text-wrap: auto;"></pre></div><script>const rawData = {"hex":"","txid":"fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db","version":0,"locktime":0,"vin":[{"coinbase":"03bf1e1504aede765b726567696f6e312f50726f6a65637420425443506f6f6c2f01000001bf7e000000000000","txid":"","vout":0,"scriptSig":{"hex":""},"sequence":0,"addresses":null}],"vout":[{"ValueSat":1360030331,"value":0,"n":0,"scriptPubKey":{"hex":"76a914d03c0d863d189b23b061a95ad32940b65837609f88ac","addresses":null}},{"ValueSat":0,"value":0,"n":1,"scriptPubKey":{"addresses":null}}],"confirmations":1,"time":1521595678,"blocktime":1521595678,"size":300};const txId = "fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db";handleTxPage(rawData, txId);</script></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -234,18 +407,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Address`,
-				`<small class="text-muted">0.00012345 FAKE</small>`,
-				`<span class="data">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span>`,
-				`<td class="data">0.00012345 FAKE</td>`,
-				`<a href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25">7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25</a>`,
-				`3172.83951061 FAKE <a class="text-danger" href="/spending/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25/0" title="Spent">➡</a></span>`,
-				`<td><span class="ellipsis tx-addr"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt">`,
-				`td><span class="ellipsis tx-addr"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt">`,
-				`9172.83951061 FAKE <span class="text-success" title="Unspent"> <b>×</b></span></span>`,
-				`<a href="/tx/00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840">00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840</a>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row g-0 ms-2 ms-lg-0"><div class="col-md-10 order-2 order-md-1"><h1>Address </h1><h5 class="col-12 d-flex h-data pb-2"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span></h5><h4 class="row"><div class="col-lg-6"><span class="copyable">0.<span class="amt-dec">000<span class="ns">123</span><span class="ns">45</span></span> FAKE</span></div></h4></div><div class="col-md-2 order-1 order-md-2 d-flex justify-content-center justify-content-md-end mb-3 mb-md-0"><div id="qrcode"></div><script type="text/javascript" src="/static/js/qrcode.min.js"></script><script type="text/javascript">new QRCode(document.getElementById("qrcode"), { text: "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz", width: 120, height: 120 });</script></div></div><table class="table data-table info-table"><tbody><tr><td style="white-space: nowrap;"><h5>Confirmed</h5></td><td></td></tr><tr><td style="width: 25%;">Total Received</td><td><span class="amt copyable" cc="0.0002469 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">024</span><span class="ns">690</span></span> FAKE</span></span></td></tr><tr><td>Total Sent</td><td><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></td></tr><tr><td>Final Balance</td><td><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></td></tr><tr><td>No. Transactions</td><td>2</td></tr></tbody></table><div class="row pt-3 pb-1"><h3 class="col-sm-6 col-lg-3 m-0 align-self-center">Transactions</h3><div class="col-sm-6 col-lg-3 my-2 my-lg-0 align-self-center"><select  class="w-100" onchange="self.location='?filter='+options[selectedIndex].value"><option>All</option><option  value="inputs">Address on input side</option><option  value="outputs">Address on output side</option></select></div><div class="col-lg-6"></div></div><div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25" class="ellipsis copyable txid">7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw">mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw</a></span><span class="amt tx-amt copyable" cc="12345.67890123 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">890</span><span class="ns">123</span></span> FAKE</span></span></div><div class="col-12 tx-own"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span><span class="amt tx-amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="tx-amt"><span class="amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><a class="spent" href="/spending/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25/0" tt="Spent">→</a></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt"><span class="amt copyable" cc="9172.83951061 FAKE"><span class="prim-amt">9<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable">OP_RETURN 2020f1686f6a20</span><span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000346 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">346</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="12345.67902122 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">902</span><span class="ns">122</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840" class="ellipsis copyable txid">00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-20 03:03:46">1640 days 9 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti">mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti</a></span><span class="tx-amt"><span class="amt copyable" cc="1 FAKE"><span class="prim-amt">1.<span class="amt-dec">00<span class="ns">000</span><span class="ns">000</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12 tx-own"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span><span class="tx-amt"><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span><a class="spent" href="/spending/00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840/1" tt="Spent">→</a></span></div><div class="col-12 tx-own"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span><span class="tx-amt"><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">2</span> confirmations</span><span class="amt txvalue copyable" cc="1.0002469 FAKE"><span class="prim-amt">1.<span class="amt-dec">00<span class="ns">024</span><span class="ns">690</span></span> FAKE</span></span></div></div></div></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -254,11 +416,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Transaction</h1>`,
-				`<span class="data">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</span>`,
-				`<td class="data">0.00000062 FAKE</td>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><h1 class="col-12">Transaction</h1></div><div class="row pt-3"><h5 class="col-12 d-flex h-data"><span class="ellipsis copyable">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</span></h5></div><table class="table data-table info-table"><tbody><tr><td>Mined Time</td><td><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></td></tr><tr><td>In Block</td><td class="ellipsis" style="max-width: 280px">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</td></tr><tr><td>In Block Height</td><td><a href="/block/225494">225<span class="ns">494</span></a></td></tr><tr><td>Total Input</td><td><span class="amt copyable" cc="3172.83951062 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">062</span></span> FAKE</span></span></td></tr><tr><td>Total Output</td><td><span class="amt copyable" cc="3172.83951 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">000</span></span> FAKE</span></span></td></tr><tr><td>Fees</td><td><span class="amt copyable" cc="0.00000062 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">062</span></span> FAKE</span></span></td></tr></tbody></table><div class="pt-1"><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71" class="ellipsis copyable txid">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><a class="outpoint" href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25" tt="Outpoint 7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25,0">←</a><span class="amt tx-amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/2MzmAKayJmja784jyHvRUW1bXPget1csRRG">2MzmAKayJmja784jyHvRUW1bXPget1csRRG</a></span><a class="outpoint" href="/tx/effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75" tt="Outpoint effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75,1">←</a><span class="amt tx-amt copyable" cc="0.00000001 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">001</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu">2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu</a></span><span class="tx-amt"><span class="amt copyable" cc="1186.419755 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP">mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP</a></span><span class="tx-amt"><span class="amt copyable" cc="1986.419755 FAKE"><span class="prim-amt">1<span class="nc">986</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000062 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">062</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="3172.83951 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">000</span></span> FAKE</span></span></div></div></div></div><div class="pt-4"><button style="color: black" class="btn btn-paging" id="raw-button">Raw Transaction</button><button style="color: black" class="btn btn-paging" id="raw-hex-button">Raw Transaction Hex</button><div class="json copyable"><pre id="raw" style="text-wrap: auto;"></pre></div><script>const rawData = {"hex":"","txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","version":0,"locktime":0,"vin":[{"coinbase":"","txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","vout":0,"scriptSig":{"hex":""},"sequence":0,"addresses":null},{"coinbase":"","txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"scriptSig":{"hex":""},"sequence":0,"addresses":null}],"vout":[{"ValueSat":118641975500,"value":0,"n":0,"scriptPubKey":{"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":null}},{"ValueSat":198641975500,"value":0,"n":1,"scriptPubKey":{"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":null}}],"confirmations":1,"time":1521595678,"blocktime":1521595678,"vsize":400};const txId = "3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71";handleTxPage(rawData, txId);</script></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -267,10 +425,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Error</h1>`,
-				`<h4>Transaction not found</h4>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><h1>Error</h1><h4>Transaction not found</h4></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -279,14 +434,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Blocks`,
-				`<td><a href="/block/225494">225494</a></td>`,
-				`<td class="ellipsis">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</td>`,
-				`<td class="ellipsis">0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997</td>`,
-				`<td class="text-right">2</td>`,
-				`<td class="text-right">1234567</td>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><div class="col-md-6"><h1>Blocks</h1></div><div class="col-md-6"><nav class="paging justify-content-end"><a class="btn btn-paging" href="?page=1">Previous</a><div class="paging-group mx-2"><div class="bb-group"><a class="btn active" href="?page=1">1</a><a class="btn" href="?page=2">2</a><a class="btn" href="?page=3">3</a><a class="btn" href="?page=4">4</a><span>...</span><a class="btn" href="?page=4510">4510</a></div></div><a class="btn btn-paging" href="?page=2">Next</a></nav></div></div><div><table class="table table-hover data-table"><thead><tr><th>Height</th><th class="col-md-6">Hash</th><th class="col-md-2">Timestamp</th><th class="text-end">Transactions</th><th class="text-end">Size</th></tr></thead><tbody><tr><td><a href="/block/225494">225<span class="ns">494</span></a></td><td class="ellipsis">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</td><td><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></td><td class="text-end">4</td><td class="text-end">2<span class="ns">345</span><span class="ns">678</span></td></tr><tr><td><a href="/block/225493">225<span class="ns">493</span></a></td><td class="ellipsis">0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997</td><td><span tt="2018-03-20 03:03:46">1640 days 9 hours ago</span></td><td class="text-end">2</td><td class="text-end">1<span class="ns">234</span><span class="ns">567</span></td></tr></tbody></table></div><nav class="paging justify-content-end"><a class="btn btn-paging" href="?page=1">Previous</a><div class="paging-group mx-2"><div class="bb-group"><a class="btn active" href="?page=1">1</a><a class="btn" href="?page=2">2</a><a class="btn" href="?page=3">3</a><a class="btn" href="?page=4">4</a><span>...</span><a class="btn" href="?page=4510">4510</a></div></div><a class="btn btn-paging" href="?page=2">Next</a></nav></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -295,14 +443,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Block 225494</h1>`,
-				`<span class="data">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</span>`,
-				`<td class="data">4</td>`, // number of transactions
-				`<a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a>`,
-				`9172.83951061 FAKE`,
-				`<a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><h1 class="col-sm-6">Block</h1><nav class="col-sm-6 paging justify-content-end pb-1"><a class="btn btn-paging" href="/block/0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997">Previous Block</a><span class="btn btn-paging ms-2">Next Block</span></nav></div><div class="row pt-3"><h5 class="col-lg-3 h-data"><span class="ellipsis copyable">225<span class="ns">494</span></span></h5><h5 class="col-lg-9 justify-content-end d-flex h-data"><span class="copyable ellipsis">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</span></h5></div><div class="row"><div class="col-md-6"><table class="table data-table info-table"><tbody><tr><td>Transactions</td><td>4</td></tr><tr><td>Height</td><td>225<span class="ns">494</span></td></tr><tr><td>Confirmations</td><td>1</td></tr><tr><td>Timestamp</td><td><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></td></tr><tr><td>Size (bytes)</td><td>2<span class="ns">345</span><span class="ns">678</span></td></tr></tbody></table></div><div class="col-md-6"><table class="table data-table info-table"><tbody><tr><td>Version</td><td class="ellipsis"></td></tr><tr><td>Merkle&nbsp;Root</td><td style="max-width: 280px;" class="ellipsis"></td></tr><tr><td>Nonce</td><td style="max-width: 280px;" class="ellipsis"></td></tr><tr><td>Bits</td><td class="ellipsis"></td></tr><tr><td>Difficulty</td><td class="ellipsis"></td></tr></tbody></table></div></div><div class="row pt-3 pb-1"><h3 class="col-md-6 align-self-center">Transactions</h3><div class="col-md-6"></div></div><div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25" class="ellipsis copyable txid">7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw">mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw</a></span><span class="amt tx-amt copyable" cc="12345.67890123 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">890</span><span class="ns">123</span></span> FAKE</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</a></span><span class="amt tx-amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="tx-amt"><span class="amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><a class="spent" href="/spending/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25/0" tt="Spent">→</a></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt"><span class="amt copyable" cc="9172.83951061 FAKE"><span class="prim-amt">9<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable">OP_RETURN 2020f1686f6a20</span><span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000346 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">346</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="12345.67902122 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">902</span><span class="ns">122</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71" class="ellipsis copyable txid">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="amt tx-amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/2MzmAKayJmja784jyHvRUW1bXPget1csRRG">2MzmAKayJmja784jyHvRUW1bXPget1csRRG</a></span><span class="amt tx-amt copyable" cc="0.00000001 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">001</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu">2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu</a></span><span class="tx-amt"><span class="amt copyable" cc="1186.419755 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP">mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP</a></span><span class="tx-amt"><span class="amt copyable" cc="1986.419755 FAKE"><span class="prim-amt">1<span class="nc">986</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000062 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">062</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="3172.83951 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">000</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07" class="ellipsis copyable txid">05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="amt tx-amt copyable" cc="0.00009876 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">876</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="tx-amt"><span class="amt copyable" cc="0.00009 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">000</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000876 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">876</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="0.00009 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">000</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db" class="ellipsis copyable txid">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs (Newly Generated Coins)</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj">mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj</a></span><span class="tx-amt"><span class="amt copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12">Unparsed address<span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span></div></div></div></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -311,12 +452,9 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Application status</h1>`,
-				`<h3 class="bg-warning text-white" style="padding: 20px;">Synchronization with backend is disabled, the state of index is not up to date.</h3>`,
-				`<a href="/block/225494">225494</a>`,
-				`<td class="data">/Fakecoin:0.0.1/</td>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><h1>Application status</h1><h3><span class="badge bg-warning text-white p-3 w-100" style="white-space: break-spaces;">Synchronization with backend is disabled, the state of index is not up to date.</span></h3><div class="row"><div class="col-lg-6"><table class="table data-table info-table"><tbody><tr><td style="white-space: nowrap;"><h3>Blockbook</h3></td><td></td></tr><tr><td>Coin</td><td>Fakecoin</td></tr><tr><td>Host</td><td></td></tr><tr><td>Version / Commit / Build</td><td>unknown / <a href="https://github.com/trezor/blockbook/commit/unknown" target="_blank" rel="noopener noreferrer">unknown</a> / unknown</td></tr><tr><td>Synchronized</td><td><h6 class="badge bg-success">true</h6></td></tr><tr><td>Last Block</td><td><a href="/block/225494">225<span class="ns">494</span></a></td></tr><tr><td>Last Block Update</td><td>`,
+				`</td></tr><tr><td>Mempool in Sync</td><td><h6 class="badge bg-danger">false</h6></td></tr><tr><td>Last Mempool Update</td><td></td></tr><tr><td>Transactions in Mempool</td><td><a href="/mempool">0</a></td></tr><tr><td>Current Fiat rates</td>`,
+				`</td></tr></tbody></table></div><div class="col-lg-6"><table class="table data-table info-table"><tbody><tr><td style="white-space: nowrap;"><h3>Backend</h3></td><td></td></tr><tr><td>Chain</td><td>fakecoin</td></tr><tr><td>Version</td><td>001001</td></tr><tr><td>Subversion</td><td>/Fakecoin:0.0.1/</td></tr><tr><td>Last Block</td><td>2</td></tr><tr><td>Difficulty</td><td></td></tr></tbody></table></div></div><span class="text-muted">Blockbook - blockchain indexer for Trezor Suite https://trezor.io/trezor-suite. Do not use for any other purpose.</span></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -325,14 +463,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Block 225494</h1>`,
-				`<span class="data">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</span>`,
-				`<td class="data">4</td>`, // number of transactions
-				`<a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a>`,
-				`9172.83951061 FAKE`,
-				`<a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><h1 class="col-sm-6">Block</h1><nav class="col-sm-6 paging justify-content-end pb-1"><a class="btn btn-paging" href="/block/0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997">Previous Block</a><span class="btn btn-paging ms-2">Next Block</span></nav></div><div class="row pt-3"><h5 class="col-lg-3 h-data"><span class="ellipsis copyable">225<span class="ns">494</span></span></h5><h5 class="col-lg-9 justify-content-end d-flex h-data"><span class="copyable ellipsis">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</span></h5></div><div class="row"><div class="col-md-6"><table class="table data-table info-table"><tbody><tr><td>Transactions</td><td>4</td></tr><tr><td>Height</td><td>225<span class="ns">494</span></td></tr><tr><td>Confirmations</td><td>1</td></tr><tr><td>Timestamp</td><td><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></td></tr><tr><td>Size (bytes)</td><td>2<span class="ns">345</span><span class="ns">678</span></td></tr></tbody></table></div><div class="col-md-6"><table class="table data-table info-table"><tbody><tr><td>Version</td><td class="ellipsis"></td></tr><tr><td>Merkle&nbsp;Root</td><td style="max-width: 280px;" class="ellipsis"></td></tr><tr><td>Nonce</td><td style="max-width: 280px;" class="ellipsis"></td></tr><tr><td>Bits</td><td class="ellipsis"></td></tr><tr><td>Difficulty</td><td class="ellipsis"></td></tr></tbody></table></div></div><div class="row pt-3 pb-1"><h3 class="col-md-6 align-self-center">Transactions</h3><div class="col-md-6"></div></div><div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25" class="ellipsis copyable txid">7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw">mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw</a></span><span class="amt tx-amt copyable" cc="12345.67890123 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">890</span><span class="ns">123</span></span> FAKE</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</a></span><span class="amt tx-amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="tx-amt"><span class="amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><a class="spent" href="/spending/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25/0" tt="Spent">→</a></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt"><span class="amt copyable" cc="9172.83951061 FAKE"><span class="prim-amt">9<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable">OP_RETURN 2020f1686f6a20</span><span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000346 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">346</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="12345.67902122 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">902</span><span class="ns">122</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71" class="ellipsis copyable txid">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="amt tx-amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/2MzmAKayJmja784jyHvRUW1bXPget1csRRG">2MzmAKayJmja784jyHvRUW1bXPget1csRRG</a></span><span class="amt tx-amt copyable" cc="0.00000001 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">001</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu">2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu</a></span><span class="tx-amt"><span class="amt copyable" cc="1186.419755 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP">mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP</a></span><span class="tx-amt"><span class="amt copyable" cc="1986.419755 FAKE"><span class="prim-amt">1<span class="nc">986</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000062 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">062</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="3172.83951 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">000</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07" class="ellipsis copyable txid">05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="amt tx-amt copyable" cc="0.00009876 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">876</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="tx-amt"><span class="amt copyable" cc="0.00009 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">000</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000876 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">876</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="0.00009 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">000</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db" class="ellipsis copyable txid">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs (Newly Generated Coins)</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj">mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj</a></span><span class="tx-amt"><span class="amt copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12">Unparsed address<span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span></div></div></div></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -341,14 +472,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Block 225494</h1>`,
-				`<span class="data">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</span>`,
-				`<td class="data">4</td>`, // number of transactions
-				`<a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a>`,
-				`9172.83951061 FAKE`,
-				`<a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><h1 class="col-sm-6">Block</h1><nav class="col-sm-6 paging justify-content-end pb-1"><a class="btn btn-paging" href="/block/0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997">Previous Block</a><span class="btn btn-paging ms-2">Next Block</span></nav></div><div class="row pt-3"><h5 class="col-lg-3 h-data"><span class="ellipsis copyable">225<span class="ns">494</span></span></h5><h5 class="col-lg-9 justify-content-end d-flex h-data"><span class="copyable ellipsis">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</span></h5></div><div class="row"><div class="col-md-6"><table class="table data-table info-table"><tbody><tr><td>Transactions</td><td>4</td></tr><tr><td>Height</td><td>225<span class="ns">494</span></td></tr><tr><td>Confirmations</td><td>1</td></tr><tr><td>Timestamp</td><td><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></td></tr><tr><td>Size (bytes)</td><td>2<span class="ns">345</span><span class="ns">678</span></td></tr></tbody></table></div><div class="col-md-6"><table class="table data-table info-table"><tbody><tr><td>Version</td><td class="ellipsis"></td></tr><tr><td>Merkle&nbsp;Root</td><td style="max-width: 280px;" class="ellipsis"></td></tr><tr><td>Nonce</td><td style="max-width: 280px;" class="ellipsis"></td></tr><tr><td>Bits</td><td class="ellipsis"></td></tr><tr><td>Difficulty</td><td class="ellipsis"></td></tr></tbody></table></div></div><div class="row pt-3 pb-1"><h3 class="col-md-6 align-self-center">Transactions</h3><div class="col-md-6"></div></div><div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25" class="ellipsis copyable txid">7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw">mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw</a></span><span class="amt tx-amt copyable" cc="12345.67890123 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">890</span><span class="ns">123</span></span> FAKE</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</a></span><span class="amt tx-amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="tx-amt"><span class="amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><a class="spent" href="/spending/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25/0" tt="Spent">→</a></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt"><span class="amt copyable" cc="9172.83951061 FAKE"><span class="prim-amt">9<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable">OP_RETURN 2020f1686f6a20</span><span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000346 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">346</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="12345.67902122 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">902</span><span class="ns">122</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71" class="ellipsis copyable txid">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="amt tx-amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/2MzmAKayJmja784jyHvRUW1bXPget1csRRG">2MzmAKayJmja784jyHvRUW1bXPget1csRRG</a></span><span class="amt tx-amt copyable" cc="0.00000001 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">001</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu">2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu</a></span><span class="tx-amt"><span class="amt copyable" cc="1186.419755 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP">mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP</a></span><span class="tx-amt"><span class="amt copyable" cc="1986.419755 FAKE"><span class="prim-amt">1<span class="nc">986</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000062 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">062</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="3172.83951 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">000</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07" class="ellipsis copyable txid">05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="amt tx-amt copyable" cc="0.00009876 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">876</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="tx-amt"><span class="amt copyable" cc="0.00009 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">000</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000876 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">876</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="0.00009 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">000</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db" class="ellipsis copyable txid">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs (Newly Generated Coins)</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj">mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj</a></span><span class="tx-amt"><span class="amt copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12">Unparsed address<span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span></div></div></div></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -357,14 +481,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Transaction</h1>`,
-				`<span class="data">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</span>`,
-				`td class="data">0 FAKE</td>`,
-				`<a href="/address/mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj">mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj</a>`,
-				`13.60030331 FAKE`,
-				`<td><span class="tx-addr">No Inputs (Newly Generated Coins)</span></td>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><h1 class="col-12">Transaction</h1></div><div class="row pt-3"><h5 class="col-12 d-flex h-data"><span class="ellipsis copyable">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</span></h5></div><table class="table data-table info-table"><tbody><tr><td>Mined Time</td><td><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></td></tr><tr><td>In Block</td><td class="ellipsis" style="max-width: 280px">00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6</td></tr><tr><td>In Block Height</td><td><a href="/block/225494">225<span class="ns">494</span></a></td></tr><tr><td>Total Input</td><td><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></td></tr><tr><td>Total Output</td><td><span class="amt copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span></td></tr><tr><td>Fees</td><td><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></td></tr></tbody></table><div class="pt-1"><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db" class="ellipsis copyable txid">fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs (Newly Generated Coins)</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj">mzVznVsCHkVHX9UN8WPFASWUUHtxnNn4Jj</a></span><span class="tx-amt"><span class="amt copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12">Unparsed address<span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="13.60030331 FAKE"><span class="prim-amt">13.<span class="amt-dec">60<span class="ns">030</span><span class="ns">331</span></span> FAKE</span></span></div></div></div></div><div class="pt-4"><button style="color: black" class="btn btn-paging" id="raw-button">Raw Transaction</button><button style="color: black" class="btn btn-paging" id="raw-hex-button">Raw Transaction Hex</button><div class="json copyable"><pre id="raw" style="text-wrap: auto;"></pre></div><script>const rawData = {"hex":"","txid":"fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db","version":0,"locktime":0,"vin":[{"coinbase":"03bf1e1504aede765b726567696f6e312f50726f6a65637420425443506f6f6c2f01000001bf7e000000000000","txid":"","vout":0,"scriptSig":{"hex":""},"sequence":0,"addresses":null}],"vout":[{"ValueSat":1360030331,"value":0,"n":0,"scriptPubKey":{"hex":"76a914d03c0d863d189b23b061a95ad32940b65837609f88ac","addresses":null}},{"ValueSat":0,"value":0,"n":1,"scriptPubKey":{"addresses":null}}],"confirmations":1,"time":1521595678,"blocktime":1521595678,"size":300};const txId = "fdd824a780cbb718eeb766eb05d83fdefc793a27082cd5e67f856d69798cf7db";handleTxPage(rawData, txId);</script></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -373,18 +490,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Address`,
-				`<small class="text-muted">0.00012345 FAKE</small>`,
-				`<span class="data">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span>`,
-				`<td class="data">0.00012345 FAKE</td>`,
-				`<a href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25">7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25</a>`,
-				`3172.83951061 FAKE <a class="text-danger" href="/spending/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25/0" title="Spent">➡</a></span>`,
-				`<td><span class="ellipsis tx-addr"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt">`,
-				`td><span class="ellipsis tx-addr"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt">`,
-				`9172.83951061 FAKE <span class="text-success" title="Unspent"> <b>×</b></span></span>`,
-				`<a href="/tx/00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840">00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840</a>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row g-0 ms-2 ms-lg-0"><div class="col-md-10 order-2 order-md-1"><h1>Address </h1><h5 class="col-12 d-flex h-data pb-2"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span></h5><h4 class="row"><div class="col-lg-6"><span class="copyable">0.<span class="amt-dec">000<span class="ns">123</span><span class="ns">45</span></span> FAKE</span></div></h4></div><div class="col-md-2 order-1 order-md-2 d-flex justify-content-center justify-content-md-end mb-3 mb-md-0"><div id="qrcode"></div><script type="text/javascript" src="/static/js/qrcode.min.js"></script><script type="text/javascript">new QRCode(document.getElementById("qrcode"), { text: "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz", width: 120, height: 120 });</script></div></div><table class="table data-table info-table"><tbody><tr><td style="white-space: nowrap;"><h5>Confirmed</h5></td><td></td></tr><tr><td style="width: 25%;">Total Received</td><td><span class="amt copyable" cc="0.0002469 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">024</span><span class="ns">690</span></span> FAKE</span></span></td></tr><tr><td>Total Sent</td><td><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></td></tr><tr><td>Final Balance</td><td><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></td></tr><tr><td>No. Transactions</td><td>2</td></tr></tbody></table><div class="row pt-3 pb-1"><h3 class="col-sm-6 col-lg-3 m-0 align-self-center">Transactions</h3><div class="col-sm-6 col-lg-3 my-2 my-lg-0 align-self-center"><select  class="w-100" onchange="self.location='?filter='+options[selectedIndex].value"><option>All</option><option  value="inputs">Address on input side</option><option  value="outputs">Address on output side</option></select></div><div class="col-lg-6"></div></div><div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25" class="ellipsis copyable txid">7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw">mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw</a></span><span class="amt tx-amt copyable" cc="12345.67890123 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">890</span><span class="ns">123</span></span> FAKE</span></span></div><div class="col-12 tx-own"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span><span class="amt tx-amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="tx-amt"><span class="amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><a class="spent" href="/spending/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25/0" tt="Spent">→</a></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL">mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL</a></span><span class="tx-amt"><span class="amt copyable" cc="9172.83951061 FAKE"><span class="prim-amt">9<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable">OP_RETURN 2020f1686f6a20</span><span class="tx-amt"><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000346 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">346</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="12345.67902122 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">902</span><span class="ns">122</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840" class="ellipsis copyable txid">00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-20 03:03:46">1640 days 9 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti">mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti</a></span><span class="tx-amt"><span class="amt copyable" cc="1 FAKE"><span class="prim-amt">1.<span class="amt-dec">00<span class="ns">000</span><span class="ns">000</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12 tx-own"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span><span class="tx-amt"><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span><a class="spent" href="/spending/00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840/1" tt="Spent">→</a></span></div><div class="col-12 tx-own"><span class="ellipsis copyable">mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz</span><span class="tx-amt"><span class="amt copyable" cc="0.00012345 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">012</span><span class="ns">345</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">2</span> confirmations</span><span class="amt txvalue copyable" cc="1.0002469 FAKE"><span class="prim-amt">1.<span class="amt-dec">00<span class="ns">024</span><span class="ns">690</span></span> FAKE</span></span></div></div></div></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -393,16 +499,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>XPUB <small class="text-muted">1186.419755 FAKE</small></h1><div class="alert alert-data ellipsis"><span class="data">upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q</span></div>`,
-				`<td style="width: 25%;">Total Received</td><td class="data">1186.41975501 FAKE</td>`,
-				`<td>Total Sent</td><td class="data">0.00000001 FAKE</td>`,
-				`<td>Used XPUB Addresses</td><td class="data">2</td>`,
-				`<td class="data ellipsis"><a href="/address/2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu">2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu</a></td><td class="data">1186.419755 FAKE</td><td class="data">1</td><td>m/49&#39;/1&#39;/33&#39;/1/3</td>`,
-				`<div class="col-xs-7 col-md-8 ellipsis"><a href="/tx/3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</a></div>`,
-				`<div class="col-xs-7 col-md-8 ellipsis"><a href="/tx/effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75">effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75</a></div>`,
-				`<td><span class="ellipsis tx-addr"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="tx-amt">0.00009876 FAKE <a class="text-danger" href="/spending/effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75/2" title="Spent">➡</a></span></td>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><div class="col-md-10 order-2 order-md-1"><h1>XPUB</h1><h5 class="col-12 d-flex h-data pb-2"><span class="ellipsis copyable">upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q</span></h5><h4 class="row"><div class="col-lg-6"><span class="copyable">1<span class="nc">186</span>.<span class="amt-dec">419<span class="ns">755</span></span> FAKE</span></div></h4></div><div class="col-md-2 order-1 order-md-2 d-flex justify-content-center justify-content-md-end mb-3 mb-md-0"><div id="qrcode"></div><script type="text/javascript" src="/static/js/qrcode.min.js"></script><script type="text/javascript">new QRCode(document.getElementById("qrcode"), { text: "upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q", width: 120, height: 120 });</script></div></div><table class="table data-table info-table"><tbody><tr><td style="white-space: nowrap;"><h5>Confirmed</h5></td><td></td></tr><tr><td style="width: 25%;">Total Received</td><td><span class="amt copyable" cc="1186.41975501 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">501</span></span> FAKE</span></span></td></tr><tr><td>Total Sent</td><td><span class="amt copyable" cc="0.00000001 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">001</span></span> FAKE</span></span></td></tr><tr><td>Final Balance</td><td><span class="amt copyable" cc="1186.419755 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span></td></tr><tr><td>No. Transactions</td><td>2</td></tr><tr><td>Used XPUB Addresses</td><td>2</td></tr></tbody></table><table class="table data-table"><tbody><tr><td style="white-space: nowrap; width: 50%;"><h5>XPUB Addresses with Balance</h5></td><td colspan="3"></td></tr><tr><th>Address</th><th>Balance</th><th>Txs</th><th>Path</th></tr><tr><td class="ellipsis"><a href="/address/2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu" class="copyable">2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu</a></td><td><span class="amt copyable" cc="1186.419755 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span></td><td>1</td><td>m/49&#39;/1&#39;/33&#39;/1/3</td></tr></tbody></table><div class="row mb-4"><div class="col-12"><a href="?tokens=used" class="ms-3 me-3">Show used XPUB addresses</a><a href="?tokens=derived">Show all derived XPUB addresses</a></div></div><div class="row pt-3 pb-1"><h3 class="col-sm-6 col-lg-3 m-0 align-self-center">Transactions</h3><div class="col-sm-6 col-lg-3 my-2 my-lg-0 align-self-center"><select  class="w-100" onchange="self.location='?filter='+options[selectedIndex].value"><option>All</option><option  value="inputs">XPUB addresses on input side</option><option  value="outputs">XPUB addresses on output side</option></select></div><div class="col-lg-6"></div></div><div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71" class="ellipsis copyable txid">3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-21 01:27:58">1639 days 11 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX">mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX</a></span><span class="amt tx-amt copyable" cc="3172.83951061 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">061</span></span> FAKE</span></span></div><div class="col-12 tx-own"><span class="ellipsis copyable"><a href="/address/2MzmAKayJmja784jyHvRUW1bXPget1csRRG">2MzmAKayJmja784jyHvRUW1bXPget1csRRG</a></span><span class="amt tx-amt copyable" cc="0.00000001 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">001</span></span> FAKE</span></span></div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12 tx-own"><span class="ellipsis copyable"><a href="/address/2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu">2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu</a></span><span class="tx-amt"><span class="amt copyable" cc="1186.419755 FAKE"><span class="prim-amt">1<span class="nc">186</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP">mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP</a></span><span class="tx-amt"><span class="amt copyable" cc="1986.419755 FAKE"><span class="prim-amt">1<span class="nc">986</span>.<span class="amt-dec">41<span class="ns">975</span><span class="ns">500</span></span> FAKE</span></span><span class="unspent" tt="Unspent">×</span></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0.00000062 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">062</span></span> FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">1</span> confirmations</span><span class="amt txvalue copyable" cc="3172.83951 FAKE"><span class="prim-amt">3<span class="nc">172</span>.<span class="amt-dec">83<span class="ns">951</span><span class="ns">000</span></span> FAKE</span></span></div></div></div><div class="tx-detail"><div class="row head"><div class="col-xs-7 col-md-8"><a href="/tx/effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75" class="ellipsis copyable txid">effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75</a></div><div class="col-xs-5 col-md-4 text-end">mined <span class="txvalue ms-1"><span tt="2018-03-20 03:03:46">1640 days 9 hours ago</span></span></div></div><div class="row body"><div class="col-md-5"><div class="row tx-in"><div class="col-12">No Inputs</div></div></div><div class="col-md-1 col-xs-12 text-center">&nbsp;<span class="octicon"></span></div><div class="col-md-6"><div class="row tx-out"><div class="col-12"><span class="ellipsis copyable"><a href="/address/mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw">mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw</a></span><span class="tx-amt"><span class="amt copyable" cc="12345.67890123 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">890</span><span class="ns">123</span></span> FAKE</span></span><a class="spent" href="/spending/effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75/0" tt="Spent">→</a></span></div><div class="col-12 tx-own"><span class="ellipsis copyable"><a href="/address/2MzmAKayJmja784jyHvRUW1bXPget1csRRG">2MzmAKayJmja784jyHvRUW1bXPget1csRRG</a></span><span class="tx-amt"><span class="amt copyable" cc="0.00000001 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">000</span><span class="ns">001</span></span> FAKE</span></span><a class="spent" href="/spending/effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75/1" tt="Spent">→</a></span></div><div class="col-12"><span class="ellipsis copyable"><a href="/address/2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1">2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1</a></span><span class="tx-amt"><span class="amt copyable" cc="0.00009876 FAKE"><span class="prim-amt">0.<span class="amt-dec">00<span class="ns">009</span><span class="ns">876</span></span> FAKE</span></span><a class="spent" href="/spending/effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75/2" tt="Spent">→</a></span></div></div></div></div><div class="row footer"><div class="col-sm-12 col-md-4">Fee <span class="amt txvalue copyable ms-3" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></div><div class="col-sm-12 col-md-8 text-end"><span class="me-4"><span class="txvalue">2</span> confirmations</span><span class="amt txvalue copyable" cc="12345.679 FAKE"><span class="prim-amt">12<span class="nc">345</span>.<span class="amt-dec">67<span class="ns">900</span><span class="ns">000</span></span> FAKE</span></span></div></div></div></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -411,12 +508,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>XPUB <small class="text-muted">0 FAKE</small></h1><div class="alert alert-data ellipsis"><span class="data">tr([5c9e228d/86&#39;/1&#39;/0&#39;]tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{0,1}/*)#4rqwxvej</span></div><h3>Confirmed</h3>`,
-				`<tr><td style="width: 25%;">Total Received</td><td class="data">0 FAKE</td></tr>`,
-				`<tr><td>Total Sent</td><td class="data">0 FAKE</td></tr>`,
-				`<tr><td>Used XPUB Addresses</td><td class="data">0</td></tr>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><div class="row"><div class="col-md-10 order-2 order-md-1"><h1>XPUB</h1><h5 class="col-12 d-flex h-data pb-2"><span class="ellipsis copyable">tr([5c9e228d/86&#39;/1&#39;/0&#39;]tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{0,1}/*)#4rqwxvej</span></h5><h4 class="row"><div class="col-lg-6"><span class="copyable">0 FAKE</span></div></h4></div><div class="col-md-2 order-1 order-md-2 d-flex justify-content-center justify-content-md-end mb-3 mb-md-0"><div id="qrcode"></div><script type="text/javascript" src="/static/js/qrcode.min.js"></script><script type="text/javascript">new QRCode(document.getElementById("qrcode"), { text: "tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{0,1}/*)#4rqwxvej", width: 120, height: 120 });</script></div></div><table class="table data-table info-table"><tbody><tr><td style="white-space: nowrap;"><h5>Confirmed</h5></td><td></td></tr><tr><td style="width: 25%;">Total Received</td><td><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></td></tr><tr><td>Total Sent</td><td><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></td></tr><tr><td>Final Balance</td><td><span class="amt copyable" cc="0 FAKE"><span class="prim-amt">0 FAKE</span></span></td></tr><tr><td>No. Transactions</td><td>0</td></tr><tr><td>Used XPUB Addresses</td><td>0</td></tr></tbody></table><table class="table data-table"><tbody><tr><td style="white-space: nowrap; width: 50%;"><h5>XPUB Addresses with Balance</h5></td><td colspan="3"></td></tr><tr><td colspan="4">No addresses</td></tr></tbody></table><div class="row mb-4"><div class="col-12"><a href="?tokens=used" class="ms-3 me-3">Show used XPUB addresses</a><a href="?tokens=derived">Show all derived XPUB addresses</a></div></div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -425,10 +517,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Error</h1>`,
-				`<h4>No matching records found for &#39;1234&#39;</h4>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><h1>Error</h1><h4>No matching records found for &#39;1234&#39;</h4></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -437,10 +526,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Send Raw Transaction</h1>`,
-				`<textarea class="form-control" rows="8" name="hex"></textarea>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><h1>Send Raw Transaction</h1><form method="POST" action="/sendtx"><div class="form-group"><label for="exampleFormControlTextarea1">Raw transaction data</label><textarea class="form-control" rows="8" name="hex"></textarea></div><div class="form-group mt-3"><button type="submit" class="btn btn-outline-secondary">Send</button></div></form></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -449,11 +535,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			body: []string{
-				`<a class="navbar-brand" href="/">Fake Coin Explorer</a>`,
-				`<h1>Send Raw Transaction</h1>`,
-				`<textarea class="form-control" rows="8" name="hex">12341234</textarea>`,
-				`<div class="alert alert-danger">Invalid data</div>`,
-				`</html>`,
+				`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no"><link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css"><link rel="stylesheet" href="/static/css/main.min.4.css"><script>var hasSecondary=false;</script><script src="/static/js/bootstrap.bundle.5.2.2.min.js"></script><script src="/static/js/main.min.4.js"></script><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="description" content="Trezor Fake Coin Explorer"><title>Trezor Fake Coin Explorer</title></head><body><header id="header"><nav class="navbar navbar-expand-lg"><div class="container"><a class="navbar-brand" href="/" title="Home"><span class="trezor-logo"></span><span style="padding-left: 140px;">Fake Coin Explorer</span></a><button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><div class="collapse navbar-collapse" id="navbarSupportedContent"><ul class="navbar-nav m-md-auto"><li class="nav-item pe-xl-4"><a href="/blocks" class="nav-link">Blocks</a></li><li class="nav-item"><a href="/" class="nav-link">Status</a></li></ul><span class="navbar-form"><form class="d-flex" id="search" action="/search" method="get"><input name="q" type="text" class="form-control form-control-lg" placeholder="Search for block, transaction, address or xpub" focus="true"><button class="btn" type="submit"><span class="search-icon"></span></button></form></span></div></div></nav></header><main id="wrap"><div class="container"><h1>Send Raw Transaction</h1><form method="POST" action="/sendtx"><div class="form-group"><label for="exampleFormControlTextarea1">Raw transaction data</label><textarea class="form-control" rows="8" name="hex">12341234</textarea></div><div class="form-group mt-3"><button type="submit" class="btn btn-outline-secondary">Send</button></div></form><div class="alert alert-danger mt-3">Invalid data</div></div></main><footer id="footer"><div class="container"><nav class="navbar navbar-dark"><span class="navbar-nav"><a class="nav-link" href="https://satoshilabs.com/" target="_blank" rel="noopener noreferrer">Created by SatoshiLabs</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="https://trezor.io/terms-of-use" target="_blank" rel="noopener noreferrer">Terms of Use</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/" target="_blank" rel="noopener noreferrer">Trezor</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/trezor-suite" target="_blank" rel="noopener noreferrer">Suite</a></span><span class="navbar-nav ml-md-auto d-md-flex d-none"><a class="nav-link" href="https://trezor.io/support" target="_blank" rel="noopener noreferrer">Support</a></span><span class="navbar-nav ml-md-auto"><a class="nav-link" href="/sendtx">Send Transaction</a></span><span class="navbar-nav ml-md-auto d-lg-flex d-none"><a class="nav-link" href="https://trezor.io/compare" target="_blank" rel="noopener noreferrer">Don't have a Trezor? Get one!</a></span></nav></div></footer></body></html>`,
 			},
 		},
 		{
@@ -533,12 +615,12 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			},
 		},
 		{
-			name:        "apiFiatRates missing currency",
+			name:        "apiFiatRates all currencies",
 			r:           newGetRequest(ts.URL + "/api/v2/tickers"),
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1574346615,"rates":{"eur":7134.1,"usd":7914.5}}`,
+				`{"ts":1574380800,"rates":{"eur":7134.1,"usd":7914.5}}`,
 			},
 		},
 		{
@@ -547,16 +629,16 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1574346615,"rates":{"usd":7914.5}}`,
+				`{"ts":1574380800,"rates":{"usd":7914.5}}`,
 			},
 		},
 		{
 			name:        "apiFiatRates get rate by exact timestamp",
-			r:           newGetRequest(ts.URL + "/api/v2/tickers?currency=usd&timestamp=1574344800"),
+			r:           newGetRequest(ts.URL + "/api/v2/tickers?currency=usd&timestamp=1521545531"),
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1574344800,"rates":{"usd":7814.5}}`,
+				`{"ts":1521590400,"rates":{"usd":2001}}`,
 			},
 		},
 		{
@@ -592,25 +674,25 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1574344800,"rates":{"eur":7100}}`,
+				`{"ts":1574380800,"rates":{"eur":7134.1}`,
 			},
 		},
 		{
 			name:        "apiMultiFiatRates all currencies",
-			r:           newGetRequest(ts.URL + "/api/v2/multi-tickers?timestamp=1574344800,1574346615"),
+			r:           newGetRequest(ts.URL + "/api/v2/multi-tickers?timestamp=1574344800,1521677000"),
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`[{"ts":1574344800,"rates":{"eur":7100,"usd":7814.5}},{"ts":1574346615,"rates":{"eur":7134.1,"usd":7914.5}}]`,
+				`[{"ts":1574380800,"rates":{"eur":7134.1,"usd":7914.5}},{"ts":1521849600,"rates":{"eur":1303,"usd":2003}}]`,
 			},
 		},
 		{
 			name:        "apiMultiFiatRates get EUR rate",
-			r:           newGetRequest(ts.URL + "/api/v2/multi-tickers?timestamp=1574344800,1574346615&currency=eur"),
+			r:           newGetRequest(ts.URL + "/api/v2/multi-tickers?timestamp=1521545531,1574346615&currency=eur"),
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`[{"ts":1574344800,"rates":{"eur":7100}},{"ts":1574346615,"rates":{"eur":7134.1}}]`,
+				`[{"ts":1521590400,"rates":{"eur":1301}},{"ts":1574380800,"rates":{"eur":7134.1}}]`,
 			},
 		},
 		{
@@ -619,7 +701,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1521511200,"rates":{"usd":2000}}`,
+				`{"ts":1521504000,"rates":{"usd":2000}}`,
 			},
 		},
 		{
@@ -628,7 +710,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1521611721,"rates":{"usd":2003}}`,
+				`{"ts":1521676800,"rates":{"usd":2002}}`,
 			},
 		},
 		{
@@ -637,7 +719,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1574346615,"rates":{"eur":7134.1}}`,
+				`{"ts":1574380800,"rates":{"eur":7134.1}}`,
 			},
 		},
 		{
@@ -655,7 +737,52 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"ts":1574346615,"available_currencies":["eur","usd"]}`,
+				`{"ts":1574380800,"available_currencies":["eur","usd"]}`,
+			},
+		},
+		{
+			name:        "apiTickerList missing timestamp",
+			r:           newGetRequest(ts.URL + "/api/v2/tickers-list"),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"Parameter \"timestamp\" is not a valid Unix timestamp."}`,
+			},
+		},
+		{
+			name:        "apiTickerList invalid timestamp",
+			r:           newGetRequest(ts.URL + "/api/v2/tickers-list?timestamp=abc"),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"Parameter \"timestamp\" is not a valid Unix timestamp."}`,
+			},
+		},
+		{
+			name:        "apiMultiFiatRates missing timestamp",
+			r:           newGetRequest(ts.URL + "/api/v2/multi-tickers"),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"Parameter 'timestamp' is missing."}`,
+			},
+		},
+		{
+			name:        "apiMultiFiatRates invalid timestamp item",
+			r:           newGetRequest(ts.URL + "/api/v2/multi-tickers?timestamp=1574344800,abc&currency=usd"),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"Parameter 'timestamp' does not contain a valid Unix timestamp."}`,
+			},
+		},
+		{
+			name:        "apiMultiFiatRates timestamp limit",
+			r:           newGetRequest(ts.URL + "/api/v2/multi-tickers?timestamp=" + strings.Repeat("1,", api.MaxFiatRatesTimestamps) + "1&currency=usd"),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"too many timestamps, max ` + strconv.Itoa(api.MaxFiatRatesTimestamps) + `"}`,
 			},
 		},
 		{
@@ -682,7 +809,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"address":"mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw","balance":"0","totalReceived":"1234567890123","totalSent":"1234567890123","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2}`,
+				`{"address":"mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw","balance":"0","totalReceived":"1234567890123","totalSent":"1234567890123","unconfirmedTxs":0,"txs":2}`,
 			},
 		},
 		{
@@ -709,7 +836,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"],"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"}]}`,
+				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"addrTxCount":3,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"],"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"}]}`,
 			},
 		},
 		{
@@ -718,7 +845,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"],"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"}]}`,
+				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"addrTxCount":3,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"],"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"}]}`,
 			},
 		},
 		{
@@ -727,7 +854,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"],"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuWrWMzoBt8VDFNvPmpJf42M1GTUs85fPx","path":"m/49'/1'/33'/0/6","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuVZ2Ca6Da9zmYynt49Rx7uikAgubGcymF","path":"m/49'/1'/33'/0/7","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzRGWDUmrPP9HwYu4B43QGCTLwoop5cExa","path":"m/49'/1'/33'/0/8","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5C9EEWJzyBXhpyPHqa3UNed73Amsi5b3L","path":"m/49'/1'/33'/0/9","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzNawz2zjwq1L85GDE3YydEJGJYfXxaWkk","path":"m/49'/1'/33'/0/10","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N7NdeuAMgL57WE7QCeV2gTWi2Um8iAu5dA","path":"m/49'/1'/33'/0/11","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8JQEP6DSHEZHNsSDPA1gHMUq9YFndhkfV","path":"m/49'/1'/33'/0/12","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mvbn3YXqKZVpQKugaoQrfjSYPvz76RwZkC","path":"m/49'/1'/33'/0/13","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8MRNxCfwUY9TSW27X9ooGYtqgrGCfLRHx","path":"m/49'/1'/33'/0/14","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N6HvwrHC113KYZAmCtJ9XJNWgaTcnFunCM","path":"m/49'/1'/33'/0/15","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NEo3oNyHUoi7rmRWee7wki37jxPWsWCopJ","path":"m/49'/1'/33'/0/16","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mzm5KY8qdFbDHsQfy4akXbFvbR3FAwDuVo","path":"m/49'/1'/33'/0/17","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NGMwftmQCogp6XZNGvgiybz3WZysvsJzqC","path":"m/49'/1'/33'/0/18","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N3fJrrefndYjLGycvFFfYgevpZtcRKCkRD","path":"m/49'/1'/33'/0/19","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N1T7TnHBwfdpBoyw53EGUL7vuJmb2mU6jF","path":"m/49'/1'/33'/0/20","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"},{"type":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N7HexL4dyAQc7Th4iqcCW4hZuyiZsLWf74","path":"m/49'/1'/33'/1/9","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NF6X5FDGWrQj4nQrfP6hA77zB5WAc1DGup","path":"m/49'/1'/33'/1/10","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4ZRPdvc7BVioBTohy4F6QtxreqcjNj26b","path":"m/49'/1'/33'/1/11","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mtfho1rLmevh4qTnkYWxZEFCWteDMtTcUF","path":"m/49'/1'/33'/1/12","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NFUCphKYvmMcNZRZrF261mRX6iADVB9Qms","path":"m/49'/1'/33'/1/13","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5kBNMB8qgxE4Y4f8J19fScsE49J4aNvoJ","path":"m/49'/1'/33'/1/14","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NANWCaefhCKdXMcW8NbZnnrFRDvhJN2wPy","path":"m/49'/1'/33'/1/15","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NFHw7Yo2Bz8D2wGAYHW9qidbZFLpfJ72qB","path":"m/49'/1'/33'/1/16","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NBDSsBgy5PpFniLCb1eAFHcSxgxwPSDsZa","path":"m/49'/1'/33'/1/17","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NDWCSQHogc7sCuc2WoYt9PX2i2i6a5k6dX","path":"m/49'/1'/33'/1/18","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8vNyDP7iSDjm3BKpXrbDjAxyphqfvnJz8","path":"m/49'/1'/33'/1/19","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4tFKLurSbMusAyq1tv4tzymVjveAFV1Vb","path":"m/49'/1'/33'/1/20","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NBx5WwjAr2cH6Yqrp3Vsf957HtRKwDUVdX","path":"m/49'/1'/33'/1/21","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NBu1seHTaFhQxbcW5L5BkZzqFLGmZqpxsa","path":"m/49'/1'/33'/1/22","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NCDLoea22jGsXuarfT1n2QyCUh6RFhAPnT","path":"m/49'/1'/33'/1/23","transfers":0,"decimals":8}]}`,
+				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"addrTxCount":3,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"],"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuWrWMzoBt8VDFNvPmpJf42M1GTUs85fPx","path":"m/49'/1'/33'/0/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuVZ2Ca6Da9zmYynt49Rx7uikAgubGcymF","path":"m/49'/1'/33'/0/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzRGWDUmrPP9HwYu4B43QGCTLwoop5cExa","path":"m/49'/1'/33'/0/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5C9EEWJzyBXhpyPHqa3UNed73Amsi5b3L","path":"m/49'/1'/33'/0/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzNawz2zjwq1L85GDE3YydEJGJYfXxaWkk","path":"m/49'/1'/33'/0/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N7NdeuAMgL57WE7QCeV2gTWi2Um8iAu5dA","path":"m/49'/1'/33'/0/11","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8JQEP6DSHEZHNsSDPA1gHMUq9YFndhkfV","path":"m/49'/1'/33'/0/12","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mvbn3YXqKZVpQKugaoQrfjSYPvz76RwZkC","path":"m/49'/1'/33'/0/13","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8MRNxCfwUY9TSW27X9ooGYtqgrGCfLRHx","path":"m/49'/1'/33'/0/14","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6HvwrHC113KYZAmCtJ9XJNWgaTcnFunCM","path":"m/49'/1'/33'/0/15","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEo3oNyHUoi7rmRWee7wki37jxPWsWCopJ","path":"m/49'/1'/33'/0/16","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mzm5KY8qdFbDHsQfy4akXbFvbR3FAwDuVo","path":"m/49'/1'/33'/0/17","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NGMwftmQCogp6XZNGvgiybz3WZysvsJzqC","path":"m/49'/1'/33'/0/18","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3fJrrefndYjLGycvFFfYgevpZtcRKCkRD","path":"m/49'/1'/33'/0/19","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1T7TnHBwfdpBoyw53EGUL7vuJmb2mU6jF","path":"m/49'/1'/33'/0/20","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N7HexL4dyAQc7Th4iqcCW4hZuyiZsLWf74","path":"m/49'/1'/33'/1/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NF6X5FDGWrQj4nQrfP6hA77zB5WAc1DGup","path":"m/49'/1'/33'/1/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4ZRPdvc7BVioBTohy4F6QtxreqcjNj26b","path":"m/49'/1'/33'/1/11","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mtfho1rLmevh4qTnkYWxZEFCWteDMtTcUF","path":"m/49'/1'/33'/1/12","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NFUCphKYvmMcNZRZrF261mRX6iADVB9Qms","path":"m/49'/1'/33'/1/13","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5kBNMB8qgxE4Y4f8J19fScsE49J4aNvoJ","path":"m/49'/1'/33'/1/14","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NANWCaefhCKdXMcW8NbZnnrFRDvhJN2wPy","path":"m/49'/1'/33'/1/15","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NFHw7Yo2Bz8D2wGAYHW9qidbZFLpfJ72qB","path":"m/49'/1'/33'/1/16","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBDSsBgy5PpFniLCb1eAFHcSxgxwPSDsZa","path":"m/49'/1'/33'/1/17","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NDWCSQHogc7sCuc2WoYt9PX2i2i6a5k6dX","path":"m/49'/1'/33'/1/18","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8vNyDP7iSDjm3BKpXrbDjAxyphqfvnJz8","path":"m/49'/1'/33'/1/19","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4tFKLurSbMusAyq1tv4tzymVjveAFV1Vb","path":"m/49'/1'/33'/1/20","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBx5WwjAr2cH6Yqrp3Vsf957HtRKwDUVdX","path":"m/49'/1'/33'/1/21","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBu1seHTaFhQxbcW5L5BkZzqFLGmZqpxsa","path":"m/49'/1'/33'/1/22","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NCDLoea22jGsXuarfT1n2QyCUh6RFhAPnT","path":"m/49'/1'/33'/1/23","transfers":0,"decimals":8}]}`,
 			},
 		},
 		{
@@ -736,7 +863,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{0,1}/*)#4rqwxvej","balance":"0","totalReceived":"0","totalSent":"0","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":0,"tokens":[{"type":"XPUBAddress","name":"tb1pswrqtykue8r89t9u4rprjs0gt4qzkdfuursfnvqaa3f2yql07zmq8s8a5u","path":"m/86'/1'/0'/0/0","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"tb1p8tvmvsvhsee73rhym86wt435qrqm92psfsyhy6a3n5gw455znnpqm8wald","path":"m/86'/1'/0'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"tb1p537ddhyuydg5c2v75xxmn6ac64yz4xns2x0gpdcwj5vzzzgrywlqlqwk43","path":"m/86'/1'/0'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"tb1pn2d0yjeedavnkd8z8lhm566p0f2utm3lgvxrsdehnl94y34txmts5s7t4c","path":"m/86'/1'/0'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"tb1p0pnd6ue5vryymvd28aeq3kdz6rmsdjqrq6eespgtg8wdgnxjzjksujhq4u","path":"m/86'/1'/0'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"tb1p29gpmd96hhgf7wj2vs03ca7x2xx39g8t6e0p55h2d5ssqs4fsj8qtx00wc","path":"m/86'/1'/0'/1/2","transfers":0,"decimals":8}]}`,
+				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{0,1}/*)#4rqwxvej","balance":"0","totalReceived":"0","totalSent":"0","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":0,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"tb1pswrqtykue8r89t9u4rprjs0gt4qzkdfuursfnvqaa3f2yql07zmq8s8a5u","path":"m/86'/1'/0'/0/0","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"tb1p8tvmvsvhsee73rhym86wt435qrqm92psfsyhy6a3n5gw455znnpqm8wald","path":"m/86'/1'/0'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"tb1p537ddhyuydg5c2v75xxmn6ac64yz4xns2x0gpdcwj5vzzzgrywlqlqwk43","path":"m/86'/1'/0'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"tb1pn2d0yjeedavnkd8z8lhm566p0f2utm3lgvxrsdehnl94y34txmts5s7t4c","path":"m/86'/1'/0'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"tb1p0pnd6ue5vryymvd28aeq3kdz6rmsdjqrq6eespgtg8wdgnxjzjksujhq4u","path":"m/86'/1'/0'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"tb1p29gpmd96hhgf7wj2vs03ca7x2xx39g8t6e0p55h2d5ssqs4fsj8qtx00wc","path":"m/86'/1'/0'/1/2","transfers":0,"decimals":8}]}`,
 			},
 		},
 		{
@@ -745,7 +872,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":3,"usedTokens":2}`,
+				`{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedTxs":0,"txs":3,"addrTxCount":3,"usedTokens":2}`,
 			},
 		},
 		{
@@ -754,7 +881,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":3,"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8},{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8}]}`,
+				`{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":3,"addrTxCount":3,"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8}]}`,
 			},
 		},
 		{
@@ -763,7 +890,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":3,"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"}]}`,
+				`{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":3,"addrTxCount":3,"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"}]}`,
 			},
 		},
 		{
@@ -772,7 +899,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`{"page":1,"totalPages":1,"itemsOnPage":3,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"transactions":[{"txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","vin":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","n":0,"addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true,"value":"317283951061"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"n":1,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true,"value":"1"}],"vout":[{"value":"118641975500","n":0,"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":["2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"],"isAddress":true,"isOwn":true},{"value":"198641975500","n":1,"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":["mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"],"isAddress":true}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"317283951000","valueIn":"317283951062","fees":"62"}],"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"},{"type":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8}]}`,
+				`{"page":1,"totalPages":1,"itemsOnPage":3,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"addrTxCount":3,"transactions":[{"txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","vin":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","n":0,"addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true,"value":"317283951061"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"n":1,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true,"value":"1"}],"vout":[{"value":"118641975500","n":0,"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":["2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"],"isAddress":true,"isOwn":true},{"value":"198641975500","n":1,"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":["mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"],"isAddress":true}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"317283951000","valueIn":"317283951062","fees":"62"}],"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8}]}`,
 			},
 		},
 		{
@@ -826,7 +953,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`[{"time":1521514800,"txs":1,"received":"24690","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"0","sent":"12345","sentToSelf":"0","rates":{"eur":1303,"usd":2003}}]`,
+				`[{"time":1521514800,"txs":1,"received":"24690","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"0","sent":"12345","sentToSelf":"0","rates":{"eur":1302,"usd":2002}}]`,
 			},
 		},
 		{
@@ -835,7 +962,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`[{"time":1521514800,"txs":1,"received":"9876","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"9000","sent":"9876","sentToSelf":"9000","rates":{"eur":1303,"usd":2003}}]`,
+				`[{"time":1521514800,"txs":1,"received":"9876","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"9000","sent":"9876","sentToSelf":"9000","rates":{"eur":1302,"usd":2002}}]`,
 			},
 		},
 		{
@@ -844,7 +971,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`[{"time":1521514800,"txs":1,"received":"9876","sent":"0","sentToSelf":"0","rates":{"eur":1301}},{"time":1521594000,"txs":1,"received":"9000","sent":"9876","sentToSelf":"9000","rates":{"eur":1303}}]`,
+				`[{"time":1521514800,"txs":1,"received":"9876","sent":"0","sentToSelf":"0","rates":{"eur":1301}},{"time":1521594000,"txs":1,"received":"9000","sent":"9876","sentToSelf":"9000","rates":{"eur":1302}}]`,
 			},
 		},
 		{
@@ -862,7 +989,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"118641975500","sent":"1","sentToSelf":"118641975500","rates":{"eur":1303,"usd":2003}}]`,
+				`[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"118641975500","sent":"1","sentToSelf":"118641975500","rates":{"eur":1302,"usd":2002}}]`,
 			},
 		},
 		{
@@ -889,7 +1016,7 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			status:      http.StatusOK,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
-				`[{"time":1521594000,"txs":1,"received":"118641975500","sent":"1","sentToSelf":"118641975500","rates":{"eur":1303,"usd":2003}}]`,
+				`[{"time":1521594000,"txs":1,"received":"118641975500","sent":"1","sentToSelf":"118641975500","rates":{"eur":1302,"usd":2002}}]`,
 			},
 		},
 		{
@@ -911,30 +1038,21 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			},
 		},
 		{
-			name:        "apiSendTx POST JSON",
-			r:           newPostRequest(ts.URL+"/api/v2/sendtx/", `{"hex":"123456"}`),
-			status:      http.StatusOK,
-			contentType: "application/json; charset=utf-8",
-			body: []string{
-				`{"result":"9876"}`,
-			},
-		},
-		{
-			name:        "apiSendTx POST JSON maxburn unsupported",
-			r:           newPostRequest(ts.URL+"/api/v2/sendtx/", `{"hex":"123456","maxburnamount":"1"}`),
-			status:      http.StatusBadRequest,
-			contentType: "application/json; charset=utf-8",
-			body: []string{
-				`{"error":"maxfeerate and maxburnamount are supported only on Syscoin"}`,
-			},
-		},
-		{
 			name:        "apiSendTx POST empty",
 			r:           newPostRequest(ts.URL+"/api/v2/sendtx", ""),
 			status:      http.StatusBadRequest,
 			contentType: "application/json; charset=utf-8",
 			body: []string{
 				`{"error":"Missing tx blob"}`,
+			},
+		},
+		{
+			name:        "apiSendTx POST too large",
+			r:           newPostRequestWithContentLength(ts.URL+"/api/v2/sendtx/", maxSendTxBodyBytes+1),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"Tx blob too large"}`,
 			},
 		},
 		{
@@ -965,568 +1083,656 @@ func httpTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 			},
 		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resp, err := http.DefaultClient.Do(tt.r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != tt.status {
-				t.Errorf("StatusCode = %v, want %v", resp.StatusCode, tt.status)
-			}
-			if resp.Header["Content-Type"][0] != tt.contentType {
-				t.Errorf("Content-Type = %v, want %v", resp.Header["Content-Type"][0], tt.contentType)
-			}
-			bb, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
-			b := string(bb)
-			for _, c := range tt.body {
-				if !strings.Contains(b, c) {
-					t.Errorf("got %v, want to contain %v", b, c)
-					break
-				}
-			}
-		})
-	}
+	performHttpTests(tests, t, ts)
 }
 
-func socketioTestsBitcoinType(t *testing.T, ts *httptest.Server) {
-	type socketioReq struct {
-		Method string        `json:"method"`
-		Params []interface{} `json:"params"`
-	}
+type websocketReq struct {
+	ID     string      `json:"id"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params,omitempty"`
+}
+type websocketResp struct {
+	ID string `json:"id"`
+}
 
-	url := strings.Replace(ts.URL, "http://", "ws://", 1) + "/socket.io/"
-	s, err := gosocketio.Dial(url, transport.GetDefaultWebsocketTransport())
+type websocketRespWithData struct {
+	ID   string          `json:"id"`
+	Data json.RawMessage `json:"data"`
+}
+
+type websocketTest struct {
+	name string
+	req  websocketReq
+	want string
+}
+
+func connectWebsocket(t *testing.T, ts *httptest.Server) *websocket.Conn {
+	t.Helper()
+	url := strings.Replace(ts.URL, "http://", "ws://", 1) + "/websocket"
+	s, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	return s
+}
 
-	tests := []struct {
-		name string
-		req  socketioReq
-		want string
-	}{
-		{
-			name: "socketio getInfo",
-			req:  socketioReq{"getInfo", []interface{}{}},
-			want: `{"result":{"blocks":225494,"testnet":true,"network":"fakecoin","subversion":"/Fakecoin:0.0.1/","coin_name":"Fakecoin","about":"Blockbook - blockchain indexer for Trezor wallet https://trezor.io/. Do not use for any other purpose."}}`,
-		},
-		{
-			name: "socketio estimateFee",
-			req:  socketioReq{"estimateFee", []interface{}{17}},
-			want: `{"result":0.000034}`,
-		},
-		{
-			name: "socketio estimateSmartFee",
-			req:  socketioReq{"estimateSmartFee", []interface{}{19, true}},
-			want: `{"result":0.000019}`,
-		},
-		{
-			name: "socketio getAddressTxids",
-			req: socketioReq{"getAddressTxids", []interface{}{
-				[]string{"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"},
-				map[string]interface{}{
-					"start":        2000000,
-					"end":          0,
-					"queryMempool": false,
-				},
-			}},
-			want: `{"result":["7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840"]}`,
-		},
-		{
-			name: "socketio getAddressTxids limited range",
-			req: socketioReq{"getAddressTxids", []interface{}{
-				[]string{"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"},
-				map[string]interface{}{
-					"start":        225494,
-					"end":          225494,
-					"queryMempool": false,
-				},
-			}},
-			want: `{"result":["7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25"]}`,
-		},
-		{
-			name: "socketio getAddressHistory",
-			req: socketioReq{"getAddressHistory", []interface{}{
-				[]string{"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"},
-				map[string]interface{}{
-					"start":        2000000,
-					"end":          0,
-					"queryMempool": false,
-					"from":         0,
-					"to":           5,
-				},
-			}},
-			want: `{"result":{"totalCount":2,"items":[{"addresses":{"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz":{"inputIndexes":[1],"outputIndexes":[]}},"satoshis":-12345,"confirmations":1,"tx":{"hex":"","height":225494,"blockTimestamp":1521595678,"version":0,"hash":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","inputs":[{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","outputIndex":0,"script":"","sequence":0,"address":"mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw","satoshis":1234567890123},{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","outputIndex":1,"script":"","sequence":0,"address":"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz","satoshis":12345}],"inputSatoshis":1234567902468,"outputs":[{"satoshis":317283951061,"script":"76a914ccaaaf374e1b06cb83118453d102587b4273d09588ac","address":"mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"},{"satoshis":917283951061,"script":"76a9148d802c045445df49613f6a70ddd2e48526f3701f88ac","address":"mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL"},{"satoshis":0,"script":"6a072020f1686f6a20","address":"OP_RETURN 2020f1686f6a20"}],"outputSatoshis":1234567902122,"feeSatoshis":346}},{"addresses":{"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz":{"inputIndexes":[],"outputIndexes":[1,2]}},"satoshis":24690,"confirmations":2,"tx":{"hex":"","height":225493,"blockTimestamp":1521515026,"version":0,"hash":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","inputs":[],"outputs":[{"satoshis":100000000,"script":"76a914010d39800f86122416e28f485029acf77507169288ac","address":"mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti"},{"satoshis":12345,"script":"76a9148bdf0aa3c567aa5975c2e61321b8bebbe7293df688ac","address":"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"},{"satoshis":12345,"script":"76a9148bdf0aa3c567aa5975c2e61321b8bebbe7293df688ac","address":"mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"}],"outputSatoshis":100024690}}]}}`,
-		},
-		{
-			name: "socketio getBlockHeader",
-			req:  socketioReq{"getBlockHeader", []interface{}{225493}},
-			want: `{"result":{"hash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","version":0,"confirmations":0,"height":0,"chainWork":"","nextHash":"","merkleRoot":"","time":0,"medianTime":0,"nonce":0,"bits":"","difficulty":0}}`,
-		},
-		{
-			name: "socketio getDetailedTransaction",
-			req:  socketioReq{"getDetailedTransaction", []interface{}{"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71"}},
-			want: `{"result":{"hex":"","height":225494,"blockTimestamp":1521595678,"version":0,"hash":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","inputs":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","outputIndex":0,"script":"","sequence":0,"address":"mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX","satoshis":317283951061},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","outputIndex":1,"script":"","sequence":0,"address":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","satoshis":1}],"inputSatoshis":317283951062,"outputs":[{"satoshis":118641975500,"script":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","address":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"},{"satoshis":198641975500,"script":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","address":"mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"}],"outputSatoshis":317283951000,"feeSatoshis":62}}`,
-		},
-		{
-			name: "socketio sendTransaction",
-			req:  socketioReq{"sendTransaction", []interface{}{"010000000001019d64f0c72a0d206001decbffaa722eb1044534c"}},
-			want: `{"error":{"message":"Invalid data"}}`,
-		},
+func readWebsocketResponse(t *testing.T, s *websocket.Conn, timeout time.Duration) websocketRespWithData {
+	t.Helper()
+	if err := s.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		t.Fatal(err)
 	}
+	defer s.SetReadDeadline(time.Time{})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resp, err := s.Ack("message", tt.req, time.Second*3)
-			if err != nil {
-				t.Errorf("Socketio error %v", err)
-			}
-			if resp != tt.want {
-				t.Errorf("got %v, want %v", resp, tt.want)
-			}
-		})
+	_, message, err := s.ReadMessage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resp websocketRespWithData
+	if err := json.Unmarshal(message, &resp); err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
+func assertNoWebsocketMessage(t *testing.T, s *websocket.Conn, timeout time.Duration) {
+	t.Helper()
+	if err := s.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := s.ReadMessage()
+	s.SetReadDeadline(time.Time{})
+	if err == nil {
+		t.Fatal("expected no websocket message, got one")
+	}
+	var netErr net.Error
+	if !errors.As(err, &netErr) || !netErr.Timeout() {
+		t.Fatalf("expected timeout error, got %v", err)
 	}
 }
 
-func websocketTestsBitcoinType(t *testing.T, ts *httptest.Server) {
-	type websocketReq struct {
-		ID     string      `json:"id"`
-		Method string      `json:"method"`
-		Params interface{} `json:"params,omitempty"`
+func Test_WebsocketRejectsOversizedMessage(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	ws := connectWebsocket(t, ts)
+	defer ws.Close()
+
+	// Verify the connection is healthy before sending an oversized frame.
+	if err := ws.WriteJSON(websocketReq{ID: "0", Method: "getInfo"}); err != nil {
+		t.Fatal(err)
 	}
-	type websocketResp struct {
-		ID string `json:"id"`
+	resp := readWebsocketResponse(t, ws, time.Second)
+	if resp.ID != "0" {
+		t.Fatalf("got response id %q, want %q", resp.ID, "0")
 	}
+
+	payload := strings.Repeat("a", int(maxWebsocketMessageBytes)+1)
+	if err := ws.WriteMessage(websocket.TextMessage, []byte(payload)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ws.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := ws.ReadMessage()
+	ws.SetReadDeadline(time.Time{})
+	if err == nil {
+		t.Fatal("expected websocket read error after oversized message")
+	}
+	if websocket.IsCloseError(err, websocket.CloseMessageTooBig, websocket.CloseAbnormalClosure) {
+		return
+	}
+	if errors.Is(err, io.EOF) {
+		return
+	}
+	t.Fatalf("unexpected websocket error after oversized message: %v", err)
+}
+
+func Test_WebsocketClosesWhenPendingRequestLimitExceeded(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+
+	releaseRequests := make(chan struct{})
+	defer close(releaseRequests)
+	startedRequests := make(chan struct{}, maxWebsocketPendingRequests)
+	originalPingHandler := requestHandlers["ping"]
+	requestHandlers["ping"] = func(s *WebsocketServer, c *websocketChannel, req *WsReq) (interface{}, error) {
+		startedRequests <- struct{}{}
+		<-releaseRequests
+		return struct{}{}, nil
+	}
+	defer func() {
+		requestHandlers["ping"] = originalPingHandler
+	}()
+
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	ws := connectWebsocket(t, ts)
+	defer ws.Close()
+
+	for i := 0; i < maxWebsocketPendingRequests; i++ {
+		if err := ws.WriteJSON(websocketReq{ID: strconv.Itoa(i), Method: "ping"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < maxWebsocketPendingRequests; i++ {
+		select {
+		case <-startedRequests:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for pending request %d", i)
+		}
+	}
+
+	if err := ws.WriteJSON(websocketReq{ID: "overflow", Method: "ping"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ws.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := ws.ReadMessage()
+	ws.SetReadDeadline(time.Time{})
+	if err == nil {
+		t.Fatal("expected websocket read error after pending request limit was exceeded")
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		t.Fatal("expected connection close after pending request limit was exceeded, got timeout")
+	}
+}
+
+var websocketTestsBitcoinType = []websocketTest{
+	{
+		name: "websocket getInfo",
+		req: websocketReq{
+			Method: "getInfo",
+		},
+		want: `{"id":"0","data":{"name":"Fakecoin","shortcut":"FAKE","network":"FAKE","decimals":8,"version":"unknown","bestHeight":225494,"bestHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","block0Hash":"","testnet":true,"backend":{"version":"001001","subversion":"/Fakecoin:0.0.1/"}}}`,
+	},
+	{
+		name: "websocket getBlockHash",
+		req: websocketReq{
+			Method: "getBlockHash",
+			Params: map[string]interface{}{
+				"height": 225494,
+			},
+		},
+		want: `{"id":"1","data":{"hash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6"}}`,
+	},
+	{
+		name: "websocket getAccountInfo xpub txs",
+		req: websocketReq{
+			Method: "getAccountInfo",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Xpub,
+				"details":    "txs",
+			},
+		},
+		want: `{"id":"2","data":{"page":1,"totalPages":1,"itemsOnPage":25,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"addrTxCount":3,"transactions":[{"txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","vin":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","n":0,"addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true,"value":"317283951061"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"n":1,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true,"value":"1"}],"vout":[{"value":"118641975500","n":0,"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":["2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"],"isAddress":true,"isOwn":true},{"value":"198641975500","n":1,"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":["mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"],"isAddress":true}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"317283951000","valueIn":"317283951062","fees":"62"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vin":[],"vout":[{"value":"1234567890123","n":0,"spent":true,"hex":"76a914a08eae93007f22668ab5e4a9c83c8cd1c325e3e088ac","addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true},{"value":"1","n":1,"spent":true,"hex":"a91452724c5178682f70e0ba31c6ec0633755a3b41d987","addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true},{"value":"9876","n":2,"spent":true,"hex":"a914e921fc4912a315078f370d959f2c4f7b6d2a683c87","addresses":["2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"1234567900000","valueIn":"0","fees":"0"}],"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuWrWMzoBt8VDFNvPmpJf42M1GTUs85fPx","path":"m/49'/1'/33'/0/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuVZ2Ca6Da9zmYynt49Rx7uikAgubGcymF","path":"m/49'/1'/33'/0/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzRGWDUmrPP9HwYu4B43QGCTLwoop5cExa","path":"m/49'/1'/33'/0/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5C9EEWJzyBXhpyPHqa3UNed73Amsi5b3L","path":"m/49'/1'/33'/0/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzNawz2zjwq1L85GDE3YydEJGJYfXxaWkk","path":"m/49'/1'/33'/0/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N7NdeuAMgL57WE7QCeV2gTWi2Um8iAu5dA","path":"m/49'/1'/33'/0/11","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8JQEP6DSHEZHNsSDPA1gHMUq9YFndhkfV","path":"m/49'/1'/33'/0/12","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mvbn3YXqKZVpQKugaoQrfjSYPvz76RwZkC","path":"m/49'/1'/33'/0/13","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8MRNxCfwUY9TSW27X9ooGYtqgrGCfLRHx","path":"m/49'/1'/33'/0/14","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6HvwrHC113KYZAmCtJ9XJNWgaTcnFunCM","path":"m/49'/1'/33'/0/15","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEo3oNyHUoi7rmRWee7wki37jxPWsWCopJ","path":"m/49'/1'/33'/0/16","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mzm5KY8qdFbDHsQfy4akXbFvbR3FAwDuVo","path":"m/49'/1'/33'/0/17","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NGMwftmQCogp6XZNGvgiybz3WZysvsJzqC","path":"m/49'/1'/33'/0/18","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3fJrrefndYjLGycvFFfYgevpZtcRKCkRD","path":"m/49'/1'/33'/0/19","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1T7TnHBwfdpBoyw53EGUL7vuJmb2mU6jF","path":"m/49'/1'/33'/0/20","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N7HexL4dyAQc7Th4iqcCW4hZuyiZsLWf74","path":"m/49'/1'/33'/1/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NF6X5FDGWrQj4nQrfP6hA77zB5WAc1DGup","path":"m/49'/1'/33'/1/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4ZRPdvc7BVioBTohy4F6QtxreqcjNj26b","path":"m/49'/1'/33'/1/11","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mtfho1rLmevh4qTnkYWxZEFCWteDMtTcUF","path":"m/49'/1'/33'/1/12","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NFUCphKYvmMcNZRZrF261mRX6iADVB9Qms","path":"m/49'/1'/33'/1/13","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5kBNMB8qgxE4Y4f8J19fScsE49J4aNvoJ","path":"m/49'/1'/33'/1/14","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NANWCaefhCKdXMcW8NbZnnrFRDvhJN2wPy","path":"m/49'/1'/33'/1/15","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NFHw7Yo2Bz8D2wGAYHW9qidbZFLpfJ72qB","path":"m/49'/1'/33'/1/16","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBDSsBgy5PpFniLCb1eAFHcSxgxwPSDsZa","path":"m/49'/1'/33'/1/17","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NDWCSQHogc7sCuc2WoYt9PX2i2i6a5k6dX","path":"m/49'/1'/33'/1/18","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8vNyDP7iSDjm3BKpXrbDjAxyphqfvnJz8","path":"m/49'/1'/33'/1/19","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4tFKLurSbMusAyq1tv4tzymVjveAFV1Vb","path":"m/49'/1'/33'/1/20","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBx5WwjAr2cH6Yqrp3Vsf957HtRKwDUVdX","path":"m/49'/1'/33'/1/21","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBu1seHTaFhQxbcW5L5BkZzqFLGmZqpxsa","path":"m/49'/1'/33'/1/22","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NCDLoea22jGsXuarfT1n2QyCUh6RFhAPnT","path":"m/49'/1'/33'/1/23","transfers":0,"decimals":8}]}}`,
+	},
+	{
+		name: "websocket getAccountInfo address",
+		req: websocketReq{
+			Method: "getAccountInfo",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Addr4,
+				"details":    "txids",
+			},
+		},
+		want: `{"id":"3","data":{"page":1,"totalPages":1,"itemsOnPage":25,"address":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","balance":"0","totalReceived":"1","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"]}}`,
+	},
+	{
+		name: "websocket getAccountInfo xpub gap",
+		req: websocketReq{
+			Method: "getAccountInfo",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Xpub,
+				"details":    "tokens",
+				"tokens":     "derived",
+				"gap":        10,
+			},
+		},
+		want: `{"id":"4","data":{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":3,"addrTxCount":3,"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuWrWMzoBt8VDFNvPmpJf42M1GTUs85fPx","path":"m/49'/1'/33'/0/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuVZ2Ca6Da9zmYynt49Rx7uikAgubGcymF","path":"m/49'/1'/33'/0/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzRGWDUmrPP9HwYu4B43QGCTLwoop5cExa","path":"m/49'/1'/33'/0/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5C9EEWJzyBXhpyPHqa3UNed73Amsi5b3L","path":"m/49'/1'/33'/0/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzNawz2zjwq1L85GDE3YydEJGJYfXxaWkk","path":"m/49'/1'/33'/0/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N7HexL4dyAQc7Th4iqcCW4hZuyiZsLWf74","path":"m/49'/1'/33'/1/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NF6X5FDGWrQj4nQrfP6hA77zB5WAc1DGup","path":"m/49'/1'/33'/1/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4ZRPdvc7BVioBTohy4F6QtxreqcjNj26b","path":"m/49'/1'/33'/1/11","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mtfho1rLmevh4qTnkYWxZEFCWteDMtTcUF","path":"m/49'/1'/33'/1/12","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NFUCphKYvmMcNZRZrF261mRX6iADVB9Qms","path":"m/49'/1'/33'/1/13","transfers":0,"decimals":8}]}}`,
+	},
+	{
+		name: "websocket getAccountUtxo",
+		req: websocketReq{
+			Method: "getAccountUtxo",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Addr1,
+			},
+		},
+		want: `{"id":"5","data":[{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","vout":0,"value":"100000000","height":225493,"confirmations":2}]}`,
+	},
+	{
+		name: "websocket getAccountUtxo",
+		req: websocketReq{
+			Method: "getAccountUtxo",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Addr4,
+			},
+		},
+		want: `{"id":"6","data":[]}`,
+	},
+	{
+		name: "websocket getTransaction",
+		req: websocketReq{
+			Method: "getTransaction",
+			Params: map[string]interface{}{
+				"txid": dbtestdata.TxidB2T2,
+			},
+		},
+		want: `{"id":"7","data":{"txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","vin":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","n":0,"addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true,"value":"317283951061"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"n":1,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"value":"1"}],"vout":[{"value":"118641975500","n":0,"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":["2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"],"isAddress":true},{"value":"198641975500","n":1,"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":["mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"],"isAddress":true}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"317283951000","valueIn":"317283951062","fees":"62"}}`,
+	},
+	{
+		name: "websocket getTransaction",
+		req: websocketReq{
+			Method: "getTransaction",
+			Params: map[string]interface{}{
+				"txid": "not a tx",
+			},
+		},
+		want: `{"id":"8","data":{"error":{"message":"Transaction 'not a tx' not found"}}}`,
+	},
+	{
+		name: "websocket getTransactionSpecific",
+		req: websocketReq{
+			Method: "getTransactionSpecific",
+			Params: map[string]interface{}{
+				"txid": dbtestdata.TxidB2T2,
+			},
+		},
+		want: `{"id":"9","data":{"hex":"","txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","version":0,"locktime":0,"vin":[{"coinbase":"","txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","vout":0,"scriptSig":{"hex":""},"sequence":0,"addresses":null},{"coinbase":"","txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"scriptSig":{"hex":""},"sequence":0,"addresses":null}],"vout":[{"ValueSat":118641975500,"value":0,"n":0,"scriptPubKey":{"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":null}},{"ValueSat":198641975500,"value":0,"n":1,"scriptPubKey":{"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":null}}],"confirmations":1,"time":1521595678,"blocktime":1521595678,"vsize":400}}`,
+	},
+	{
+		name: "websocket estimateFee",
+		req: websocketReq{
+			Method: "estimateFee",
+			Params: map[string]interface{}{
+				"blocks": []int{2, 5, 10, 20},
+				"specific": map[string]interface{}{
+					"conservative": false,
+					"txsize":       1234,
+				},
+			},
+		},
+		want: `{"id":"10","data":[{"feePerTx":"246","feePerUnit":"199"},{"feePerTx":"616","feePerUnit":"499"},{"feePerTx":"1233","feePerUnit":"999"},{"feePerTx":"2467","feePerUnit":"1999"}]}`,
+	},
+	{
+		name: "websocket estimateFee second time, from cache",
+		req: websocketReq{
+			Method: "estimateFee",
+			Params: map[string]interface{}{
+				"blocks": []int{2, 5, 10, 20},
+				"specific": map[string]interface{}{
+					"conservative": false,
+					"txsize":       1234,
+				},
+			},
+		},
+		want: `{"id":"11","data":[{"feePerTx":"246","feePerUnit":"199"},{"feePerTx":"616","feePerUnit":"499"},{"feePerTx":"1233","feePerUnit":"999"},{"feePerTx":"2467","feePerUnit":"1999"}]}`,
+	},
+	{
+		name: "websocket sendTransaction",
+		req: websocketReq{
+			Method: "sendTransaction",
+			Params: map[string]interface{}{
+				"hex": "123456",
+			},
+		},
+		want: `{"id":"12","data":{"result":"9876"}}`,
+	},
+	{
+		name: "websocket subscribeNewBlock",
+		req: websocketReq{
+			Method: "subscribeNewBlock",
+		},
+		want: `{"id":"13","data":{"subscribed":true}}`,
+	},
+	{
+		name: "websocket unsubscribeNewBlock",
+		req: websocketReq{
+			Method: "unsubscribeNewBlock",
+		},
+		want: `{"id":"14","data":{"subscribed":false}}`,
+	},
+	{
+		name: "websocket subscribeAddresses",
+		req: websocketReq{
+			Method: "subscribeAddresses",
+			Params: map[string]interface{}{
+				"addresses": []string{dbtestdata.Addr1, dbtestdata.Addr2},
+			},
+		},
+		want: `{"id":"15","data":{"subscribed":true}}`,
+	},
+	{
+		name: "websocket unsubscribeAddresses",
+		req: websocketReq{
+			Method: "unsubscribeAddresses",
+		},
+		want: `{"id":"16","data":{"subscribed":false}}`,
+	},
+	{
+		name: "websocket ping",
+		req: websocketReq{
+			Method: "ping",
+		},
+		want: `{"id":"17","data":{}}`,
+	},
+	{
+		name: "websocket getCurrentFiatRates all currencies",
+		req: websocketReq{
+			Method: "getCurrentFiatRates",
+			Params: map[string]interface{}{
+				"currencies": []string{},
+			},
+		},
+		want: `{"id":"18","data":{"ts":1574380800,"rates":{"eur":7134.1,"usd":7914.5}}}`,
+	},
+	{
+		name: "websocket getCurrentFiatRates usd",
+		req: websocketReq{
+			Method: "getCurrentFiatRates",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+			},
+		},
+		want: `{"id":"19","data":{"ts":1574380800,"rates":{"usd":7914.5}}}`,
+	},
+	{
+		name: "websocket getCurrentFiatRates eur",
+		req: websocketReq{
+			Method: "getCurrentFiatRates",
+			Params: map[string]interface{}{
+				"currencies": []string{"eur"},
+			},
+		},
+		want: `{"id":"20","data":{"ts":1574380800,"rates":{"eur":7134.1}}}`,
+	},
+	{
+		name: "websocket getCurrentFiatRates incorrect currency",
+		req: websocketReq{
+			Method: "getCurrentFiatRates",
+			Params: map[string]interface{}{
+				"currencies": []string{"does-not-exist"},
+			},
+		},
+		want: `{"id":"21","data":{"error":{"message":"No tickers found!"}}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps missing date",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+			},
+		},
+		want: `{"id":"22","data":{"error":{"message":"No timestamps provided"}}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps incorrect date",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+				"timestamps": []string{"yesterday"},
+			},
+		},
+		want: `{"id":"23","data":{"error":{"message":"json: cannot unmarshal string into Go struct field WsFiatRatesForTimestampsReq.timestamps of type int64"}}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps empty currency",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"timestamps": []int64{7885693815},
+				"currencies": []string{""},
+			},
+		},
+		want: `{"id":"24","data":{"tickers":[{"ts":7885693815,"rates":{}}]}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps incorrect (future) date",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+				"timestamps": []int64{7885693815},
+			},
+		},
+		want: `{"id":"25","data":{"tickers":[{"ts":7885693815,"rates":{"usd":-1}}]}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps exact date",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+				"timestamps": []int64{1574380800},
+			},
+		},
+		want: `{"id":"26","data":{"tickers":[{"ts":1574380800,"rates":{"usd":7914.5}}]}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps closest date, eur",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"eur"},
+				"timestamps": []int64{1521507600},
+			},
+		},
+		want: `{"id":"27","data":{"tickers":[{"ts":1521590400,"rates":{"eur":1301}}]}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps multiple timestamps usd",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+				"timestamps": []int64{1570346615, 1574346615},
+			},
+		},
+		want: `{"id":"28","data":{"tickers":[{"ts":1574294400,"rates":{"usd":7814.5}},{"ts":1574380800,"rates":{"usd":7914.5}}]}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps multiple timestamps eur",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"eur"},
+				"timestamps": []int64{1570346615, 1574346615},
+			},
+		},
+		want: `{"id":"29","data":{"tickers":[{"ts":1574294400,"rates":{"eur":7100}},{"ts":1574380800,"rates":{"eur":7134.1}}]}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps multiple timestamps with an error",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+				"timestamps": []int64{1570346615, 1574346615, 2000000000},
+			},
+		},
+		want: `{"id":"30","data":{"tickers":[{"ts":1574294400,"rates":{"usd":7814.5}},{"ts":1574380800,"rates":{"usd":7914.5}},{"ts":2000000000,"rates":{"usd":-1}}]}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps multiple errors",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+				"timestamps": []int64{7832854800, 2000000000},
+			},
+		},
+		want: `{"id":"31","data":{"tickers":[{"ts":7832854800,"rates":{"usd":-1}},{"ts":2000000000,"rates":{"usd":-1}}]}}`,
+	},
+	{
+		name: "websocket getTickersList",
+		req: websocketReq{
+			Method: "getFiatRatesTickersList",
+			Params: map[string]interface{}{
+				"timestamp": 1570346615,
+			},
+		},
+		want: `{"id":"32","data":{"ts":1574294400,"available_currencies":["eur","usd"]}}`,
+	},
+	{
+		name: "websocket getBalanceHistory Addr2",
+		req: websocketReq{
+			Method: "getBalanceHistory",
+			Params: map[string]interface{}{
+				"descriptor": "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz",
+			},
+		},
+		want: `{"id":"33","data":[{"time":1521514800,"txs":1,"received":"24690","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"0","sent":"12345","sentToSelf":"0","rates":{"eur":1302,"usd":2002}}]}`,
+	},
+	{
+		name: "websocket getBalanceHistory xpub",
+		req: websocketReq{
+			Method: "getBalanceHistory",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Xpub,
+			},
+		},
+		want: `{"id":"34","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"118641975500","sent":"1","sentToSelf":"118641975500","rates":{"eur":1302,"usd":2002}}]}`,
+	},
+	{
+		name: "websocket getBalanceHistory xpub from=1521504000&to=1521590400 currencies=[usd]",
+		req: websocketReq{
+			Method: "getBalanceHistory",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Xpub,
+				"from":       1521504000,
+				"to":         1521590400,
+				"currencies": []string{"usd"},
+			},
+		},
+		want: `{"id":"35","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"usd":2001}}]}`,
+	},
+	{
+		name: "websocket getBalanceHistory xpub from=1521504000&to=1521590400 currencies=[usd, eur, incorrect]",
+		req: websocketReq{
+			Method: "getBalanceHistory",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Xpub,
+				"from":       1521504000,
+				"to":         1521590400,
+				"currencies": []string{"usd", "eur", "incorrect"},
+			},
+		},
+		want: `{"id":"36","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"incorrect":-1,"usd":2001}}]}`,
+	},
+	{
+		name: "websocket getBalanceHistory xpub from=1521504000&to=1521590400 currencies=[]",
+		req: websocketReq{
+			Method: "getBalanceHistory",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Xpub,
+				"from":       1521504000,
+				"to":         1521590400,
+				"currencies": []string{},
+			},
+		},
+		want: `{"id":"37","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}}]}`,
+	},
+	{
+		name: "websocket subscribeNewTransaction",
+		req: websocketReq{
+			Method: "subscribeNewTransaction",
+		},
+		want: `{"id":"38","data":{"subscribed":false,"message":"subscribeNewTransaction not enabled, use -enablesubnewtx flag to enable."}}`,
+	},
+	{
+		name: "websocket unsubscribeNewTransaction",
+		req: websocketReq{
+			Method: "unsubscribeNewTransaction",
+		},
+		want: `{"id":"39","data":{"subscribed":false,"message":"unsubscribeNewTransaction not enabled, use -enablesubnewtx flag to enable."}}`,
+	},
+	{
+		name: "websocket getBlock",
+		req: websocketReq{
+			Method: "getBlock",
+			Params: map[string]interface{}{
+				"id": "00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6",
+			},
+		},
+		want: `{"id":"40","data":{"error":{"message":"Not supported"}}}`,
+	},
+	{
+		name: "websocket getMempoolFilters",
+		req: websocketReq{
+			Method: "getMempoolFilters",
+			Params: map[string]interface{}{
+				"scriptType": "",
+			},
+		},
+		want: `{"id":"41","data":{"P":0,"M":1,"zeroedKey":false,"entries":{}}}`,
+	},
+	{
+		name: "websocket getMempoolFilters invalid type",
+		req: websocketReq{
+			Method: "getMempoolFilters",
+			Params: map[string]interface{}{
+				"scriptType": "invalid",
+			},
+		},
+		want: `{"id":"42","data":{"error":{"message":"Unsupported script filter invalid"}}}`,
+	},
+	{
+		name: "websocket getBlockFilter",
+		req: websocketReq{
+			Method: "getBlockFilter",
+			Params: map[string]interface{}{
+				"blockHash": "abcd",
+			},
+		},
+		want: `{"id":"43","data":{"P":0,"M":1,"zeroedKey":false,"blockFilter":""}}`,
+	},
+	{
+		name: "websocket rpcCall",
+		req: websocketReq{
+			Method: "rpcCall",
+			Params: WsRpcCallReq{
+				To:   "0x123",
+				Data: "0x456",
+			},
+		},
+		want: `{"id":"44","data":{"error":{"message":"not supported"}}}`,
+	},
+	{
+		name: "websocket getFiatRatesForTimestamps timestamp limit",
+		req: websocketReq{
+			Method: "getFiatRatesForTimestamps",
+			Params: map[string]interface{}{
+				"currencies": []string{"usd"},
+				"timestamps": make([]int64, api.MaxFiatRatesTimestamps+1),
+			},
+		},
+		want: `{"id":"45","data":{"error":{"message":"too many timestamps, max ` + strconv.Itoa(api.MaxFiatRatesTimestamps) + `"}}}`,
+	},
+}
+
+func runWebsocketTests(t *testing.T, ts *httptest.Server, tests []websocketTest) {
 	url := strings.Replace(ts.URL, "http://", "ws://", 1) + "/websocket"
 	s, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
-
-	tests := []struct {
-		name string
-		req  websocketReq
-		want string
-	}{
-		{
-			name: "websocket getInfo",
-			req: websocketReq{
-				Method: "getInfo",
-			},
-			want: `{"id":"0","data":{"name":"Fakecoin","shortcut":"FAKE","decimals":8,"version":"unknown","bestHeight":225494,"bestHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","block0Hash":"","testnet":true,"backend":{"version":"001001","subversion":"/Fakecoin:0.0.1/"}}}`,
-		},
-		{
-			name: "websocket getBlockHash",
-			req: websocketReq{
-				Method: "getBlockHash",
-				Params: map[string]interface{}{
-					"height": 225494,
-				},
-			},
-			want: `{"id":"1","data":{"hash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6"}}`,
-		},
-		{
-			name: "websocket getAccountInfo xpub txs",
-			req: websocketReq{
-				Method: "getAccountInfo",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Xpub,
-					"details":    "txs",
-				},
-			},
-			want: `{"id":"2","data":{"page":1,"totalPages":1,"itemsOnPage":25,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"transactions":[{"txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","vin":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","n":0,"addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true,"value":"317283951061"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"n":1,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true,"value":"1"}],"vout":[{"value":"118641975500","n":0,"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":["2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"],"isAddress":true,"isOwn":true},{"value":"198641975500","n":1,"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":["mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"],"isAddress":true}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"317283951000","valueIn":"317283951062","fees":"62"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vin":[],"vout":[{"value":"1234567890123","n":0,"spent":true,"hex":"76a914a08eae93007f22668ab5e4a9c83c8cd1c325e3e088ac","addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true},{"value":"1","n":1,"spent":true,"hex":"a91452724c5178682f70e0ba31c6ec0633755a3b41d987","addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true},{"value":"9876","n":2,"spent":true,"hex":"a914e921fc4912a315078f370d959f2c4f7b6d2a683c87","addresses":["2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"1234567900000","valueIn":"0","fees":"0"}],"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuWrWMzoBt8VDFNvPmpJf42M1GTUs85fPx","path":"m/49'/1'/33'/0/6","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuVZ2Ca6Da9zmYynt49Rx7uikAgubGcymF","path":"m/49'/1'/33'/0/7","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzRGWDUmrPP9HwYu4B43QGCTLwoop5cExa","path":"m/49'/1'/33'/0/8","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5C9EEWJzyBXhpyPHqa3UNed73Amsi5b3L","path":"m/49'/1'/33'/0/9","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzNawz2zjwq1L85GDE3YydEJGJYfXxaWkk","path":"m/49'/1'/33'/0/10","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N7NdeuAMgL57WE7QCeV2gTWi2Um8iAu5dA","path":"m/49'/1'/33'/0/11","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8JQEP6DSHEZHNsSDPA1gHMUq9YFndhkfV","path":"m/49'/1'/33'/0/12","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mvbn3YXqKZVpQKugaoQrfjSYPvz76RwZkC","path":"m/49'/1'/33'/0/13","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8MRNxCfwUY9TSW27X9ooGYtqgrGCfLRHx","path":"m/49'/1'/33'/0/14","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N6HvwrHC113KYZAmCtJ9XJNWgaTcnFunCM","path":"m/49'/1'/33'/0/15","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NEo3oNyHUoi7rmRWee7wki37jxPWsWCopJ","path":"m/49'/1'/33'/0/16","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mzm5KY8qdFbDHsQfy4akXbFvbR3FAwDuVo","path":"m/49'/1'/33'/0/17","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NGMwftmQCogp6XZNGvgiybz3WZysvsJzqC","path":"m/49'/1'/33'/0/18","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N3fJrrefndYjLGycvFFfYgevpZtcRKCkRD","path":"m/49'/1'/33'/0/19","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N1T7TnHBwfdpBoyw53EGUL7vuJmb2mU6jF","path":"m/49'/1'/33'/0/20","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"},{"type":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N7HexL4dyAQc7Th4iqcCW4hZuyiZsLWf74","path":"m/49'/1'/33'/1/9","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NF6X5FDGWrQj4nQrfP6hA77zB5WAc1DGup","path":"m/49'/1'/33'/1/10","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4ZRPdvc7BVioBTohy4F6QtxreqcjNj26b","path":"m/49'/1'/33'/1/11","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mtfho1rLmevh4qTnkYWxZEFCWteDMtTcUF","path":"m/49'/1'/33'/1/12","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NFUCphKYvmMcNZRZrF261mRX6iADVB9Qms","path":"m/49'/1'/33'/1/13","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5kBNMB8qgxE4Y4f8J19fScsE49J4aNvoJ","path":"m/49'/1'/33'/1/14","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NANWCaefhCKdXMcW8NbZnnrFRDvhJN2wPy","path":"m/49'/1'/33'/1/15","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NFHw7Yo2Bz8D2wGAYHW9qidbZFLpfJ72qB","path":"m/49'/1'/33'/1/16","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NBDSsBgy5PpFniLCb1eAFHcSxgxwPSDsZa","path":"m/49'/1'/33'/1/17","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NDWCSQHogc7sCuc2WoYt9PX2i2i6a5k6dX","path":"m/49'/1'/33'/1/18","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8vNyDP7iSDjm3BKpXrbDjAxyphqfvnJz8","path":"m/49'/1'/33'/1/19","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4tFKLurSbMusAyq1tv4tzymVjveAFV1Vb","path":"m/49'/1'/33'/1/20","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NBx5WwjAr2cH6Yqrp3Vsf957HtRKwDUVdX","path":"m/49'/1'/33'/1/21","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NBu1seHTaFhQxbcW5L5BkZzqFLGmZqpxsa","path":"m/49'/1'/33'/1/22","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NCDLoea22jGsXuarfT1n2QyCUh6RFhAPnT","path":"m/49'/1'/33'/1/23","transfers":0,"decimals":8}]}}`,
-		},
-		{
-			name: "websocket getAccountInfo address",
-			req: websocketReq{
-				Method: "getAccountInfo",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Addr4,
-					"details":    "txids",
-				},
-			},
-			want: `{"id":"3","data":{"page":1,"totalPages":1,"itemsOnPage":25,"address":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","balance":"0","totalReceived":"1","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"txids":["3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75"]}}`,
-		},
-		{
-			name: "websocket getAccountInfo xpub gap",
-			req: websocketReq{
-				Method: "getAccountInfo",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Xpub,
-					"details":    "tokens",
-					"tokens":     "derived",
-					"gap":        10,
-				},
-			},
-			want: `{"id":"4","data":{"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":3,"usedTokens":2,"tokens":[{"type":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8},{"type":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuWrWMzoBt8VDFNvPmpJf42M1GTUs85fPx","path":"m/49'/1'/33'/0/6","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MuVZ2Ca6Da9zmYynt49Rx7uikAgubGcymF","path":"m/49'/1'/33'/0/7","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzRGWDUmrPP9HwYu4B43QGCTLwoop5cExa","path":"m/49'/1'/33'/0/8","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5C9EEWJzyBXhpyPHqa3UNed73Amsi5b3L","path":"m/49'/1'/33'/0/9","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzNawz2zjwq1L85GDE3YydEJGJYfXxaWkk","path":"m/49'/1'/33'/0/10","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8},{"type":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N7HexL4dyAQc7Th4iqcCW4hZuyiZsLWf74","path":"m/49'/1'/33'/1/9","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NF6X5FDGWrQj4nQrfP6hA77zB5WAc1DGup","path":"m/49'/1'/33'/1/10","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2N4ZRPdvc7BVioBTohy4F6QtxreqcjNj26b","path":"m/49'/1'/33'/1/11","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2Mtfho1rLmevh4qTnkYWxZEFCWteDMtTcUF","path":"m/49'/1'/33'/1/12","transfers":0,"decimals":8},{"type":"XPUBAddress","name":"2NFUCphKYvmMcNZRZrF261mRX6iADVB9Qms","path":"m/49'/1'/33'/1/13","transfers":0,"decimals":8}]}}`,
-		},
-		{
-			name: "websocket getAccountUtxo",
-			req: websocketReq{
-				Method: "getAccountUtxo",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Addr1,
-				},
-			},
-			want: `{"id":"5","data":{"utxos":[{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","vout":0,"value":"100000000","height":225493,"confirmations":2}]}}`,
-		},
-		{
-			name: "websocket getAccountUtxo",
-			req: websocketReq{
-				Method: "getAccountUtxo",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Addr4,
-				},
-			},
-			want: `{"id":"6","data":{"utxos":[]}}`,
-		},
-		{
-			name: "websocket getTransaction",
-			req: websocketReq{
-				Method: "getTransaction",
-				Params: map[string]interface{}{
-					"txid": dbtestdata.TxidB2T2,
-				},
-			},
-			want: `{"id":"7","data":{"txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","vin":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","n":0,"addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true,"value":"317283951061"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"n":1,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"value":"1"}],"vout":[{"value":"118641975500","n":0,"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":["2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"],"isAddress":true},{"value":"198641975500","n":1,"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":["mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"],"isAddress":true}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"317283951000","valueIn":"317283951062","fees":"62"}}`,
-		},
-		{
-			name: "websocket getTransaction",
-			req: websocketReq{
-				Method: "getTransaction",
-				Params: map[string]interface{}{
-					"txid": "not a tx",
-				},
-			},
-			want: `{"id":"8","data":{"error":{"message":"Transaction 'not a tx' not found"}}}`,
-		},
-		{
-			name: "websocket getTransactionSpecific",
-			req: websocketReq{
-				Method: "getTransactionSpecific",
-				Params: map[string]interface{}{
-					"txid": dbtestdata.TxidB2T2,
-				},
-			},
-			want: `{"id":"9","data":{"hex":"","txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","version":0,"locktime":0,"vin":[{"coinbase":"","txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","vout":0,"scriptSig":{"hex":""},"sequence":0,"addresses":null},{"coinbase":"","txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"scriptSig":{"hex":""},"sequence":0,"addresses":null}],"vout":[{"ValueSat":118641975500,"value":0,"n":0,"scriptPubKey":{"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":null}},{"ValueSat":198641975500,"value":0,"n":1,"scriptPubKey":{"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":null}}],"confirmations":1,"time":1521595678,"blocktime":1521595678,"vsize":400}}`,
-		},
-		{
-			name: "websocket estimateFee",
-			req: websocketReq{
-				Method: "estimateFee",
-				Params: map[string]interface{}{
-					"blocks": []int{2, 5, 10, 20},
-					"specific": map[string]interface{}{
-						"conservative": false,
-						"txsize":       1234,
-					},
-				},
-			},
-			want: `{"id":"10","data":[{"feePerTx":"246","feePerUnit":"199"},{"feePerTx":"616","feePerUnit":"499"},{"feePerTx":"1233","feePerUnit":"999"},{"feePerTx":"2467","feePerUnit":"1999"}]}`,
-		},
-		{
-			name: "websocket estimateFee second time, from cache",
-			req: websocketReq{
-				Method: "estimateFee",
-				Params: map[string]interface{}{
-					"blocks": []int{2, 5, 10, 20},
-					"specific": map[string]interface{}{
-						"conservative": false,
-						"txsize":       1234,
-					},
-				},
-			},
-			want: `{"id":"11","data":[{"feePerTx":"246","feePerUnit":"199"},{"feePerTx":"616","feePerUnit":"499"},{"feePerTx":"1233","feePerUnit":"999"},{"feePerTx":"2467","feePerUnit":"1999"}]}`,
-		},
-		{
-			name: "websocket sendTransaction",
-			req: websocketReq{
-				Method: "sendTransaction",
-				Params: map[string]interface{}{
-					"hex": "123456",
-				},
-			},
-			want: `{"id":"12","data":{"result":"9876"}}`,
-		},
-		{
-			name: "websocket subscribeNewBlock",
-			req: websocketReq{
-				Method: "subscribeNewBlock",
-			},
-			want: `{"id":"13","data":{"subscribed":true}}`,
-		},
-		{
-			name: "websocket unsubscribeNewBlock",
-			req: websocketReq{
-				Method: "unsubscribeNewBlock",
-			},
-			want: `{"id":"14","data":{"subscribed":false}}`,
-		},
-		{
-			name: "websocket subscribeAddresses",
-			req: websocketReq{
-				Method: "subscribeAddresses",
-				Params: map[string]interface{}{
-					"addresses": []string{dbtestdata.Addr1, dbtestdata.Addr2},
-				},
-			},
-			want: `{"id":"15","data":{"subscribed":true}}`,
-		},
-		{
-			name: "websocket unsubscribeAddresses",
-			req: websocketReq{
-				Method: "unsubscribeAddresses",
-			},
-			want: `{"id":"16","data":{"subscribed":false}}`,
-		},
-		{
-			name: "websocket ping",
-			req: websocketReq{
-				Method: "ping",
-			},
-			want: `{"id":"17","data":{}}`,
-		},
-		{
-			name: "websocket getCurrentFiatRates all currencies",
-			req: websocketReq{
-				Method: "getCurrentFiatRates",
-				Params: map[string]interface{}{
-					"currencies": []string{},
-				},
-			},
-			want: `{"id":"18","data":{"ts":1574346615,"rates":{"eur":7134.1,"usd":7914.5}}}`,
-		},
-		{
-			name: "websocket getCurrentFiatRates usd",
-			req: websocketReq{
-				Method: "getCurrentFiatRates",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-				},
-			},
-			want: `{"id":"19","data":{"ts":1574346615,"rates":{"usd":7914.5}}}`,
-		},
-		{
-			name: "websocket getCurrentFiatRates eur",
-			req: websocketReq{
-				Method: "getCurrentFiatRates",
-				Params: map[string]interface{}{
-					"currencies": []string{"eur"},
-				},
-			},
-			want: `{"id":"20","data":{"ts":1574346615,"rates":{"eur":7134.1}}}`,
-		},
-		{
-			name: "websocket getCurrentFiatRates incorrect currency",
-			req: websocketReq{
-				Method: "getCurrentFiatRates",
-				Params: map[string]interface{}{
-					"currencies": []string{"does-not-exist"},
-				},
-			},
-			want: `{"id":"21","data":{"ts":1574346615,"rates":{"does-not-exist":-1}}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps missing date",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-				},
-			},
-			want: `{"id":"22","data":{"error":{"message":"No timestamps provided"}}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps incorrect date",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-					"timestamps": []string{"yesterday"},
-				},
-			},
-			want: `{"id":"23","data":{"error":{"message":"json: cannot unmarshal string into Go struct field .timestamps of type int64"}}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps empty currency",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"timestamps": []int64{7885693815},
-					"currencies": []string{""},
-				},
-			},
-			want: `{"id":"24","data":{"tickers":[{"ts":7885693815,"rates":{}}]}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps incorrect (future) date",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-					"timestamps": []int64{7885693815},
-				},
-			},
-			want: `{"id":"25","data":{"tickers":[{"ts":7885693815,"rates":{"usd":-1}}]}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps exact date",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-					"timestamps": []int64{1574346615},
-				},
-			},
-			want: `{"id":"26","data":{"tickers":[{"ts":1574346615,"rates":{"usd":7914.5}}]}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps closest date, eur",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"eur"},
-					"timestamps": []int64{1521507600},
-				},
-			},
-			want: `{"id":"27","data":{"tickers":[{"ts":1521511200,"rates":{"eur":1300}}]}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps multiple timestamps usd",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-					"timestamps": []int64{1570346615, 1574346615},
-				},
-			},
-			want: `{"id":"28","data":{"tickers":[{"ts":1574344800,"rates":{"usd":7814.5}},{"ts":1574346615,"rates":{"usd":7914.5}}]}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps multiple timestamps eur",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"eur"},
-					"timestamps": []int64{1570346615, 1574346615},
-				},
-			},
-			want: `{"id":"29","data":{"tickers":[{"ts":1574344800,"rates":{"eur":7100}},{"ts":1574346615,"rates":{"eur":7134.1}}]}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps multiple timestamps with an error",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-					"timestamps": []int64{1570346615, 1574346615, 2000000000},
-				},
-			},
-			want: `{"id":"30","data":{"tickers":[{"ts":1574344800,"rates":{"usd":7814.5}},{"ts":1574346615,"rates":{"usd":7914.5}},{"ts":2000000000,"rates":{"usd":-1}}]}}`,
-		},
-		{
-			name: "websocket getFiatRatesForTimestamps multiple errors",
-			req: websocketReq{
-				Method: "getFiatRatesForTimestamps",
-				Params: map[string]interface{}{
-					"currencies": []string{"usd"},
-					"timestamps": []int64{7832854800, 2000000000},
-				},
-			},
-			want: `{"id":"31","data":{"tickers":[{"ts":7832854800,"rates":{"usd":-1}},{"ts":2000000000,"rates":{"usd":-1}}]}}`,
-		},
-		{
-			name: "websocket getTickersList",
-			req: websocketReq{
-				Method: "getFiatRatesTickersList",
-				Params: map[string]interface{}{
-					"timestamp": 1570346615,
-				},
-			},
-			want: `{"id":"32","data":{"ts":1574344800,"available_currencies":["eur","usd"]}}`,
-		},
-		{
-			name: "websocket getBalanceHistory Addr2",
-			req: websocketReq{
-				Method: "getBalanceHistory",
-				Params: map[string]interface{}{
-					"descriptor": "mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz",
-				},
-			},
-			want: `{"id":"33","data":[{"time":1521514800,"txs":1,"received":"24690","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"0","sent":"12345","sentToSelf":"0","rates":{"eur":1303,"usd":2003}}]}`,
-		},
-		{
-			name: "websocket getBalanceHistory xpub",
-			req: websocketReq{
-				Method: "getBalanceHistory",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Xpub,
-				},
-			},
-			want: `{"id":"34","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}},{"time":1521594000,"txs":1,"received":"118641975500","sent":"1","sentToSelf":"118641975500","rates":{"eur":1303,"usd":2003}}]}`,
-		},
-		{
-			name: "websocket getBalanceHistory xpub from=1521504000&to=1521590400 currencies=[usd]",
-			req: websocketReq{
-				Method: "getBalanceHistory",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Xpub,
-					"from":       1521504000,
-					"to":         1521590400,
-					"currencies": []string{"usd"},
-				},
-			},
-			want: `{"id":"35","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"usd":2001}}]}`,
-		},
-		{
-			name: "websocket getBalanceHistory xpub from=1521504000&to=1521590400 currencies=[usd, eur, incorrect]",
-			req: websocketReq{
-				Method: "getBalanceHistory",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Xpub,
-					"from":       1521504000,
-					"to":         1521590400,
-					"currencies": []string{"usd", "eur", "incorrect"},
-				},
-			},
-			want: `{"id":"36","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"incorrect":-1,"usd":2001}}]}`,
-		},
-		{
-			name: "websocket getBalanceHistory xpub from=1521504000&to=1521590400 currencies=[]",
-			req: websocketReq{
-				Method: "getBalanceHistory",
-				Params: map[string]interface{}{
-					"descriptor": dbtestdata.Xpub,
-					"from":       1521504000,
-					"to":         1521590400,
-					"currencies": []string{},
-				},
-			},
-			want: `{"id":"37","data":[{"time":1521514800,"txs":1,"received":"1","sent":"0","sentToSelf":"0","rates":{"eur":1301,"usd":2001}}]}`,
-		},
-		{
-			name: "websocket subscribeNewTransaction",
-			req: websocketReq{
-				Method: "subscribeNewTransaction",
-			},
-			want: `{"id":"38","data":{"subscribed":false,"message":"subscribeNewTransaction not enabled, use -enablesubnewtx flag to enable."}}`,
-		},
-		{
-			name: "websocket unsubscribeNewTransaction",
-			req: websocketReq{
-				Method: "unsubscribeNewTransaction",
-			},
-			want: `{"id":"39","data":{"subscribed":false,"message":"unsubscribeNewTransaction not enabled, use -enablesubnewtx flag to enable."}}`,
-		},
-	}
 
 	// send all requests at once
 	for i, tt := range tests {
@@ -1575,8 +1781,102 @@ func websocketTestsBitcoinType(t *testing.T, ts *httptest.Server) {
 	}
 }
 
+// fixedTimeNow returns always 2022-09-15 12:43:56 UTC
+func fixedTimeNow() time.Time {
+	return time.Date(2022, 9, 15, 12, 43, 56, 0, time.UTC)
+}
+
+func setupChain(t *testing.T) (bchain.BlockChainParser, bchain.BlockChain) {
+	timeNow = fixedTimeNow
+	parser := btc.NewBitcoinParser(
+		btc.GetChainParams("test"),
+		&btc.Configuration{
+			BlockAddressesToKeep:  1,
+			XPubMagic:             70617039,
+			XPubMagicSegwitP2sh:   71979618,
+			XPubMagicSegwitNative: 73342198,
+			Slip44:                1,
+		})
+
+	chain, err := dbtestdata.NewFakeBlockChain(parser)
+	if err != nil {
+		glog.Fatal("fakechain: ", err)
+	}
+	return parser, chain
+}
+
+func Test_PublicServer_OpenAPIDocs(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	get := func(endpoint string) *http.Response {
+		t.Helper()
+		resp, err := http.DefaultClient.Do(newGetRequest(ts.URL + endpoint))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+
+	resp := get("/api-docs/")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/api-docs/ StatusCode = %v, want %v", resp.StatusCode, http.StatusOK)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "text/html; charset=utf-8" {
+		t.Fatalf("/api-docs/ Content-Type = %q", ct)
+	}
+	csp := resp.Header.Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'self' https://cdn.jsdelivr.net;") {
+		t.Fatalf("Swagger CSP missing CDN in script-src: %q", csp)
+	}
+	if strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
+		t.Fatalf("Swagger CSP must not allow unsafe-inline in script-src: %q", csp)
+	}
+	if v := resp.Header.Get("X-Content-Type-Options"); v != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q, want nosniff", v)
+	}
+
+	for _, p := range []string{"/api-docs/openapi.yaml", "/openapi.yaml"} {
+		r := get(p)
+		body, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("%s StatusCode = %v", p, r.StatusCode)
+		}
+		if ct := r.Header.Get("Content-Type"); ct != "application/yaml; charset=utf-8" {
+			t.Fatalf("%s Content-Type = %q", p, ct)
+		}
+		if !strings.Contains(string(body), "openapi: 3.1.0") {
+			t.Fatalf("%s body missing openapi: 3.1.0", p)
+		}
+	}
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/openapi.yaml", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Body.Close()
+	if r.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("POST /openapi.yaml StatusCode = %v, want %v", r.StatusCode, http.StatusMethodNotAllowed)
+	}
+	if allow := r.Header.Get("Allow"); allow != "GET, HEAD" {
+		t.Fatalf("POST /openapi.yaml Allow = %q, want %q", allow, "GET, HEAD")
+	}
+}
+
 func Test_PublicServer_BitcoinType(t *testing.T) {
-	s, dbpath := setupPublicHTTPServer(t)
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
 	defer closeAndDestroyPublicServer(t, s, dbpath)
 	s.ConnectFullPublicInterface()
 	// take the handler of the public server and pass it to the test server
@@ -1584,6 +1884,942 @@ func Test_PublicServer_BitcoinType(t *testing.T) {
 	defer ts.Close()
 
 	httpTestsBitcoinType(t, ts)
-	socketioTestsBitcoinType(t, ts)
-	websocketTestsBitcoinType(t, ts)
+	runWebsocketTests(t, ts, websocketTestsBitcoinType)
+}
+
+func Test_HTTPFiatRates_CrossEndpointConsistency_BitcoinType(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	var singleByTimestamp fiatTickerResponse
+	mustGetJSON(t, ts.URL+"/api/v2/tickers?timestamp=1574344800&currency=eur", http.StatusOK, &singleByTimestamp)
+
+	var multiByTimestamp []fiatTickerResponse
+	mustGetJSON(t, ts.URL+"/api/v2/multi-tickers?timestamp=1574344800&currency=eur", http.StatusOK, &multiByTimestamp)
+	if len(multiByTimestamp) != 1 {
+		t.Fatalf("unexpected multi ticker count: got %d, want %d", len(multiByTimestamp), 1)
+	}
+	if !reflect.DeepEqual(singleByTimestamp, multiByTimestamp[0]) {
+		t.Fatalf("tickers and multi-tickers mismatch: got %v vs %v", singleByTimestamp, multiByTimestamp[0])
+	}
+
+	var byBlock fiatTickerResponse
+	mustGetJSON(t, ts.URL+"/api/v2/tickers?block=225494&currency=usd", http.StatusOK, &byBlock)
+
+	var byBlockTime fiatTickerResponse
+	mustGetJSON(t, ts.URL+"/api/v2/tickers?timestamp=1521595678&currency=usd", http.StatusOK, &byBlockTime)
+	if !reflect.DeepEqual(byBlock, byBlockTime) {
+		t.Fatalf("block and timestamp ticker mismatch: got %v vs %v", byBlock, byBlockTime)
+	}
+}
+
+func Test_HTTPFiatRates_Endpoints_TokenContractsCaseHandling_BitcoinType(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	const (
+		tronUSDT     = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+		ethLowercase = "0xa4dd6bc15be95af55f0447555c8b6aa3088562f3"
+		ethMixedCase = "0xA4DD6Bc15Be95Af55f0447555c8b6aA3088562f3"
+		tickerUnixTs = int64(1700000000)
+	)
+
+	s, dbpath := setupPublicHTTPServerWithFiatFixture(parser, chain, t, false, func(d *db.RocksDB) error {
+		ticker := common.CurrencyRatesTicker{
+			Timestamp: time.Unix(tickerUnixTs, 0).UTC(),
+			Rates: map[string]float32{
+				"usd": 1,
+			},
+			TokenRates: map[string]float32{
+				tronUSDT:     9,
+				ethLowercase: 4,
+			},
+		}
+		if err := insertFiatRate(ticker.Timestamp.UTC().Format(db.FiatRatesTimeFormat), ticker.Rates, ticker.TokenRates, d); err != nil {
+			return err
+		}
+		currentTickers := []common.CurrencyRatesTicker{ticker}
+		return d.FiatRatesStoreSpecialTickers("CurrentTickers", &currentTickers)
+	})
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	tests := []struct {
+		name  string
+		token string
+		want  float32
+	}{
+		{name: "tron usdt base58", token: tronUSDT, want: 9},
+		{name: "eth lowercase", token: ethLowercase, want: 4},
+		{name: "eth mixed-case", token: ethMixedCase, want: 4},
+	}
+	t.Run("tickers", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var got fiatTickerResponse
+				mustGetJSON(t, ts.URL+"/api/v2/tickers?currency=usd&token="+url.QueryEscape(tt.token), http.StatusOK, &got)
+				want := fiatTickerResponse{
+					Timestamp: tickerUnixTs,
+					Rates:     map[string]float32{"usd": tt.want},
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("unexpected ticker for token %q: got %v, want %v", tt.token, got, want)
+				}
+			})
+		}
+	})
+
+	t.Run("multi-tickers", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var got []fiatTickerResponse
+				u := ts.URL + "/api/v2/multi-tickers?timestamp=" + strconv.FormatInt(tickerUnixTs, 10) + "&currency=usd&token=" + url.QueryEscape(tt.token)
+				mustGetJSON(t, u, http.StatusOK, &got)
+				want := []fiatTickerResponse{
+					{
+						Timestamp: tickerUnixTs,
+						Rates:     map[string]float32{"usd": tt.want},
+					},
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("unexpected multi-tickers for token %q: got %v, want %v", tt.token, got, want)
+				}
+			})
+		}
+	})
+
+	t.Run("tickers-list", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var got fiatTickersListResponse
+				u := ts.URL + "/api/v2/tickers-list?timestamp=" + strconv.FormatInt(tickerUnixTs, 10) + "&token=" + url.QueryEscape(tt.token)
+				mustGetJSON(t, u, http.StatusOK, &got)
+				want := fiatTickersListResponse{
+					Timestamp: tickerUnixTs,
+					Tickers:   []string{"usd"},
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("unexpected tickers-list for token %q: got %v, want %v", tt.token, got, want)
+				}
+			})
+		}
+	})
+}
+
+func Test_HTTPBalanceHistory_GroupByAndInvalidCurrency_BitcoinType(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	addr := "2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"
+
+	var grouped []balanceHistoryResponse
+	mustGetJSON(
+		t,
+		ts.URL+"/api/v2/balancehistory/"+addr+"?groupBy=200000&fiatcurrency=eur",
+		http.StatusOK,
+		&grouped,
+	)
+	wantGrouped := []balanceHistoryResponse{
+		{
+			Time:       1521400000,
+			Txs:        2,
+			Received:   "18876",
+			Sent:       "9876",
+			SentToSelf: "9000",
+			Rates:      map[string]float32{"eur": 1300},
+		},
+	}
+	if !reflect.DeepEqual(grouped, wantGrouped) {
+		t.Fatalf("unexpected grouped balance history: got %v, want %v", grouped, wantGrouped)
+	}
+
+	var invalidCurrency []balanceHistoryResponse
+	mustGetJSON(
+		t,
+		ts.URL+"/api/v2/balancehistory/"+addr+"?fiatcurrency=does_not_exist",
+		http.StatusOK,
+		&invalidCurrency,
+	)
+	if len(invalidCurrency) != 2 {
+		t.Fatalf("unexpected invalid-currency balance history count: got %d, want %d", len(invalidCurrency), 2)
+	}
+	for i := range invalidCurrency {
+		if !reflect.DeepEqual(invalidCurrency[i].Rates, map[string]float32{"does_not_exist": -1}) {
+			t.Fatalf("unexpected invalid-currency rates at index %d: got %v", i, invalidCurrency[i].Rates)
+		}
+	}
+}
+
+func Test_HTTPBalanceHistory_MaxTxsCap_BitcoinType(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	// This address has 2 transactions in the fixture.
+	addr := "2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"
+
+	// With the cap disabled (0), the full history is returned.
+	s.is.BalanceHistoryMaxTxsREST = 0
+	var full []balanceHistoryResponse
+	mustGetJSON(t, ts.URL+"/api/v2/balancehistory/"+addr, http.StatusOK, &full)
+	if len(full) < 2 {
+		t.Fatalf("expected at least 2 history entries with the cap disabled, got %d", len(full))
+	}
+
+	// With a cap below the address's transaction count, the request is rejected
+	// with a public 400 error rather than doing the unbounded scan.
+	s.is.BalanceHistoryMaxTxsREST = 1
+	var apiErr struct {
+		Error string `json:"error"`
+	}
+	mustGetJSON(t, ts.URL+"/api/v2/balancehistory/"+addr, http.StatusBadRequest, &apiErr)
+	if !strings.Contains(apiErr.Error, "narrow the from/to range") {
+		t.Fatalf("unexpected address error message: %q", apiErr.Error)
+	}
+
+	// The xpub path is capped too, and its public cap error is surfaced
+	// directly (not masked by the address fallback).
+	var xpubErr struct {
+		Error string `json:"error"`
+	}
+	mustGetJSON(t, ts.URL+"/api/v2/balancehistory/"+dbtestdata.Xpub, http.StatusBadRequest, &xpubErr)
+	if !strings.Contains(xpubErr.Error, "xpub spans more than") {
+		t.Fatalf("unexpected xpub error message: %q", xpubErr.Error)
+	}
+}
+
+func Test_WebsocketFiatRates_SubscribeBroadcastAndUnsubscribe(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	ws := connectWebsocket(t, ts)
+	defer ws.Close()
+
+	token := "0xa4dd6bc15be95af55f0447555c8b6aa3088562f3"
+	subscribe := websocketReq{
+		ID:     "sub-fiat",
+		Method: "subscribeFiatRates",
+		Params: map[string]interface{}{
+			"currency": "USD",
+			"tokens":   []string{strings.ToUpper(token)},
+		},
+	}
+	if err := ws.WriteJSON(subscribe); err != nil {
+		t.Fatal(err)
+	}
+	ack := readWebsocketResponse(t, ws, time.Second)
+	if ack.ID != subscribe.ID {
+		t.Fatalf("unexpected subscribe response id: got %q, want %q", ack.ID, subscribe.ID)
+	}
+	var ackData struct {
+		Subscribed bool `json:"subscribed"`
+	}
+	if err := json.Unmarshal(ack.Data, &ackData); err != nil {
+		t.Fatal(err)
+	}
+	if !ackData.Subscribed {
+		t.Fatalf("expected subscribed=true, got false")
+	}
+
+	ticker := &common.CurrencyRatesTicker{
+		Timestamp: time.Unix(1700000000, 0),
+		Rates: map[string]float32{
+			"usd": 2.5,
+			"eur": 1.1,
+		},
+		TokenRates: map[string]float32{
+			token: 4,
+		},
+	}
+	expectedTokenRate := ticker.TokenRateInCurrency(token, "usd")
+	s.OnNewFiatRatesTicker(ticker)
+
+	push := readWebsocketResponse(t, ws, time.Second)
+	if push.ID != subscribe.ID {
+		t.Fatalf("unexpected push response id: got %q, want %q", push.ID, subscribe.ID)
+	}
+	var pushData struct {
+		Rates      map[string]float32 `json:"rates"`
+		TokenRates map[string]float32 `json:"tokenRates,omitempty"`
+	}
+	if err := json.Unmarshal(push.Data, &pushData); err != nil {
+		t.Fatal(err)
+	}
+	if len(pushData.Rates) != 1 || pushData.Rates["usd"] != 2.5 {
+		t.Fatalf("unexpected pushed rates: %v", pushData.Rates)
+	}
+	upperToken := strings.ToUpper(token)
+	if len(pushData.TokenRates) != 1 || pushData.TokenRates[upperToken] != expectedTokenRate {
+		t.Fatalf("unexpected pushed token rates: %v", pushData.TokenRates)
+	}
+
+	unsubscribe := websocketReq{
+		ID:     "unsub-fiat",
+		Method: "unsubscribeFiatRates",
+	}
+	if err := ws.WriteJSON(unsubscribe); err != nil {
+		t.Fatal(err)
+	}
+	unsubAck := readWebsocketResponse(t, ws, time.Second)
+	if unsubAck.ID != unsubscribe.ID {
+		t.Fatalf("unexpected unsubscribe response id: got %q, want %q", unsubAck.ID, unsubscribe.ID)
+	}
+	var unsubData struct {
+		Subscribed bool `json:"subscribed"`
+	}
+	if err := json.Unmarshal(unsubAck.Data, &unsubData); err != nil {
+		t.Fatal(err)
+	}
+	if unsubData.Subscribed {
+		t.Fatalf("expected subscribed=false after unsubscribe")
+	}
+
+	s.OnNewFiatRatesTicker(&common.CurrencyRatesTicker{
+		Timestamp: time.Unix(1700000060, 0),
+		Rates: map[string]float32{
+			"usd": 3.5,
+		},
+		TokenRates: map[string]float32{
+			token: 5,
+		},
+	})
+	assertNoWebsocketMessage(t, ws, 300*time.Millisecond)
+}
+
+func Test_WebsocketFiatRates_GetCurrentFiatRates_TokenContractsCaseHandling_BitcoinType(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	const (
+		tronUSDT     = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+		ethLowercase = "0xa4dd6bc15be95af55f0447555c8b6aa3088562f3"
+		ethMixedCase = "0xA4DD6Bc15Be95Af55f0447555c8b6aA3088562f3"
+		tickerUnixTs = int64(1700000000)
+	)
+
+	s, dbpath := setupPublicHTTPServerWithFiatFixture(parser, chain, t, false, func(d *db.RocksDB) error {
+		ticker := common.CurrencyRatesTicker{
+			Timestamp: time.Unix(tickerUnixTs, 0).UTC(),
+			Rates: map[string]float32{
+				"usd": 1,
+			},
+			TokenRates: map[string]float32{
+				tronUSDT:     9,
+				ethLowercase: 4,
+			},
+		}
+		if err := insertFiatRate(ticker.Timestamp.UTC().Format(db.FiatRatesTimeFormat), ticker.Rates, ticker.TokenRates, d); err != nil {
+			return err
+		}
+		currentTickers := []common.CurrencyRatesTicker{ticker}
+		return d.FiatRatesStoreSpecialTickers("CurrentTickers", &currentTickers)
+	})
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	ws := connectWebsocket(t, ts)
+	defer ws.Close()
+
+	tests := []struct {
+		name  string
+		id    string
+		token string
+		want  float32
+	}{
+		{name: "tron usdt base58", id: "ws-tron", token: tronUSDT, want: 9},
+		{name: "eth lowercase", id: "ws-eth-lower", token: ethLowercase, want: 4},
+		{name: "eth mixed-case", id: "ws-eth-mixed", token: ethMixedCase, want: 4},
+	}
+
+	t.Run("getCurrentFiatRates", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := websocketReq{
+					ID:     tt.id + "-current",
+					Method: "getCurrentFiatRates",
+					Params: map[string]interface{}{
+						"currencies": []string{"usd"},
+						"token":      tt.token,
+					},
+				}
+				if err := ws.WriteJSON(req); err != nil {
+					t.Fatal(err)
+				}
+				resp := readWebsocketResponse(t, ws, time.Second)
+				if resp.ID != req.ID {
+					t.Fatalf("unexpected response id: got %q, want %q", resp.ID, req.ID)
+				}
+
+				var got fiatTickerResponse
+				if err := json.Unmarshal(resp.Data, &got); err != nil {
+					t.Fatal(err)
+				}
+				want := fiatTickerResponse{
+					Timestamp: tickerUnixTs,
+					Rates:     map[string]float32{"usd": tt.want},
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("unexpected websocket ticker for token %q: got %v, want %v", tt.token, got, want)
+				}
+			})
+		}
+	})
+
+	t.Run("getFiatRatesForTimestamps", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := websocketReq{
+					ID:     tt.id + "-timestamps",
+					Method: "getFiatRatesForTimestamps",
+					Params: map[string]interface{}{
+						"timestamps": []int64{tickerUnixTs},
+						"currencies": []string{"usd"},
+						"token":      tt.token,
+					},
+				}
+				if err := ws.WriteJSON(req); err != nil {
+					t.Fatal(err)
+				}
+				resp := readWebsocketResponse(t, ws, time.Second)
+				if resp.ID != req.ID {
+					t.Fatalf("unexpected response id: got %q, want %q", resp.ID, req.ID)
+				}
+
+				var got struct {
+					Tickers []fiatTickerResponse `json:"tickers"`
+				}
+				if err := json.Unmarshal(resp.Data, &got); err != nil {
+					t.Fatal(err)
+				}
+				want := struct {
+					Tickers []fiatTickerResponse `json:"tickers"`
+				}{
+					Tickers: []fiatTickerResponse{
+						{
+							Timestamp: tickerUnixTs,
+							Rates:     map[string]float32{"usd": tt.want},
+						},
+					},
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("unexpected websocket timestamp tickers for token %q: got %v, want %v", tt.token, got, want)
+				}
+			})
+		}
+	})
+
+	t.Run("getFiatRatesTickersList", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := websocketReq{
+					ID:     tt.id + "-list",
+					Method: "getFiatRatesTickersList",
+					Params: map[string]interface{}{
+						"timestamp": tickerUnixTs,
+						"token":     tt.token,
+					},
+				}
+				if err := ws.WriteJSON(req); err != nil {
+					t.Fatal(err)
+				}
+				resp := readWebsocketResponse(t, ws, time.Second)
+				if resp.ID != req.ID {
+					t.Fatalf("unexpected response id: got %q, want %q", resp.ID, req.ID)
+				}
+
+				var got fiatTickersListResponse
+				if err := json.Unmarshal(resp.Data, &got); err != nil {
+					t.Fatal(err)
+				}
+				want := fiatTickersListResponse{
+					Timestamp: tickerUnixTs,
+					Tickers:   []string{"usd"},
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("unexpected websocket tickers list for token %q: got %v, want %v", tt.token, got, want)
+				}
+			})
+		}
+	})
+}
+
+func Test_WebsocketFiatRates_SubscribeBroadcastPreservesBase58TokenAddress(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	ws := connectWebsocket(t, ts)
+	defer ws.Close()
+
+	const tronUSDT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+	subscribe := websocketReq{
+		ID:     "sub-tron-fiat",
+		Method: "subscribeFiatRates",
+		Params: map[string]interface{}{
+			"currency": "USD",
+			"tokens":   []string{tronUSDT},
+		},
+	}
+	if err := ws.WriteJSON(subscribe); err != nil {
+		t.Fatal(err)
+	}
+	_ = readWebsocketResponse(t, ws, time.Second)
+
+	ticker := &common.CurrencyRatesTicker{
+		Timestamp: time.Unix(1700000000, 0),
+		Rates: map[string]float32{
+			"usd": 2.5,
+		},
+		TokenRates: map[string]float32{
+			tronUSDT: 9,
+		},
+	}
+	s.OnNewFiatRatesTicker(ticker)
+
+	push := readWebsocketResponse(t, ws, time.Second)
+	var pushData struct {
+		TokenRates map[string]float32 `json:"tokenRates,omitempty"`
+	}
+	if err := json.Unmarshal(push.Data, &pushData); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(pushData.TokenRates, map[string]float32{tronUSDT: 9}) {
+		t.Fatalf("unexpected pushed tron token rates: %v", pushData.TokenRates)
+	}
+}
+
+func Test_WebsocketFiatRates_ResubscribeReplacesPreviousCurrency(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	ws := connectWebsocket(t, ts)
+	defer ws.Close()
+
+	subscribeUSD := websocketReq{
+		ID:     "sub-usd",
+		Method: "subscribeFiatRates",
+		Params: map[string]interface{}{
+			"currency": "usd",
+		},
+	}
+	if err := ws.WriteJSON(subscribeUSD); err != nil {
+		t.Fatal(err)
+	}
+	_ = readWebsocketResponse(t, ws, time.Second)
+
+	subscribeEUR := websocketReq{
+		ID:     "sub-eur",
+		Method: "subscribeFiatRates",
+		Params: map[string]interface{}{
+			"currency": "eur",
+		},
+	}
+	if err := ws.WriteJSON(subscribeEUR); err != nil {
+		t.Fatal(err)
+	}
+	_ = readWebsocketResponse(t, ws, time.Second)
+
+	s.OnNewFiatRatesTicker(&common.CurrencyRatesTicker{
+		Timestamp: time.Unix(1700000120, 0),
+		Rates: map[string]float32{
+			"usd": 100,
+			"eur": 200,
+		},
+	})
+
+	push := readWebsocketResponse(t, ws, time.Second)
+	if push.ID != subscribeEUR.ID {
+		t.Fatalf("unexpected push response id: got %q, want %q", push.ID, subscribeEUR.ID)
+	}
+	var pushData struct {
+		Rates map[string]float32 `json:"rates"`
+	}
+	if err := json.Unmarshal(push.Data, &pushData); err != nil {
+		t.Fatal(err)
+	}
+	if len(pushData.Rates) != 1 || pushData.Rates["eur"] != 200 {
+		t.Fatalf("unexpected pushed rates after resubscribe: %v", pushData.Rates)
+	}
+
+	assertNoWebsocketMessage(t, ws, 300*time.Millisecond)
+}
+
+func httpTestsBitcoinTypeExtendedIndex(t *testing.T, ts *httptest.Server) {
+	tests := []struct {
+		name        string
+		r           *http.Request
+		status      int
+		contentType string
+		body        []string
+	}{
+		{
+			name:        "apiIndex",
+			r:           newGetRequest(ts.URL + "/api"),
+			status:      http.StatusOK,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"blockbook":{"coin":"Fakecoin"`,
+				`"bestHeight":225494`,
+				`"decimals":8`,
+				`"backend":{"chain":"fakecoin","blocks":2,"headers":2,"bestBlockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6"`,
+				`"version":"001001","subversion":"/Fakecoin:0.0.1/"`,
+			},
+		},
+		{
+			name:        "apiTx v2",
+			r:           newGetRequest(ts.URL + "/api/v2/tx/7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25"),
+			status:      http.StatusOK,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","vin":[{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","n":0,"addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true,"value":"1234567890123"},{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","vout":1,"n":1,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true,"value":"12345"}],"vout":[{"value":"317283951061","n":0,"spent":true,"spentTxId":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","spentHeight":225494,"hex":"76a914ccaaaf374e1b06cb83118453d102587b4273d09588ac","addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true},{"value":"917283951061","n":1,"hex":"76a9148d802c045445df49613f6a70ddd2e48526f3701f88ac","addresses":["mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL"],"isAddress":true},{"value":"0","n":2,"hex":"6a072020f1686f6a20","addresses":["OP_RETURN 2020f1686f6a20"],"isAddress":false}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"1234567902122","valueIn":"1234567902468","fees":"346"}`,
+			},
+		},
+		{
+			name:        "apiAddress v2 details=txs",
+			r:           newGetRequest(ts.URL + "/api/v2/address/mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw?details=txs"),
+			status:      http.StatusOK,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"page":1,"totalPages":1,"itemsOnPage":1000,"address":"mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw","balance":"0","totalReceived":"1234567890123","totalSent":"1234567890123","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"transactions":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","vin":[{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","n":0,"addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true,"isOwn":true,"value":"1234567890123"},{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","vout":1,"n":1,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true,"value":"12345"}],"vout":[{"value":"317283951061","n":0,"spent":true,"spentTxId":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","spentHeight":225494,"hex":"76a914ccaaaf374e1b06cb83118453d102587b4273d09588ac","addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true},{"value":"917283951061","n":1,"hex":"76a9148d802c045445df49613f6a70ddd2e48526f3701f88ac","addresses":["mtR97eM2HPWVM6c8FGLGcukgaHHQv7THoL"],"isAddress":true},{"value":"0","n":2,"hex":"6a072020f1686f6a20","addresses":["OP_RETURN 2020f1686f6a20"],"isAddress":false}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"1234567902122","valueIn":"1234567902468","fees":"346"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vin":[],"vout":[{"value":"1234567890123","n":0,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentHeight":225494,"hex":"76a914a08eae93007f22668ab5e4a9c83c8cd1c325e3e088ac","addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true,"isOwn":true},{"value":"1","n":1,"spent":true,"spentTxId":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","spentIndex":1,"spentHeight":225494,"hex":"a91452724c5178682f70e0ba31c6ec0633755a3b41d987","addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true},{"value":"9876","n":2,"spent":true,"spentTxId":"05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07","spentHeight":225494,"hex":"a914e921fc4912a315078f370d959f2c4f7b6d2a683c87","addresses":["2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"1234567900000","valueIn":"0","fees":"0"}]}`,
+			},
+		},
+		{
+			name:        "apiGetBlock",
+			r:           newGetRequest(ts.URL + "/api/v2/block/225493"),
+			status:      http.StatusOK,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"page":1,"totalPages":1,"itemsOnPage":1000,"hash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","nextBlockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","height":225493,"confirmations":2,"size":1234567,"time":1521515026,"version":0,"merkleRoot":"","nonce":"","bits":"","difficulty":"","txCount":2,"txs":[{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","vin":[],"vout":[{"value":"100000000","n":0,"addresses":["mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti"],"isAddress":true},{"value":"12345","n":1,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentIndex":1,"spentHeight":225494,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true},{"value":"12345","n":2,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"100024690","valueIn":"0","fees":"0"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vin":[],"vout":[{"value":"1234567890123","n":0,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentHeight":225494,"addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true},{"value":"1","n":1,"spent":true,"spentTxId":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","spentIndex":1,"spentHeight":225494,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true},{"value":"9876","n":2,"spent":true,"spentTxId":"05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07","spentHeight":225494,"addresses":["2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"1234567900000","valueIn":"0","fees":"0"}]}`,
+			},
+		},
+		{
+			name:        "apiBlockFilters",
+			r:           newGetRequest(ts.URL + "/api/v2/block-filters?lastN=2"),
+			status:      http.StatusOK,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"P":20,"M":1048576,"zeroedKey":false,"blockFilters":{"225493":{"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","filter":"050079b0d468a27502af2ac08f2fc0"},"225494":{"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","filter":"0a0195bc0a550129e827a9ba4aa44287840cc73d0c27d16832059690"}}}`,
+			},
+		},
+		{
+			name:        "apiBlockFilters range too large",
+			r:           newGetRequest(ts.URL + "/api/v2/block-filters?from=0&to=10000"),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"Requested block filter range too large, max 10000"}`,
+			},
+		},
+		{
+			name:        "apiBlockFilters scriptType=taproot",
+			r:           newGetRequest(ts.URL + "/api/v2/block-filters?lastN=2&scriptType=taproot"),
+			status:      http.StatusBadRequest,
+			contentType: "application/json; charset=utf-8",
+			body: []string{
+				`{"error":"Invalid scriptType taproot. Use "}`,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := http.DefaultClient.Do(tt.r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tt.status {
+				t.Errorf("StatusCode = %v, want %v", resp.StatusCode, tt.status)
+			}
+			if resp.Header["Content-Type"][0] != tt.contentType {
+				t.Errorf("Content-Type = %v, want %v", resp.Header["Content-Type"][0], tt.contentType)
+			}
+			bb, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			b := string(bb)
+			for _, c := range tt.body {
+				if !strings.Contains(b, c) {
+					t.Errorf("got %v, want to contain %v", b, c)
+					break
+				}
+			}
+		})
+	}
+}
+
+var websocketTestsBitcoinTypeExtendedIndex = []websocketTest{
+	{
+		name: "websocket getInfo",
+		req: websocketReq{
+			Method: "getInfo",
+		},
+		want: `{"id":"0","data":{"name":"Fakecoin","shortcut":"FAKE","network":"FAKE","decimals":8,"version":"unknown","bestHeight":225494,"bestHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","block0Hash":"","testnet":true,"backend":{"version":"001001","subversion":"/Fakecoin:0.0.1/"}}}`,
+	},
+	{
+		name: "websocket getBlockHash",
+		req: websocketReq{
+			Method: "getBlockHash",
+			Params: map[string]interface{}{
+				"height": 225494,
+			},
+		},
+		want: `{"id":"1","data":{"hash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6"}}`,
+	},
+	{
+		name: "websocket getAccountInfo xpub txs",
+		req: websocketReq{
+			Method: "getAccountInfo",
+			Params: map[string]interface{}{
+				"descriptor": dbtestdata.Xpub,
+				"details":    "txs",
+			},
+		},
+		want: `{"id":"2","data":{"page":1,"totalPages":1,"itemsOnPage":25,"address":"upub5E1xjDmZ7Hhej6LPpS8duATdKXnRYui7bDYj6ehfFGzWDZtmCmQkZhc3Zb7kgRLtHWd16QFxyP86JKL3ShZEBFX88aciJ3xyocuyhZZ8g6q","balance":"118641975500","totalReceived":"118641975501","totalSent":"1","unconfirmedBalance":"0","unconfirmedTxs":0,"txs":2,"addrTxCount":3,"transactions":[{"txid":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","vin":[{"txid":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","n":0,"addresses":["mzB8cYrfRwFRFAGTDzV8LkUQy5BQicxGhX"],"isAddress":true,"value":"317283951061"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vout":1,"n":1,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true,"value":"1"}],"vout":[{"value":"118641975500","n":0,"hex":"a91495e9fbe306449c991d314afe3c3567d5bf78efd287","addresses":["2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu"],"isAddress":true,"isOwn":true},{"value":"198641975500","n":1,"hex":"76a9143f8ba3fda3ba7b69f5818086e12223c6dd25e3c888ac","addresses":["mmJx9Y8ayz9h14yd9fgCW1bUKoEpkBAquP"],"isAddress":true}],"blockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","blockHeight":225494,"confirmations":1,"blockTime":1521595678,"value":"317283951000","valueIn":"317283951062","fees":"62"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vin":[],"vout":[{"value":"1234567890123","n":0,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentHeight":225494,"hex":"76a914a08eae93007f22668ab5e4a9c83c8cd1c325e3e088ac","addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true},{"value":"1","n":1,"spent":true,"spentTxId":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","spentIndex":1,"spentHeight":225494,"hex":"a91452724c5178682f70e0ba31c6ec0633755a3b41d987","addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true,"isOwn":true},{"value":"9876","n":2,"spent":true,"spentTxId":"05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07","spentHeight":225494,"hex":"a914e921fc4912a315078f370d959f2c4f7b6d2a683c87","addresses":["2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"1234567900000","valueIn":"0","fees":"0"}],"usedTokens":2,"tokens":[{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzmAKayJmja784jyHvRUW1bXPget1csRRG","path":"m/49'/1'/33'/0/0","transfers":2,"decimals":8,"balance":"0","totalReceived":"1","totalSent":"1"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MsYfbi6ZdVXLDNrYAQ11ja9Sd3otMk4Pmj","path":"m/49'/1'/33'/0/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuAZNAjLSo6RLFad2fvHSfgqBD7BoEVy4T","path":"m/49'/1'/33'/0/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEqKzw3BosGnBE9by5uaDy5QgwjHac4Zbg","path":"m/49'/1'/33'/0/3","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mw7vJNC8zUK6VNN4CEjtoTYmuNPLewxZzV","path":"m/49'/1'/33'/0/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1kvo97NFASPXiwephZUxE9PRXunjTxEc4","path":"m/49'/1'/33'/0/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuWrWMzoBt8VDFNvPmpJf42M1GTUs85fPx","path":"m/49'/1'/33'/0/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MuVZ2Ca6Da9zmYynt49Rx7uikAgubGcymF","path":"m/49'/1'/33'/0/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzRGWDUmrPP9HwYu4B43QGCTLwoop5cExa","path":"m/49'/1'/33'/0/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5C9EEWJzyBXhpyPHqa3UNed73Amsi5b3L","path":"m/49'/1'/33'/0/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzNawz2zjwq1L85GDE3YydEJGJYfXxaWkk","path":"m/49'/1'/33'/0/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N7NdeuAMgL57WE7QCeV2gTWi2Um8iAu5dA","path":"m/49'/1'/33'/0/11","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8JQEP6DSHEZHNsSDPA1gHMUq9YFndhkfV","path":"m/49'/1'/33'/0/12","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mvbn3YXqKZVpQKugaoQrfjSYPvz76RwZkC","path":"m/49'/1'/33'/0/13","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8MRNxCfwUY9TSW27X9ooGYtqgrGCfLRHx","path":"m/49'/1'/33'/0/14","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6HvwrHC113KYZAmCtJ9XJNWgaTcnFunCM","path":"m/49'/1'/33'/0/15","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEo3oNyHUoi7rmRWee7wki37jxPWsWCopJ","path":"m/49'/1'/33'/0/16","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mzm5KY8qdFbDHsQfy4akXbFvbR3FAwDuVo","path":"m/49'/1'/33'/0/17","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NGMwftmQCogp6XZNGvgiybz3WZysvsJzqC","path":"m/49'/1'/33'/0/18","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3fJrrefndYjLGycvFFfYgevpZtcRKCkRD","path":"m/49'/1'/33'/0/19","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N1T7TnHBwfdpBoyw53EGUL7vuJmb2mU6jF","path":"m/49'/1'/33'/0/20","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MzSBtRWHbBjeUcu3H5VRDqkvz5sfmDxJKo","path":"m/49'/1'/33'/1/0","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MtShtAJYb1afWduUTwF1SixJjan7urZKke","path":"m/49'/1'/33'/1/1","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N3cP668SeqyBEr9gnB4yQEmU3VyxeRYith","path":"m/49'/1'/33'/1/2","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N6utyMZfPNUb1Bk8oz7p2JqJrXkq83gegu","path":"m/49'/1'/33'/1/3","transfers":1,"decimals":8,"balance":"118641975500","totalReceived":"118641975500","totalSent":"0"},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NEzatauNhf9kPTwwj6ZfYKjUdy52j4hVUL","path":"m/49'/1'/33'/1/4","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4RjsDp4LBpkNqyF91aNjgpF9CwDwBkJZq","path":"m/49'/1'/33'/1/5","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8XygTmQc4NoBBPEy3yybnfCYhsxFtzPDY","path":"m/49'/1'/33'/1/6","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5BjBomZvb48sccK2vwLMiQ5ETKp1fdPVn","path":"m/49'/1'/33'/1/7","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2MybMwbZRPCGU3SMWPwQCpDkbcQFw5Hbwen","path":"m/49'/1'/33'/1/8","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N7HexL4dyAQc7Th4iqcCW4hZuyiZsLWf74","path":"m/49'/1'/33'/1/9","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NF6X5FDGWrQj4nQrfP6hA77zB5WAc1DGup","path":"m/49'/1'/33'/1/10","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4ZRPdvc7BVioBTohy4F6QtxreqcjNj26b","path":"m/49'/1'/33'/1/11","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2Mtfho1rLmevh4qTnkYWxZEFCWteDMtTcUF","path":"m/49'/1'/33'/1/12","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NFUCphKYvmMcNZRZrF261mRX6iADVB9Qms","path":"m/49'/1'/33'/1/13","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N5kBNMB8qgxE4Y4f8J19fScsE49J4aNvoJ","path":"m/49'/1'/33'/1/14","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NANWCaefhCKdXMcW8NbZnnrFRDvhJN2wPy","path":"m/49'/1'/33'/1/15","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NFHw7Yo2Bz8D2wGAYHW9qidbZFLpfJ72qB","path":"m/49'/1'/33'/1/16","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBDSsBgy5PpFniLCb1eAFHcSxgxwPSDsZa","path":"m/49'/1'/33'/1/17","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NDWCSQHogc7sCuc2WoYt9PX2i2i6a5k6dX","path":"m/49'/1'/33'/1/18","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N8vNyDP7iSDjm3BKpXrbDjAxyphqfvnJz8","path":"m/49'/1'/33'/1/19","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2N4tFKLurSbMusAyq1tv4tzymVjveAFV1Vb","path":"m/49'/1'/33'/1/20","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBx5WwjAr2cH6Yqrp3Vsf957HtRKwDUVdX","path":"m/49'/1'/33'/1/21","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NBu1seHTaFhQxbcW5L5BkZzqFLGmZqpxsa","path":"m/49'/1'/33'/1/22","transfers":0,"decimals":8},{"type":"XPUBAddress","standard":"XPUBAddress","name":"2NCDLoea22jGsXuarfT1n2QyCUh6RFhAPnT","path":"m/49'/1'/33'/1/23","transfers":0,"decimals":8}]}}`,
+	},
+	{
+		name: "websocket getBlock default pagination",
+		req: websocketReq{
+			Method: "getBlock",
+			Params: map[string]interface{}{
+				"id": "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997",
+			},
+		},
+		want: `{"id":"3","data":{"page":1,"totalPages":1,"itemsOnPage":1000,"hash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","nextBlockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","height":225493,"confirmations":2,"size":1234567,"time":1521515026,"version":0,"merkleRoot":"","nonce":"","bits":"","difficulty":"","txCount":2,"txs":[{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","vin":[],"vout":[{"value":"100000000","n":0,"addresses":["mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti"],"isAddress":true},{"value":"12345","n":1,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentIndex":1,"spentHeight":225494,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true},{"value":"12345","n":2,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"100024690","valueIn":"0","fees":"0"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vin":[],"vout":[{"value":"1234567890123","n":0,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentHeight":225494,"addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true},{"value":"1","n":1,"spent":true,"spentTxId":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","spentIndex":1,"spentHeight":225494,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true},{"value":"9876","n":2,"spent":true,"spentTxId":"05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07","spentHeight":225494,"addresses":["2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"1234567900000","valueIn":"0","fees":"0"}]}}`,
+	},
+	{
+		name: "websocket getBlock caps pageSize",
+		req: websocketReq{
+			Method: "getBlock",
+			Params: map[string]interface{}{
+				"id":       "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997",
+				"pageSize": 1000001,
+			},
+		},
+		want: `{"id":"4","data":{"page":1,"totalPages":1,"itemsOnPage":10000,"hash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","nextBlockHash":"00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6","height":225493,"confirmations":2,"size":1234567,"time":1521515026,"version":0,"merkleRoot":"","nonce":"","bits":"","difficulty":"","txCount":2,"txs":[{"txid":"00b2c06055e5e90e9c82bd4181fde310104391a7fa4f289b1704e5d90caa3840","vin":[],"vout":[{"value":"100000000","n":0,"addresses":["mfcWp7DB6NuaZsExybTTXpVgWz559Np4Ti"],"isAddress":true},{"value":"12345","n":1,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentIndex":1,"spentHeight":225494,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true},{"value":"12345","n":2,"addresses":["mtGXQvBowMkBpnhLckhxhbwYK44Gs9eEtz"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"100024690","valueIn":"0","fees":"0"},{"txid":"effd9ef509383d536b1c8af5bf434c8efbf521a4f2befd4022bbd68694b4ac75","vin":[],"vout":[{"value":"1234567890123","n":0,"spent":true,"spentTxId":"7c3be24063f268aaa1ed81b64776798f56088757641a34fb156c4f51ed2e9d25","spentHeight":225494,"addresses":["mv9uLThosiEnGRbVPS7Vhyw6VssbVRsiAw"],"isAddress":true},{"value":"1","n":1,"spent":true,"spentTxId":"3d90d15ed026dc45e19ffb52875ed18fa9e8012ad123d7f7212176e2b0ebdb71","spentIndex":1,"spentHeight":225494,"addresses":["2MzmAKayJmja784jyHvRUW1bXPget1csRRG"],"isAddress":true},{"value":"9876","n":2,"spent":true,"spentTxId":"05e2e48aeabdd9b75def7b48d756ba304713c2aba7b522bf9dbc893fc4231b07","spentHeight":225494,"addresses":["2NEVv9LJmAnY99W1pFoc5UJjVdypBqdnvu1"],"isAddress":true}],"blockHash":"0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997","blockHeight":225493,"confirmations":2,"blockTime":1521515026,"value":"1234567900000","valueIn":"0","fees":"0"}]}}`,
+	},
+	{
+		name: "websocket getBlockFilter",
+		req: websocketReq{
+			Method: "getBlockFilter",
+			Params: map[string]interface{}{
+				"blockHash": "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997",
+			},
+		},
+		want: `{"id":"5","data":{"P":20,"M":1048576,"zeroedKey":false,"blockFilter":"050079b0d468a27502af2ac08f2fc0"}}`,
+	},
+	{
+		name: "websocket getBlockFiltersBatch bestKnownBlockHash 1st block",
+		req: websocketReq{
+			Method: "getBlockFiltersBatch",
+			Params: map[string]interface{}{
+				"bestKnownBlockHash": "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997",
+			},
+		},
+		want: `{"id":"6","data":{"P":20,"M":1048576,"zeroedKey":false,"blockFiltersBatch":["225494:00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6:0a0195bc0a550129e827a9ba4aa44287840cc73d0c27d16832059690"]}}`,
+	},
+	{
+		name: "websocket getBlockFiltersBatch bestKnownBlockHash 2nd block",
+		req: websocketReq{
+			Method: "getBlockFiltersBatch",
+			Params: map[string]interface{}{
+				"bestKnownBlockHash": "00000000eb0443fd7dc4a1ed5c686a8e995057805f9a161d9a5a77a95e72b7b6",
+			},
+		},
+		want: `{"id":"7","data":{"P":20,"M":1048576,"zeroedKey":false,"blockFiltersBatch":[]}}`,
+	},
+	{
+		name: "websocket getBlockFiltersBatch bestKnownBlockHash 1st block, unsupported script type",
+		req: websocketReq{
+			Method: "getBlockFiltersBatch",
+			Params: map[string]interface{}{
+				"bestKnownBlockHash": "0000000076fbbed90fd75b0e18856aa35baa984e9c9d444cf746ad85e94e2997",
+				"scriptType":         "unsupported",
+			},
+		},
+		want: `{"id":"8","data":{"error":{"message":"Unsupported script type unsupported"}}}`,
+	},
+}
+
+func Test_PublicServer_BitcoinType_ExtendedIndex(t *testing.T) {
+	parser, chain := setupChain(t)
+
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, true)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+	s.ConnectFullPublicInterface()
+	// take the handler of the public server and pass it to the test server
+	ts := httptest.NewServer(s.https.Handler)
+	defer ts.Close()
+
+	httpTestsBitcoinTypeExtendedIndex(t, ts)
+	runWebsocketTests(t, ts, websocketTestsBitcoinTypeExtendedIndex)
+}
+
+func Test_validateIntParam(t *testing.T) {
+	tests := []struct {
+		name         string
+		value        string
+		defaultValue int
+		min          int
+		max          int
+		want         int
+	}{
+		{"empty string", "", 0, 0, 100, 0},
+		{"empty string with default", "", 42, 0, 100, 42},
+		{"valid value", "10", 0, 0, 100, 10},
+		{"value at min", "0", 0, 0, 100, 0},
+		{"value at max", "100", 0, 0, 100, 100},
+		{"value exceeds max", "150", 0, 0, 100, 100},
+		{"negative value", "-5", 0, 0, 100, 0},
+		{"negative value below min", "-10", 0, 0, 100, 0},
+		{"invalid string", "abc", 0, 0, 100, 0},
+		{"invalid string with default", "xyz", 42, 0, 100, 42},
+		{"zero max (no limit)", "1000", 0, 0, 0, 1000},
+		{"very large number", "9223372036854775807", 0, 0, maxPageNumber, maxPageNumber},
+		{"negative with min constraint", "-5", 0, 5, 100, 0},
+		{"whitespace", "  10  ", 0, 0, 100, 0},
+		{"zero value", "0", 0, 0, 100, 0},
+		{"max int32", "2147483647", 0, 0, 0, 2147483647},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := validateIntParam(tt.value, tt.defaultValue, tt.min, tt.max); got != tt.want {
+				t.Errorf("validateIntParam(%q, %d, %d, %d) = %d, want %d", tt.value, tt.defaultValue, tt.min, tt.max, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_sanitizePagingParams(t *testing.T) {
+	tests := []struct {
+		name            string
+		page            int
+		pageSize        int
+		defaultPageSize int
+		maxPageSize     int
+		wantPage        int
+		wantPageSize    int
+	}{
+		{"default page size", 0, 0, txsInAPI, maxWebsocketBlockPageSize, 0, txsInAPI},
+		{"oversized page size", 1, maxWebsocketBlockPageSize + 1, txsInAPI, maxWebsocketBlockPageSize, 1, maxWebsocketBlockPageSize},
+		{"negative values", -1, -1, txsInAPI, maxWebsocketBlockPageSize, 0, txsInAPI},
+		{"safe offset clamp", maxPageNumber, maxPageNumber, maxPageNumber, maxPageNumber, maxSafePagingOffset / maxPageNumber, maxPageNumber},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page, pageSize := sanitizePagingParams(tt.page, tt.pageSize, tt.defaultPageSize, tt.maxPageSize)
+			if page != tt.wantPage || pageSize != tt.wantPageSize {
+				t.Errorf("sanitizePagingParams(%d, %d, %d, %d) = (%d, %d), want (%d, %d)",
+					tt.page, tt.pageSize, tt.defaultPageSize, tt.maxPageSize,
+					page, pageSize, tt.wantPage, tt.wantPageSize)
+			}
+		})
+	}
+}
+
+func Test_sanitizeAccountPagingParams(t *testing.T) {
+	tests := []struct {
+		name            string
+		page            int
+		pageSize        int
+		defaultPageSize int
+		maxPageSize     int
+		wantPage        int
+		wantPageSize    int
+	}{
+		{"ws getAccountInfo default", 0, 0, txsOnPage, txsInAPI, 0, txsOnPage},
+		{"ws getAccountInfo within limit", 1, 100, txsOnPage, txsInAPI, 1, 100},
+		{"ws getAccountInfo caps page size at txsInAPI", 1, txsInAPI + 1, txsOnPage, txsInAPI, 1, txsInAPI},
+		{"ws getAccountInfo negative defaults", 0, -5, txsOnPage, txsInAPI, 0, txsOnPage},
+		{"api address caps history offset", maxPageNumber, txsInAPI, txsInAPI, txsInAPI, maxAccountHistoryPagingOffset / txsInAPI, txsInAPI},
+		{"explorer address caps history offset", maxPageNumber, txsOnPage, txsOnPage, txsOnPage, maxAccountHistoryPagingOffset / txsOnPage, txsOnPage},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page, pageSize := sanitizeAccountPagingParams(tt.page, tt.pageSize, tt.defaultPageSize, tt.maxPageSize)
+			if page != tt.wantPage || pageSize != tt.wantPageSize {
+				t.Errorf("sanitizeAccountPagingParams(%d, %d, %d, %d) = (%d, %d), want (%d, %d)",
+					tt.page, tt.pageSize, tt.defaultPageSize, tt.maxPageSize,
+					page, pageSize, tt.wantPage, tt.wantPageSize)
+			}
+		})
+	}
+}
+
+func Test_validateIntValue_gapClamp(t *testing.T) {
+	// Mirrors the WS getAccountInfo gap clamp: validateIntValue(req.Gap, 0, 0, maxGapValue).
+	tests := []struct {
+		name string
+		val  int
+		want int
+	}{
+		{"unset passes through as 0", 0, 0},
+		{"suite default 20 passes through", 20, 20},
+		{"negative defaults to 0", -1, 0},
+		{"caps at maxGapValue", maxGapValue + 1, maxGapValue},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validateIntValue(tt.val, 0, 0, maxGapValue)
+			if got != tt.want {
+				t.Errorf("validateIntValue(%d, 0, 0, %d) = %d, want %d",
+					tt.val, maxGapValue, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_countCommaSeparatedValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		limit int
+		want  int
+	}{
+		{"empty string", "", api.MaxFiatRatesTimestamps, 0},
+		{"single value", "1", api.MaxFiatRatesTimestamps, 1},
+		{"stops after limit exceeded", "1,2,3", 2, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := countCommaSeparatedValues(tt.value, tt.limit); got != tt.want {
+				t.Errorf("countCommaSeparatedValues(%q, %d) = %d, want %d", tt.value, tt.limit, got, tt.want)
+			}
+		})
+	}
 }

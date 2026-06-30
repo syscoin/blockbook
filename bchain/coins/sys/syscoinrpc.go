@@ -1,12 +1,12 @@
 package syscoin
 
 import (
-	"encoding/json"
 	"context"
-	
+	"encoding/json"
+
 	"github.com/golang/glog"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
 )
 
 // SyscoinRPC is an interface to JSON-RPC bitcoind service
@@ -14,7 +14,6 @@ type SyscoinRPC struct {
 	*btc.BitcoinRPC
 	NEVMClient *NEVMClient
 }
-
 
 // NewSyscoinRPC returns new SyscoinRPC instance
 func NewSyscoinRPC(config json.RawMessage, pushHandler func(notificationType bchain.NotificationType)) (bchain.BlockChain, error) {
@@ -47,7 +46,6 @@ func (b *SyscoinRPC) Shutdown(ctx context.Context) error {
 
 	return nil
 }
-
 
 // Initialize initializes SyscoinRPC instance.
 func (b *SyscoinRPC) Initialize() error {
@@ -84,43 +82,8 @@ func (b *SyscoinRPC) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 func (b *SyscoinRPC) GetContractExplorerBaseURL() string {
 	return b.ChainConfig.Web3Explorer
 }
-// GetBlock returns block with given hash
-func (b *SyscoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
-	var err error
-	if hash == "" {
-		hash, err = b.GetBlockHash(height)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if !b.ParseBlocks {
-		return b.GetBlockFull(hash)
-	}
-	return b.GetBlockWithoutHeader(hash, height)
-}
 
-func (b *SyscoinRPC) GetChainTips() (string, error) {
-	glog.V(1).Info("rpc: getchaintips")
-
-	res := btc.ResGetChainTips{}
-	req := btc.CmdGetChainTips{Method: "getchaintips"}
-	err := b.Call(&req, &res)
-
-	if err != nil {
-		return "", err
-	}
-	if res.Error != nil {
-		return "", err
-	}
-	rawMarshal, err := json.Marshal(&res.Result)
-    if err != nil {
-        return "", err
-    }
-	decodedRawString := string(rawMarshal)
-	return decodedRawString, nil
-}
-
-func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
+func (b *SyscoinRPC) GetSPVProof(hash string) (json.RawMessage, error) {
 	glog.V(1).Info("rpc: getspvproof", hash)
 
 	res := btc.ResGetSPVProof{}
@@ -129,17 +92,12 @@ func (b *SyscoinRPC) GetSPVProof(hash string) (string, error) {
 	err := b.Call(&req, &res)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if res.Error != nil {
-		return "", err
+		return nil, res.Error
 	}
-	rawMarshal, err := json.Marshal(&res.Result)
-    if err != nil {
-        return "", err
-    }
-	decodedRawString := string(rawMarshal)
-	return decodedRawString, nil
+	return res.Result, nil
 }
 
 // GetTransactionForMempool returns a transaction by the transaction ID.
@@ -148,12 +106,10 @@ func (b *SyscoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
 	return b.GetTransaction(txid)
 }
 
-// Syscoin Core sendrawtransaction default maxfeerate is 0.10.
-// Syscoin Core sendrawtransaction default maxburnamount is 0.0.
-// Governance Proposal needs maxburnamount of 150.
-// This change allows sending governance proposals without explicitly setting both parameters.
+// SYSCOIN: Syscoin Core sendrawtransaction default maxburnamount is 0.0.
+// Governance proposal collateral needs 150 SYS burn allowance.
 const (
-	defaultSyscoinMaxFeeRate = "0.10"
+	defaultSyscoinMaxFeeRate    = "0.10"
 	defaultSyscoinMaxBurnAmount = "150"
 )
 
@@ -169,9 +125,10 @@ func syscoinSendRawParams(p bchain.SendRawTransactionParams) bchain.SendRawTrans
 	return p
 }
 
-// Override BitcoinRPC to apply Syscoin default maxfeerate / maxburnamount.
-func (b *SyscoinRPC) SendRawTransaction(tx string) (string, error) {
-	return b.SendRawTransactionWithOpts(bchain.SendRawTransactionParams{Hex: tx})
+// SendRawTransaction overrides BitcoinRPC to apply Syscoin default maxfeerate /
+// maxburnamount while preserving upstream's disableAlternativeRPC argument.
+func (b *SyscoinRPC) SendRawTransaction(tx string, disableAlternativeRPC bool) (string, error) {
+	return b.SendRawTransactionWithOpts(bchain.SendRawTransactionParams{Hex: tx, DisableAlternativeRPC: disableAlternativeRPC})
 }
 
 // Forwards maxfeerate / maxburnamount to Syscoin Core sendrawtransaction.

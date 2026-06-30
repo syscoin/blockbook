@@ -8,9 +8,9 @@ import (
 	"github.com/martinboehm/btcd/chaincfg/chainhash"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
-	"github.com/syscoin/blockbook/bchain/coins/utils"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/bchain/coins/utils"
 )
 
 const (
@@ -52,7 +52,9 @@ type BGoldParser struct {
 
 // NewBGoldParser returns new BGoldParser instance
 func NewBGoldParser(params *chaincfg.Params, c *btc.Configuration) *BGoldParser {
-	return &BGoldParser{BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c)}
+	p := &BGoldParser{BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c)}
+	p.VSizeSupport = true
+	return p
 }
 
 // GetChainParams contains network parameters for the main Bitcoin Cash network,
@@ -81,12 +83,18 @@ func GetChainParams(chain string) *chaincfg.Params {
 // headerFixedLength is the length of fixed fields of a block (i.e. without solution)
 // see https://github.com/BTCGPU/BTCGPU/wiki/Technical-Spec#block-header
 const headerFixedLength = 44 + (chainhash.HashSize * 3)
+const prevHashOffset = 4
 const timestampOffset = 100
 const timestampLength = 4
 
 // ParseBlock parses raw block to our Block struct
 func (p *BGoldParser) ParseBlock(b []byte) (*bchain.Block, error) {
 	r := bytes.NewReader(b)
+	prev, err := readPrevBlockHash(r)
+	if err != nil {
+		return nil, err
+	}
+
 	time, err := getTimestampAndSkipHeader(r, 0)
 	if err != nil {
 		return nil, err
@@ -105,11 +113,27 @@ func (p *BGoldParser) ParseBlock(b []byte) (*bchain.Block, error) {
 
 	return &bchain.Block{
 		BlockHeader: bchain.BlockHeader{
+			Prev: prev, // needed for fork detection when parsing raw blocks
 			Size: len(b),
 			Time: time,
 		},
 		Txs: txs,
 	}, nil
+}
+
+func readPrevBlockHash(r io.ReadSeeker) (string, error) {
+	// Read prev hash directly so fork detection still works with raw parsing.
+	if _, err := r.Seek(prevHashOffset, io.SeekStart); err != nil {
+		// Return the seek error when the header layout can't be accessed.
+		return "", err
+	}
+	var prevHash chainhash.Hash
+	if _, err := io.ReadFull(r, prevHash[:]); err != nil {
+		// Return read errors for truncated or malformed headers.
+		return "", err
+	}
+	// Return the canonical display string for comparison in sync logic.
+	return prevHash.String(), nil
 }
 
 func getTimestampAndSkipHeader(r io.ReadSeeker, pver uint32) (int64, error) {

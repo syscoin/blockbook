@@ -13,6 +13,7 @@
   },
   "ipc": {
     "rpc_url_template": "http://127.0.0.1:{{.Ports.BackendRPC}}",
+    "rpc_url_ws_template": "ws://127.0.0.1:{{.Ports.BackendRPC}}",
     "rpc_user": "rpc",
     "rpc_pass": "rpc",
     "rpc_timeout": 25,
@@ -22,10 +23,10 @@
     "package_name": "backend-flux",
     "package_revision": "satoshilabs-1",
     "system_user": "flux",
-    "version": "6.0.0",
-    "binary_url": "https://github.com/RunOnFlux/fluxd/releases/download/v6.0.0/Flux-amd64-v6.0.0.tar.gz",
+    "version": "9.0.0",
+    "binary_url": "https://github.com/RunOnFlux/fluxd/releases/download/v9.0.5/Flux-amd64-v9.0.5.tar.gz",
     "verification_type": "sha256",
-    "verification_source": "28717246a383018de8f6099a26afc3a4877da32f2d9531a3253b1664c22145e7",
+    "verification_source": "c2c7d2ef27937244d7b0df1819bd66275c57072e3d6f290f8fb179bc3e403cc0",
     "extract_command": "tar -C backend -xf",
     "exclude_files": [],
     "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/fluxd -datadir={{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend -conf={{.Env.BackendInstallPath}}/{{.Coin.Alias}}/{{.Coin.Alias}}.conf -pid=/run/{{.Coin.Alias}}/{{.Coin.Alias}}.pid",
@@ -39,10 +40,12 @@
     "client_config_file": "bitcoin_like_client.conf",
     "additional_params": {
       "addnode": [
-        "explorer.zel.cash",
-        "explorer2.zel.cash",
-        "explorer.zelcash.online",
-        "explorer-asia.zel.cash"
+        "explorer.runonflux.com",
+        "explorer.runonflux.io",
+        "blockbook.runonflux.com",
+        "blockbook.runonflux.io",
+        "explorer.flux.zelcore.io",
+        "blockbook.flux.zelcore.io"
       ]
     }
   },

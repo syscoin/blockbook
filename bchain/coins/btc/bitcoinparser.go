@@ -6,24 +6,24 @@ import (
 
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/common"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/common"
 )
 
 // temp params for signet(wait btcd commit)
 // magic numbers
 const (
-	SignetMagic wire.BitcoinNet = 0x6a70c7f0
+	Testnet4Magic wire.BitcoinNet = 0x283f161c
 )
 
 // chain parameters
 var (
-	SigNetParams chaincfg.Params
+	TestNet4Params chaincfg.Params
 )
 
 func init() {
-	SigNetParams = chaincfg.TestNet3Params
-	SigNetParams.Net = SignetMagic
+	TestNet4Params = chaincfg.TestNet3Params
+	TestNet4Params.Net = Testnet4Magic
 }
 
 // BitcoinParser handle
@@ -33,9 +33,11 @@ type BitcoinParser struct {
 
 // NewBitcoinParser returns new BitcoinParser instance
 func NewBitcoinParser(params *chaincfg.Params, c *Configuration) *BitcoinParser {
-	return &BitcoinParser{
+	p := &BitcoinParser{
 		BitcoinLikeParser: NewBitcoinLikeParser(params, c),
 	}
+	p.VSizeSupport = true
+	return p
 }
 
 // GetChainParams contains network parameters for the main Bitcoin network,
@@ -48,8 +50,12 @@ func GetChainParams(chain string) *chaincfg.Params {
 	switch chain {
 	case "test":
 		return &chaincfg.TestNet3Params
+	case "testnet4":
+		return &TestNet4Params
 	case "regtest":
 		return &chaincfg.RegressionNetParams
+	case "signet":
+		return &chaincfg.SigNetParams
 	}
 	return &chaincfg.MainNetParams
 }
@@ -74,10 +80,16 @@ type Vout struct {
 // Tx is blockchain transaction
 // unnecessary fields are commented out to avoid overhead
 type Tx struct {
-	Hex         string       `json:"hex"`
-	Txid        string       `json:"txid"`
-	Version     int32        `json:"version"`
+	Hex  string `json:"hex"`
+	Txid string `json:"txid"`
+	// Version is decoded as uint32 to tolerate non-standard/invalid tx
+	// versions present on Bitcoin mainnet (e.g. tx 637dd1a3...fef7413f in
+	// block 256818 has version 2187681472, which overflows int32). It is
+	// bit-cast to int32 in ParseTxFromJson to match the value the binary
+	// block parser produces via wire.MsgTx.Deserialize.
+	Version     uint32       `json:"version"`
 	LockTime    uint32       `json:"locktime"`
+	VSize       int64        `json:"vsize,omitempty"`
 	Vin         []bchain.Vin `json:"vin"`
 	Vout        []Vout       `json:"vout"`
 	BlockHeight uint32       `json:"blockHeight,omitempty"`
@@ -101,8 +113,9 @@ func (p *BitcoinParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error)
 	// it is necessary to copy bitcoinTx to Tx to make it compatible
 	tx.Hex = bitcoinTx.Hex
 	tx.Txid = bitcoinTx.Txid
-	tx.Version = bitcoinTx.Version
+	tx.Version = int32(bitcoinTx.Version)
 	tx.LockTime = bitcoinTx.LockTime
+	tx.VSize = bitcoinTx.VSize
 	tx.Vin = bitcoinTx.Vin
 	tx.BlockHeight = bitcoinTx.BlockHeight
 	tx.Confirmations = bitcoinTx.Confirmations

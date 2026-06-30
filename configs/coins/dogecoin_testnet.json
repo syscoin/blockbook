@@ -13,6 +13,7 @@
   },
   "ipc": {
     "rpc_url_template": "http://127.0.0.1:{{.Ports.BackendRPC}}",
+    "rpc_url_ws_template": "ws://127.0.0.1:{{.Ports.BackendRPC}}",
     "rpc_user": "rpc",
     "rpc_pass": "rpcp",
     "rpc_timeout": 25,
@@ -22,10 +23,10 @@
     "package_name": "backend-dogecoin-testnet",
     "package_revision": "satoshilabs-1",
     "system_user": "dogecoin",
-    "version": "1.14.6",
-    "binary_url": "https://github.com/dogecoin/dogecoin/releases/download/v1.14.6/dogecoin-1.14.6-x86_64-linux-gnu.tar.gz",
+    "version": "1.14.9",
+    "binary_url": "https://github.com/dogecoin/dogecoin/releases/download/v1.14.9/dogecoin-1.14.9-x86_64-linux-gnu.tar.gz",
     "verification_type": "sha256",
-    "verification_source": "fe9c9cdab946155866a5bd5a5127d2971a9eed3e0b65fb553fe393ad1daaebb0",
+    "verification_source": "4f227117b411a7c98622c970986e27bcfc3f547a72bef65e7d9e82989175d4f8",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/dogecoin-qt"
@@ -44,6 +45,13 @@
       "rpcthreads": 16,
       "upnp": 0,
       "whitelist": "127.0.0.1"
+    },
+    "platforms": {
+      "arm64": {
+            "binary_url": "https://github.com/dogecoin/dogecoin/releases/download/v1.14.9/dogecoin-1.14.9-aarch64-linux-gnu.tar.gz",
+            "verification_source": "6928c895a20d0bcb6d5c7dcec753d35c884a471aaf8ad4242a89a96acb4f2985",
+        "exclude_files": []
+      }
     }
   },
   "blockbook": {

@@ -22,10 +22,10 @@
     "package_name": "backend-syscoin",
     "package_revision": "satoshilabs-1",
     "system_user": "syscoin",
-    "version": "5.0.0.0",
-    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/syscoin-5.0.0-x86_64-linux-gnu.tar.gz",
+    "version": "5.1.0.0",
+    "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.1.0/syscoin-5.1.0-x86_64-linux-gnu.tar.gz",
     "verification_type": "gpg-sha256",
-    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/SHA256SUMS.asc",
+    "verification_source": "https://github.com/syscoin/syscoin/releases/download/v5.1.0/SHA256SUMS.asc",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
       "bin/syscoin-qt"
@@ -40,11 +40,22 @@
     "server_config_file": "syscoin.conf",
     "client_config_file": "bitcoin_client.conf",
     "additional_params": {
-      "deprecatedrpc": "estimatefee"
+      "deprecatedrpc": "estimatefee",
+      "gethcommandline": [
+        "--http",
+        "--http.addr",
+        "127.0.0.1",
+        "--http.port",
+        "28545",
+        "--http.api",
+        "eth,net,web3",
+        "--port",
+        "30303"
+      ]
     },
     "platforms": {
       "arm64": {
-        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.0.0/syscoin-5.0.0-aarch64-linux-gnu.tar.gz"
+        "binary_url": "https://github.com/syscoin/syscoin/releases/download/v5.1.0/syscoin-5.1.0-aarch64-linux-gnu.tar.gz"
       }
     }
   },
@@ -54,7 +65,7 @@
     "internal_binding_template": ":{{.Ports.BlockbookInternal}}",
     "public_binding_template": ":{{.Ports.BlockbookPublic}}",
     "explorer_url": "",
-    "additional_params": "-dbcache=1073741824",
+    "additional_params": "-dbcache=4294967296 -dbmaxopenfiles=500000 -workers=16 -chunk=1000",
     "block_chain": {
       "parse": true,
       "mempool_workers": 8,
@@ -64,10 +75,10 @@
       "xpub_magic_segwit_p2sh": 77429938,
       "xpub_magic_segwit_native": 78792518,
       "slip44": 57,
-      "web3_rpc_url": "https://rpc.syscoin.org",
-      "web3_rpc_url_backup": "https://rpc1.syscoin.org",
+      "web3_rpc_url": "http://127.0.0.1:28545",
+      "web3_rpc_url_backup": "",
       "web3_explorer_url": "https://explorer.syscoin.org",
-      "subversion": "/Satoshi:5.0.0/",
+      "subversion": "/Satoshi:5.1.0/",
       "additional_params": {
         "fiat_rates": "coingecko",
         "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"syscoin\", \"periodSeconds\": 150}"

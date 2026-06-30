@@ -1,21 +1,21 @@
 SHELL = /bin/bash
 VERSION ?= devel
-GITCOMMIT = $(shell cd /src && git describe --always --dirty)
+GITCOMMIT ?= $(shell cd /src && git config --global --add safe.directory /src && git describe --always --dirty)
 BUILDTIME = $(shell date --iso-8601=seconds)
-LDFLAGS := -X github.com/syscoin/blockbook/common.version=$(VERSION) -X github.com/syscoin/blockbook/common.gitcommit=$(GITCOMMIT) -X github.com/syscoin/blockbook/common.buildtime=$(BUILDTIME)
-BLOCKBOOK_BASE := $(GOPATH)/src/github.com/syscoin
+LDFLAGS := -X github.com/trezor/blockbook/common.version=$(VERSION) -X github.com/trezor/blockbook/common.gitcommit=$(GITCOMMIT) -X github.com/trezor/blockbook/common.buildtime=$(BUILDTIME)
+BLOCKBOOK_BASE := $(GOPATH)/src/github.com/trezor
 BLOCKBOOK_SRC := $(BLOCKBOOK_BASE)/blockbook
 ARGS ?=
 
 all: build tools
 
 build: prepare-sources
-	cd $(BLOCKBOOK_SRC) && go build -tags rocksdb_6_16 -o $(CURDIR)/blockbook -ldflags="-s -w $(LDFLAGS)" $(ARGS)
+	cd $(BLOCKBOOK_SRC) && go build -o $(CURDIR)/blockbook -ldflags="-s -w $(LDFLAGS)" $(ARGS)
 	cp $(CURDIR)/blockbook /out/blockbook
 	chown $(PACKAGER) /out/blockbook
 
 build-debug: prepare-sources
-	cd $(BLOCKBOOK_SRC) && go build -tags rocksdb_6_16 -o $(CURDIR)/blockbook -ldflags="$(LDFLAGS)" $(ARGS)
+	cd $(BLOCKBOOK_SRC) && go build -o $(CURDIR)/blockbook -ldflags="$(LDFLAGS)" $(ARGS)
 	cp $(CURDIR)/blockbook /out/blockbook
 	chown $(PACKAGER) /out/blockbook
 
@@ -24,13 +24,20 @@ tools:
 	chown $(PACKAGER) /out/{ldb,sst_dump}
 
 test: prepare-sources
-	cd $(BLOCKBOOK_SRC) && go test -tags 'rocksdb_6_16 unittest' `go list ./... | grep -vP '^github.com/syscoin/blockbook/(contrib|tests)'` $(ARGS)
+	cd $(BLOCKBOOK_SRC) && go test -tags 'unittest' `go list ./... | grep -vP '^github.com/trezor/blockbook/(contrib|tests)'` $(ARGS)
 
 test-integration: prepare-sources
-	cd $(BLOCKBOOK_SRC) && go test -tags 'rocksdb_6_16 integration' `go list github.com/syscoin/blockbook/tests/...` $(ARGS)
+	cd $(BLOCKBOOK_SRC) && go test -tags 'integration' `go list github.com/trezor/blockbook/tests/...` -run 'TestIntegration/.*/(rpc|sync)' -timeout 30m $(ARGS)
+
+test-e2e: prepare-sources
+	@echo "Go API e2e tests were removed. Run contrib/tests/run-openapi-tests.sh from the repository root."
+	@false
+
+test-connectivity: prepare-sources
+	cd $(BLOCKBOOK_SRC) && go test -tags 'integration' github.com/trezor/blockbook/tests -run "$${CONNECTIVITY_REGEX:-TestIntegration/.*/connectivity}" -timeout 3m $(ARGS)
 
 test-all: prepare-sources
-	cd $(BLOCKBOOK_SRC) && go test -tags 'rocksdb_6_16 unittest integration' `go list ./... | grep -v '^github.com/syscoin/blockbook/contrib'` $(ARGS)
+	cd $(BLOCKBOOK_SRC) && go test -tags 'unittest integration' `go list ./... | grep -v '^github.com/trezor/blockbook/contrib'` -timeout 30m $(ARGS)
 
 prepare-sources:
 	@ [ -n "`ls /src 2> /dev/null`" ] || (echo "/src doesn't exist or is empty" 1>&2 && exit 1)

@@ -1,4 +1,4 @@
-//usr/bin/go run $0 $@ ; exit
+// usr/bin/go run $0 $@ ; exit
 package main
 
 import (
@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	build "github.com/syscoin/blockbook/build/tools"
+	build "github.com/trezor/blockbook/build/tools"
 )
 
 const (

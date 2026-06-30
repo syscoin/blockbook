@@ -15,7 +15,7 @@ mkdir -p build
 cp -r /src/build/templates build
 cp -r /src/build/scripts build
 cp -r /src/configs .
-mkdir -p /go/src/github.com/syscoin/blockbook/build && cp -r /src/build/tools /go/src/github.com/syscoin/blockbook/build/tools
+mkdir -p /go/src/github.com/trezor/blockbook/build && cp -r /src/build/tools /go/src/github.com/trezor/blockbook/build/tools
 go env -w GO111MODULE=off
 go run build/templates/generate.go $coin
 go env -w GO111MODULE=auto
@@ -30,6 +30,7 @@ if ([ $package = "blockbook" ] || [ $package = "all" ]) && [ -d build/pkg-defs/b
     export VERSION=$(cd build/pkg-defs/blockbook && dpkg-parsechangelog | sed -rne 's/^Version: ([0-9.]+)([-+~].+)?$/\1/p')
 
     cp Makefile ldb sst_dump build/pkg-defs/blockbook
+    cp /src/openapi.yaml build/pkg-defs/blockbook
     cp -r /src/static build/pkg-defs/blockbook
     mkdir build/pkg-defs/blockbook/cert && cp /src/server/testcert.* build/pkg-defs/blockbook/cert
     (cd build/pkg-defs/blockbook && dpkg-buildpackage -b -us -uc $@)

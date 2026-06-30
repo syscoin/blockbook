@@ -1,31 +1,35 @@
 package syscoin
 
 import (
-    "context"
-    "math/big"
-    "strings"
+	"context"
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
 
-    "github.com/ethereum/go-ethereum/accounts/abi"
-    "github.com/ethereum/go-ethereum/common"
-    "github.com/ethereum/go-ethereum/ethclient"
-	"github.com/syscoin/blockbook/bchain"
 	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/syscoin/syscoinwire/syscoin/wire"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/golang/glog"
+	"github.com/syscoin/syscoinwire/syscoin/wire"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
 )
+
 const (
-	vaultManagerAddress = "0x7904299b3D3dC1b03d1DdEb45E9fDF3576aCBd5f"
-	
+	vaultManagerAddress      = "0x7904299b3D3dC1b03d1DdEb45E9fDF3576aCBd5f"
+	defaultNEVMRPCTimeoutSec = 15
 )
+
 type NEVMClient struct {
-	rpcClient   *ethclient.Client
+	rpcClient    *ethclient.Client
 	backupClient *ethclient.Client
-	vaultAddr   common.Address
-	vaultABI    abi.ABI
-	tokenABI    abi.ABI
-	explorerURL string
+	vaultAddr    common.Address
+	vaultABI     abi.ABI
+	tokenABI     abi.ABI
+	explorerURL  string
+	timeout      time.Duration
 }
 
 // NewNEVMClient initializes the primary and backup RPC clients.
@@ -64,6 +68,10 @@ func NewNEVMClient(c *btc.Configuration) (*NEVMClient, error) {
 		}
 		return nil, err
 	}
+	timeout := time.Duration(c.RPCTimeout) * time.Second
+	if timeout <= 0 {
+		timeout = defaultNEVMRPCTimeoutSec * time.Second
+	}
 
 	return &NEVMClient{
 		rpcClient:    mainClient,
@@ -72,6 +80,7 @@ func NewNEVMClient(c *btc.Configuration) (*NEVMClient, error) {
 		vaultABI:     vaultABI,
 		tokenABI:     tokenABI,
 		explorerURL:  c.Web3Explorer,
+		timeout:      timeout,
 	}, nil
 }
 
@@ -86,14 +95,18 @@ func (c *NEVMClient) Close() {
 }
 
 // callContract attempts the call with primary RPC, falling back to backup if needed.
-func (c *NEVMClient) callContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
+func (c *NEVMClient) callContract(msg ethereum.CallMsg) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	res, err := c.rpcClient.CallContract(ctx, msg, nil)
+	cancel()
 	if err == nil {
 		return res, nil
 	}
 
 	// If backup RPC exists, attempt fallback
 	if c.backupClient != nil {
+		ctx, cancel = context.WithTimeout(context.Background(), c.timeout)
+		defer cancel()
 		return c.backupClient.CallContract(ctx, msg, nil)
 	}
 
@@ -108,7 +121,7 @@ func (c *NEVMClient) getRealTokenId(assetId uint32, tokenIdx uint32) (*big.Int, 
 	}
 
 	callMsg := ethereum.CallMsg{To: &c.vaultAddr, Data: data}
-	res, err := c.callContract(context.Background(), callMsg)
+	res, err := c.callContract(callMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +141,7 @@ func (c *NEVMClient) getTokenSymbol(contractAddr common.Address) (string, error)
 	}
 
 	callMsg := ethereum.CallMsg{To: &contractAddr, Data: data}
-	res, err := c.callContract(context.Background(), callMsg)
+	res, err := c.callContract(callMsg)
 	if err != nil {
 		return "", err
 	}
@@ -155,8 +168,6 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			MetaData: []byte("Syscoin Native Asset"),
 		}, nil
 	}
-	
-	ctx := context.Background()
 
 	assetId := uint32(assetGuid & 0xffffffff)
 	tokenIdx := uint32(assetGuid >> 32)
@@ -167,7 +178,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 	}
 	glog.Infof("Calling vaultManager for assetId: %d with data: %x", assetId, data)
 	callMsg := ethereum.CallMsg{To: &c.vaultAddr, Data: data}
-	res, err := c.callContract(ctx, callMsg)
+	res, err := c.callContract(callMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +205,8 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			symbol = fmt.Sprintf("ERC20-%d", assetId)
 		}
 		metadata = "ERC20 Token"
+		// SYSCOIN: UTXO-side SPT values are stored and exposed as CAmount/COIN
+		// units, matching Core's 8-decimal asset_value formatting.
 		precision = 8
 
 	case 3: // ERC721 (NFT)
@@ -218,8 +231,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		precision = 0
 
 	default:
-		symbol = fmt.Sprintf("UNKNOWN-%d", assetId)
-		metadata = "Unknown Asset Type"
+		return nil, fmt.Errorf("unsupported NEVM asset type %d for asset %d", registry.AssetType, assetId)
 	}
 
 	return &bchain.Asset{
@@ -234,5 +246,3 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		MetaData: []byte(metadata),
 	}, nil
 }
-
-

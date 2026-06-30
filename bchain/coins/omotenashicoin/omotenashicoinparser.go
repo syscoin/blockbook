@@ -11,9 +11,9 @@ import (
 	"github.com/martinboehm/btcd/blockchain"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
-	"github.com/syscoin/blockbook/bchain/coins/utils"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/bchain/coins/utils"
 )
 
 // magic numbers
@@ -112,6 +112,7 @@ func (p *OmotenashiCoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 
 	return &bchain.Block{
 		BlockHeader: bchain.BlockHeader{
+			Prev: h.PrevBlock.String(), // needed for fork detection when parsing raw blocks
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},

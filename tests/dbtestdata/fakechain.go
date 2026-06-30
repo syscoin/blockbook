@@ -6,7 +6,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/syscoin/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain"
 )
 
 type fakeBlockChain struct {
@@ -19,14 +19,14 @@ func NewFakeBlockChain(parser bchain.BlockChainParser) (bchain.BlockChain, error
 }
 
 func (c *fakeBlockChain) CreateMempool(chain bchain.BlockChain) (bchain.Mempool, error) {
-	return bchain.NewMempoolBitcoinType(chain, 1, 1), nil
+	return bchain.NewMempoolBitcoinType(chain, 1, 1, 0, "", false, 1), nil
 }
 
 func (c *fakeBlockChain) Initialize() error {
 	return nil
 }
 
-func (c *fakeBlockChain) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc, onNewTx bchain.OnNewTxFunc) error {
+func (c *fakeBlockChain) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTx bchain.OnNewTxFunc) error {
 	return nil
 }
 
@@ -188,7 +188,7 @@ func (c *fakeBlockChain) GetTransactionForMempool(txid string) (v *bchain.Tx, er
 }
 
 func (c *fakeBlockChain) EstimateSmartFee(blocks int, conservative bool) (v big.Int, err error) {
-	if conservative == false {
+	if !conservative {
 		v.SetInt64(int64(blocks)*100 - 1)
 	} else {
 		v.SetInt64(int64(blocks) * 100)
@@ -201,7 +201,7 @@ func (c *fakeBlockChain) EstimateFee(blocks int) (v big.Int, err error) {
 	return
 }
 
-func (c *fakeBlockChain) SendRawTransaction(tx string) (v string, err error) {
+func (c *fakeBlockChain) SendRawTransaction(tx string, disableAlternativeRPC bool) (v string, err error) {
 	if tx == "123456" {
 		return "9876", nil
 	}

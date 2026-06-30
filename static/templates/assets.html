@@ -1,38 +1,35 @@
-{{define "specific"}}
-{{$cs := .CoinShortcut}}{{$assets := .Assets}}{{$data := .}}
-<h1>Assets <small class="text-muted">Filtered by <b>{{$assets.Filter}}</b></small></h1>
-<div class="row h-container">
-    <h5 class="col-md-6 col-sm-12">{{$assets.NumAssets}} Assets found</h5>
-    <nav class="col-md-6 col-sm-12">{{template "paging" $data }}</nav>
+{{define "specific"}}{{$assets := .Assets}}{{$data := .}}
+<div class="row">
+    <h1 class="col-12">Assets <small class="text-muted">Filtered by <b>{{$assets.Filter}}</b></small></h1>
 </div>
-<div class="data-div">
-    <table class="table table-striped data-table table-hover">
-        <thead>
-            <tr>
-                <th>Asset</th>
-                <th>Transactions</th>
-                <th>Contract</th>
-                <th>Metadata</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{- range $assetDetails := $assets.AssetDetails -}}{{- if $assetDetails -}}
-            <tr>
-                <td class="data">
-                    <a href="/asset/{{$assetDetails.AssetGuid}}">{{$assetDetails.AssetGuid}}</a>&nbsp;
-                    <span class="text-muted">{{$assetDetails.Symbol}}</span>
-                </td>
-                <td class="data">{{$assetDetails.Txs}}</td>
-                <td class="data ellipsis">
-                    <a href="{{formatContractExplorerURL $assetDetails.Contract}}">{{$assetDetails.Contract}}</a>
-                </td>
-                <td class="data ellipsis">
-                    {{- if $assetDetails.MetaData}}{{$assetDetails.MetaData}}{{end -}}
-                </td>
-            </tr>
-            {{- end -}}{{- end -}}
-        </tbody>
-    </table>
+<div class="row pt-3 pb-1">
+    <h5 class="col-md-6 col-sm-12">{{formatInt $assets.NumAssets}} Assets found</h5>
+    <div class="col-md-6 col-sm-12">{{template "paging" $data}}</div>
 </div>
-<nav>{{template "paging" $data }}</nav>
+<table class="table data-table">
+    <tbody>
+        <tr>
+            <th>Asset</th>
+            <th>Transactions</th>
+            <th>Contract</th>
+            <th>Metadata</th>
+        </tr>
+        {{range $assetDetails := $assets.AssetDetails}}
+        {{if $assetDetails}}
+        <tr>
+            <td>
+                <a href="/asset/{{$assetDetails.AssetGuid}}" class="copyable">{{$assetDetails.AssetGuid}}</a>&nbsp;
+                <span class="text-muted">{{$assetDetails.Symbol}}</span>
+            </td>
+            <td>{{formatInt $assetDetails.Txs}}</td>
+            <td class="ellipsis">
+                {{if $assetDetails.Contract}}{{$contractURL := formatContractExplorerURL $assetDetails.Contract}}{{if $contractURL}}<a href="{{$contractURL}}">{{$assetDetails.Contract}}</a>{{else}}<span class="copyable">{{$assetDetails.Contract}}</span>{{end}}{{end}}
+            </td>
+            <td class="ellipsis">{{if $assetDetails.MetaData}}{{$assetDetails.MetaData}}{{end}}</td>
+        </tr>
+        {{end}}
+        {{end}}
+    </tbody>
+</table>
+{{template "paging" $data}}
 {{end}}
