@@ -39,9 +39,11 @@
                             <a class="outpoint" href="/tx/{{$vin.Txid}}" tt="Outpoint {{$vin.Txid}},{{$vin.Vout}}">←</a>
                             {{end}}
                         </div>
-                        {{if $vin.Addresses}}
+                        {{if or $vin.Addresses $vin.AssetInfo}}
                         <div class="tx-io-amount">
+                            {{if $vin.Addresses}}
                             {{amountSpan $vin.ValueSat $data "copyable"}}
+                            {{end}}
                             {{/* SYSCOIN: show SPT metadata attached to transaction inputs. */}}
                             {{if isSyscoinShortcut $data.CoinShortcut}}
                             {{if $vin.AssetInfo}}
