@@ -1573,6 +1573,8 @@ func (w *Worker) summarizeTxForAccount(tx *Tx, addrDescs map[string]struct{}) *T
 	accountAssetTransfers := accountAssetTransfersFromSummary(assetTransfers)
 	return &Tx{
 		Txid:                   tx.Txid,
+		Vin:                    []Vin{},
+		Vout:                   []Vout{},
 		Blockhash:              tx.Blockhash,
 		Blockheight:            tx.Blockheight,
 		Confirmations:          tx.Confirmations,
