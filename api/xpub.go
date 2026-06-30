@@ -546,6 +546,12 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	if err != nil {
 		return nil, err
 	}
+	accountAddrDescs := make(map[string]struct{}) // SYSCOIN
+	for _, da := range data.addresses {
+		for i := range da {
+			accountAddrDescs[string(da[i].addrDesc)] = struct{}{}
+		}
+	}
 	// setup filtering of txids
 	var txidFilter func(txid *xpubTxid, ad *xpubAddress) bool
 	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff && filter.AssetsMask == bchain.AllMask) {
@@ -670,6 +676,8 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		for _, entry := range mempoolEntries {
 			if option == AccountDetailsTxidHistory {
 				txids = append(txids, entry.Txid)
+			} else if option == AccountDetailsTxHistorySummary {
+				txs = append(txs, w.summarizeTxForAccount(txmMap[entry.Txid], accountAddrDescs)) // SYSCOIN
 			} else if option >= AccountDetailsTxHistoryLight {
 				txs = append(txs, txmMap[entry.Txid])
 			}
@@ -727,6 +735,9 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				tx, err := w.txFromTxid(xpubTxid.txid, bestheight, option, nil, addresses)
 				if err != nil {
 					return nil, err
+				}
+				if option == AccountDetailsTxHistorySummary {
+					tx = w.summarizeTxForAccount(tx, accountAddrDescs) // SYSCOIN
 				}
 				txs = append(txs, tx)
 			}

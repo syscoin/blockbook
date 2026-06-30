@@ -1157,6 +1157,9 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 		accountDetails = api.AccountDetailsTokenBalances
 	case "txids":
 		accountDetails = api.AccountDetailsTxidHistory
+	// SYSCOIN
+	case "txsummary":
+		accountDetails = api.AccountDetailsTxHistorySummary
 	case "txslight":
 		accountDetails = api.AccountDetailsTxHistoryLight
 	case "txs":

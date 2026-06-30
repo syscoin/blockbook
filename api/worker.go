@@ -1462,6 +1462,132 @@ func (t *Tx) getAddrVoutValue(addrDesc bchain.AddressDescriptor) *big.Int {
 	return &val
 }
 
+// SYSCOIN
+type accountAssetTransferSummary struct {
+	value    big.Int
+	symbol   string
+	decimals int
+}
+
+// SYSCOIN
+func addrDescInSet(addrDesc bchain.AddressDescriptor, addrDescs map[string]struct{}) bool {
+	if len(addrDescs) == 0 {
+		return false
+	}
+	_, found := addrDescs[string(addrDesc)]
+	return found
+}
+
+// SYSCOIN
+func (w *Worker) addAccountAssetTransfer(m map[string]*accountAssetTransferSummary, assetInfo *AssetInfo, sign int) {
+	if assetInfo == nil || assetInfo.AssetGuid == "" || assetInfo.ValueSat == nil {
+		return
+	}
+	summary := m[assetInfo.AssetGuid]
+	if summary == nil {
+		summary = &accountAssetTransferSummary{
+			symbol:   assetInfo.Symbol,
+			decimals: w.chainParser.AmountDecimals(),
+		}
+		if guid, err := strconv.ParseUint(assetInfo.AssetGuid, 10, 64); err == nil {
+			if dbAsset, err := w.db.GetAsset(guid, nil); err == nil {
+				summary.symbol = string(dbAsset.AssetObj.Symbol)
+				summary.decimals = int(dbAsset.AssetObj.Precision)
+			}
+		}
+		m[assetInfo.AssetGuid] = summary
+	}
+	if summary.symbol == "" {
+		summary.symbol = assetInfo.Symbol
+	}
+	delta := new(big.Int).Set((*big.Int)(assetInfo.ValueSat))
+	if sign < 0 {
+		delta.Neg(delta)
+	}
+	summary.value.Add(&summary.value, delta)
+}
+
+// SYSCOIN
+func accountAssetTransfersFromSummary(m map[string]*accountAssetTransferSummary) []TokenTransfer {
+	if len(m) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for guid, summary := range m {
+		if summary.value.Sign() != 0 {
+			keys = append(keys, guid)
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	sort.Strings(keys)
+	transfers := make([]TokenTransfer, 0, len(keys))
+	for _, guid := range keys {
+		summary := m[guid]
+		value := new(big.Int).Abs(&summary.value)
+		transfers = append(transfers, TokenTransfer{
+			AssetGuid: guid,
+			Symbol:    summary.symbol,
+			Decimals:  summary.decimals,
+			Value:     (*Amount)(value),
+		})
+	}
+	return transfers
+}
+
+// SYSCOIN
+func (w *Worker) summarizeTxForAccount(tx *Tx, addrDescs map[string]struct{}) *Tx {
+	if tx == nil {
+		return nil
+	}
+	var valueIn, valueOut big.Int
+	assetTransfers := make(map[string]*accountAssetTransferSummary)
+	for i := range tx.Vin {
+		vin := &tx.Vin[i]
+		if !addrDescInSet(vin.AddrDesc, addrDescs) {
+			continue
+		}
+		if vin.ValueSat != nil {
+			valueIn.Add(&valueIn, (*big.Int)(vin.ValueSat))
+		}
+		w.addAccountAssetTransfer(assetTransfers, vin.AssetInfo, -1)
+	}
+	for i := range tx.Vout {
+		vout := &tx.Vout[i]
+		if !addrDescInSet(vout.AddrDesc, addrDescs) {
+			continue
+		}
+		if vout.ValueSat != nil {
+			valueOut.Add(&valueOut, (*big.Int)(vout.ValueSat))
+		}
+		w.addAccountAssetTransfer(assetTransfers, vout.AssetInfo, 1)
+	}
+	direction := "received"
+	if valueIn.Cmp(&valueOut) > 0 {
+		direction = "sent"
+	}
+	accountAssetTransfers := accountAssetTransfersFromSummary(assetTransfers)
+	return &Tx{
+		Txid:                   tx.Txid,
+		Blockhash:              tx.Blockhash,
+		Blockheight:            tx.Blockheight,
+		Confirmations:          tx.Confirmations,
+		ConfirmationETABlocks:  tx.ConfirmationETABlocks,
+		ConfirmationETASeconds: tx.ConfirmationETASeconds,
+		Blocktime:              tx.Blocktime,
+		ValueInSat:             (*Amount)(&valueIn),
+		ValueOutSat:            (*Amount)(&valueOut),
+		FeesSat:                tx.FeesSat,
+		TokenTransfers:         accountAssetTransfers,
+		Direction:              direction,
+		AddressValueInSat:      (*Amount)(&valueIn),
+		AddressValueOutSat:     (*Amount)(&valueOut),
+		AccountAssetTransfers:  accountAssetTransfers,
+		TokenType:              tx.TokenType,
+	}
+}
+
 type syscoinTokenMempoolInfo struct {
 	used           bool
 	unconfirmedTxs int
@@ -2047,8 +2173,8 @@ func (w *Worker) getStakingPoolsData(addrDesc bchain.AddressDescriptor) ([]Staki
 func (w *Worker) txFromTxid(txid string, bestHeight uint32, option AccountDetails, blockInfo *db.BlockInfo, addresses map[string]struct{}) (*Tx, error) {
 	var tx *Tx
 	var err error
-	// only ChainBitcoinType supports TxHistoryLight
-	if option == AccountDetailsTxHistoryLight && w.chainType == bchain.ChainBitcoinType {
+	// SYSCOIN: summary history shares the indexed Bitcoin-type light path.
+	if option >= AccountDetailsTxHistorySummary && option <= AccountDetailsTxHistoryLight && w.chainType == bchain.ChainBitcoinType {
 		ta, err := w.db.GetTxAddresses(txid)
 		if err != nil {
 			return nil, errors.Annotatef(err, "GetTxAddresses %v", txid)
@@ -2184,6 +2310,7 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if err != nil {
 		return nil, err
 	}
+	accountAddrDescs := map[string]struct{}{string(addrDesc): {}} // SYSCOIN
 	accountChainExtraData, err = w.getAccountChainExtraData(addrDesc)
 	if err != nil {
 		glog.Warningf("GetAccountChainExtraData error %v, %v", err, address)
@@ -2250,6 +2377,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 						if page == 0 {
 							if option == AccountDetailsTxidHistory {
 								txids = append(txids, tx.Txid)
+							} else if option == AccountDetailsTxHistorySummary {
+								txs = append(txs, w.summarizeTxForAccount(tx, accountAddrDescs)) // SYSCOIN
 							} else if option >= AccountDetailsTxHistoryLight {
 								setIsOwnAddress(tx, address)
 								txs = append(txs, tx)
@@ -2288,8 +2417,12 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				if err != nil {
 					return nil, err
 				}
-				setIsOwnAddress(tx, address)
-				txs = append(txs, tx)
+				if option == AccountDetailsTxHistorySummary {
+					txs = append(txs, w.summarizeTxForAccount(tx, accountAddrDescs)) // SYSCOIN
+				} else {
+					setIsOwnAddress(tx, address)
+					txs = append(txs, tx)
+				}
 			}
 		}
 	}
@@ -2298,7 +2431,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	if page == 0 && txsOnPage > 0 {
 		if option == AccountDetailsTxidHistory && len(txids) > txsOnPage {
 			txids = txids[:txsOnPage]
-		} else if option >= AccountDetailsTxHistoryLight && len(txs) > txsOnPage {
+		} else if option >= AccountDetailsTxHistorySummary && len(txs) > txsOnPage {
+			// SYSCOIN
 			txs = txs[:txsOnPage]
 		}
 	}
