@@ -1810,6 +1810,36 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
+// SYSCOIN
+func computePagingWithFirstPageMempool(confirmedCount, mempoolCount, page, itemsOnPage int) (Paging, int, int, int) {
+	if itemsOnPage <= 0 {
+		itemsOnPage = 1
+	}
+	mempoolSlots := mempoolCount
+	if mempoolSlots > itemsOnPage {
+		mempoolSlots = itemsOnPage
+	}
+	if mempoolSlots < 0 {
+		mempoolSlots = 0
+	}
+	pg, from, to, page := computePaging(confirmedCount+mempoolSlots, page, itemsOnPage)
+	from -= mempoolSlots
+	if from < 0 {
+		from = 0
+	}
+	to -= mempoolSlots
+	if to < 0 {
+		to = 0
+	}
+	if from > confirmedCount {
+		from = confirmedCount
+	}
+	if to > confirmedCount {
+		to = confirmedCount
+	}
+	return pg, from, to, page
+}
+
 func (w *Worker) getEthereumContractBalance(addrDesc bchain.AddressDescriptor, index int, c *db.AddrContract, details AccountDetails, ticker *common.CurrencyRatesTicker, secondaryCoin string, erc20Balance *big.Int, erc20Batched bool) (*Token, error) {
 	standard := bchain.EthereumTokenStandardMap[c.Standard]
 	ci, validContract, err := w.getContractDescriptorInfo(c.Contract, standard)
@@ -2405,12 +2435,21 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			return nil, errors.Annotatef(err, "GetBestBlock")
 		}
 		var from, to int
-		pg, from, to, page = computePaging(len(txc), page, txsOnPage)
+		if option == AccountDetailsTxHistorySummary {
+			pg, from, to, page = computePagingWithFirstPageMempool(len(txc), unconfirmedTxs, page, txsOnPage) // SYSCOIN
+		} else {
+			pg, from, to, page = computePaging(len(txc), page, txsOnPage)
+		}
 		if len(txc) >= txsOnPage {
 			if totalResults < 0 {
 				pg.TotalPages = -1
 			} else {
-				pg, _, _, _ = computePaging(totalResults, page, txsOnPage)
+				// SYSCOIN
+				if option == AccountDetailsTxHistorySummary {
+					pg, _, _, _ = computePagingWithFirstPageMempool(totalResults, unconfirmedTxs, page, txsOnPage)
+				} else {
+					pg, _, _, _ = computePaging(totalResults, page, txsOnPage)
+				}
 			}
 		}
 		for i := from; i < to; i++ {
