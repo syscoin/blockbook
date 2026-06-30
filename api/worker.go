@@ -1527,6 +1527,9 @@ func accountAssetTransfersFromSummary(m map[string]*accountAssetTransferSummary)
 		summary := m[guid]
 		value := new(big.Int).Abs(&summary.value)
 		transfers = append(transfers, TokenTransfer{
+			Type:      bchain.TokenStandardName("SPT"),
+			Standard:  bchain.TokenStandardName("SPT"),
+			Contract:  guid,
 			AssetGuid: guid,
 			Symbol:    summary.symbol,
 			Decimals:  summary.decimals,

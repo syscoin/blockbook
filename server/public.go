@@ -85,6 +85,19 @@ type PublicServer struct {
 	isFullInterface     bool
 }
 
+// SYSCOIN
+func (s *PublicServer) supportsAccountTxSummary() bool {
+	return s.chainParser.GetChainType() == bchain.ChainBitcoinType
+}
+
+// SYSCOIN
+func (s *PublicServer) validateTxSummarySupported(r *http.Request) error {
+	if r.URL.Query().Get("details") == "txsummary" && !s.supportsAccountTxSummary() {
+		return api.NewAPIError("details=txsummary is not supported for this chain", true)
+	}
+	return nil
+}
+
 // NewPublicServer creates new public server http interface to blockbook and returns its handle
 // only basic functionality is mapped, to map all functions, call
 func NewPublicServer(binding string, certFiles string, db *db.RocksDB, chain bchain.BlockChain, mempool bchain.Mempool, txCache *db.TxCache, explorerURL string, metrics *common.Metrics, is *common.InternalState, fiatRates *fiat.FiatRates, debugMode bool) (*PublicServer, error) {
@@ -1159,7 +1172,9 @@ func (s *PublicServer) getAddressQueryParams(r *http.Request, accountDetails api
 		accountDetails = api.AccountDetailsTxidHistory
 	// SYSCOIN
 	case "txsummary":
-		accountDetails = api.AccountDetailsTxHistorySummary
+		if s.supportsAccountTxSummary() {
+			accountDetails = api.AccountDetailsTxHistorySummary
+		}
 	case "txslight":
 		accountDetails = api.AccountDetailsTxHistoryLight
 	case "txs":
@@ -1770,6 +1785,9 @@ func (s *PublicServer) apiAddress(r *http.Request, apiVersion int) (interface{},
 	var address *api.Address
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-address"}).Inc()
+	if err := s.validateTxSummarySupported(r); err != nil {
+		return nil, err
+	}
 	page, pageSize, details, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
 	if err := s.api.ValidateProtocolsForChain(filter.Protocols); err != nil {
 		return nil, err
@@ -1862,6 +1880,9 @@ func (s *PublicServer) apiXpub(r *http.Request, apiVersion int) (interface{}, er
 	var address *api.Address
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-xpub"}).Inc()
+	if err := s.validateTxSummarySupported(r); err != nil {
+		return nil, err
+	}
 	page, pageSize, details, filter, _, gap := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
 	secondaryCoin := strings.ToLower(r.URL.Query().Get("secondary"))
 	address, err = s.api.GetXpubAddress(xpub, page, pageSize, details, filter, gap, secondaryCoin)

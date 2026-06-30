@@ -137,6 +137,11 @@ type WebsocketServer struct {
 	requestWg      sync.WaitGroup
 }
 
+// SYSCOIN
+func (s *WebsocketServer) supportsAccountTxSummary() bool {
+	return s.chainParser.GetChainType() == bchain.ChainBitcoinType
+}
+
 // NewWebsocketServer creates new websocket interface to blockbook and returns its handle
 func NewWebsocketServer(db *db.RocksDB, chain bchain.BlockChain, mempool bchain.Mempool, txCache *db.TxCache, metrics *common.Metrics, is *common.InternalState, fiatRates *fiat.FiatRates) (*WebsocketServer, error) {
 	api, err := api.NewWorker(db, chain, mempool, txCache, metrics, is, fiatRates)
@@ -914,6 +919,9 @@ func (s *WebsocketServer) getAccountInfo(req *WsAccountInfoReq) (res *api.Addres
 		opt = api.AccountDetailsTxidHistory
 	// SYSCOIN
 	case "txsummary":
+		if !s.supportsAccountTxSummary() {
+			return nil, api.NewAPIError("details=txsummary is not supported for this chain", true)
+		}
 		opt = api.AccountDetailsTxHistorySummary
 	case "txslight":
 		opt = api.AccountDetailsTxHistoryLight
