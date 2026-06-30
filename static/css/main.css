@@ -424,11 +424,6 @@ span.btn-paging:hover {
     letter-spacing: -0.01em;
 }
 
-/* SYSCOIN: keep transaction type badges anchored under the txid. */
-.tx-detail .head .txid {
-    float: none;
-}
-
 .tx-type-badges {
     clear: both;
 }
