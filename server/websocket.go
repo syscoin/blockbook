@@ -912,6 +912,9 @@ func (s *WebsocketServer) getAccountInfo(req *WsAccountInfoReq) (res *api.Addres
 		opt = api.AccountDetailsTokenBalances
 	case "txids":
 		opt = api.AccountDetailsTxidHistory
+	// SYSCOIN
+	case "txsummary":
+		opt = api.AccountDetailsTxHistorySummary
 	case "txslight":
 		opt = api.AccountDetailsTxHistoryLight
 	case "txs":

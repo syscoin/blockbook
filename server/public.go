@@ -1815,6 +1815,10 @@ func (s *PublicServer) apiAsset(r *http.Request, apiVersion int) (interface{}, e
 	}
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-asset"}).Inc()
 	page, pageSize, details, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
+	// SYSCOIN: txsummary is account-context only; asset history needs full tx rows.
+	if details == api.AccountDetailsTxHistorySummary {
+		return nil, api.NewAPIError("details=txsummary is not supported for asset endpoint", true)
+	}
 	return s.api.GetAsset(assetParam, page, pageSize, details, filter)
 }
 
