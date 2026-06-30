@@ -611,14 +611,6 @@ func isSyscoinNativeAsset(assetGuid string) bool {
 	return strings.TrimSpace(assetGuid) == "123456"
 }
 
-// SYSCOIN
-func (s *PublicServer) formatContractExplorerURL(contract string) string {
-	if strings.HasPrefix(contract, "http://") || strings.HasPrefix(contract, "https://") {
-		return contract
-	}
-	return ""
-}
-
 func (s *PublicServer) parseTemplates() []*template.Template {
 	templateFuncMap := template.FuncMap{
 		"timeSpan":                  timeSpan,
@@ -716,38 +708,6 @@ func (s *PublicServer) parseTemplates() []*template.Template {
 	t[xpubTpl] = createTemplate("./static/templates/xpub.html", "./static/templates/txdetail.html", "./static/templates/paging.html", "./static/templates/base.html")
 	t[mempoolTpl] = createTemplate("./static/templates/mempool.html", "./static/templates/paging.html", "./static/templates/base.html")
 	return t
-}
-
-// SYSCOIN
-func formatNFTID(value interface{}) uint64 {
-	assetGuid, err := strconv.ParseUint(fmt.Sprint(value), 10, 64)
-	if err != nil {
-		return 0
-	}
-	return assetGuid >> 32
-}
-
-// SYSCOIN
-func formatBaseAssetID(value interface{}) uint64 {
-	assetGuid, err := strconv.ParseUint(fmt.Sprint(value), 10, 64)
-	if err != nil {
-		return 0
-	}
-	return assetGuid & 0xffffffff
-}
-
-// SYSCOIN
-func isNFT(guid string) bool {
-	assetGuid, err := strconv.ParseUint(guid, 10, 64)
-	if err != nil {
-		return false
-	}
-	return (assetGuid >> 32) > 0
-}
-
-// SYSCOIN
-func formatEncodeBase64(value []byte) string {
-	return base64.StdEncoding.EncodeToString(value)
 }
 
 func (s *PublicServer) postHtmlTemplateHandler(data *TemplateData, w http.ResponseWriter, r *http.Request) {
