@@ -27,8 +27,9 @@ type resultError struct {
 
 // WsAccountInfoReq carries parameters for the 'getAccountInfo' method.
 type WsAccountInfoReq struct {
-	Descriptor        string   `json:"descriptor" ts_doc:"Address or XPUB descriptor to query."`
-	Details           string   `json:"details,omitempty" ts_type:"'basic' | 'tokens' | 'tokenBalances' | 'txids' | 'txslight' | 'txs'" ts_doc:"Level of detail to retrieve about the account."`
+	Descriptor string `json:"descriptor" ts_doc:"Address or XPUB descriptor to query."`
+	// SYSCOIN: txsummary is a compact account-context history mode for wallet lists.
+	Details           string   `json:"details,omitempty" ts_type:"'basic' | 'tokens' | 'tokenBalances' | 'txids' | 'txsummary' | 'txslight' | 'txs'" ts_doc:"Level of detail to retrieve about the account."`
 	Tokens            string   `json:"tokens,omitempty" ts_type:"'derived' | 'used' | 'nonzero'" ts_doc:"Which tokens to include in the account info."`
 	Protocols         []string `json:"protocols,omitempty" ts_doc:"Optional protocol enrichments to include. Supported values currently include 'erc4626'."`
 	PageSize          int      `json:"pageSize,omitempty" ts_doc:"Number of items per page, if paging is used."`

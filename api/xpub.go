@@ -546,6 +546,12 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	if err != nil {
 		return nil, err
 	}
+	accountAddrDescs := make(map[string]struct{}) // SYSCOIN
+	for _, da := range data.addresses {
+		for i := range da {
+			accountAddrDescs[string(da[i].addrDesc)] = struct{}{}
+		}
+	}
 	// setup filtering of txids
 	var txidFilter func(txid *xpubTxid, ad *xpubAddress) bool
 	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff && filter.AssetsMask == bchain.AllMask) {
@@ -592,6 +598,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	}
 	addresses := w.newAddressesMapForAliases()
 	xpubAssetMempool := make(map[string]map[string]*syscoinTokenMempoolInfo) // SYSCOIN
+	mempoolEntryCount := 0                                                   // SYSCOIN
 	// process mempool, only if ToHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txmMap = make(map[string]*Tx)
@@ -654,12 +661,15 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 							tx.addAddrVinAssetMempool(ad.addrDesc, assetMempool)
 						}
 						// mempool txs are returned only on the first page, uniquely and filtered
-						if page == 0 && xpubMempoolTxidFilter(&txid) {
+						if xpubMempoolTxidFilter(&txid) {
 							if _, added := addedMempoolEntries[txid.txid]; added {
 								continue
 							}
 							addedMempoolEntries[txid.txid] = struct{}{}
-							mempoolEntries = append(mempoolEntries, bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
+							mempoolEntryCount++ // SYSCOIN
+							if page == 0 {
+								mempoolEntries = append(mempoolEntries, bchain.MempoolTxidEntry{Txid: txid.txid, Time: uint32(tx.Blocktime)})
+							}
 						}
 					}
 				}
@@ -667,9 +677,15 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		}
 		// sort the entries by time descending
 		sort.Sort(mempoolEntries)
-		for _, entry := range mempoolEntries {
+		mempoolEntriesToReturn := mempoolEntries
+		if option == AccountDetailsTxHistorySummary && txsOnPage > 0 && len(mempoolEntriesToReturn) > txsOnPage {
+			mempoolEntriesToReturn = mempoolEntriesToReturn[:txsOnPage] // SYSCOIN
+		}
+		for _, entry := range mempoolEntriesToReturn {
 			if option == AccountDetailsTxidHistory {
 				txids = append(txids, entry.Txid)
+			} else if option == AccountDetailsTxHistorySummary {
+				txs = append(txs, w.summarizeTxForAccount(txmMap[entry.Txid], accountAddrDescs)) // SYSCOIN
 			} else if option >= AccountDetailsTxHistoryLight {
 				txs = append(txs, txmMap[entry.Txid])
 			}
@@ -710,12 +726,21 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			totalResults = -1
 		}
 		var from, to int
-		pg, from, to, page = computePaging(len(txc), page, txsOnPage)
+		if option == AccountDetailsTxHistorySummary {
+			pg, from, to, page = computePagingWithFirstPageMempool(len(txc), mempoolEntryCount, page, txsOnPage) // SYSCOIN
+		} else {
+			pg, from, to, page = computePaging(len(txc), page, txsOnPage)
+		}
 		if len(txc) >= txsOnPage {
 			if totalResults < 0 {
 				pg.TotalPages = -1
 			} else {
-				pg, _, _, _ = computePaging(totalResults, page, txsOnPage)
+				// SYSCOIN
+				if option == AccountDetailsTxHistorySummary {
+					pg, _, _, _ = computePagingWithFirstPageMempool(totalResults, mempoolEntryCount, page, txsOnPage)
+				} else {
+					pg, _, _, _ = computePaging(totalResults, page, txsOnPage)
+				}
 			}
 		}
 		// get confirmed transactions
@@ -727,6 +752,9 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				tx, err := w.txFromTxid(xpubTxid.txid, bestheight, option, nil, addresses)
 				if err != nil {
 					return nil, err
+				}
+				if option == AccountDetailsTxHistorySummary {
+					tx = w.summarizeTxForAccount(tx, accountAddrDescs) // SYSCOIN
 				}
 				txs = append(txs, tx)
 			}

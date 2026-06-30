@@ -252,6 +252,18 @@ export interface Tx {
     chainExtraData?: TxChainExtraData;
     /** List of token transfers that occurred in this transaction. */
     tokenTransfers?: TokenTransfer[];
+    /** SYSCOIN Transaction direction relative to the queried account, when returned by account summary endpoints. */
+    direction?: string;
+    /** Total input value belonging to the queried account, when returned by account summary endpoints. */
+    addressValueIn?: string;
+    /** Total output value belonging to the queried account, when returned by account summary endpoints. */
+    addressValueOut?: string;
+    /** Syscoin SPT transfers summarized relative to the queried account. */
+    accountAssetTransfers?: TokenTransfer[];
+    /** Syscoin SPT transaction type. */
+    tokenType?: string;
+    /** Syscoin SPT memo decoded from OP_RETURN. */
+    memo?: string;
     /** Ethereum-like blockchain specific data (if applicable). */
     ethereumSpecific?: EthereumSpecific;
     /** Aliases for addresses involved in this transaction. */
@@ -684,7 +696,7 @@ export interface WsAccountInfoReq {
     /** Address or XPUB descriptor to query. */
     descriptor: string;
     /** Level of detail to retrieve about the account. */
-    details?: 'basic' | 'tokens' | 'tokenBalances' | 'txids' | 'txslight' | 'txs';
+    details?: 'basic' | 'tokens' | 'tokenBalances' | 'txids' | 'txsummary' | 'txslight' | 'txs';
     /** Which tokens to include in the account info. */
     tokens?: 'derived' | 'used' | 'nonzero';
     /** Optional protocol enrichments to include. Supported values currently include 'erc4626'. */

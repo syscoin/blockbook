@@ -30,6 +30,9 @@ const (
 	AccountDetailsTokenBalances
 	// AccountDetailsTxidHistory - basic + token balances + txids, subject to paging
 	AccountDetailsTxidHistory
+	// SYSCOIN
+	// AccountDetailsTxHistorySummary - basic + token balances + compact account-context tx summaries, subject to paging
+	AccountDetailsTxHistorySummary
 	// AccountDetailsTxHistoryLight - basic + tokens + easily obtained tx data (not requiring requests to backend), subject to paging
 	AccountDetailsTxHistoryLight
 	// AccountDetailsTxHistory - basic + tokens + full tx data, subject to paging
@@ -393,6 +396,11 @@ type Tx struct {
 	CoinSpecificData       json.RawMessage   `json:"coinSpecificData,omitempty" ts_type:"any" ts_doc:"Blockchain-specific extended data."`
 	ChainExtraData         *TxChainExtraData `json:"chainExtraData,omitempty" ts_type:"{ payloadType: 'tron'; payload?: TronChainExtraData } | { payloadType: string; payload?: any }" ts_doc:"Additional normalized chain-specific transaction data. Use payloadType as discriminator for payload."`
 	TokenTransfers         []TokenTransfer   `json:"tokenTransfers,omitempty" ts_doc:"List of token transfers that occurred in this transaction."`
+	// SYSCOIN: account-context transaction summary fields for compact wallet history.
+	Direction             string          `json:"direction,omitempty" ts_doc:"Transaction direction relative to the queried account, when returned by account summary endpoints."`
+	AddressValueInSat     *Amount         `json:"addressValueIn,omitempty" ts_doc:"Total input value belonging to the queried account, when returned by account summary endpoints."`
+	AddressValueOutSat    *Amount         `json:"addressValueOut,omitempty" ts_doc:"Total output value belonging to the queried account, when returned by account summary endpoints."`
+	AccountAssetTransfers []TokenTransfer `json:"accountAssetTransfers,omitempty" ts_doc:"Syscoin SPT transfers summarized relative to the queried account."`
 	// SYSCOIN: SPT transaction type and optional decoded memo.
 	TokenType        *bchain.TokenType `json:"tokenType,omitempty" ts_doc:"Syscoin SPT transaction type."`
 	Memo             []byte            `json:"memo,omitempty" ts_doc:"Syscoin SPT memo decoded from OP_RETURN."`
