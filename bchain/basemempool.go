@@ -7,19 +7,21 @@ import (
 )
 
 type addrIndex struct {
-	addrDesc string
-	n        int32
-	AssetInfo *AssetInfo
+	addrDesc  string
+	n         int32
+	AssetInfo *AssetInfo // SYSCOIN
 }
 
 type txEntry struct {
 	addrIndexes []addrIndex
 	time        uint32
+	filter      string
 }
 
 type txidio struct {
-	txid string
-	io   []addrIndex
+	txid   string
+	io     []addrIndex
+	filter string
 }
 
 // BaseMempool is mempool base handle
@@ -28,7 +30,6 @@ type BaseMempool struct {
 	mux          sync.Mutex
 	txEntries    map[string]txEntry
 	addrDescToTx map[string][]Outpoint
-	OnNewTxAddr  OnNewTxAddrFunc
 	OnNewTx      OnNewTxFunc
 }
 
@@ -71,19 +72,27 @@ func (a MempoolTxidEntries) Less(i, j int) bool {
 // removeEntryFromMempool removes entry from mempool structs. The caller is responsible for locking!
 func (m *BaseMempool) removeEntryFromMempool(txid string, entry txEntry) {
 	delete(m.txEntries, txid)
+	// store already processed addrDesc - it can appear multiple times as a different outpoint
+	processedAddrDesc := make(map[string]struct{})
 	for _, si := range entry.addrIndexes {
 		outpoints, found := m.addrDescToTx[si.addrDesc]
 		if found {
-			newOutpoints := make([]Outpoint, 0, len(outpoints)-1)
-			for _, o := range outpoints {
-				if o.Txid != txid {
-					newOutpoints = append(newOutpoints, o)
+			_, processed := processedAddrDesc[si.addrDesc]
+			if !processed {
+				processedAddrDesc[si.addrDesc] = struct{}{}
+				j := 0
+				for i := 0; i < len(outpoints); i++ {
+					if outpoints[i].Txid != txid {
+						outpoints[j] = outpoints[i]
+						j++
+					}
 				}
-			}
-			if len(newOutpoints) > 0 {
-				m.addrDescToTx[si.addrDesc] = newOutpoints
-			} else {
-				delete(m.addrDescToTx, si.addrDesc)
+				outpoints = outpoints[:j]
+				if len(outpoints) > 0 {
+					m.addrDescToTx[si.addrDesc] = outpoints
+				} else {
+					delete(m.addrDescToTx, si.addrDesc)
+				}
 			}
 		}
 	}
@@ -105,28 +114,34 @@ func (m *BaseMempool) GetAllEntries() MempoolTxidEntries {
 	sort.Sort(entries)
 	return entries
 }
+
+// GetTxAssets returns all mempool entries touching a Syscoin SPT asset.
+//
+// SYSCOIN
 func (m *BaseMempool) GetTxAssets(assetGuid uint64) MempoolTxidEntries {
 	m.mux.Lock()
+	defer m.mux.Unlock()
 	mapTxid := make(map[string]struct{})
 	entries := make(MempoolTxidEntries, 0)
 	for txid, entry := range m.txEntries {
-		if _, found := mapTxid[txid]; !found {
-			for _, addrIndex := range entry.addrIndexes {
-				if addrIndex.AssetInfo != nil && addrIndex.AssetInfo.AssetGuid == assetGuid {
-					mapTxid[txid] = struct{}{}
-					entries = append(entries, MempoolTxidEntry{
-						Txid: txid,
-						Time: entry.time,
-					})
-					break
-				}
+		if _, found := mapTxid[txid]; found {
+			continue
+		}
+		for _, addrIndex := range entry.addrIndexes {
+			if addrIndex.AssetInfo != nil && addrIndex.AssetInfo.AssetGuid == assetGuid {
+				mapTxid[txid] = struct{}{}
+				entries = append(entries, MempoolTxidEntry{
+					Txid: txid,
+					Time: entry.time,
+				})
+				break
 			}
 		}
 	}
-	m.mux.Unlock()
 	sort.Sort(entries)
 	return entries
 }
+
 // GetTransactionTime returns first seen time of a transaction
 func (m *BaseMempool) GetTransactionTime(txid string) uint32 {
 	m.mux.Lock()
@@ -144,12 +159,10 @@ func (m *BaseMempool) txToMempoolTx(tx *Tx) *MempoolTx {
 		Blocktime:        time.Now().Unix(),
 		LockTime:         tx.LockTime,
 		Txid:             tx.Txid,
+		VSize:            tx.VSize,
 		Version:          tx.Version,
 		Vout:             tx.Vout,
 		CoinSpecificData: tx.CoinSpecificData,
-	}
-	if len(tx.Memo) > 0 {
-		mtx.Memo = tx.Memo
 	}
 	mtx.Vin = make([]MempoolVin, len(tx.Vin))
 	for i, vin := range tx.Vin {

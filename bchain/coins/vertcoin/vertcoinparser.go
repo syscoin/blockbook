@@ -3,7 +3,7 @@ package vertcoin
 import (
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/bchain/coins/btc"
 )
 
 // magic numbers
@@ -35,12 +35,14 @@ func init() {
 
 // VertcoinParser handle
 type VertcoinParser struct {
-	*btc.BitcoinLikeParser
+	*btc.BitcoinParser
 }
 
 // NewVertcoinParser returns new VertcoinParser instance
 func NewVertcoinParser(params *chaincfg.Params, c *btc.Configuration) *VertcoinParser {
-	return &VertcoinParser{BitcoinLikeParser: btc.NewBitcoinLikeParser(params, c)}
+	p := &VertcoinParser{BitcoinParser: btc.NewBitcoinParser(params, c)}
+	p.VSizeSupport = true
+	return p
 }
 
 // GetChainParams contains network parameters for the main Vertcoin network,

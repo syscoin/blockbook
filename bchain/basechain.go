@@ -1,6 +1,7 @@
 package bchain
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 )
@@ -39,43 +40,90 @@ func (b *BaseChain) GetMempoolEntry(txid string) (*MempoolEntry, error) {
 	return nil, errors.New("GetMempoolEntry: not supported")
 }
 
-// EthereumTypeGetBalance is not supported
-func (b *BaseChain) EthereumTypeGetBalance(addrDesc AddressDescriptor) (*big.Int, error) {
-	return nil, errors.New("Not supported")
+// GetSPVProof is not supported by default.
+//
+// SYSCOIN
+func (b *BaseChain) GetSPVProof(hash string) (json.RawMessage, error) {
+	return nil, errors.New("GetSPVProof: not supported")
 }
 
-// EthereumTypeGetNonce is not supported
-func (b *BaseChain) EthereumTypeGetNonce(addrDesc AddressDescriptor) (uint64, error) {
-	return 0, errors.New("Not supported")
+// GetAddressChainExtraData returns no chain-specific account/address data by default.
+func (b *BaseChain) GetAddressChainExtraData(addrDesc AddressDescriptor) (json.RawMessage, error) {
+	return nil, nil
+}
+
+// LongTermFeeRate returns smallest fee rate from historic blocks.
+func (b *BaseChain) LongTermFeeRate() (*LongTermFeeRate, error) {
+	return nil, errors.New("not supported")
+}
+
+// EthereumTypeGetBalance is not supported
+func (b *BaseChain) EthereumTypeGetBalance(addrDesc AddressDescriptor) (*big.Int, error) {
+	return nil, errors.New("not supported")
+}
+
+// EthereumTypeGetNonces is not supported
+func (b *BaseChain) EthereumTypeGetNonces(addrDesc AddressDescriptor, withConfirmed bool) (uint64, uint64, bool, error) {
+	return 0, 0, false, errors.New("not supported")
 }
 
 // EthereumTypeEstimateGas is not supported
 func (b *BaseChain) EthereumTypeEstimateGas(params map[string]interface{}) (uint64, error) {
-	return 0, errors.New("Not supported")
+	return 0, errors.New("not supported")
 }
 
-// EthereumTypeGetErc20ContractInfo is not supported
-func (b *BaseChain) EthereumTypeGetErc20ContractInfo(contractDesc AddressDescriptor) (*Erc20Contract, error) {
-	return nil, errors.New("Not supported")
+// EthereumTypeGetEip1559Fees is not supported
+func (b *BaseChain) EthereumTypeGetEip1559Fees() (*Eip1559Fees, error) {
+	return nil, errors.New("not supported")
+}
+
+// GetContractInfo is not supported
+func (b *BaseChain) GetContractInfo(contractDesc AddressDescriptor) (*ContractInfo, error) {
+	return nil, errors.New("not supported")
 }
 
 // EthereumTypeGetErc20ContractBalance is not supported
 func (b *BaseChain) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("not supported")
 }
 
-func (b *BaseChain) GetChainTips() (string, error) {
-	return "", errors.New("Not supported")
-}
-func (b *BaseChain) GetSPVProof(hash string) (string, error) {
-	return "", errors.New("Not supported")
+// EthereumTypeGetErc20ContractBalances is not supported
+func (b *BaseChain) EthereumTypeGetErc20ContractBalances(addrDesc AddressDescriptor, contractDescs []AddressDescriptor) ([]*big.Int, error) {
+	return nil, errors.New("not supported")
 }
 
-func (p *BaseChain) FetchNEVMAssetDetails(assetGuid uint64) (*Asset, error) {
-	return nil, errors.New("Not supported")
+// GetTokenURI returns URI of non fungible or multi token defined by token id
+func (p *BaseChain) GetTokenURI(contractDesc AddressDescriptor, tokenID *big.Int) (string, error) {
+	return "", errors.New("not supported")
 }
 
-func (p *BaseChain) GetContractExplorerBaseURL() string {
-	return ""
+func (b *BaseChain) EthereumTypeGetSupportedStakingPools() []string {
+	return nil
 }
 
+func (b *BaseChain) EthereumTypeGetStakingPoolsData(addrDesc AddressDescriptor) ([]StakingPoolData, error) {
+	return nil, errors.New("not supported")
+}
+
+// EthereumTypeRpcCall calls eth_call with given data and to address
+func (b *BaseChain) EthereumTypeRpcCall(data, to, from string) (string, error) {
+	return "", errors.New("not supported")
+}
+
+// EthereumTypeRpcCallBatch performs batch eth_call requests.
+func (b *BaseChain) EthereumTypeRpcCallBatch(calls []EthereumTypeRPCCall) ([]EthereumTypeRPCCallResult, error) {
+	return nil, errors.New("not supported")
+}
+
+// EthereumTypeMulticallAggregate3 issues a Multicall3 aggregate3 call.
+func (b *BaseChain) EthereumTypeMulticallAggregate3(calls []EthereumMulticallCall, blockNumber *big.Int) ([]EthereumMulticallResult, error) {
+	return nil, errors.New("not supported")
+}
+
+func (b *BaseChain) EthereumTypeGetRawTransaction(txid string) (string, error) {
+	return "", errors.New("not supported")
+}
+
+func (b *BaseChain) EthereumTypeGetTransactionReceipt(txid string) (*RpcReceipt, error) {
+	return nil, errors.New("not supported")
+}

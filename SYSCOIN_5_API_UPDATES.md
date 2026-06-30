@@ -40,7 +40,7 @@
 ### 4. Updated Address Endpoint
 - Added SPT token information in address responses
 - Example shows `tokens` array with SPT assets
-- Token type: "SPTAllocated" 
+- Token type: "SPTAllocated"
 - Includes asset GUID, symbol, decimals, balances, and transfer counts
 
 ### 5. Enhanced Query Parameters

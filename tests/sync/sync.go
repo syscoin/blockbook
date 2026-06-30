@@ -9,10 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/common"
-	"github.com/syscoin/blockbook/db"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/common"
+	"github.com/trezor/blockbook/db"
 )
 
 var testMap = map[string]func(t *testing.T, th *TestHandler){
@@ -145,7 +146,7 @@ func makeRocksDB(parser bchain.BlockChainParser, m *common.Metrics, is *common.I
 		return nil, nil, err
 	}
 
-	d, err := db.NewRocksDB(p, 1<<17, 1<<14, parser, m, nil)
+	d, err := db.NewRocksDB(p, 1<<17, 1<<14, parser, m, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -161,6 +162,19 @@ func makeRocksDB(parser bchain.BlockChainParser, m *common.Metrics, is *common.I
 }
 
 var metricsRegistry = map[string]*common.Metrics{}
+
+// Lower thresholds speed up integration tests that intentionally trigger
+// missing-block retries.
+var testSyncWorkerConfig = &db.SyncWorkerConfig{
+	MissingBlockRetry: db.MissingBlockRetryConfig{
+		RecheckThreshold:    3,
+		TipRecheckThreshold: 2,
+		RetryDelay:          50 * time.Millisecond,
+		// Keep the liveness cap exercised but short so a stall yields quickly
+		// instead of waiting on the 60s production default.
+		MaxStallDuration: 5 * time.Second,
+	},
+}
 
 func getMetrics(name string) (*common.Metrics, error) {
 	if m, found := metricsRegistry[name]; found {
@@ -190,7 +204,7 @@ func withRocksDBAndSyncWorker(t *testing.T, h *TestHandler, startHeight uint32, 
 
 	ch := make(chan os.Signal)
 
-	sw, err := db.NewSyncWorker(d, h.Chain, 8, 0, int(startHeight), false, ch, m, is)
+	sw, err := db.NewSyncWorkerWithConfig(d, h.Chain, 8, 0, int(startHeight), false, ch, m, is, testSyncWorkerConfig)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,19 +1,21 @@
 package syscoin
 
 import (
-	"encoding/json"
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"math/big"
-	"github.com/martinboehm/btcd/wire"
-	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/martinboehm/btcutil/txscript"
+
 	vlq "github.com/bsm/go-vlq"
 	"github.com/juju/errors"
+	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil"
-	
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
-	"github.com/syscoin/blockbook/bchain/coins/utils"
+	"github.com/martinboehm/btcutil/chaincfg"
+	"github.com/martinboehm/btcutil/txscript"
+
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/bchain/coins/utils"
 )
 
 // magic numbers
@@ -23,13 +25,12 @@ const (
 
 	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN int32 = 138
 	SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION int32 = 139
-	SYSCOIN_TX_VERSION_ALLOCATION_MINT int32 = 140
-	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM int32 = 141
-	SYSCOIN_TX_VERSION_ALLOCATION_SEND int32 = 142
+	SYSCOIN_TX_VERSION_ALLOCATION_MINT            int32 = 140
+	SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM    int32 = 141
+	SYSCOIN_TX_VERSION_ALLOCATION_SEND            int32 = 142
 
 	maxAddrDescLen = 10000
-	maxMemoLen = 256
-
+	maxMemoLen     = 256
 )
 
 // chain parameters
@@ -44,14 +45,14 @@ func init() {
 
 	// Mainnet address encoding magics
 	MainNetParams.PubKeyHashAddrID = []byte{63} // base58 prefix: s
-	MainNetParams.ScriptHashAddrID = []byte{5} // base68 prefix: 3
+	MainNetParams.ScriptHashAddrID = []byte{5}  // base68 prefix: 3
 	MainNetParams.Bech32HRPSegwit = "sys"
 
 	TestnetParams = chaincfg.TestNet3Params
 	TestnetParams.Net = TestnetMagic
 
 	// Testnet address encoding magics
-	TestnetParams.PubKeyHashAddrID = []byte{65} // base58 prefix: t
+	TestnetParams.PubKeyHashAddrID = []byte{65}  // base58 prefix: t
 	TestnetParams.ScriptHashAddrID = []byte{196} // base58 prefix: 2
 	TestnetParams.Bech32HRPSegwit = "tsys"
 }
@@ -69,6 +70,12 @@ func NewSyscoinParser(params *chaincfg.Params, c *btc.Configuration) *SyscoinPar
 	}
 	parser.BaseParser = parser.BitcoinLikeParser.BaseParser
 	return parser
+}
+
+// SupportsSyscoinAssets marks this Bitcoin-like parser as using the Syscoin SPT
+// RocksDB extensions.
+func (p *SyscoinParser) SupportsSyscoinAssets() bool {
+	return true
 }
 
 // matches max data carrier for systx
@@ -107,24 +114,53 @@ func (p *SyscoinParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	p.LoadAssets(tx)
+	if err := p.LoadAssets(tx); err != nil {
+		return nil, 0, err
+	}
 	return tx, height, nil
 }
-// TxFromMsgTx converts syscoin wire Tx to bchain.Tx
-func (p *SyscoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
+
+func (p *SyscoinParser) txFromMsgTx(t *wire.MsgTx, parseAddresses bool) (bchain.Tx, error) {
 	tx := p.BitcoinLikeParser.TxFromMsgTx(t, parseAddresses)
-	p.LoadAssets(&tx)
+	if err := p.LoadAssets(&tx); err != nil {
+		return tx, err
+	}
+	return tx, nil
+}
+
+// TxFromMsgTx converts syscoin wire Tx to bchain.Tx.
+func (p *SyscoinParser) TxFromMsgTx(t *wire.MsgTx, parseAddresses bool) bchain.Tx {
+	tx, _ := p.txFromMsgTx(t, parseAddresses)
 	return tx
 }
+
+// ParseTx parses byte array containing transaction and returns Tx struct.
+func (p *SyscoinParser) ParseTx(b []byte) (*bchain.Tx, error) {
+	t := wire.MsgTx{}
+	r := bytes.NewReader(b)
+	if err := t.Deserialize(r); err != nil {
+		return nil, err
+	}
+	tx, err := p.txFromMsgTx(&t, true)
+	if err != nil {
+		return nil, err
+	}
+	tx.Hex = hex.EncodeToString(b)
+	return &tx, nil
+}
+
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
 func (p *SyscoinParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
 	tx, err := p.BaseParser.ParseTxFromJson(msg)
 	if err != nil {
 		return nil, err
 	}
-	p.LoadAssets(tx)
+	if err := p.LoadAssets(tx); err != nil {
+		return nil, err
+	}
 	return tx, nil
 }
+
 // ParseBlock parses raw block to our Block struct
 // it has special handling for Auxpow blocks that cannot be parsed by standard btc wire parse
 func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
@@ -149,11 +185,16 @@ func (p *SyscoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
 
 	txs := make([]bchain.Tx, len(w.Transactions))
 	for ti, t := range w.Transactions {
-		txs[ti] = p.TxFromMsgTx(t, false)
+		tx, err := p.txFromMsgTx(t, false)
+		if err != nil {
+			return nil, errors.Annotatef(err, "transaction %d", ti)
+		}
+		txs[ti] = tx
 	}
 
 	return &bchain.Block{
 		BlockHeader: bchain.BlockHeader{
+			Prev: h.PrevBlock.String(), // needed for fork detection when parsing raw blocks
 			Size: len(b),
 			Time: h.Timestamp.Unix(),
 		},
@@ -197,20 +238,19 @@ func (p *SyscoinParser) GetAssetsMaskFromVersion(nVersion int32) bchain.AssetsMa
 }
 
 func (p *SyscoinParser) IsSyscoinMintTx(nVersion int32) bool {
-    return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_MINT
+	return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_MINT
 }
-
 
 // note assetsend in core is assettx but its deserialized as allocation, we just care about balances so we can do it in same code for allocations
 func (p *SyscoinParser) IsAssetAllocationTx(nVersion int32) bool {
 	return nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM || nVersion == SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN || nVersion == SYSCOIN_TX_VERSION_SYSCOIN_BURN_TO_ALLOCATION ||
-	nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND
+		nVersion == SYSCOIN_TX_VERSION_ALLOCATION_SEND
 }
 
 func (p *SyscoinParser) IsSyscoinTx(nVersion int32, nHeight uint32) bool {
-    return p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
+	return p.IsAssetAllocationTx(nVersion) || p.IsSyscoinMintTx(nVersion)
 }
-	
+
 // TryGetOPReturn tries to process OP_RETURN script and return data
 func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 	if len(script) > 1 && script[0] == txscript.OP_RETURN {
@@ -221,10 +261,23 @@ func (p *SyscoinParser) TryGetOPReturn(script []byte) []byte {
 		op := script[1]
 		var data []byte
 		if op < txscript.OP_PUSHDATA1 {
+			if len(script) < 2+int(op) {
+				return nil
+			}
 			data = script[2:]
 		} else if op == txscript.OP_PUSHDATA1 {
+			if len(script) < 3 || len(script) < 3+int(script[2]) {
+				return nil
+			}
 			data = script[3:]
 		} else if op == txscript.OP_PUSHDATA2 {
+			if len(script) < 4 {
+				return nil
+			}
+			pushLen := int(script[2]) | int(script[3])<<8
+			if len(script) < 4+pushLen {
+				return nil
+			}
 			data = script[4:]
 		}
 		return data
@@ -258,8 +311,6 @@ func (p *SyscoinParser) GetSPTDataFromDesc(addrDesc *bchain.AddressDescriptor) (
 	return sptData, nil
 }
 
-
-
 func (p *SyscoinParser) GetAssetAllocationFromDesc(addrDesc *bchain.AddressDescriptor, txVersion int32) (*bchain.AssetAllocation, []byte, error) {
 	sptData, err := p.GetSPTDataFromDesc(addrDesc)
 	if err != nil {
@@ -276,7 +327,7 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int
 		return nil, nil, err
 	}
 	var memo []byte
-	if (p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN) {
+	if p.IsAssetAllocationTx(txVersion) && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_NEVM && txVersion != SYSCOIN_TX_VERSION_ALLOCATION_BURN_TO_SYSCOIN {
 		memo = make([]byte, maxMemoLen)
 		n, _ := r.Read(memo)
 		memo = memo[:n]
@@ -284,18 +335,21 @@ func (p *SyscoinParser) GetAssetAllocationFromData(sptData []byte, txVersion int
 	return &assetAllocation, memo, nil
 }
 func (p *SyscoinParser) LoadAssets(tx *bchain.Tx) error {
-    if p.IsSyscoinTx(tx.Version, tx.BlockHeight) {
-        allocation, memo, err := p.GetAllocationFromTx(tx)
+	if p.IsSyscoinTx(tx.Version, tx.BlockHeight) {
+		allocation, memo, err := p.GetAllocationFromTx(tx)
 		if err != nil {
 			return err
 		}
 		tx.Memo = memo
-        for _, v := range allocation.AssetObj.VoutAssets {
-            for _,voutAsset := range v.Values {
+		for _, v := range allocation.AssetObj.VoutAssets {
+			for _, voutAsset := range v.Values {
+				if int(voutAsset.N) >= len(tx.Vout) {
+					return errors.Errorf("asset allocation vout index %d out of range", voutAsset.N)
+				}
 				// store in vout
 				tx.Vout[voutAsset.N].AssetInfo = &bchain.AssetInfo{AssetGuid: v.AssetGuid, ValueSat: big.NewInt(voutAsset.ValueSat)}
-            }
-        }       
+			}
+		}
 	}
 	return nil
 }
@@ -307,7 +361,6 @@ func (p *SyscoinParser) WitnessPubKeyHashFromKeyID(keyId []byte) (string, error)
 	}
 	return addr.EncodeAddress(), nil
 }
-
 
 func (p *SyscoinParser) PackAssetKey(assetGuid uint64, height uint32) []byte {
 	var buf []byte
@@ -375,6 +428,52 @@ func (p *SyscoinParser) UnpackAssetInfo(assetInfo *bchain.AssetInfo, buf []byte)
 	return l
 }
 
+func (p *SyscoinParser) appendTxInput(txi *bchain.TxInput, buf []byte, varBuf []byte) []byte {
+	l := p.BaseParser.PackVaruint(uint(len(txi.AddrDesc)), varBuf)
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, txi.AddrDesc...)
+	l = p.BaseParser.PackBigint(&txi.ValueSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+func (p *SyscoinParser) appendTxOutput(txo *bchain.TxOutput, buf []byte, varBuf []byte) []byte {
+	addrDescLen := len(txo.AddrDesc)
+	if txo.Spent {
+		addrDescLen = ^addrDescLen
+	}
+	l := vlq.PutInt(varBuf, int64(addrDescLen))
+	buf = append(buf, varBuf[:l]...)
+	buf = append(buf, txo.AddrDesc...)
+	l = p.BaseParser.PackBigint(&txo.ValueSat, varBuf)
+	buf = append(buf, varBuf[:l]...)
+	return buf
+}
+
+func (p *SyscoinParser) unpackTxInput(ti *bchain.TxInput, buf []byte) int {
+	addrDescLen, l := p.BaseParser.UnpackVaruint(buf)
+	offset := l
+	ti.AddrDesc = append([]byte(nil), buf[offset:offset+int(addrDescLen)]...)
+	offset += int(addrDescLen)
+	var valueLen int
+	ti.ValueSat, valueLen = p.BaseParser.UnpackBigint(buf[offset:])
+	return offset + valueLen
+}
+
+func (p *SyscoinParser) unpackTxOutput(to *bchain.TxOutput, buf []byte) int {
+	addrDescLen, l := vlq.Int(buf)
+	if addrDescLen < 0 {
+		to.Spent = true
+		addrDescLen = ^addrDescLen
+	}
+	offset := l
+	to.AddrDesc = append([]byte(nil), buf[offset:offset+int(addrDescLen)]...)
+	offset += int(addrDescLen)
+	var valueLen int
+	to.ValueSat, valueLen = p.BaseParser.UnpackBigint(buf[offset:])
+	return offset + valueLen
+}
+
 func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varBuf []byte) []byte {
 	buf = buf[:0]
 	// pack version info for syscoin to detect sysx tx types
@@ -386,7 +485,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Inputs {
 		ti := &ta.Inputs[i]
-		buf = p.BitcoinLikeParser.AppendTxInput(ti, buf, varBuf)
+		buf = p.appendTxInput(ti, buf, varBuf)
 		if ti.AssetInfo != nil {
 			l = p.BaseParser.PackVaruint(1, varBuf)
 			buf = append(buf, varBuf[:l]...)
@@ -400,7 +499,7 @@ func (p *SyscoinParser) PackTxAddresses(ta *bchain.TxAddresses, buf []byte, varB
 	buf = append(buf, varBuf[:l]...)
 	for i := range ta.Outputs {
 		to := &ta.Outputs[i]
-		buf = p.BitcoinLikeParser.AppendTxOutput(to, buf, varBuf)
+		buf = p.appendTxOutput(to, buf, varBuf)
 		if to.AssetInfo != nil {
 			l = p.BaseParser.PackVaruint(1, varBuf)
 			buf = append(buf, varBuf[:l]...)
@@ -427,7 +526,7 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	ta.Inputs = make([]bchain.TxInput, inputs)
 	for i := uint(0); i < inputs; i++ {
 		ti := &ta.Inputs[i]
-		l += p.BitcoinLikeParser.UnpackTxInput(ti, buf[l:])
+		l += p.unpackTxInput(ti, buf[l:])
 		assetInfoFlag, ll := p.BaseParser.UnpackVaruint(buf[l:])
 		l += ll
 		if assetInfoFlag == 1 {
@@ -440,7 +539,7 @@ func (p *SyscoinParser) UnpackTxAddresses(buf []byte) (*bchain.TxAddresses, erro
 	ta.Outputs = make([]bchain.TxOutput, outputs)
 	for i := uint(0); i < outputs; i++ {
 		to := &ta.Outputs[i]
-		l += p.BitcoinLikeParser.UnpackTxOutput(to, buf[l:])
+		l += p.unpackTxOutput(to, buf[l:])
 		assetInfoFlag, ll := p.BaseParser.UnpackVaruint(buf[l:])
 		l += ll
 		if assetInfoFlag == 1 {
@@ -522,7 +621,7 @@ func (p *SyscoinParser) PackAddrBalance(ab *bchain.AddrBalance, buf, varBuf []by
 	buf = append(buf, varBuf[:l]...)
 	l = p.BaseParser.PackBigint(&ab.BalanceSat, varBuf)
 	buf = append(buf, varBuf[:l]...)
-	
+
 	// pack asset balance information
 	l = p.BaseParser.PackVaruint(uint(len(ab.AssetBalances)), varBuf)
 	buf = append(buf, varBuf[:l]...)
@@ -609,7 +708,7 @@ func (p *SyscoinParser) PackTxIndexes(txi []bchain.TxIndexes) []byte {
 
 func (p *SyscoinParser) PackAsset(asset *bchain.Asset) ([]byte, error) {
 	buf := make([]byte, 0, 315)
-	varBuf := make([]byte, 4)
+	varBuf := make([]byte, vlq.MaxLen64)
 	l := p.BaseParser.PackVaruint(uint(asset.Transactions), varBuf)
 	buf = append(buf, varBuf[:l]...)
 	buf = append(buf, p.BaseParser.PackVarBytes(asset.MetaData)...)

@@ -19,9 +19,9 @@ import (
 	"github.com/decred/dcrd/dcrjson/v3"
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
-	"github.com/syscoin/blockbook/common"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/common"
 )
 
 // voteBitYes defines the vote bit set when a given block validates the previous
@@ -791,7 +791,7 @@ func (d *DecredRPC) EstimateFee(blocks int) (big.Int, error) {
 	return r, nil
 }
 
-func (d *DecredRPC) SendRawTransaction(tx string) (string, error) {
+func (d *DecredRPC) SendRawTransaction(tx string, disableAlternativeRPC bool) (string, error) {
 	sendRawTxRequest := &GenericCmd{
 		ID:     1,
 		Method: "sendrawtransaction",

@@ -16,8 +16,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
 )
 
 // NulsRPC is an interface to JSON-RPC bitcoind service
@@ -471,7 +471,7 @@ func (n *NulsRPC) EstimateFee(blocks int) (big.Int, error) {
 	return *big.NewInt(100000), nil
 }
 
-func (n *NulsRPC) SendRawTransaction(tx string) (string, error) {
+func (n *NulsRPC) SendRawTransaction(tx string, alternativeRPC bool) (string, error) {
 	broadcast := CmdTxBroadcast{}
 	req := struct {
 		TxHex string `json:"txHex"`

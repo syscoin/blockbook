@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/tests/dbtestdata"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/tests/dbtestdata"
 )
 
 func TestEthParser_GetAddrDescFromAddress(t *testing.T) {
@@ -54,7 +54,7 @@ func TestEthParser_GetAddrDescFromAddress(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewEthereumParser(1)
+			p := NewEthereumParser(1, false)
 			got, err := p.GetAddrDescFromAddress(tt.args.address)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EthParser.GetAddrDescFromAddress() error = %v, wantErr %v", err, tt.wantErr)
@@ -89,23 +89,26 @@ func init() {
 				},
 			},
 		},
-		CoinSpecificData: completeTransaction{
-			Tx: &rpcTransaction{
-				AccountNonce:     "0xb26c",
-				GasPrice:         "0x430e23400",
-				GasLimit:         "0x5208",
-				To:               "0x555Ee11FBDDc0E49A9bAB358A8941AD95fFDB48f",
-				Value:            "0x1bc0159d530e6000",
-				Payload:          "0x",
-				Hash:             "0xcd647151552b5132b2aef7c9be00dc6f73afc5901dde157aab131335baaa853b",
-				BlockNumber:      "0x41eee8",
-				From:             "0x3E3a3D69dc66bA10737F531ed088954a9EC89d97",
-				TransactionIndex: "0xa",
+		CoinSpecificData: bchain.EthereumSpecificData{
+			Tx: &bchain.RpcTransaction{
+				AccountNonce:         "0xb26c",
+				GasPrice:             "0x430e23400",
+				MaxPriorityFeePerGas: "0x430e23401",
+				MaxFeePerGas:         "0x430e23402",
+				BaseFeePerGas:        "0x430e23403",
+				GasLimit:             "0x5208",
+				To:                   "0x555Ee11FBDDc0E49A9bAB358A8941AD95fFDB48f",
+				Value:                "0x1bc0159d530e6000",
+				Payload:              "0x",
+				Hash:                 "0xcd647151552b5132b2aef7c9be00dc6f73afc5901dde157aab131335baaa853b",
+				BlockNumber:          "0x41eee8",
+				From:                 "0x3E3a3D69dc66bA10737F531ed088954a9EC89d97",
+				TransactionIndex:     "0xa",
 			},
-			Receipt: &rpcReceipt{
+			Receipt: &bchain.RpcReceipt{
 				GasUsed: "0x5208",
 				Status:  "0x1",
-				Logs:    []*rpcLog{},
+				Logs:    []*bchain.RpcLog{},
 			},
 		},
 	}
@@ -127,22 +130,25 @@ func init() {
 				},
 			},
 		},
-		CoinSpecificData: completeTransaction{
-			Tx: &rpcTransaction{
-				AccountNonce:     "0xd0",
-				GasPrice:         "0x9502f9000",
-				GasLimit:         "0x130d5",
-				To:               "0x4af4114F73d1c1C903aC9E0361b379D1291808A2",
-				Value:            "0x0",
-				Payload:          "0xa9059cbb000000000000000000000000555ee11fbddc0e49a9bab358a8941ad95ffdb48f00000000000000000000000000000000000000000000021e19e0c9bab2400000",
-				Hash:             "0xa9cd088aba2131000da6f38a33c20169baee476218deea6b78720700b895b101",
-				BlockNumber:      "0x41eee8",
-				From:             "0x20cD153de35D469BA46127A0C8F18626b59a256A",
-				TransactionIndex: "0x0"},
-			Receipt: &rpcReceipt{
+		CoinSpecificData: bchain.EthereumSpecificData{
+			Tx: &bchain.RpcTransaction{
+				AccountNonce:         "0xd0",
+				GasPrice:             "0x9502f9000",
+				MaxPriorityFeePerGas: "0x9502f9001",
+				MaxFeePerGas:         "0x9502f9002",
+				BaseFeePerGas:        "0x9502f9003",
+				GasLimit:             "0x130d5",
+				To:                   "0x4af4114F73d1c1C903aC9E0361b379D1291808A2",
+				Value:                "0x0",
+				Payload:              "0xa9059cbb000000000000000000000000555ee11fbddc0e49a9bab358a8941ad95ffdb48f00000000000000000000000000000000000000000000021e19e0c9bab2400000",
+				Hash:                 "0xa9cd088aba2131000da6f38a33c20169baee476218deea6b78720700b895b101",
+				BlockNumber:          "0x41eee8",
+				From:                 "0x20cD153de35D469BA46127A0C8F18626b59a256A",
+				TransactionIndex:     "0x0"},
+			Receipt: &bchain.RpcReceipt{
 				GasUsed: "0xcb39",
 				Status:  "0x1",
-				Logs: []*rpcLog{
+				Logs: []*bchain.RpcLog{
 					{
 						Address: "0x4af4114F73d1c1C903aC9E0361b379D1291808A2",
 						Data:    "0x00000000000000000000000000000000000000000000021e19e0c9bab2400000",
@@ -174,8 +180,8 @@ func init() {
 				},
 			},
 		},
-		CoinSpecificData: completeTransaction{
-			Tx: &rpcTransaction{
+		CoinSpecificData: bchain.EthereumSpecificData{
+			Tx: &bchain.RpcTransaction{
 				AccountNonce:     "0xb26c",
 				GasPrice:         "0x430e23400",
 				GasLimit:         "0x5208",
@@ -187,10 +193,10 @@ func init() {
 				From:             "0x3E3a3D69dc66bA10737F531ed088954a9EC89d97",
 				TransactionIndex: "0xa",
 			},
-			Receipt: &rpcReceipt{
+			Receipt: &bchain.RpcReceipt{
 				GasUsed: "0x5208",
 				Status:  "0x0",
-				Logs:    []*rpcLog{},
+				Logs:    []*bchain.RpcLog{},
 			},
 		},
 	}
@@ -212,8 +218,8 @@ func init() {
 				},
 			},
 		},
-		CoinSpecificData: completeTransaction{
-			Tx: &rpcTransaction{
+		CoinSpecificData: bchain.EthereumSpecificData{
+			Tx: &bchain.RpcTransaction{
 				AccountNonce:     "0xb26c",
 				GasPrice:         "0x430e23400",
 				GasLimit:         "0x5208",
@@ -225,10 +231,10 @@ func init() {
 				From:             "0x3E3a3D69dc66bA10737F531ed088954a9EC89d97",
 				TransactionIndex: "0xa",
 			},
-			Receipt: &rpcReceipt{
+			Receipt: &bchain.RpcReceipt{
 				GasUsed: "0x5208",
 				Status:  "",
-				Logs:    []*rpcLog{},
+				Logs:    []*bchain.RpcLog{},
 			},
 		},
 	}
@@ -285,7 +291,7 @@ func TestEthereumParser_PackTx(t *testing.T) {
 			want: dbtestdata.EthTx1NoStatusPacked,
 		},
 	}
-	p := NewEthereumParser(1)
+	p := NewEthereumParser(1, false)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := p.PackTx(tt.args.tx, tt.args.height, tt.args.blockTime)
@@ -338,7 +344,7 @@ func TestEthereumParser_UnpackTx(t *testing.T) {
 			want1: 4321000,
 		},
 	}
-	p := NewEthereumParser(1)
+	p := NewEthereumParser(1, false)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b, err := hex.DecodeString(tt.args.hex)
@@ -351,8 +357,8 @@ func TestEthereumParser_UnpackTx(t *testing.T) {
 				return
 			}
 			// DeepEqual has problems with pointers in completeTransaction
-			gs := got.CoinSpecificData.(completeTransaction)
-			ws := tt.want.CoinSpecificData.(completeTransaction)
+			gs := got.CoinSpecificData.(bchain.EthereumSpecificData)
+			ws := tt.want.CoinSpecificData.(bchain.EthereumSpecificData)
 			gc := *got
 			wc := *tt.want
 			gc.CoinSpecificData = nil
@@ -374,7 +380,53 @@ func TestEthereumParser_UnpackTx(t *testing.T) {
 	}
 }
 
+func TestEthereumParser_PackUnpackChainExtraData(t *testing.T) {
+	p := NewEthereumParser(1, false)
+	original := &bchain.Tx{
+		CoinSpecificData: bchain.EthereumSpecificData{
+			Tx: &bchain.RpcTransaction{
+				AccountNonce:     "0x1",
+				GasPrice:         "0x430e23400",
+				GasLimit:         "0x5208",
+				To:               "0x555Ee11FBDDc0E49A9bAB358A8941AD95fFDB48f",
+				Value:            "0x0",
+				Payload:          "0x",
+				Hash:             "0xcd647151552b5132b2aef7c9be00dc6f73afc5901dde157aab131335baaa853b",
+				BlockNumber:      "0x41eee8",
+				From:             "0x3E3a3D69dc66bA10737F531ed088954a9EC89d97",
+				TransactionIndex: "0x0",
+			},
+			Receipt: &bchain.RpcReceipt{
+				GasUsed: "0x5208",
+				Status:  "0x1",
+				Logs:    []*bchain.RpcLog{},
+			},
+			ChainExtraData: []byte(`{"operation":"vote","totalFee":"12345"}`),
+		},
+	}
+
+	packed, err := p.PackTx(original, 4321000, 1534858022)
+	if err != nil {
+		t.Fatalf("PackTx error: %v", err)
+	}
+
+	unpacked, _, err := p.UnpackTx(packed)
+	if err != nil {
+		t.Fatalf("UnpackTx error: %v", err)
+	}
+
+	csd, ok := unpacked.CoinSpecificData.(bchain.EthereumSpecificData)
+	if !ok {
+		t.Fatalf("unexpected CoinSpecificData type: %T", unpacked.CoinSpecificData)
+	}
+
+	if !reflect.DeepEqual(csd.ChainExtraData, original.CoinSpecificData.(bchain.EthereumSpecificData).ChainExtraData) {
+		t.Fatalf("ChainExtraData mismatch, got %s, want %s", string(csd.ChainExtraData), string(original.CoinSpecificData.(bchain.EthereumSpecificData).ChainExtraData))
+	}
+}
+
 func TestEthereumParser_GetEthereumTxData(t *testing.T) {
+	p := NewEthereumParser(1, false)
 	tests := []struct {
 		name string
 		tx   *bchain.Tx
@@ -393,9 +445,103 @@ func TestEthereumParser_GetEthereumTxData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetEthereumTxData(tt.tx)
+			got := p.GetEthereumTxData(tt.tx)
 			if got.Data != tt.want {
 				t.Errorf("EthereumParser.GetEthereumTxData() = %v, want %v", got.Data, tt.want)
+			}
+		})
+	}
+}
+
+func TestEthereumParser_ParseErrorFromOutput(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "ParseErrorFromOutput 1",
+			output: "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000031546f74616c206e756d626572206f662067726f757073206d7573742062652067726561746572207468616e207a65726f2e000000000000000000000000000000",
+			want:   "Total number of groups must be greater than zero.",
+		},
+		{
+			name:   "ParseErrorFromOutput 2",
+			output: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000126e6f7420656e6f7567682062616c616e63650000000000000000000000000000",
+			want:   "not enough balance",
+		},
+		{
+			name:   "ParseErrorFromOutput empty",
+			output: "",
+			want:   "",
+		},
+		{
+			name:   "ParseErrorFromOutput short",
+			output: "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012",
+			want:   "",
+		},
+		{
+			name:   "ParseErrorFromOutput invalid signature",
+			output: "0x08c379b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000126e6f7420656e6f7567682062616c616e63650000000000000000000000000000",
+			want:   "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseErrorFromOutput(tt.output)
+			if got != tt.want {
+				t.Errorf("EthereumParser.ParseErrorFromOutput() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEthereumParser_PackInternalTransactionError_UnpackInternalTransactionError(t *testing.T) {
+	tests := []struct {
+		name     string
+		original string
+		packed   string
+		unpacked string
+	}{
+		{
+			name:     "execution reverted",
+			original: "execution reverted",
+			packed:   "\x01",
+			unpacked: "Reverted.",
+		},
+		{
+			name:     "out of gas",
+			original: "out of gas",
+			packed:   "\x02",
+			unpacked: "Out of gas.",
+		},
+		{
+			name:     "contract creation code storage out of gas",
+			original: "contract creation code storage out of gas",
+			packed:   "\x03",
+			unpacked: "Contract creation code storage out of gas.",
+		},
+		{
+			name:     "max code size exceeded",
+			original: "max code size exceeded",
+			packed:   "\x04",
+			unpacked: "Max code size exceeded.",
+		},
+		{
+			name:     "unknown error",
+			original: "unknown error",
+			packed:   "unknown error",
+			unpacked: "unknown error",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			packed := PackInternalTransactionError(tt.original)
+			if packed != tt.packed {
+				t.Errorf("EthereumParser.PackInternalTransactionError() = %v, want %v", packed, tt.packed)
+			}
+			unpacked := UnpackInternalTransactionError([]byte(packed))
+			if unpacked != tt.unpacked {
+				t.Errorf("EthereumParser.UnpackInternalTransactionError() = %v, want %v", unpacked, tt.unpacked)
 			}
 		})
 	}

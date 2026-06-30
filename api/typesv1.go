@@ -3,7 +3,7 @@ package api
 import (
 	"math/big"
 
-	"github.com/syscoin/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain"
 )
 
 // ScriptSigV1 is used for legacy api v1
@@ -178,6 +178,12 @@ func (w *Worker) transactionsToV1(txs []*Tx) []*TxV1 {
 // AddressToV1 converts Address to AddressV1
 func (w *Worker) AddressToV1(a *Address) *AddressV1 {
 	d := w.chainParser.AmountDecimals()
+	// v1 always serializes UnconfirmedBalance as a decimal string;
+	// when the v2 field is omitted (AccountDetailsBasic), preserve "0".
+	unconfirmedBalance := "0"
+	if a.UnconfirmedBalanceSat != nil {
+		unconfirmedBalance = a.UnconfirmedBalanceSat.DecimalString(d)
+	}
 	return &AddressV1{
 		AddrStr:                 a.AddrStr,
 		Balance:                 a.BalanceSat.DecimalString(d),
@@ -187,7 +193,7 @@ func (w *Worker) AddressToV1(a *Address) *AddressV1 {
 		Transactions:            w.transactionsToV1(a.Transactions),
 		TxApperances:            a.Txs,
 		Txids:                   a.Txids,
-		UnconfirmedBalance:      a.UnconfirmedBalanceSat.DecimalString(d),
+		UnconfirmedBalance:      unconfirmedBalance,
 		UnconfirmedTxApperances: a.UnconfirmedTxs,
 	}
 }
@@ -195,9 +201,9 @@ func (w *Worker) AddressToV1(a *Address) *AddressV1 {
 // AddressUtxoToV1 converts []AddressUtxo to []AddressUtxoV1
 func (w *Worker) AddressUtxoToV1(au Utxos) []AddressUtxoV1 {
 	d := w.chainParser.AmountDecimals()
-	v1 := make([]AddressUtxoV1, len(au.Utxos))
-	for i := range au.Utxos {
-		utxo := &au.Utxos[i]
+	v1 := make([]AddressUtxoV1, len(au))
+	for i := range au {
+		utxo := &au[i]
 		v1[i] = AddressUtxoV1{
 			AmountSat:     utxo.AmountSat.AsBigInt(),
 			Amount:        utxo.AmountSat.DecimalString(d),

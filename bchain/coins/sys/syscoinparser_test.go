@@ -3,6 +3,7 @@
 package syscoin
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"os"
@@ -10,8 +11,9 @@ import (
 	"testing"
 
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
+	syscoinwire "github.com/syscoin/syscoinwire/syscoin/wire"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
 )
 
 func TestMain(m *testing.M) {
@@ -217,6 +219,68 @@ func Test_PackTx(t *testing.T) {
 	}
 }
 
+func Test_ParseTxAssetVersionPropagatesLoadAssetsError(t *testing.T) {
+	parser := NewSyscoinParser(GetChainParams("main"), &btc.Configuration{})
+	raw, err := hex.DecodeString(testTx1.Hex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// SYSCOIN: asset allocation versions must include a decodable allocation
+	// OP_RETURN. This otherwise valid tx has no allocation payload.
+	raw[0] = byte(SYSCOIN_TX_VERSION_ALLOCATION_SEND)
+	raw[1] = 0
+	raw[2] = 0
+	raw[3] = 0
+
+	if _, err := parser.ParseTx(raw); err == nil {
+		t.Fatal("ParseTx returned nil error for malformed asset allocation tx")
+	}
+}
+
+func Test_TryGetOPReturnRejectsMalformedPushdata(t *testing.T) {
+	parser := NewSyscoinParser(GetChainParams("main"), &btc.Configuration{})
+	tests := [][]byte{
+		{0x6a, 0x02, 0x01},
+		{0x6a, 0x4c},
+		{0x6a, 0x4c, 0x02, 0x01},
+		{0x6a, 0x4d, 0x00},
+		{0x6a, 0x4d, 0x02, 0x00, 0x01},
+	}
+	for _, script := range tests {
+		if got := parser.TryGetOPReturn(script); got != nil {
+			t.Fatalf("TryGetOPReturn(%x) = %x, want nil", script, got)
+		}
+	}
+}
+
+func Test_LoadAssetsRejectsOutOfRangeVoutIndex(t *testing.T) {
+	parser := NewSyscoinParser(GetChainParams("main"), &btc.Configuration{})
+	allocation := syscoinwire.AssetAllocationType{
+		VoutAssets: []syscoinwire.AssetOutType{{
+			AssetGuid: 123456,
+			Values:    []syscoinwire.AssetOutValueType{{N: 1, ValueSat: 100}},
+		}},
+	}
+	var payload bytes.Buffer
+	if err := allocation.Serialize(&payload); err != nil {
+		t.Fatal(err)
+	}
+	script := append([]byte{0x6a, byte(payload.Len())}, payload.Bytes()...)
+	tx := &bchain.Tx{
+		Version: SYSCOIN_TX_VERSION_ALLOCATION_SEND,
+		Vout: []bchain.Vout{{
+			N: 0,
+			ScriptPubKey: bchain.ScriptPubKey{
+				Hex: hex.EncodeToString(script),
+			},
+		}},
+	}
+
+	if err := parser.LoadAssets(tx); err == nil {
+		t.Fatal("LoadAssets returned nil error for out-of-range allocation vout index")
+	}
+}
+
 func Test_UnpackTx(t *testing.T) {
 	type args struct {
 		packedTx string
@@ -247,6 +311,12 @@ func Test_UnpackTx(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("unpackTx() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if len(got.Vin) > 0 && len(got.Vin[0].Witness) == 0 {
+				t.Errorf("unpackTx() expected segwit witness data")
+			}
+			for i := range got.Vin {
+				got.Vin[i].Witness = nil
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("unpackTx() got = %v, want %v", got, tt.want)

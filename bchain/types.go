@@ -7,12 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"unsafe"
-	"bytes"
 
-	"github.com/golang/glog"
-	"github.com/syscoin/syscoinwire/syscoin/wire"
-	"github.com/syscoin/blockbook/common"
+	syscoinwire "github.com/syscoin/syscoinwire/syscoin/wire"
+	"github.com/trezor/blockbook/common"
 )
 
 // ChainType is type of the blockchain
@@ -43,156 +40,223 @@ var (
 
 // Outpoint is txid together with output (or input) index
 type Outpoint struct {
-	Txid string
-	Vout int32
+	Txid string `ts_doc:"Transaction ID of the referenced outpoint."`
+	Vout int32  `ts_doc:"Index of the specific output in the transaction."`
 }
 
 // ScriptSig contains data about input script
 type ScriptSig struct {
 	// Asm string `json:"asm"`
-	Hex string `json:"hex"`
-}
-
-type AssetInfo struct {
-	AssetGuid uint64  `json:"assetGuid,omitempty"`
-	ValueSat *big.Int `json:"valueSat,omitempty"`
+	Hex string `json:"hex" ts_doc:"Hex-encoded representation of the scriptSig."`
 }
 
 // Vin contains data about tx input
 type Vin struct {
-	Coinbase  string    `json:"coinbase"`
-	Txid      string    `json:"txid"`
-	Vout      uint32    `json:"vout"`
-	ScriptSig ScriptSig `json:"scriptSig"`
-	Sequence  uint32    `json:"sequence"`
-	Addresses []string  `json:"addresses"`
-	AssetInfo	*AssetInfo `json:"assetInfo,omitempty"`
+	Coinbase  string    `json:"coinbase" ts_doc:"Coinbase data if this is a coinbase input."`
+	Txid      string    `json:"txid" ts_doc:"Transaction ID of the input being spent."`
+	Vout      uint32    `json:"vout" ts_doc:"Output index in the referenced transaction."`
+	ScriptSig ScriptSig `json:"scriptSig" ts_doc:"scriptSig object containing the spending script data."`
+	Sequence  uint32    `json:"sequence" ts_doc:"Sequence number for the input."`
+	Addresses []string  `json:"addresses" ts_doc:"Addresses derived from this input's script (if known)."`
+	Witness   [][]byte  `json:"-" ts_doc:"Witness data for SegWit inputs (not exposed via JSON)."`
 }
 
 // ScriptPubKey contains data about output script
 type ScriptPubKey struct {
 	// Asm       string   `json:"asm"`
-	Hex string `json:"hex,omitempty"`
+	Hex string `json:"hex,omitempty" ts_doc:"Hex-encoded representation of the scriptPubKey."`
 	// Type      string   `json:"type"`
-	Addresses []string `json:"addresses"`
+	Addresses []string `json:"addresses" ts_doc:"Addresses derived from this output's script (if known)."`
 }
 
 // Vout contains data about tx output
 type Vout struct {
-	ValueSat     big.Int
-	JsonValue    common.JSONNumber `json:"value"`
-	N            uint32            `json:"n"`
-	ScriptPubKey ScriptPubKey      `json:"scriptPubKey"`
-	AssetInfo	*AssetInfo `json:"assetInfo,omitempty"`
+	ValueSat     big.Int           `ts_doc:"Amount (in satoshi or base unit) for this output."`
+	JsonValue    common.JSONNumber `json:"value" ts_doc:"String-based amount for JSON usage."`
+	N            uint32            `json:"n" ts_doc:"Index of this output in the transaction."`
+	ScriptPubKey ScriptPubKey      `json:"scriptPubKey" ts_doc:"scriptPubKey object containing the output script data."`
+	// SYSCOIN: SPT allocation metadata attached to this UTXO.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT asset metadata for this output."`
 }
 
 // Tx is blockchain transaction
 // unnecessary fields are commented out to avoid overhead
 type Tx struct {
-	Hex         string `json:"hex"`
-	Txid        string `json:"txid"`
-	Version     int32  `json:"version"`
-	LockTime    uint32 `json:"locktime"`
-	Vin         []Vin  `json:"vin"`
-	Vout        []Vout `json:"vout"`
-	BlockHeight uint32 `json:"blockHeight,omitempty"`
+	Hex         string `json:"hex" ts_doc:"Hex-encoded transaction data."`
+	Txid        string `json:"txid" ts_doc:"Transaction ID (hash)."`
+	Version     int32  `json:"version" ts_doc:"Transaction version number."`
+	LockTime    uint32 `json:"locktime" ts_doc:"Locktime specifying earliest time/block a tx can be mined."`
+	VSize       int64  `json:"vsize,omitempty" ts_doc:"Virtual size of the transaction (for SegWit-based networks)."`
+	Vin         []Vin  `json:"vin" ts_doc:"List of inputs."`
+	Vout        []Vout `json:"vout" ts_doc:"List of outputs."`
+	BlockHeight uint32 `json:"blockHeight,omitempty" ts_doc:"Block height in which this transaction was included."`
 	// BlockHash     string `json:"blockhash,omitempty"`
-	Confirmations    uint32      `json:"confirmations,omitempty"`
-	Time             int64       `json:"time,omitempty"`
-	Blocktime        int64       `json:"blocktime,omitempty"`
-	CoinSpecificData interface{} `json:"-"`
-	Memo     []byte `json:"memo,omitempty"`
+	Confirmations    uint32      `json:"confirmations,omitempty" ts_doc:"Number of confirmations the transaction has."`
+	Time             int64       `json:"time,omitempty" ts_doc:"Timestamp when the transaction was broadcast or included in a block."`
+	Blocktime        int64       `json:"blocktime,omitempty" ts_doc:"Timestamp of the block in which the transaction was mined."`
+	CoinSpecificData interface{} `json:"-" ts_doc:"Additional chain-specific data (not exposed via JSON)."`
+	// SYSCOIN: SPT memo decoded from allocation OP_RETURN data.
+	Memo []byte `json:"memo,omitempty"`
 }
 
-// MempoolVin contains data about tx input
+// MempoolVin contains data about tx input specifically in mempool
 type MempoolVin struct {
 	Vin
-	AddrDesc AddressDescriptor `json:"-"`
-	ValueSat big.Int
-	AssetInfo	*AssetInfo `json:"assetInfo,omitempty"`
+	AddrDesc AddressDescriptor `json:"-" ts_doc:"Internal descriptor for the input address (not exposed)."`
+	ValueSat big.Int           `ts_doc:"Amount (in satoshi or base unit) of the input."`
+	// SYSCOIN: SPT metadata on the spent output.
+	AssetInfo *AssetInfo `json:"assetInfo,omitempty" ts_doc:"Syscoin SPT asset metadata for this input."`
 }
 
 // MempoolTx is blockchain transaction in mempool
 // optimized for onNewTx notification
 type MempoolTx struct {
-	Hex              string          `json:"hex"`
-	Txid             string          `json:"txid"`
-	Version          int32           `json:"version"`
-	LockTime         uint32          `json:"locktime"`
-	Vin              []MempoolVin    `json:"vin"`
-	Vout             []Vout          `json:"vout"`
-	Blocktime        int64           `json:"blocktime,omitempty"`
-	Erc20            []Erc20Transfer `json:"-"`
-	CoinSpecificData interface{}     `json:"-"`
-	Memo			 []byte			 `json:"memo,omitempty"`
+	Hex              string         `json:"hex" ts_doc:"Hex-encoded transaction data."`
+	Txid             string         `json:"txid" ts_doc:"Transaction ID (hash)."`
+	Version          int32          `json:"version" ts_doc:"Transaction version number."`
+	LockTime         uint32         `json:"locktime" ts_doc:"Locktime specifying earliest time/block a tx can be mined."`
+	VSize            int64          `json:"vsize,omitempty" ts_doc:"Virtual size of the transaction (if applicable)."`
+	Vin              []MempoolVin   `json:"vin" ts_doc:"List of inputs in this mempool transaction."`
+	Vout             []Vout         `json:"vout" ts_doc:"List of outputs in this mempool transaction."`
+	Blocktime        int64          `json:"blocktime,omitempty" ts_doc:"Timestamp for the block in which tx might eventually be mined, if known."`
+	TokenTransfers   TokenTransfers `json:"-" ts_doc:"Token transfers discovered in this mempool transaction (not exposed by default)."`
+	CoinSpecificData interface{}    `json:"-" ts_doc:"Additional chain-specific data (not exposed via JSON)."`
+}
+
+// SYSCOIN: AssetInfo holds SPT allocation metadata attached to transaction
+// inputs, outputs, and UTXOs. ValueSat is in the asset's base unit.
+type AssetInfo struct {
+	AssetGuid uint64
+	ValueSat  *big.Int
+}
+
+// TokenStandard - standard of token
+type TokenStandard int
+
+// TokenStandard enumeration
+const (
+	FungibleToken    = TokenStandard(iota) // ERC20/BEP20
+	NonFungibleToken                       // ERC721/BEP721
+	MultiToken                             // ERC1155/BEP1155
+)
+
+// TokenStandardName specifies standard of token
+type TokenStandardName string
+
+// SYSCOIN: keep the historical Syscoin parser naming while using upstream's
+// token-standard string type underneath.
+type TokenType = TokenStandardName
+
+// Token standards
+const (
+	UnknownTokenStandard   TokenStandardName = ""
+	UnhandledTokenStandard TokenStandardName = "-"
+
+	// XPUBAddressStandard is address derived from xpub
+	XPUBAddressStandard TokenStandardName = "XPUBAddress"
+
+	// SYSCOIN: SPT token standards exposed through the generic token fields.
+	SPTTokenStandard                        TokenStandardName = "SPTAllocated"
+	SPTAssetAllocationMintStandard          TokenStandardName = "SPTAssetAllocationMint"
+	SPTAssetAllocationSendStandard          TokenStandardName = "SPTAssetAllocationSend"
+	SPTAssetSyscoinBurnToAllocationStandard TokenStandardName = "SPTSyscoinBurnToAssetAllocation"
+	SPTAssetAllocationBurnToSyscoinStandard TokenStandardName = "SPTAssetAllocationBurnToSyscoin"
+	SPTAssetAllocationBurnToNEVMStandard    TokenStandardName = "SPTAssetAllocationBurnToNEVM"
+
+	// SYSCOIN: historical names used by the Syscoin SPT parser and API.
+	SPTNoneType                         TokenType = "Syscoin"
+	SPTTokenType                        TokenType = SPTTokenStandard
+	SPTUnknownType                      TokenType = "SPTUnknown"
+	SPTAssetAllocationMintType          TokenType = SPTAssetAllocationMintStandard
+	SPTAssetAllocationSendType          TokenType = SPTAssetAllocationSendStandard
+	SPTAssetSyscoinBurnToAllocationType TokenType = SPTAssetSyscoinBurnToAllocationStandard
+	SPTAssetAllocationBurnToSyscoinType TokenType = SPTAssetAllocationBurnToSyscoinStandard
+	SPTAssetAllocationBurnToNEVMType    TokenType = SPTAssetAllocationBurnToNEVMStandard
+)
+
+// TokenTransfers is array of TokenTransfer
+type TokenTransfers []*TokenTransfer
+
+func (a TokenTransfers) Len() int      { return len(a) }
+func (a TokenTransfers) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a TokenTransfers) Less(i, j int) bool {
+	return a[i].Standard < a[j].Standard
 }
 
 // Block is block header and list of transactions
 type Block struct {
 	BlockHeader
-	Txs []Tx `json:"tx"`
+	Txs              []Tx        `json:"tx" ts_doc:"List of full transactions included in this block."`
+	CoinSpecificData interface{} `json:"-" ts_doc:"Additional chain-specific data (not exposed via JSON)."`
 }
 
 // BlockHeader contains limited data (as needed for indexing) from backend block header
 type BlockHeader struct {
-	Hash          string `json:"hash"`
-	Prev          string `json:"previousblockhash"`
-	Next          string `json:"nextblockhash"`
-	Height        uint32 `json:"height"`
-	Confirmations int    `json:"confirmations"`
-	Size          int    `json:"size"`
-	Time          int64  `json:"time,omitempty"`
+	Hash          string `json:"hash" ts_doc:"Block hash."`
+	Prev          string `json:"previousblockhash" ts_doc:"Hash of the previous block in the chain."`
+	Next          string `json:"nextblockhash" ts_doc:"Hash of the next block, if known."`
+	Height        uint32 `json:"height" ts_doc:"Block height (0-based index in the chain)."`
+	Confirmations int    `json:"confirmations" ts_doc:"Number of confirmations (distance from best chain tip)."`
+	Size          int    `json:"size" ts_doc:"Block size in bytes."`
+	Time          int64  `json:"time,omitempty" ts_doc:"Timestamp of when this block was mined."`
 }
 
 // BlockInfo contains extended block header data and a list of block txids
 type BlockInfo struct {
 	BlockHeader
-	Version    common.JSONNumber `json:"version"`
-	MerkleRoot string            `json:"merkleroot"`
-	Nonce      common.JSONNumber `json:"nonce"`
-	Bits       string            `json:"bits"`
-	Difficulty common.JSONNumber `json:"difficulty"`
-	Txids      []string          `json:"tx,omitempty"`
+	Version    common.JSONNumber `json:"version" ts_doc:"Block version (chain-specific meaning)."`
+	MerkleRoot string            `json:"merkleroot" ts_doc:"Merkle root of the block's transactions."`
+	Nonce      common.JSONNumber `json:"nonce" ts_doc:"Nonce used in the mining process."`
+	Bits       string            `json:"bits" ts_doc:"Compact representation of the target threshold."`
+	Difficulty common.JSONNumber `json:"difficulty" ts_doc:"Difficulty target for mining this block."`
+	Txids      []string          `json:"tx,omitempty" ts_doc:"List of transaction IDs included in this block."`
 }
 
 // MempoolEntry is used to get data about mempool entry
 type MempoolEntry struct {
-	Size            uint32 `json:"size"`
-	FeeSat          big.Int
-	Fee             common.JSONNumber `json:"fee"`
-	ModifiedFeeSat  big.Int
-	ModifiedFee     common.JSONNumber `json:"modifiedfee"`
-	Time            uint64            `json:"time"`
-	Height          uint32            `json:"height"`
-	DescendantCount uint32            `json:"descendantcount"`
-	DescendantSize  uint32            `json:"descendantsize"`
-	DescendantFees  uint32            `json:"descendantfees"`
-	AncestorCount   uint32            `json:"ancestorcount"`
-	AncestorSize    uint32            `json:"ancestorsize"`
-	AncestorFees    uint32            `json:"ancestorfees"`
-	Depends         []string          `json:"depends"`
+	Size            uint32            `json:"size" ts_doc:"Size of the transaction in bytes, as stored in mempool."`
+	FeeSat          big.Int           `ts_doc:"Transaction fee in satoshi/base units."`
+	Fee             common.JSONNumber `json:"fee" ts_doc:"String-based fee for JSON usage."`
+	ModifiedFeeSat  big.Int           `ts_doc:"Modified fee in satoshi/base units after priority adjustments."`
+	ModifiedFee     common.JSONNumber `json:"modifiedfee" ts_doc:"String-based modified fee for JSON usage."`
+	Time            uint64            `json:"time" ts_doc:"Unix timestamp when the tx entered the mempool."`
+	Height          uint32            `json:"height" ts_doc:"Block height when the tx entered the mempool."`
+	DescendantCount uint32            `json:"descendantcount" ts_doc:"Number of descendant transactions in mempool."`
+	DescendantSize  uint32            `json:"descendantsize" ts_doc:"Total size of all descendant transactions in bytes."`
+	DescendantFees  uint32            `json:"descendantfees" ts_doc:"Combined fees of all descendant transactions."`
+	AncestorCount   uint32            `json:"ancestorcount" ts_doc:"Number of ancestor transactions in mempool."`
+	AncestorSize    uint32            `json:"ancestorsize" ts_doc:"Total size of all ancestor transactions in bytes."`
+	AncestorFees    uint32            `json:"ancestorfees" ts_doc:"Combined fees of all ancestor transactions."`
+	Depends         []string          `json:"depends" ts_doc:"List of txids this transaction depends on."`
 }
 
 // ChainInfo is used to get information about blockchain
 type ChainInfo struct {
-	Chain           string  `json:"chain"`
-	Blocks          int     `json:"blocks"`
-	Headers         int     `json:"headers"`
-	Bestblockhash   string  `json:"bestblockhash"`
-	Difficulty      string  `json:"difficulty"`
-	SizeOnDisk      int64   `json:"size_on_disk"`
-	Version         string  `json:"version"`
-	Subversion      string  `json:"subversion"`
-	ProtocolVersion string  `json:"protocolversion"`
-	Timeoffset      float64 `json:"timeoffset"`
-	Warnings        string  `json:"warnings"`
-	Consensus       interface{} `json:"consensus,omitempty"`
+	Chain            string      `json:"chain" ts_doc:"Name of the chain (e.g. 'main')."`
+	Blocks           int         `json:"blocks" ts_doc:"Number of fully verified blocks in the chain."`
+	Headers          int         `json:"headers" ts_doc:"Number of block headers in the chain (can be ahead of full blocks)."`
+	Bestblockhash    string      `json:"bestblockhash" ts_doc:"Hash of the best (latest) block."`
+	Difficulty       string      `json:"difficulty" ts_doc:"Current difficulty of the network."`
+	SizeOnDisk       int64       `json:"size_on_disk" ts_doc:"Size of the blockchain data on disk in bytes."`
+	Version          string      `json:"version" ts_doc:"Version of the blockchain backend."`
+	Subversion       string      `json:"subversion" ts_doc:"Subversion string of the blockchain backend."`
+	ProtocolVersion  string      `json:"protocolversion" ts_doc:"Protocol version for this chain node."`
+	Timeoffset       float64     `json:"timeoffset" ts_doc:"Time offset (in seconds) reported by the node."`
+	Warnings         string      `json:"warnings" ts_doc:"Any warnings generated by the node regarding the chain state."`
+	ConsensusVersion string      `json:"consensus_version,omitempty" ts_doc:"Version of the chain's consensus protocol, if available."`
+	Consensus        interface{} `json:"consensus,omitempty" ts_doc:"Additional consensus details, structure depends on chain."`
+}
+
+// LongTermFeeRate gets information about the fee rate over longer period of time.
+type LongTermFeeRate struct {
+	FeePerUnit big.Int `json:"feePerUnit" ts_doc:"Long term fee rate (in sat/kByte)."`
+	Blocks     uint64  `json:"blocks" ts_doc:"Amount of blocks used for the long term fee rate estimation."`
 }
 
 // RPCError defines rpc error returned by backend
 type RPCError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int    `json:"code" ts_doc:"Error code returned by the backend RPC."`
+	Message string `json:"message" ts_doc:"Human-readable error message."`
 }
 
 func (e *RPCError) Error() string {
@@ -206,6 +270,13 @@ func (ad AddressDescriptor) String() string {
 	return "ad:" + hex.EncodeToString(ad)
 }
 
+func (ad AddressDescriptor) IsTaproot() bool {
+	if len(ad) == 34 && ad[0] == 0x51 && ad[1] == 0x20 {
+		return true
+	}
+	return false
+}
+
 // AddressDescriptorFromString converts string created by AddressDescriptor.String to AddressDescriptor
 func AddressDescriptorFromString(s string) (AddressDescriptor, error) {
 	if len(s) > 3 && s[0:3] == "ad:" {
@@ -214,167 +285,12 @@ func AddressDescriptorFromString(s string) (AddressDescriptor, error) {
 	return nil, errors.New("invalid address descriptor")
 }
 
-// EthereumType specific
-
-// Erc20Contract contains info about ERC20 contract
-type Erc20Contract struct {
-	Contract string `json:"contract"`
-	Name     string `json:"name"`
-	Symbol   string `json:"symbol"`
-	Decimals int    `json:"decimals"`
-}
-
-// Erc20Transfer contains a single ERC20 token transfer
-type Erc20Transfer struct {
-	Contract string
-	From     string
-	To       string
-	Tokens   big.Int
-}
-
 // MempoolTxidEntry contains mempool txid with first seen time
 type MempoolTxidEntry struct {
-	Txid string
-	Time uint32
+	Txid string `ts_doc:"Transaction ID (hash) of the mempool entry."`
+	Time uint32 `ts_doc:"Unix timestamp when the transaction was first seen in the mempool."`
 }
 
-// Utxo holds information about unspent transaction output
-type Utxo struct {
-	BtxID    []byte
-	Vout     int32
-	Height   uint32
-	ValueSat big.Int
-	AssetInfo	*AssetInfo `json:"assetInfo,omitempty"`
-}
-// holds balance information for an asset indexed by a uint32 asset guid
-type AssetBalance struct {
-	SentSat 	*big.Int
-	BalanceSat  *big.Int
-	Transfers	uint32
-}
-
-// AddrBalance stores number of transactions and balances of an address
-type AddrBalance struct {
-	Txs        uint32
-	SentSat    big.Int
-	BalanceSat big.Int
-	Utxos      []Utxo
-	UtxosMap   map[string]int
-	AssetBalances map[uint64]*AssetBalance
-}
-
-
-// ReceivedSat computes received amount from total balance and sent amount
-func (ab *AddrBalance) ReceivedSat() *big.Int {
-	var r big.Int
-	r.Add(&ab.BalanceSat, &ab.SentSat)
-	return &r
-}
-
-// calc received based on balance, sent passed in
-func ReceivedSatFromBalances(balance *big.Int, sent *big.Int) *big.Int {
-	var r big.Int
-	r.Add(balance,sent)
-	return &r
-}
-
-
-// addUtxo
-func (ab *AddrBalance) AddUtxo(u *Utxo) {
-	ab.Utxos = append(ab.Utxos, *u)
-	ab.manageUtxoMap(u)
-}
-
-func (ab *AddrBalance) manageUtxoMap(u *Utxo) {
-	l := len(ab.Utxos)
-	if l >= 16 {
-		if len(ab.UtxosMap) == 0 {
-			ab.UtxosMap = make(map[string]int, 32)
-			for i := 0; i < l; i++ {
-				s := string(ab.Utxos[i].BtxID)
-				if _, e := ab.UtxosMap[s]; !e {
-					ab.UtxosMap[s] = i
-				}
-			}
-		} else {
-			s := string(u.BtxID)
-			if _, e := ab.UtxosMap[s]; !e {
-				ab.UtxosMap[s] = l - 1
-			}
-		}
-	}
-}
-
-// on disconnect, the added utxos must be inserted in the right position so that UtxosMap index works
-func (ab *AddrBalance) AddUtxoInDisconnect(u *Utxo) {
-	insert := -1
-	if len(ab.UtxosMap) > 0 {
-		if i, e := ab.UtxosMap[string(u.BtxID)]; e {
-			insert = i
-		}
-	} else {
-		for i := range ab.Utxos {
-			utxo := &ab.Utxos[i]
-			if *(*int)(unsafe.Pointer(&utxo.BtxID[0])) == *(*int)(unsafe.Pointer(&u.BtxID[0])) && bytes.Equal(utxo.BtxID, u.BtxID) {
-				insert = i
-				break
-			}
-		}
-	}
-	if insert > -1 {
-		// check if it is necessary to insert the utxo into the array
-		for i := insert; i < len(ab.Utxos); i++ {
-			utxo := &ab.Utxos[i]
-			// either the vout is greater than the inserted vout or it is a different tx
-			if utxo.Vout > u.Vout || *(*int)(unsafe.Pointer(&utxo.BtxID[0])) != *(*int)(unsafe.Pointer(&u.BtxID[0])) || !bytes.Equal(utxo.BtxID, u.BtxID) {
-				// found the right place, insert the utxo
-				ab.Utxos = append(ab.Utxos, *u)
-				copy(ab.Utxos[i+1:], ab.Utxos[i:])
-				ab.Utxos[i] = *u
-				// reset UtxosMap after insert, the index will have to be rebuilt if needed
-				ab.UtxosMap = nil
-				return
-			}
-		}
-	}
-	ab.Utxos = append(ab.Utxos, *u)
-	ab.manageUtxoMap(u)
-}
-
-// MarkUtxoAsSpent finds outpoint btxID:vout in utxos and marks it as spent
-// for small number of utxos the linear search is done, for larger number there is a hashmap index
-// it is much faster than removing the utxo from the slice as it would cause in memory reallocations
-func (ab *AddrBalance) MarkUtxoAsSpent(btxID []byte, vout int32) {
-	if len(ab.UtxosMap) == 0 {
-		for i := range ab.Utxos {
-			utxo := &ab.Utxos[i]
-			if utxo.Vout == vout && *(*int)(unsafe.Pointer(&utxo.BtxID[0])) == *(*int)(unsafe.Pointer(&btxID[0])) && bytes.Equal(utxo.BtxID, btxID) {
-				// mark utxo as spent by setting vout=-1
-				utxo.Vout = -1
-				return
-			}
-		}
-	} else {
-		if i, e := ab.UtxosMap[string(btxID)]; e {
-			l := len(ab.Utxos)
-			for ; i < l; i++ {
-				utxo := &ab.Utxos[i]
-				if utxo.Vout == vout {
-					if bytes.Equal(utxo.BtxID, btxID) {
-						// mark utxo as spent by setting vout=-1
-						utxo.Vout = -1
-						return
-					}
-					break
-				}
-			}
-		}
-	}
-	glog.Errorf("Utxo %s:%d not found, UtxosMap size %d", hex.EncodeToString(btxID), vout, len(ab.UtxosMap))
-}
-
-// AddressBalanceDetail specifies what data are returned by GetAddressBalance
-type AddressBalanceDetail int
 // ScriptType - type of output script parsed from xpub (descriptor)
 type ScriptType int
 
@@ -387,237 +303,127 @@ const (
 	P2TR
 )
 
+// MaxXpubChangeIndexes limits how many change branches one xpub descriptor can
+// expand during account scans.
+const MaxXpubChangeIndexes = 10
+
 // XpubDescriptor contains parsed data from xpub descriptor
 type XpubDescriptor struct {
-	XpubDescriptor string // The whole descriptor
-	Xpub           string // Xpub part of the descriptor
-	Type           ScriptType
-	Bip            string
-	ChangeIndexes  []uint32
-	ExtKey         interface{} // extended key parsed from xpub, usually of type *hdkeychain.ExtendedKey
+	XpubDescriptor string      `ts_doc:"Full descriptor string including xpub and script type."`
+	Xpub           string      `ts_doc:"The xpub part itself extracted from the descriptor."`
+	Type           ScriptType  `ts_doc:"Parsed script type (P2PKH, P2WPKH, etc.)."`
+	Bip            string      `ts_doc:"BIP standard (e.g. BIP44) inferred from the descriptor."`
+	ChangeIndexes  []uint32    `ts_doc:"Indexes designated as change addresses."`
+	ExtKey         interface{} `ts_doc:"Extended key object parsed from xpub (implementation-specific)."`
 }
 
 // MempoolTxidEntries is array of MempoolTxidEntry
 type MempoolTxidEntries []MempoolTxidEntry
 
-// OnNewBlockFunc is used to send notification about a new block
-type OnNewBlockFunc func(hash string, height uint32)
+// MempoolTxidFilterEntries is a map of txids to mempool golomb filters
+// Also contains a flag whether constant zeroed key was used when calculating the filters
+type MempoolTxidFilterEntries struct {
+	Entries       map[string]string `json:"entries,omitempty" ts_doc:"Map of txid to filter data (hex-encoded)."`
+	UsedZeroedKey bool              `json:"usedZeroedKey,omitempty" ts_doc:"Indicates if a zeroed key was used in filter calculation."`
+}
 
-// OnNewTxAddrFunc is used to send notification about a new transaction/address
-type OnNewTxAddrFunc func(tx *Tx, desc AddressDescriptor)
+// ENSResolution represents the result of resolving an ENS name to an Ethereum address.
+type ENSResolution struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	Error   string `json:"error,omitempty"`
+}
 
-// OnNewTxFunc is used to send notification about a new transaction/address
-type OnNewTxFunc func(tx *MempoolTx)
-
-// AddrDescForOutpointFunc returns address descriptor and value for given outpoint or nil if outpoint not found
-type AddrDescForOutpointFunc func(outpoint Outpoint) (AddressDescriptor, *big.Int)
-
+// SYSCOIN: AssetsMask filters base coin and SPT transaction classes.
 type AssetsMask uint32
 
-// Addresses index
-type TxIndexes struct {
-	BtxID   []byte
-	Indexes []int32
-	Type 	AssetsMask
-	Assets  []uint64
+const (
+	AllMask                          AssetsMask = 0
+	BaseCoinMask                     AssetsMask = 1
+	AssetAllocationSendMask          AssetsMask = 2
+	AssetSyscoinBurnToAllocationMask AssetsMask = 4
+	AssetAllocationBurnToSyscoinMask AssetsMask = 8
+	AssetAllocationBurnToNEVMMask    AssetsMask = 16
+	AssetAllocationMintMask          AssetsMask = 32
+	AssetMask                        AssetsMask = AssetSyscoinBurnToAllocationMask | AssetAllocationBurnToSyscoinMask | AssetAllocationBurnToNEVMMask | AssetAllocationMintMask | AssetAllocationSendMask
+)
 
-}
-
-// AddressesMap is a map of addresses in a block
-// each address contains a slice of transactions with indexes where the address appears
-// slice is used instead of map so that order is defined and also search in case of few items
-type AddressesMap map[string][]TxIndexes
-
-
-// TxInput holds input data of the transaction in TxAddresses
-type TxInput struct {
-	AddrDesc AddressDescriptor
-	ValueSat big.Int
-	AssetInfo	*AssetInfo `json:"assetInfo,omitempty"`
-}
-
-// BlockInfo holds information about blocks kept in column height
-type DbBlockInfo struct {
-	Hash   string
-	Time   int64
-	Txs    uint32
-	Size   uint32
-	Height uint32 // Height is not packed!
-}
-
-// TxOutput holds output data of the transaction in TxAddresses
-type TxOutput struct {
-	AddrDesc AddressDescriptor
-	Spent    bool
-	ValueSat big.Int
-	AssetInfo	*AssetInfo `json:"assetInfo,omitempty"`
-}
-
-// Addresses converts AddressDescriptor of the input to array of strings
-func (ti *TxInput) Addresses(p BlockChainParser) ([]string, bool, error) {
-	return p.GetAddressesFromAddrDesc(ti.AddrDesc)
-}
-
-// Addresses converts AddressDescriptor of the output to array of strings
-func (to *TxOutput) Addresses(p BlockChainParser) ([]string, bool, error) {
-	return p.GetAddressesFromAddrDesc(to.AddrDesc)
-}
-
-// TokenType specifies type of token
-type TokenType string
-
-// ERC20TokenType is Ethereum ERC20 token
-const ERC20TokenType TokenType = "ERC20"
-
-// XPUBAddressTokenType is address derived from xpub
-const XPUBAddressTokenType TokenType = "XPUBAddress"
-
-// Syscoin SPT transaction
-const SPTNoneType TokenType = "Syscoin"
-const SPTTokenType TokenType = "SPTAllocated"
-const SPTUnknownType TokenType = "SPTUnknown"
-const SPTAssetAllocationMintType TokenType = "SPTAssetAllocationMint"
-const SPTAssetAllocationSendType TokenType = "SPTAssetAllocationSend"
-const SPTAssetSyscoinBurnToAllocationType TokenType = "SPTSyscoinBurnToAssetAllocation"
-const SPTAssetAllocationBurnToSyscoinType TokenType = "SPTAssetAllocationBurnToSyscoin"
-const SPTAssetAllocationBurnToNEVMType TokenType = "SPTAssetAllocationBurnToNEVM"
-
-const AllMask AssetsMask = 0
-const BaseCoinMask AssetsMask = 1
-const AssetAllocationSendMask AssetsMask = 2
-const AssetSyscoinBurnToAllocationMask AssetsMask = 4
-const AssetAllocationBurnToSyscoinMask AssetsMask = 8
-const AssetAllocationBurnToNEVMMask AssetsMask = 16
-const AssetAllocationMintMask AssetsMask = 32
-const AssetMask AssetsMask = AssetSyscoinBurnToAllocationMask | AssetAllocationBurnToSyscoinMask | AssetAllocationBurnToNEVMMask | AssetAllocationMintMask | AssetAllocationSendMask
-// Amount is datatype holding amounts
-type Amount big.Int
-// MarshalJSON Amount serialization
-func (a *Amount) MarshalJSON() (out []byte, err error) {
-	if a == nil {
-		return []byte(`"0"`), nil
-	}
-	return []byte(`"` + (*big.Int)(a).String() + `"`), nil
-}
-
-func (a *Amount) String() string {
-	if a == nil {
-		return ""
-	}
-	return (*big.Int)(a).String()
-}
-
-// DecimalString returns amount with decimal point placed according to parameter d
-func (a *Amount) DecimalString(d int) string {
-	return AmountToDecimalString((*big.Int)(a), d)
-}
-
-// AsBigInt returns big.Int type for the Amount (empty if Amount is nil)
-func (a *Amount) AsBigInt() big.Int {
-	if a == nil {
-		return *new(big.Int)
-	}
-	return big.Int(*a)
-}
-
-// AsInt64 returns Amount as int64 (0 if Amount is nil).
-// It is used only for legacy interfaces (socket.io)
-// and generally not recommended to use for possible loss of precision.
-func (a *Amount) AsInt64() int64 {
-	if a == nil {
-		return 0
-	}
-	return (*big.Int)(a).Int64()
-}
-
-
-// encapuslates Syscoin SPT wire types
+// SYSCOIN: AssetAllocation and Asset wrap the Syscoin wire SPT payloads used by
+// the parser and Syscoin-specific RocksDB column families.
 type AssetAllocation struct {
-	AssetObj 		wire.AssetAllocationType
+	AssetObj syscoinwire.AssetAllocationType
 }
+
 type Asset struct {
-	Transactions	uint32
-	AssetObj 		wire.AssetType
-	MetaData		[]byte
-}
-// Assets is array of Asset
-type Assets []Asset
-
-func (a Assets) Len() int           { return len(a) }
-func (a Assets) Swap(i, j int)      { 
-	a[i], a[j] = a[j], a[i] 
-}
-func (a Assets) Less(i, j int) bool { 
-	return string(a[i].AssetObj.Symbol) < string(a[j].AssetObj.Symbol)
+	Transactions uint32
+	AssetObj     syscoinwire.AssetType
+	MetaData     []byte
 }
 
-// Token contains info about tokens held by an address
-type Token struct {
-	Type             TokenType `json:"type"`
-	Name             string    `json:"name"`
-	Path             string    `json:"path,omitempty"`
-	Contract         string    `json:"contract,omitempty"`
-	AssetGuid        string    `json:"assetGuid,omitempty"`
-	Transfers        uint32    `json:"transfers"`
-	UnconfirmedTransfers   int       `json:"unconfirmedTransfers,omitempty"`
-	Symbol           string    `json:"symbol,omitempty"`
-	Decimals         int       `json:"decimals"`
-	BalanceSat       *Amount   `json:"balance,omitempty"`
-	UnconfirmedBalanceSat       *Amount   `json:"unconfirmedBalance,omitempty"`
-	TotalReceivedSat *Amount   `json:"totalReceived,omitempty"`
-	TotalSentSat     *Amount   `json:"totalSent,omitempty"`
-	ContractIndex    string    `json:"-"`
-	AddrStr		 	 string    `json:"addrStr,omitempty"`
-}
-type Tokens []*Token
-func (t Tokens) Len() int           { return len(t) }
-func (t Tokens) Swap(i, j int)      { 
-	if t[i] != nil && t[j] != nil && t[i].Type != XPUBAddressTokenType && t[j].Type != XPUBAddressTokenType {
-		t[i], t[j] = t[j], t[i] 
-	}
-}
-func (t Tokens) Less(i, j int) bool { 
-	if t[i] == nil || t[j] == nil || t[i].Type == XPUBAddressTokenType || t[j].Type == XPUBAddressTokenType {
-		return false
-	}
-	return t[i].Contract < t[j].Contract
+type AssetBalance struct {
+	Transfers  uint32
+	BalanceSat *big.Int
+	SentSat    *big.Int
 }
 
-// TokenTransferSummary contains info about a token transfer done in a transaction
-type TokenTransferSummary struct {
-	From     string    `json:"from"`
-	To       string    `json:"to"`
-	Token    string    `json:"token"`
-	Name     string    `json:"name"`
-	Symbol   string    `json:"symbol"`
-	Decimals int       `json:"decimals"`
-	Value	 *Amount   `json:"valueOut"`
-	Fee	 	 *Amount   `json:"fee,omitempty"`
-}
-
-// used to store all txids related to an asset for asset history
 type TxAssetIndex struct {
-	Type 	  AssetsMask
-	BtxID      []byte
+	Type  AssetsMask
+	BtxID []byte
 }
 
 type TxAsset struct {
-	Height    uint32
-	Txs       []*TxAssetIndex
+	Height uint32
+	Txs    []*TxAssetIndex
 }
+
 type TxAssetMap map[string]*TxAsset
 
-// used to store all unique txid/address tuples related to an asset
 type TxAssetAddressIndex struct {
-	AddrDesc   AddressDescriptor
-	BtxID      []byte
+	AddrDesc AddressDescriptor
+	BtxID    []byte
 }
+
 type TxAssetAddress struct {
-	Txs       []*TxAssetAddressIndex
+	Txs []*TxAssetAddressIndex
 }
+
 type TxAssetAddressMap map[uint64]*TxAssetAddress
-type AssetsMap map[uint64]int64
-// TxAddresses stores transaction inputs and outputs with amounts
+
+// SYSCOIN: legacy parser-side packing structs kept for the Syscoin parser's
+// SPT serializers. Upstream DB code owns its own internal tx-address structs.
+type TxInput struct {
+	AddrDesc  AddressDescriptor
+	ValueSat  big.Int
+	AssetInfo *AssetInfo
+}
+
+type TxOutput struct {
+	AddrDesc  AddressDescriptor
+	Spent     bool
+	ValueSat  big.Int
+	AssetInfo *AssetInfo
+}
+
+type Utxo struct {
+	BtxID     []byte
+	Vout      int32
+	Height    uint32
+	ValueSat  big.Int
+	AssetInfo *AssetInfo
+}
+
+type AddrBalance struct {
+	Txs           uint32
+	SentSat       big.Int
+	BalanceSat    big.Int
+	Utxos         []Utxo
+	AssetBalances map[uint64]*AssetBalance
+}
+
+func (ab *AddrBalance) AddUtxo(u *Utxo) {
+	ab.Utxos = append(ab.Utxos, *u)
+}
+
 type TxAddresses struct {
 	Version int32
 	Height  uint32
@@ -626,38 +432,50 @@ type TxAddresses struct {
 	Memo    []byte
 }
 
-type DbOutpoint struct {
-	BtxID []byte
-	Index int32
-}
-
-type BlockTxs struct {
-	BtxID  []byte
-	Inputs []DbOutpoint
-}
+// SYSCOIN: legacy constants/types used by parser-side SPT serializers.
+type AddressBalanceDetail int
 
 const (
-	// AddressBalanceDetailNoUTXO returns address balance without utxos
-	AddressBalanceDetailNoUTXO = 0
-	// AddressBalanceDetailUTXO returns address balance with utxos
-	AddressBalanceDetailUTXO = 1
-	// AddressBalanceDetailUTXOIndexed returns address balance with utxos and index for updates, used only internally
-	AddressBalanceDetailUTXOIndexed = 2
+	AddressBalanceDetailNoUTXO = AddressBalanceDetail(iota)
+	AddressBalanceDetailUTXO
+	AddressBalanceDetailUTXOIndexed
 )
 
-// SendRawTransactionParams carries optional arguments for Syscoin Core sendrawtransaction
-// (maxfeerate, maxburnamount). Used with SendRawTransactionOpts.
-// The implementation (see syscoinrpc.go) takes care of the proper optional argument settings.
-type SendRawTransactionParams struct {
-	Hex           string
-	MaxFeeRate    *string
-	MaxBurnAmount *string
+type TxIndexes struct {
+	Type    AssetsMask
+	BtxID   []byte
+	Indexes []int32
+	Assets  []uint64
 }
 
-// SendRawTransactionOpts is implemented by chains whose node supports
-// sendrawtransaction with maxfeerate / maxburnamount (Syscoin).
+// OnNewBlockFunc is used to send notification about a new block
+type OnNewBlockFunc func(block *Block)
+
+// OnNewTxFunc is used to send notification about a new transaction/address
+type OnNewTxFunc func(tx *MempoolTx)
+
+// AddrDescForOutpointFunc returns address descriptor, value, and optional
+// asset metadata for given outpoint or nil if outpoint not found.
+type AddrDescForOutpointFunc func(outpoint Outpoint) (AddressDescriptor, *big.Int, *AssetInfo)
+
+// MempoolBatcher allows batch fetching of mempool transactions when supported.
+type MempoolBatcher interface {
+	GetRawTransactionsForMempoolBatch(txids []string) (map[string]*Tx, error)
+}
+
+// SYSCOIN: optional Bitcoin-like sendrawtransaction parameters used by Syscoin
+// Core for governance collateral burns. Other Bitcoin-like coins ignore this
+// opt-in interface and keep the upstream raw-hex broadcast contract.
+type SendRawTransactionParams struct {
+	Hex                   string
+	MaxFeeRate            *string
+	MaxBurnAmount         *string
+	DisableAlternativeRPC bool
+}
+
+// SYSCOIN: implemented by chains that accept extra sendrawtransaction params.
 type SendRawTransactionOpts interface {
-	SendRawTransactionWithOpts(p SendRawTransactionParams) (string, error)
+	SendRawTransactionWithOpts(SendRawTransactionParams) (string, error)
 }
 
 // BlockChain defines common interface to block chain daemon
@@ -668,7 +486,7 @@ type BlockChain interface {
 	// create mempool but do not initialize it
 	CreateMempool(BlockChain) (Mempool, error)
 	// initialize mempool, create ZeroMQ (or other) subscription
-	InitializeMempool(AddrDescForOutpointFunc, OnNewTxAddrFunc, OnNewTxFunc) error
+	InitializeMempool(AddrDescForOutpointFunc, OnNewTxFunc) error
 	// shutdown mempool, ZeroMQ and block chain connections
 	Shutdown(ctx context.Context) error
 	// chain info
@@ -689,22 +507,29 @@ type BlockChain interface {
 	GetTransaction(txid string) (*Tx, error)
 	GetTransactionForMempool(txid string) (*Tx, error)
 	GetTransactionSpecific(tx *Tx) (json.RawMessage, error)
+	GetAddressChainExtraData(addrDesc AddressDescriptor) (json.RawMessage, error)
 	EstimateSmartFee(blocks int, conservative bool) (big.Int, error)
 	EstimateFee(blocks int) (big.Int, error)
-	SendRawTransaction(tx string) (string, error)
+	LongTermFeeRate() (*LongTermFeeRate, error)
+	SendRawTransaction(tx string, disableAlternativeRPC bool) (string, error)
 	GetMempoolEntry(txid string) (*MempoolEntry, error)
+	GetSPVProof(hash string) (json.RawMessage, error) // SYSCOIN
+	GetContractInfo(contractDesc AddressDescriptor) (*ContractInfo, error)
 	// parser
 	GetChainParser() BlockChainParser
 	// EthereumType specific
 	EthereumTypeGetBalance(addrDesc AddressDescriptor) (*big.Int, error)
-	EthereumTypeGetNonce(addrDesc AddressDescriptor) (uint64, error)
+	EthereumTypeGetNonces(addrDesc AddressDescriptor, withConfirmed bool) (pending uint64, confirmed uint64, confirmedOK bool, err error)
 	EthereumTypeEstimateGas(params map[string]interface{}) (uint64, error)
-	EthereumTypeGetErc20ContractInfo(contractDesc AddressDescriptor) (*Erc20Contract, error)
+	EthereumTypeGetEip1559Fees() (*Eip1559Fees, error)
 	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error)
-	GetChainTips() (string, error)
-	GetSPVProof(hash string) (string, error)
-	FetchNEVMAssetDetails(assetGuid uint64) (*Asset, error)
-	GetContractExplorerBaseURL() string
+	EthereumTypeGetErc20ContractBalances(addrDesc AddressDescriptor, contractDescs []AddressDescriptor) ([]*big.Int, error)
+	EthereumTypeGetSupportedStakingPools() []string
+	EthereumTypeGetStakingPoolsData(addrDesc AddressDescriptor) ([]StakingPoolData, error)
+	EthereumTypeRpcCall(data, to, from string) (string, error)
+	EthereumTypeGetRawTransaction(txid string) (string, error)
+	EthereumTypeGetTransactionReceipt(txid string) (*RpcReceipt, error)
+	GetTokenURI(contractDesc AddressDescriptor, tokenID *big.Int) (string, error)
 }
 
 // BlockChainParser defines common interface to parsing and conversions of block chain data
@@ -716,25 +541,25 @@ type BlockChainParser interface {
 	KeepBlockAddresses() int
 	// AmountDecimals returns number of decimal places in coin amounts
 	AmountDecimals() int
+	// UseAddressAliases returns true if address aliases are enabled
+	UseAddressAliases() bool
 	// MinimumCoinbaseConfirmations returns minimum number of confirmations a coinbase transaction must have before it can be spent
 	MinimumCoinbaseConfirmations() int
+	// SupportsVSize returns true if vsize of a transaction should be computed and returned by API
+	SupportsVSize() bool
 	// AmountToDecimalString converts amount in big.Int to string with decimal point in the correct place
 	AmountToDecimalString(a *big.Int) string
 	// AmountToBigInt converts amount in common.JSONNumber (string) to big.Int
 	// it uses string operations to avoid problems with rounding
 	AmountToBigInt(n common.JSONNumber) (big.Int, error)
-	// get max script length, in bitcoin base derivatives its 1024 
-	// but for example in syscoin this is going to be 8000 for max opreturn output script for syscoin coloured tx
-	GetMaxAddrLength() int
 	// address descriptor conversions
 	GetAddrDescFromVout(output *Vout) (AddressDescriptor, error)
 	GetAddrDescFromAddress(address string) (AddressDescriptor, error)
 	GetAddressesFromAddrDesc(addrDesc AddressDescriptor) ([]string, bool, error)
 	GetScriptFromAddrDesc(addrDesc AddressDescriptor) ([]byte, error)
 	IsAddrDescIndexable(addrDesc AddressDescriptor) bool
-	// parsing/packing/unpacking specific to chain
+	// transactions
 	PackedTxidLen() int
-	PackedTxIndexLen() int
 	PackTxid(txid string) ([]byte, error)
 	UnpackTxid(buf []byte) (string, error)
 	ParseTx(b []byte) (*Tx, error)
@@ -742,42 +567,6 @@ type BlockChainParser interface {
 	PackTx(tx *Tx, height uint32, blockTime int64) ([]byte, error)
 	UnpackTx(buf []byte) (*Tx, uint32, error)
 	GetAddrDescForUnknownInput(tx *Tx, input int) AddressDescriptor
-	PackAddrBalance(ab *AddrBalance, buf, varBuf []byte) []byte
-	UnpackAddrBalance(buf []byte, txidUnpackedLen int, detail AddressBalanceDetail) (*AddrBalance, error)
-	PackAddressKey(addrDesc AddressDescriptor, height uint32) []byte
-	UnpackAddressKey(key []byte) ([]byte, uint32, error)
-	PackTxAddresses(ta *TxAddresses, buf []byte, varBuf []byte) []byte
-	AppendTxInput(txi *TxInput, buf []byte, varBuf []byte) []byte
-	AppendTxOutput(txo *TxOutput, buf []byte, varBuf []byte) []byte
-	UnpackTxAddresses(buf []byte) (*TxAddresses, error)
-	UnpackTxInput(ti *TxInput, buf []byte) int
-	UnpackTxOutput(to *TxOutput, buf []byte) int
-	PackTxIndexes(txi []TxIndexes) []byte
-	UnpackTxIndexes(txindexes *[]int32, buf *[]byte) error
-	UnpackTxIndexAssets(assets *[]uint64, buf *[]byte) uint
-	PackOutpoints(outpoints []DbOutpoint) []byte
-	UnpackNOutpoints(buf []byte) ([]DbOutpoint, int, error)
-	PackBlockInfo(block *DbBlockInfo) ([]byte, error)
-	UnpackBlockInfo(buf []byte) (*DbBlockInfo, error)
-	// packing/unpacking generic to all chain (expect this to be in baseparser)
-	PackUint(i uint32) []byte
-	UnpackUint(buf []byte) uint32
-	PackUint64(i uint64) []byte
-	UnpackUint64(buf []byte) uint64
-	PackVarint32(i int32, buf []byte) int
-	PackVarint(i int, buf []byte) int
-	PackVaruint(i uint, buf []byte) int
-	PackVaruint64(i uint64, buf []byte) int
-	UnpackVarint32(buf []byte) (int32, int)
-	UnpackVarint(buf []byte) (int, int)
-	UnpackVaruint(buf []byte) (uint, int)
-	UnpackVaruint64(buf []byte) (uint64, int)
-	PackBigint(bi *big.Int, buf []byte) int
-	UnpackBigint(buf []byte) (big.Int, int)
-	MaxPackedBigintBytes() int
-	UnpackVarBytes(buf []byte) ([]byte, int)
-	PackVarBytes(bufValue []byte) []byte
-
 	// blocks
 	PackBlockHash(hash string) ([]byte, error)
 	UnpackBlockHash(buf []byte) (string, error)
@@ -788,28 +577,13 @@ type BlockChainParser interface {
 	DeriveAddressDescriptors(descriptor *XpubDescriptor, change uint32, indexes []uint32) ([]AddressDescriptor, error)
 	DeriveAddressDescriptorsFromTo(descriptor *XpubDescriptor, change uint32, fromIndex uint32, toIndex uint32) ([]AddressDescriptor, error)
 	// EthereumType specific
-	EthereumTypeGetErc20FromTx(tx *Tx) ([]Erc20Transfer, error)
-	// SyscoinType specific
-	IsSyscoinTx(nVersion int32, nHeight uint32) bool
-	IsSyscoinMintTx(nVersion int32) bool
-	IsAssetAllocationTx(nVersion int32) bool
-	TryGetOPReturn(script []byte) []byte
-	GetAssetsMaskFromVersion(nVersion int32) AssetsMask
-	GetAssetTypeFromVersion(nVersion int32) *TokenType
-	PackAssetKey(assetGuid uint64, height uint32) []byte
-	UnpackAssetKey(key []byte) (uint64, uint32)
-	PackAssetTxIndex(txAsset *TxAsset) []byte
-	UnpackAssetTxIndex(buf []byte) []*TxAssetIndex
-	PackAsset(asset *Asset) ([]byte, error)
-	UnpackAsset(buf []byte) (*Asset, error)
-	GetAssetAllocationFromData(sptData []byte, txVersion int32) (*AssetAllocation, []byte, error)
-	GetAssetAllocationFromDesc(addrDesc *AddressDescriptor, txVersion int32) (*AssetAllocation, []byte, error) 
-	GetAllocationFromTx(tx *Tx) (*AssetAllocation, []byte, error)
-	LoadAssets(tx *Tx) error
-	AppendAssetInfo(assetInfo *AssetInfo, buf []byte, varBuf []byte) []byte
-	UnpackAssetInfo(assetInfo *AssetInfo, buf []byte) int
-	UnpackTxIndexType(buf []byte) (AssetsMask, int)
-	WitnessPubKeyHashFromKeyID(keyId []byte) (string, error)
+	EthereumTypeGetTokenTransfersFromTx(tx *Tx) (TokenTransfers, error)
+	GetEthereumTxData(tx *Tx) *EthereumTxData
+	GetChainExtraPayloadType() ChainExtraPayloadType
+	GetChainExtraData(tx *Tx) (json.RawMessage, error)
+	ParseInputData(signatures *[]FourByteSignature, data string) *EthereumParsedInputData
+	// AddressAlias
+	FormatAddressAlias(address string, name string) string
 }
 
 // Mempool defines common interface to mempool
@@ -818,6 +592,27 @@ type Mempool interface {
 	GetTransactions(address string) ([]Outpoint, error)
 	GetAddrDescTransactions(addrDesc AddressDescriptor) ([]Outpoint, error)
 	GetAllEntries() MempoolTxidEntries
+	GetTxAssets(assetGuid uint64) MempoolTxidEntries // SYSCOIN
 	GetTransactionTime(txid string) uint32
-	GetTxAssets(assetGuid uint64) MempoolTxidEntries
+	GetTxidFilterEntries(filterScripts string, fromTimestamp uint32) (MempoolTxidFilterEntries, error)
+}
+
+// MissingBlockRetry is the JSON wire shape for per-chain overrides of the
+// sync-worker missing-block retry policy. Each field is optional; zero / missing
+// values fall back to the db package's built-in defaults. Operators set this
+// under `additional_params.missingBlockRetry` in `configs/coins/*.json`.
+type MissingBlockRetry struct {
+	// RetryDelayMs is the sleep between successive GetBlock attempts for the same
+	// missing block in the parallel worker path. The sequential tip path applies
+	// an additional internal cap of 250 ms regardless of this value.
+	RetryDelayMs int `json:"retryDelayMs,omitempty"`
+	// RecheckThreshold is the number of consecutive retryable errors in the
+	// parallel worker before probing the chain via shouldRestartSyncOnMissingBlock.
+	RecheckThreshold int `json:"recheckThreshold,omitempty"`
+	// TipRecheckThreshold is the equivalent threshold once the hash queue is
+	// closed (we are at the tail of a range) or for the sequential tip path.
+	TipRecheckThreshold int `json:"tipRecheckThreshold,omitempty"`
+	// MaxStallMs is the wall-clock budget per stuck block before the retry loop
+	// yields errResync to the outer machinery.
+	MaxStallMs int `json:"maxStallMs,omitempty"`
 }

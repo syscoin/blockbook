@@ -1,76 +1,85 @@
-{{define "specific"}}{{$cs := .CoinShortcut}}{{$asset := .Asset}}{{$data := .}}
-<h1>Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}}</small></h1>
-<div class="alert alert-data ellipsis">
-    <span class="data">{{$asset.AssetDetails.AssetGuid}}</span>
+{{define "specific"}}{{$asset := .Asset}}{{$data := .}}
+<div class="row">
+    <h1 class="col-12">Asset <small class="text-muted">{{$asset.AssetDetails.Symbol}}</small></h1>
 </div>
-<h3>Details</h3>
-<div class="data-div row">
-    <div class="col-lg-10">
-        <table class="table data-table">
-            <tbody>
-                {{- if isNFT $asset.AssetDetails.AssetGuid -}}
-                <tr>
-                    <td>NFT ID</td>
-                    <td class="data">{{formatNFTID $asset.AssetDetails.AssetGuid}}</td>
-                    <td>Base Asset GUID</td>
-                    <td class="data">{{formatBaseAssetID $asset.AssetDetails.AssetGuid}}</a></td>
-                </tr>
-                {{- end -}}
-                <tr>
-                    <td>Transactions</td>
-                    <td class="data">{{$asset.Txs}}</td>
-                </tr>
-                <tr>
-                    <td>Contract</td>
-                    <td class="data"><a href="{{formatContractExplorerURL $asset.AssetDetails.Contract}}">{{$asset.AssetDetails.Contract}}</a></td>
-                </tr>
-                {{if $asset.AssetDetails.MetaData}}
-                <tr>
-                    <td>Metadata</td>
-                    <td class="data ellipsis" colspan="3">{{$asset.AssetDetails.MetaData}}</td>
-                </tr>
-                {{- end -}}
-            </tbody>
-        </table>
+<div class="row pt-3">
+    <h5 class="col-12 d-flex h-data"><span class="ellipsis copyable">{{$asset.AssetDetails.AssetGuid}}</span></h5>
+</div>
+<table class="table data-table info-table">
+    <tbody>
+        {{if isNFT $asset.AssetDetails.AssetGuid}}
+        <tr>
+            <td>NFT ID</td>
+            <td>{{formatNFTID $asset.AssetDetails.AssetGuid}}</td>
+        </tr>
+        <tr>
+            <td>Base Asset GUID</td>
+            <td>{{formatBaseAssetID $asset.AssetDetails.AssetGuid}}</td>
+        </tr>
+        {{end}}
+        <tr>
+            <td>Transactions</td>
+            <td>{{formatInt $asset.Txs}}</td>
+        </tr>
+        {{if $asset.AssetDetails.Contract}}
+        <tr>
+            <td>Contract</td>
+            {{$contractURL := formatContractExplorerURL $asset.AssetDetails.Contract}}
+            <td class="ellipsis">{{if $contractURL}}<a href="{{$contractURL}}">{{$asset.AssetDetails.Contract}}</a>{{else}}<span class="copyable">{{$asset.AssetDetails.Contract}}</span>{{end}}</td>
+        </tr>
+        {{end}}
+        {{if not (isSyscoinNativeAsset $asset.AssetDetails.AssetGuid)}}
+        <tr>
+            <td>Total Supply</td>
+            <td>{{formattedAmountSpan $asset.AssetDetails.TotalSupply $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
+        </tr>
+        <tr>
+            <td>Max Supply</td>
+            <td>{{formattedAmountSpan $asset.AssetDetails.MaxSupply $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
+        </tr>
+        {{end}}
+        {{if $asset.AssetDetails.MetaData}}
+        <tr>
+            <td>Metadata</td>
+            <td class="ellipsis copyable">{{$asset.AssetDetails.MetaData}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{if $asset.UnconfirmedTxs}}
+<table class="table data-table info-table">
+    <tbody>
+        <tr>
+            <td style="white-space: nowrap;"><h5>Unconfirmed</h5></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td style="width: 25%;">Unconfirmed Balance</td>
+            <td>{{formattedAmountSpan $asset.UnconfirmedBalanceSat $asset.AssetDetails.Decimals $asset.AssetDetails.Symbol $data "copyable"}}</td>
+        </tr>
+        <tr>
+            <td>No. Transactions</td>
+            <td>{{formatInt $asset.UnconfirmedTxs}}</td>
+        </tr>
+    </tbody>
+</table>
+{{end}}
+{{if or $asset.Transactions $asset.Filter}}
+<div class="row pt-3 pb-1">
+    <h3 class="col-sm-6 col-lg-3 m-0 align-self-center">Transactions</h3>
+    <div class="col-sm-6 col-lg-3 my-2 my-lg-0 align-self-center">
+        <select class="w-100" onchange="self.location='?assetMask='+options[selectedIndex].value">
+            <option>All</option>
+            <option {{if eq $asset.Filter "token-transfers"}}selected{{end}} value="token-transfers">Transfers</option>
+            <option {{if eq $asset.Filter "non-token-transfers"}}selected{{end}} value="non-token-transfers">Non-Transfers</option>
+        </select>
     </div>
-    <div class="col-lg-2">
-        <div id="qrcode" style="width: 160px; height: 160px; float: right; padding-left: 10px;"></div>
-        <script type="text/javascript" src="/static/js/qrcode.min.js"></script>
-        <script type="text/javascript">
-            new QRCode(document.getElementById("qrcode"), { text: "{{$asset.AssetDetails.AssetGuid}}", width: 160, height: 160 });
-        </script>
+    <div class="col-lg-6">
+        {{template "paging" $data}}
     </div>
 </div>
-{{- if $asset.UnconfirmedTxs -}}
-<h3>Unconfirmed</h3>
-<div class="data-div">
-    <table class="table data-table">
-        <tbody>
-            <tr>
-                <td style="width: 25%;">Unconfirmed Balance</td>
-                <td class="data">{{formatAmountWithDecimals $asset.UnconfirmedBalanceSat $asset.AssetDetails.Decimals}} {{$asset.AssetDetails.Symbol}}</td>
-            </tr>
-            <tr>
-                <td>No. Transactions</td>
-                <td class="data">{{$asset.UnconfirmedTxs}}</td>
-            </tr>
-        </tbody>
-    </table>
+<div>
+    {{range $tx := $asset.Transactions}}{{$data := setTxToTemplateData $data $tx}}{{template "txdetail" $data}}{{end}}
 </div>
-{{- end}}{{if or $asset.Transactions $asset.Filter -}}
-<div class="row h-container">
-    <h3 class="col-md-3">Transactions</h3>
-    <select class="col-md-2" style="background-color: #eaeaea;" onchange="self.location='?assetMask='+options[selectedIndex].value">
-        <option>All</option>
-        <option {{if eq $asset.Filter "token-transfers" -}} selected{{end}} value="token-transfers">Transfers</option>
-        <option {{if eq $asset.Filter "non-token-transfers" -}} selected{{end}} value="non-token-transfers">Non-Transfers</option>
-    </select>
-    <div class="col-md-7">
-        <nav>{{template "paging" $data}}</nav>
-    </div>
-</div>
-<div class="data-div">
-    {{- range $tx := $asset.Transactions}}{{$data := setTxToTemplateData $data $tx}}{{template "txdetail" $data}}{{end -}}
-</div>
-<nav>{{template "paging" $data }}</nav>
+{{template "paging" $data}}
 {{end}}{{end}}

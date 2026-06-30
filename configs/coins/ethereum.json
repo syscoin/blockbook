@@ -1,64 +1,78 @@
 {
-  "coin": {
-    "name": "Ethereum",
-    "shortcut": "ETH",
-    "label": "Ethereum",
-    "alias": "ethereum"
-  },
-  "ports": {
-    "backend_rpc": 8036,
-    "backend_message_queue": 0,
-    "backend_p2p": 38336,
-    "backend_http": 8136,
-    "blockbook_internal": 9036,
-    "blockbook_public": 9136
-  },
-  "ipc": {
-    "rpc_url_template": "ws://127.0.0.1:{{.Ports.BackendRPC}}",
-    "rpc_timeout": 25
-  },
-  "backend": {
-    "package_name": "backend-ethereum",
-    "package_revision": "satoshilabs-1",
-    "system_user": "ethereum",
-    "version": "1.9.24-cc05b050",
-    "binary_url": "https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.9.24-cc05b050.tar.gz",
-    "verification_type": "gpg",
-    "verification_source": "https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.9.24-cc05b050.tar.gz.asc",
-    "extract_command": "tar -C backend --strip 1 -xf",
-    "exclude_files": [],
-    "exec_command_template": "/bin/sh -c '{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/geth --ipcdisable --syncmode full --cache 1024 --nat none --datadir {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --port 38336 --ws --wsaddr 127.0.0.1 --wsport {{.Ports.BackendRPC}} --wsorigins \"*\" --rpc --rpcport 8136 -rpcaddr 127.0.0.1 --rpccorsdomain \"*\" --rpcvhosts \"*\" 2>>{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/{{.Coin.Alias}}.log'",
-    "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/{{.Coin.Alias}}.log",
-    "postinst_script_template": "",
-    "service_type": "simple",
-    "service_additional_params_template": "",
-    "protect_memory": true,
-    "mainnet": true,
-    "server_config_file": "",
-    "client_config_file": ""
-  },
-  "blockbook": {
-    "package_name": "blockbook-ethereum",
-    "system_user": "blockbook-ethereum",
-    "internal_binding_template": ":{{.Ports.BlockbookInternal}}",
-    "public_binding_template": ":{{.Ports.BlockbookPublic}}",
-    "explorer_url": "",
-    "additional_params": "",
-    "block_chain": {
-      "parse": true,
-      "mempool_workers": 8,
-      "mempool_sub_workers": 2,
-      "block_addresses_to_keep": 300,
-      "additional_params": {
-        "mempoolTxTimeoutHours": 48,
-        "queryBackendOnMempoolResync": false,
-        "fiat_rates": "coingecko",
-        "fiat_rates_params": "{\"url\": \"https://api.coingecko.com/api/v3\", \"coin\": \"ethereum\", \"periodSeconds\": 60}"
-      }
+    "coin": {
+        "name": "Ethereum",
+        "shortcut": "ETH",
+        "label": "Ethereum",
+        "alias": "ethereum"
+    },
+    "ports": {
+        "backend_rpc": 8036,
+        "backend_message_queue": 0,
+        "backend_p2p": 38336,
+        "backend_http": 8136,
+        "backend_authrpc": 8536,
+        "blockbook_internal": 9036,
+        "blockbook_public": 9136
+    },
+    "ipc": {
+        "rpc_url_template": "http://127.0.0.1:{{.Ports.BackendRPC}}",
+        "rpc_url_ws_template": "ws://127.0.0.1:{{.Ports.BackendRPC}}",
+        "rpc_timeout": 25
+    },
+    "backend": {
+        "package_name": "backend-ethereum",
+        "package_revision": "satoshilabs-1",
+        "system_user": "ethereum",
+        "version": "3.3.10",
+        "binary_url": "https://github.com/erigontech/erigon/releases/download/v3.3.10/erigon_v3.3.10_linux_amd64.tar.gz",
+        "verification_type": "sha256",
+        "verification_source": "b717a6fce275d02e517eb473fc5d4385a7b0cd1d9e9ed144e4ef712799a474b7",
+        "extract_command": "tar -C backend --strip-components=1 -xf",
+        "exclude_files": [],
+        "exec_command_template": "/bin/sh -c '{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/erigon --chain mainnet --snap.keepblocks --db.size.limit 15TB --db.pagesize 16KB --prune.mode full --externalcl --nat none --datadir {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/erigon --port {{.Ports.BackendP2P}} --ws --ws.port {{.Ports.BackendRPC}} --http --http.port {{.Ports.BackendRPC}} --http.addr {{.Env.RPCBindHost}} --http.corsdomain \"*\" --http.vhosts \"*\" --http.api \"eth,net,web3,debug,txpool\" --authrpc.port {{.Ports.BackendAuthRpc}} --private.api.addr \"\" --torrent.port {{.Ports.BackendHttp}} --log.dir.path {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --log.dir.prefix {{.Coin.Alias}}'",
+        "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/{{.Coin.Alias}}.log",
+        "postinst_script_template": "",
+        "service_type": "simple",
+        "service_additional_params_template": "",
+        "protect_memory": true,
+        "mainnet": true,
+        "server_config_file": "",
+        "client_config_file": "",
+        "platforms": {
+            "arm64": {
+                "binary_url": "https://github.com/erigontech/erigon/releases/download/v3.3.10/erigon_v3.3.10_linux_arm64.tar.gz",
+                "verification_source": "d85460c6e4c287235939d77051cb3abf3606b21498e71b29b2d8f61f87dddf5b"
+            }
+        }
+    },
+    "blockbook": {
+        "package_name": "blockbook-ethereum",
+        "system_user": "blockbook-ethereum",
+        "internal_binding_template": ":{{.Ports.BlockbookInternal}}",
+        "public_binding_template": ":{{.Ports.BlockbookPublic}}",
+        "explorer_url": "",
+        "additional_params": "",
+        "block_chain": {
+            "parse": true,
+            "mempool_workers": 8,
+            "mempool_sub_workers": 2,
+            "block_addresses_to_keep": 300,
+            "additional_params": {
+                "averageBlockTimeMs": 12000,
+                "consensusNodeVersion": "http://localhost:7536/eth/v1/node/version",
+                "address_aliases": true,
+                "eip1559Fees": true,
+                "mempoolTxTimeoutHours": 48,
+                "queryBackendOnMempoolResync": false,
+                "fiat_rates": "coingecko",
+                "fiat_rates_vs_currencies": "AED,ARS,AUD,BDT,BHD,BMD,BRL,CAD,CHF,CLP,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,KWD,LKR,MMK,MXN,MYR,NGN,NOK,NZD,PHP,PKR,PLN,RUB,SAR,SEK,SGD,THB,TRY,TWD,UAH,USD,VEF,VND,ZAR,BTC,ETH",
+                "fiat_rates_params": "{\"coin\": \"ethereum\",\"platformIdentifier\": \"ethereum\",\"platformVsCurrency\": \"usd\",\"periodSeconds\": 900}",
+                "fourByteSignatures": "https://www.4byte.directory/api/v1/signatures/"
+            }
+        }
+    },
+    "meta": {
+        "package_maintainer": "IT",
+        "package_maintainer_email": "it@satoshilabs.com"
     }
-  },
-  "meta": {
-    "package_maintainer": "IT",
-    "package_maintainer_email": "it@satoshilabs.com"
-  }
 }

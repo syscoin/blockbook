@@ -7,16 +7,34 @@ import (
 	"math/big"
 	"os"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/syscoin/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain"
 )
 
 func TestMain(m *testing.M) {
 	c := m.Run()
 	chaincfg.ResetParams()
 	os.Exit(c)
+}
+
+func testChangeList(count int, separator string) string {
+	changes := make([]string, count)
+	for i := range changes {
+		changes[i] = strconv.Itoa(i)
+	}
+	return strings.Join(changes, separator)
+}
+
+func testChangeIndexes(count int) []uint32 {
+	indexes := make([]uint32, count)
+	for i := range indexes {
+		indexes[i] = uint32(i)
+	}
+	return indexes
 }
 
 func TestGetAddrDescFromAddress(t *testing.T) {
@@ -467,10 +485,12 @@ func TestGetAddressesFromAddrDescTestnet(t *testing.T) {
 }
 
 var (
-	testTx1, testTx2 bchain.Tx
+	testTx1, testTx2, testTx3, testTx4 bchain.Tx
 
 	testTxPacked1 = "0001e2408ba8d7af5401000000017f9a22c9cbf54bd902400df746f138f37bcf5b4d93eb755820e974ba43ed5f42040000006a4730440220037f4ed5427cde81d55b9b6a2fd08c8a25090c2c2fff3a75c1a57625ca8a7118022076c702fe55969fa08137f71afd4851c48e31082dd3c40c919c92cdbc826758d30121029f6da5623c9f9b68a9baf9c1bc7511df88fa34c6c2f71f7c62f2f03ff48dca80feffffff019c9700000000000017a9146144d57c8aff48492c9dfb914e120b20bad72d6f8773d00700"
 	testTxPacked2 = "0007c91a899ab7da6a010000000001019d64f0c72a0d206001decbffaa722eb1044534c74eee7a5df8318e42a4323ec10000000017160014550da1f5d25a9dae2eafd6902b4194c4c6500af6ffffffff02809698000000000017a914cd668d781ece600efa4b2404dc91fd26b8b8aed8870553d7360000000017a914246655bdbd54c7e477d0ea2375e86e0db2b8f80a8702473044022076aba4ad559616905fa51d4ddd357fc1fdb428d40cb388e042cdd1da4a1b7357022011916f90c712ead9a66d5f058252efd280439ad8956a967e95d437d246710bc9012102a80a5964c5612bb769ef73147b2cf3c149bc0fd4ecb02f8097629c94ab013ffd00000000"
+	testTxPacked3 = "00003d818bfda9aa3e02000000000102deb1999a857ab0a13d6b12fbd95ea75b409edde5f2ff747507ce42d9986a8b9d0000000000fdffffff9fd2d3361e203b2375eba6438efbef5b3075531e7e583c7cc76b7294fe7f22980000000000fdffffff02a0860100000000001600148091746745464e7555c31e9a5afceac14a02978ae7fc1c0000000000160014565ea9ff4589d3e05ba149ae6e257752bfdc2a1e0247304402207d67d320a8e813f986b35e9791935fcb736754812b7038686f5de6cfdcda99cd02201c3bb2c178e0056016437ecfe365a7eef84aa9d293ebdc566177af82e22fcdd3012103abb30c1bbe878b07b58dc169b1d061d48c60be8107f632a59778b38bf7ceea5a02473044022044f54a478cfe086e870cb026c9dcd4e14e63778bef569a4d55a6332725cd9a9802202f0e94c04e6f328fc64ad9efe552888c299750d1b8d033324825a3ff29920e030121036fcd433428aa7dc65c4f5408fa31f208c54fe4b4c6c1ae9c39a825ed4f1ac039813d0000"
+	testTxPacked4 = "0000a2b98ced82b6400300000000010148f8f93ebb12407809920d2ab9cc1bf01289b314eb23028c83fdab21e5fefa690100000000fdffffff0150c3000000000000160014cb888de3c89670a3061fb6ef6590f187649cca060247304402206a9db8d7157e4b0a06a1f090b9de88cdc616028b431b80617a055117877e479a02202937d6d1658d4a8afde86b245325c3bb0e769a87cb09d802bcefaa21550065e201210374aa8f312de4ebccbef55609700a39764387aa4ff5d76f1ccb4d2382e454f05b00000000"
 )
 
 func init() {
@@ -479,6 +499,7 @@ func init() {
 		Blocktime: 1519053802,
 		Txid:      "056e3d82e5ffd0e915fb9b62797d76263508c34fe3e5dbed30dd3e943930f204",
 		LockTime:  512115,
+		VSize:     189,
 		Version:   1,
 		Vin: []bchain.Vin{
 			{
@@ -509,6 +530,7 @@ func init() {
 		Blocktime: 1235678901,
 		Txid:      "474e6795760ebe81cb4023dc227e5a0efe340e1771c89a0035276361ed733de7",
 		LockTime:  0,
+		VSize:     166,
 		Version:   1,
 		Vin: []bchain.Vin{
 			{
@@ -538,6 +560,86 @@ func init() {
 					Hex: "a914246655bdbd54c7e477d0ea2375e86e0db2b8f80a87",
 					Addresses: []string{
 						"2MvZguYaGjM7JihBgNqgLF2Ca2Enb76Hj9D",
+					},
+				},
+			},
+		},
+	}
+
+	testTx3 = bchain.Tx{
+		Hex:       "02000000000102deb1999a857ab0a13d6b12fbd95ea75b409edde5f2ff747507ce42d9986a8b9d0000000000fdffffff9fd2d3361e203b2375eba6438efbef5b3075531e7e583c7cc76b7294fe7f22980000000000fdffffff02a0860100000000001600148091746745464e7555c31e9a5afceac14a02978ae7fc1c0000000000160014565ea9ff4589d3e05ba149ae6e257752bfdc2a1e0247304402207d67d320a8e813f986b35e9791935fcb736754812b7038686f5de6cfdcda99cd02201c3bb2c178e0056016437ecfe365a7eef84aa9d293ebdc566177af82e22fcdd3012103abb30c1bbe878b07b58dc169b1d061d48c60be8107f632a59778b38bf7ceea5a02473044022044f54a478cfe086e870cb026c9dcd4e14e63778bef569a4d55a6332725cd9a9802202f0e94c04e6f328fc64ad9efe552888c299750d1b8d033324825a3ff29920e030121036fcd433428aa7dc65c4f5408fa31f208c54fe4b4c6c1ae9c39a825ed4f1ac039813d0000",
+		Blocktime: 1607805599,
+		Txid:      "24551a58a1d1fb89d7052e2bbac7cb69a7825ee1e39439befbec8c32148cf735",
+		LockTime:  15745,
+		VSize:     208,
+		Version:   2,
+		Vin: []bchain.Vin{
+			{
+				ScriptSig: bchain.ScriptSig{
+					Hex: "",
+				},
+				Txid:     "9d8b6a98d942ce077574fff2e5dd9e405ba75ed9fb126b3da1b07a859a99b1de",
+				Vout:     0,
+				Sequence: 4294967293,
+			},
+			{
+				ScriptSig: bchain.ScriptSig{
+					Hex: "",
+				},
+				Txid:     "98227ffe94726bc77c3c587e1e5375305beffb8e43a6eb75233b201e36d3d29f",
+				Vout:     0,
+				Sequence: 4294967293,
+			},
+		},
+		Vout: []bchain.Vout{
+			{
+				ValueSat: *big.NewInt(100000),
+				N:        0,
+				ScriptPubKey: bchain.ScriptPubKey{
+					Hex: "00148091746745464e7555c31e9a5afceac14a02978a",
+					Addresses: []string{
+						"tb1qszghge69ge8824wrr6d94l82c99q99u2ccgv5w",
+					},
+				},
+			},
+			{
+				ValueSat: *big.NewInt(1899751),
+				N:        1,
+				ScriptPubKey: bchain.ScriptPubKey{
+					Hex: "0014565ea9ff4589d3e05ba149ae6e257752bfdc2a1e",
+					Addresses: []string{
+						"tb1q2e02nl6938f7qkapfxhxufth22lac2s792vsxp",
+					},
+				},
+			},
+		},
+	}
+
+	testTx4 = bchain.Tx{
+		Hex:       "0300000000010148f8f93ebb12407809920d2ab9cc1bf01289b314eb23028c83fdab21e5fefa690100000000fdffffff0150c3000000000000160014cb888de3c89670a3061fb6ef6590f187649cca060247304402206a9db8d7157e4b0a06a1f090b9de88cdc616028b431b80617a055117877e479a02202937d6d1658d4a8afde86b245325c3bb0e769a87cb09d802bcefaa21550065e201210374aa8f312de4ebccbef55609700a39764387aa4ff5d76f1ccb4d2382e454f05b00000000",
+		Blocktime: 1724927392,
+		Txid:      "8e3f38bf6854dd3c358be8d4f9a40a6dccc50de49616125d27af9fdbe65287eb",
+		LockTime:  0,
+		VSize:     110,
+		Version:   3,
+		Vin: []bchain.Vin{
+			{
+				ScriptSig: bchain.ScriptSig{
+					Hex: "",
+				},
+				Txid:     "69fafee521abfd838c0223eb14b38912f01bccb92a0d9209784012bb3ef9f848",
+				Vout:     1,
+				Sequence: 4294967293,
+			},
+		},
+		Vout: []bchain.Vout{
+			{
+				ValueSat: *big.NewInt(50000),
+				N:        0,
+				ScriptPubKey: bchain.ScriptPubKey{
+					Hex: "0014cb888de3c89670a3061fb6ef6590f187649cca06",
+					Addresses: []string{
+						"tb1qewygmc7gjec2xpslkmhkty83sajfejsxqmy5dq",
 					},
 				},
 			},
@@ -578,6 +680,28 @@ func TestPackTx(t *testing.T) {
 				parser:    NewBitcoinParser(GetChainParams("test"), &Configuration{}),
 			},
 			want:    testTxPacked2,
+			wantErr: false,
+		},
+		{
+			name: "signet-1",
+			args: args{
+				tx:        testTx3,
+				height:    15745,
+				blockTime: 1607805599,
+				parser:    NewBitcoinParser(GetChainParams("signet"), &Configuration{}),
+			},
+			want:    testTxPacked3,
+			wantErr: false,
+		},
+		{
+			name: "testnet4-1",
+			args: args{
+				tx:        testTx4,
+				height:    41657,
+				blockTime: 1724927392,
+				parser:    NewBitcoinParser(GetChainParams("testnet4"), &Configuration{}),
+			},
+			want:    testTxPacked4,
 			wantErr: false,
 		},
 	}
@@ -628,6 +752,26 @@ func TestUnpackTx(t *testing.T) {
 			want1:   510234,
 			wantErr: false,
 		},
+		{
+			name: "signet-1",
+			args: args{
+				packedTx: testTxPacked3,
+				parser:   NewBitcoinParser(GetChainParams("signet"), &Configuration{}),
+			},
+			want:    &testTx3,
+			want1:   15745,
+			wantErr: false,
+		},
+		{
+			name: "testnet4-1",
+			args: args{
+				packedTx: testTxPacked4,
+				parser:   NewBitcoinParser(GetChainParams("testnet4"), &Configuration{}),
+			},
+			want:    &testTx4,
+			want1:   41657,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -636,6 +780,10 @@ func TestUnpackTx(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("unpackTx() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			// ignore witness unpacking
+			for i := range got.Vin {
+				got.Vin[i].Witness = nil
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("unpackTx() got = %v, want %v", got, tt.want)
@@ -651,11 +799,12 @@ func TestParseXpubDescriptors(t *testing.T) {
 	btcMainParser := NewBitcoinParser(GetChainParams("main"), &Configuration{XPubMagic: 76067358, XPubMagicSegwitP2sh: 77429938, XPubMagicSegwitNative: 78792518})
 	btcTestnetParser := NewBitcoinParser(GetChainParams("test"), &Configuration{XPubMagic: 70617039, XPubMagicSegwitP2sh: 71979618, XPubMagicSegwitNative: 73342198})
 	tests := []struct {
-		name    string
-		xpub    string
-		parser  *BitcoinParser
-		want    *bchain.XpubDescriptor
-		wantErr bool
+		name            string
+		xpub            string
+		parser          *BitcoinParser
+		want            *bchain.XpubDescriptor
+		wantErr         bool
+		wantErrContains string
 	}{
 		{
 			name:   "tpub",
@@ -694,6 +843,18 @@ func TestParseXpubDescriptors(t *testing.T) {
 			},
 		},
 		{
+			name:   "tr([5c9e228d/86h/1h/0h]tpubD/{0,1,2}/*)#4rqwxvej",
+			xpub:   "tr([5c9e228d/86h/1h/0h]tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{0,1,2}/*)#4rqwxvej",
+			parser: btcTestnetParser,
+			want: &bchain.XpubDescriptor{
+				XpubDescriptor: "tr([5c9e228d/86h/1h/0h]tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{0,1,2}/*)#4rqwxvej",
+				Xpub:           "tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN",
+				Type:           bchain.P2TR,
+				Bip:            "86",
+				ChangeIndexes:  []uint32{0, 1, 2},
+			},
+		},
+		{
 			name:   "tr([5c9e228d/86'/1'/0']tpubD/<0;1;2>/*)#4rqwxvej",
 			xpub:   "tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/<0;1;2>/*)#4rqwxvej",
 			parser: btcTestnetParser,
@@ -704,6 +865,32 @@ func TestParseXpubDescriptors(t *testing.T) {
 				Bip:            "86",
 				ChangeIndexes:  []uint32{0, 1, 2},
 			},
+		},
+		{
+			name:   "tr([5c9e228d/86'/1'/0']tpubD/{max changes}/*)#4rqwxvej",
+			xpub:   "tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{" + testChangeList(bchain.MaxXpubChangeIndexes, ",") + "}/*)#4rqwxvej",
+			parser: btcTestnetParser,
+			want: &bchain.XpubDescriptor{
+				XpubDescriptor: "tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{" + testChangeList(bchain.MaxXpubChangeIndexes, ",") + "}/*)#4rqwxvej",
+				Xpub:           "tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN",
+				Type:           bchain.P2TR,
+				Bip:            "86",
+				ChangeIndexes:  testChangeIndexes(bchain.MaxXpubChangeIndexes),
+			},
+		},
+		{
+			name:            "tr([5c9e228d/86'/1'/0']tpubD/{too many changes}/*)#4rqwxvej error - change list limit",
+			xpub:            "tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/{" + testChangeList(bchain.MaxXpubChangeIndexes+1, ",") + "}/*)#4rqwxvej",
+			parser:          btcTestnetParser,
+			wantErr:         true,
+			wantErrContains: "change index count exceeds limit",
+		},
+		{
+			name:            "tr([5c9e228d/86'/1'/0']tpubD/<too many changes>/*)#4rqwxvej error - change list limit",
+			xpub:            "tr([5c9e228d/86'/1'/0']tpubDC88gkaZi5HvJGxGDNLADkvtdpni3mLmx6vr2KnXmWMG8zfkBRggsxHVBkUpgcwPe2KKpkyvTJCdXHb1UHEWE64vczyyPQfHr1skBcsRedN/<" + testChangeList(bchain.MaxXpubChangeIndexes+1, ";") + ">/*)#4rqwxvej",
+			parser:          btcTestnetParser,
+			wantErr:         true,
+			wantErrContains: "change index count exceeds limit",
 		},
 		{
 			name:   "tr([5c9e228d/86'/1'/0']tpubD/3/*)#4rqwxvej",
@@ -814,6 +1001,12 @@ func TestParseXpubDescriptors(t *testing.T) {
 			},
 		},
 		{
+			name:    "wpkh(xpub) error - trailing JS suffix",
+			xpub:    `wpkh(xpub6BgBgsespWvERF3LHQu6CnqdvfEvtMcQjYrcRzx53QJjSxarj2afYWcLteoGVky7D3UKDP9QyrLprQ3VCECoY49yfdDEHGCtMMj92pReUsQ)"});alert(1);//`,
+			parser:  btcMainParser,
+			wantErr: true,
+		},
+		{
 			name:    "xxx(xpub) error - unknown output script",
 			xpub:    "xxx(xpub6BgBgsespWvERF3LHQu6CnqdvfEvtMcQjYrcRzx53QJjSxarj2afYWcLteoGVky7D3UKDP9QyrLprQ3VCECoY49yfdDEHGCtMMj92pReUsQ)",
 			parser:  btcMainParser,
@@ -838,6 +1031,9 @@ func TestParseXpubDescriptors(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseXpub() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if err != nil && tt.wantErrContains != "" && !strings.Contains(err.Error(), tt.wantErrContains) {
+				t.Errorf("ParseXpub() error = %v, want error containing %q", err, tt.wantErrContains)
 			}
 			if err == nil {
 				if got.ExtKey == nil {
@@ -1166,6 +1362,52 @@ func TestBitcoinParser_DerivationBasePath(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("BitcoinParser.DerivationBasePath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseTxFromJson_VersionOverflow exercises ParseTxFromJson with
+// non-standard/invalid tx-version values that don't fit in int32.
+// Bitcoin Core serializes the transaction's version field as an unsigned
+// 32-bit integer in JSON, so values above math.MaxInt32 (e.g. the historical
+// mainnet tx 637dd1a3418386a418ceeac7bb58633a904dbf127fa47bbea9cc8f86fef7413f
+// in block 256818, whose version is 2187681472) must be accepted and
+// bit-cast to int32 to match the value produced by the binary block parser.
+func TestParseTxFromJson_VersionOverflow(t *testing.T) {
+	p := NewBitcoinParser(GetChainParams("main"), &Configuration{})
+	tests := []struct {
+		name        string
+		jsonVersion string
+		wantVersion int32
+	}{
+		{
+			name:        "standard version 2",
+			jsonVersion: "2",
+			wantVersion: 2,
+		},
+		{
+			// uint32 0x826C6B40 == 2187681472, bit-cast to int32 == -2107285824
+			name:        "real-world overflow tx 637dd1a3...",
+			jsonVersion: "2187681472",
+			wantVersion: -2107285824,
+		},
+		{
+			// uint32 0xFFFFFFFF, bit-cast to int32 == -1
+			name:        "uint32 max",
+			jsonVersion: "4294967295",
+			wantVersion: -1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg := `{"hex":"00","txid":"637dd1a3418386a418ceeac7bb58633a904dbf127fa47bbea9cc8f86fef7413f","version":` + tt.jsonVersion + `,"locktime":0,"vin":[],"vout":[]}`
+			got, err := p.ParseTxFromJson([]byte(msg))
+			if err != nil {
+				t.Fatalf("ParseTxFromJson() unexpected error: %v", err)
+			}
+			if got.Version != tt.wantVersion {
+				t.Errorf("ParseTxFromJson() Version = %d, want %d", got.Version, tt.wantVersion)
 			}
 		})
 	}

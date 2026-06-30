@@ -3,9 +3,9 @@ package db
 import (
 	"github.com/golang/glog"
 	"github.com/juju/errors"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/eth"
-	"github.com/syscoin/blockbook/common"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/eth"
+	"github.com/trezor/blockbook/common"
 )
 
 // TxCache is handle to TxCacheServer
@@ -46,7 +46,7 @@ func (c *TxCache) GetTransaction(txid string) (*bchain.Tx, int, error) {
 		}
 		if tx != nil {
 			// number of confirmations is not stored in cache, they change all the time
-			_, bestheight, _ := c.is.GetSyncState()
+			_, bestheight, _, _ := c.is.GetSyncState()
 			tx.Confirmations = bestheight - h + 1
 			c.metrics.TxCacheEfficiency.With(common.Labels{"status": "hit"}).Inc()
 			return tx, int(h), nil

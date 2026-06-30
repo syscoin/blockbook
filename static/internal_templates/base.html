@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no">
+    <link rel="stylesheet" href="/static/css/bootstrap.5.2.2.min.css">
+    <title>Blockbook {{.CoinLabel}} Internal Admin</title>
+</head>
+
+<body>
+    <header id="header">
+        <nav class="navbar">
+            <div class="container">
+                <a class="navbar-brand" href="/admin" title="Home">
+                    <h1>Blockbook {{.CoinLabel}} Internal Admin</h1>
+                </a>
+            </div>
+        </nav>
+    </header>
+    <main id="wrap">
+        <div class="container">
+            {{- template "specific" . -}}
+        </div>
+    </main>
+</body>
+
+</html>

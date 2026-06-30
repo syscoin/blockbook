@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/martinboehm/btcutil/chaincfg"
-	"github.com/syscoin/blockbook/bchain"
-	"github.com/syscoin/blockbook/bchain/coins/btc"
+	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
 )
 
 func TestMain(m *testing.M) {
@@ -293,6 +293,10 @@ func Test_UnpackTx(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("unpackTx() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			// ignore witness unpacking
+			for i := range got.Vin {
+				got.Vin[i].Witness = nil
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("unpackTx() got = %v, want %v", got, tt.want)

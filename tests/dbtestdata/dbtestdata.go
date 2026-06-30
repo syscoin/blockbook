@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/golang/glog"
-	"github.com/syscoin/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain"
 )
 
 // Txids, Xpubs and Addresses

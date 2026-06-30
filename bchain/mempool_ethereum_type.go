@@ -1,6 +1,7 @@
 package bchain
 
 import (
+	"errors"
 	"time"
 
 	"github.com/golang/glog"
@@ -17,8 +18,7 @@ type MempoolEthereumType struct {
 }
 
 // NewMempoolEthereumType creates new mempool handler.
-func NewMempoolEthereumType(chain BlockChain, mempoolTxTimeoutHours int, queryBackendOnResync bool) *MempoolEthereumType {
-	mempoolTimeoutTime := time.Duration(mempoolTxTimeoutHours) * time.Hour
+func NewMempoolEthereumType(chain BlockChain, mempoolTimeoutTime time.Duration, queryBackendOnResync bool) *MempoolEthereumType {
 	return &MempoolEthereumType{
 		BaseMempool: BaseMempool{
 			chain:        chain,
@@ -40,7 +40,7 @@ func appendAddress(io []addrIndex, i int32, a string, parser BlockChainParser) (
 			glog.Error("error in input addrDesc in ", a, ": ", err)
 			return io, nil
 		}
-		io = append(io, addrIndex{string(addrDesc), i, nil})
+		io = append(io, addrIndex{addrDesc: string(addrDesc), n: i})
 	}
 	return io, addrDesc
 }
@@ -65,7 +65,7 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 			continue
 		}
 		if len(addrDesc) > 0 {
-			addrIndexes = append(addrIndexes, addrIndex{string(addrDesc), int32(output.N), nil})
+			addrIndexes = append(addrIndexes, addrIndex{addrDesc: string(addrDesc), n: int32(output.N)})
 		}
 	}
 	for j := range mtx.Vin {
@@ -74,23 +74,14 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 			addrIndexes, input.AddrDesc = appendAddress(addrIndexes, ^int32(i), a, parser)
 		}
 	}
-	t, err := parser.EthereumTypeGetErc20FromTx(tx)
+	t, err := parser.EthereumTypeGetTokenTransfersFromTx(tx)
 	if err != nil {
-		glog.Error("GetErc20FromTx for tx ", txid, ", ", err)
+		glog.Error("GetGetTokenTransfersFromTx for tx ", txid, ", ", err)
 	} else {
-		mtx.Erc20 = t
+		mtx.TokenTransfers = t
 		for i := range t {
 			addrIndexes, _ = appendAddress(addrIndexes, ^int32(i+1), t[i].From, parser)
 			addrIndexes, _ = appendAddress(addrIndexes, int32(i+1), t[i].To, parser)
-		}
-	}
-	if m.OnNewTxAddr != nil {
-		sent := make(map[string]struct{})
-		for _, si := range addrIndexes {
-			if _, found := sent[si.addrDesc]; !found {
-				m.OnNewTxAddr(tx, AddressDescriptor(si.addrDesc))
-				sent[si.addrDesc] = struct{}{}
-			}
 		}
 	}
 	if m.OnNewTx != nil {
@@ -102,14 +93,22 @@ func (m *MempoolEthereumType) createTxEntry(txid string, txTime uint32) (txEntry
 // Resync ethereum type removes timed out transactions and returns number of transactions in mempool.
 // Transactions are added/removed by AddTransactionToMempool/RemoveTransactionFromMempool methods
 func (m *MempoolEthereumType) Resync() (int, error) {
+	start := time.Now()
+	processedTxs := 0
+	backendRemoved := 0
 	if m.queryBackendOnResync {
+		backendSnapshotTime := uint32(time.Now().Unix())
 		txs, err := m.chain.GetMempoolTransactions()
 		if err != nil {
 			return 0, err
 		}
+		processedTxs = len(txs)
+		backendTxs := make(map[string]struct{}, len(txs))
 		for _, txid := range txs {
+			backendTxs[txid] = struct{}{}
 			m.AddTransactionToMempool(txid)
 		}
+		backendRemoved = m.removeTransactionsMissingFromBackend(backendTxs, backendSnapshotTime)
 	}
 	m.mux.Lock()
 	entries := len(m.txEntries)
@@ -127,12 +126,39 @@ func (m *MempoolEthereumType) Resync() (int, error) {
 		m.nextTimeoutRun = now.Add(mempoolTimeoutRunPeriod)
 	}
 	m.mux.Unlock()
-	glog.Info("Mempool: resync ", entries, " transactions in mempool")
+	duration := time.Since(start)
+	durationRounded := duration.Round(time.Millisecond)
+	if durationRounded == 0 {
+		durationRounded = duration
+	}
+	if m.queryBackendOnResync {
+		throughput := 0.0
+		if seconds := duration.Seconds(); seconds > 0 {
+			throughput = float64(processedTxs) / seconds
+		}
+		glog.Infof("Mempool: resync complete, mempool size %d txs, processed %d txs, removed %d stale txs, duration %s, throughput %.2f tx/s", entries, processedTxs, backendRemoved, durationRounded, throughput)
+	} else {
+		glog.Infof("Mempool: resync complete, mempool size %d txs, duration %s", entries, durationRounded)
+	}
 	return entries, nil
 }
 
-// AddTransactionToMempool adds transactions to mempool
-func (m *MempoolEthereumType) AddTransactionToMempool(txid string) {
+func (m *MempoolEthereumType) removeTransactionsMissingFromBackend(backendTxs map[string]struct{}, backendSnapshotTime uint32) int {
+	removed := 0
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	for txid, entry := range m.txEntries {
+		if _, exists := backendTxs[txid]; exists || entry.time >= backendSnapshotTime {
+			continue
+		}
+		m.removeEntryFromMempool(txid, entry)
+		removed++
+	}
+	return removed
+}
+
+// AddTransactionToMempool adds transactions to mempool, returns true if tx added to mempool, false if not added (for example duplicate call)
+func (m *MempoolEthereumType) AddTransactionToMempool(txid string) bool {
 	m.mux.Lock()
 	_, exists := m.txEntries[txid]
 	m.mux.Unlock()
@@ -142,7 +168,7 @@ func (m *MempoolEthereumType) AddTransactionToMempool(txid string) {
 	if !exists {
 		entry, ok := m.createTxEntry(txid, uint32(time.Now().Unix()))
 		if !ok {
-			return
+			return false
 		}
 		m.mux.Lock()
 		m.txEntries[txid] = entry
@@ -151,6 +177,7 @@ func (m *MempoolEthereumType) AddTransactionToMempool(txid string) {
 		}
 		m.mux.Unlock()
 	}
+	return !exists
 }
 
 // RemoveTransactionFromMempool removes transaction from mempool
@@ -164,4 +191,9 @@ func (m *MempoolEthereumType) RemoveTransactionFromMempool(txid string) {
 		m.removeEntryFromMempool(txid, entry)
 	}
 	m.mux.Unlock()
+}
+
+// GetTxidFilterEntries returns all mempool entries with golomb filter from
+func (m *MempoolEthereumType) GetTxidFilterEntries(filterScripts string, fromTimestamp uint32) (MempoolTxidFilterEntries, error) {
+	return MempoolTxidFilterEntries{}, errors.New("Not supported")
 }
