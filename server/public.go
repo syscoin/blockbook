@@ -91,8 +91,14 @@ func (s *PublicServer) supportsAccountTxSummary() bool {
 }
 
 // SYSCOIN
-func (s *PublicServer) validateTxSummarySupported(r *http.Request) error {
-	if r.URL.Query().Get("details") == "txsummary" && !s.supportsAccountTxSummary() {
+func (s *PublicServer) validateTxSummarySupported(r *http.Request, apiVersion int) error {
+	if r.URL.Query().Get("details") != "txsummary" {
+		return nil
+	}
+	if apiVersion != apiV2 {
+		return api.NewAPIError("details=txsummary is not supported for API v1", true)
+	}
+	if !s.supportsAccountTxSummary() {
 		return api.NewAPIError("details=txsummary is not supported for this chain", true)
 	}
 	return nil
@@ -1785,7 +1791,7 @@ func (s *PublicServer) apiAddress(r *http.Request, apiVersion int) (interface{},
 	var address *api.Address
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-address"}).Inc()
-	if err := s.validateTxSummarySupported(r); err != nil {
+	if err := s.validateTxSummarySupported(r, apiVersion); err != nil {
 		return nil, err
 	}
 	page, pageSize, details, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
@@ -1880,7 +1886,7 @@ func (s *PublicServer) apiXpub(r *http.Request, apiVersion int) (interface{}, er
 	var address *api.Address
 	var err error
 	s.metrics.ExplorerViews.With(common.Labels{"action": "api-xpub"}).Inc()
-	if err := s.validateTxSummarySupported(r); err != nil {
+	if err := s.validateTxSummarySupported(r, apiVersion); err != nil {
 		return nil, err
 	}
 	page, pageSize, details, filter, _, gap := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
