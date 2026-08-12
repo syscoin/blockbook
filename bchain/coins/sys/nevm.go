@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	vaultManagerAddress      = "0x7904299b3D3dC1b03d1DdEb45E9fDF3576aCBd5f"
+	// Syscoin 5 Bridge V2 registry. Legacy pre-cutover SPT metadata is not indexed.
+	vaultManagerAddress      = "0x28bD37C0926575f2568ea8f297c0745EF16174Ab"
 	defaultNEVMRPCTimeoutSec = 15
 )
 
