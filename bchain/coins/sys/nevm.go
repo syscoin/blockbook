@@ -2,10 +2,12 @@ package syscoin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
+	"unicode"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -17,11 +19,38 @@ import (
 	"github.com/trezor/blockbook/bchain/coins/btc"
 )
 
+type bridgeAssetMetadata struct {
+	Description    string `json:"description"`
+	AssetType      string `json:"assetType"`
+	OriginDecimals *uint8 `json:"originDecimals,omitempty"`
+	TokenID        string `json:"tokenId,omitempty"`
+}
+
+func encodeBridgeAssetMetadata(metadata bridgeAssetMetadata) ([]byte, error) {
+	return json.Marshal(metadata)
+}
+
 const (
 	// Syscoin 5 Bridge V2 registry. Legacy pre-cutover SPT metadata is not indexed.
-	vaultManagerAddress      = "0x28bD37C0926575f2568ea8f297c0745EF16174Ab"
-	defaultNEVMRPCTimeoutSec = 15
+	vaultManagerAddress       = "0x28bD37C0926575f2568ea8f297c0745EF16174Ab"
+	defaultNEVMRPCTimeoutSec  = 15
+	maxBridgeTokenSymbolRunes = 32
 )
+
+func sanitizeBridgeTokenSymbol(symbol string) string {
+	sanitized := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.In(r, unicode.Cf) {
+			return -1
+		}
+		return r
+	}, symbol)
+	sanitized = strings.TrimSpace(sanitized)
+	runes := []rune(sanitized)
+	if len(runes) > maxBridgeTokenSymbolRunes {
+		runes = runes[:maxBridgeTokenSymbolRunes]
+	}
+	return string(runes)
+}
 
 type NEVMClient struct {
 	rpcClient    *ethclient.Client
@@ -152,11 +181,18 @@ func (c *NEVMClient) getTokenSymbol(contractAddr common.Address) (string, error)
 		return "", err
 	}
 
-	return unpacked[0].(string), nil
+	return sanitizeBridgeTokenSymbol(unpacked[0].(string)), nil
 }
 
 func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, error) {
 	if assetGuid == 123456 {
+		metadata, err := encodeBridgeAssetMetadata(bridgeAssetMetadata{
+			Description: "Syscoin Native Asset",
+			AssetType:   "SYSX",
+		})
+		if err != nil {
+			return nil, err
+		}
 		return &bchain.Asset{
 			Transactions: 0,
 			AssetObj: wire.AssetType{
@@ -166,7 +202,7 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 				TotalSupply: 0,
 				MaxSupply:   0,
 			},
-			MetaData: []byte("Syscoin Native Asset"),
+			MetaData: metadata,
 		}, nil
 	}
 
@@ -196,7 +232,8 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		return nil, err
 	}
 
-	var symbol, metadata string
+	var symbol string
+	metadata := bridgeAssetMetadata{}
 	contractAddr := registry.AssetContract
 	precision := registry.Precision
 	switch registry.AssetType {
@@ -205,7 +242,9 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		if err != nil || symbol == "" {
 			symbol = fmt.Sprintf("ERC20-%d", assetId)
 		}
-		metadata = "ERC20 Token"
+		metadata.Description = "ERC20 Token"
+		metadata.AssetType = "ERC20"
+		metadata.OriginDecimals = &registry.Precision
 		// SYSCOIN: UTXO-side SPT values are stored and exposed as CAmount/COIN
 		// units, matching Core's 8-decimal asset_value formatting.
 		precision = 8
@@ -219,7 +258,11 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 		if err != nil || symbol == "" {
 			symbol = fmt.Sprintf("ERC721-%d", assetId)
 		}
-		metadata = fmt.Sprintf("ERC721 NFT Token ID %s", realTokenId.String())
+		metadata.Description = fmt.Sprintf("ERC721 NFT Token ID %s", realTokenId.String())
+		metadata.AssetType = "ERC721"
+		metadata.TokenID = realTokenId.String()
+		originDecimals := uint8(0)
+		metadata.OriginDecimals = &originDecimals
 		precision = 0
 
 	case 4: // ERC1155
@@ -228,11 +271,20 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			return nil, err
 		}
 		symbol = fmt.Sprintf("ERC1155-%d", assetId)
-		metadata = fmt.Sprintf("ERC1155 Token ID %s", realTokenId.String())
+		metadata.Description = fmt.Sprintf("ERC1155 Token ID %s", realTokenId.String())
+		metadata.AssetType = "ERC1155"
+		metadata.TokenID = realTokenId.String()
+		originDecimals := uint8(0)
+		metadata.OriginDecimals = &originDecimals
 		precision = 0
 
 	default:
 		return nil, fmt.Errorf("unsupported NEVM asset type %d for asset %d", registry.AssetType, assetId)
+	}
+
+	metadataJSON, err := encodeBridgeAssetMetadata(metadata)
+	if err != nil {
+		return nil, err
 	}
 
 	return &bchain.Asset{
@@ -244,6 +296,6 @@ func (c *NEVMClient) FetchNEVMAssetDetails(assetGuid uint64) (*bchain.Asset, err
 			TotalSupply: 0,
 			MaxSupply:   0,
 		},
-		MetaData: []byte(metadata),
+		MetaData: metadataJSON,
 	}, nil
 }

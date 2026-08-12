@@ -147,24 +147,30 @@ type AssetInfo struct {
 // SYSCOIN: AssetSpecific contains Syscoin SPT metadata exposed by asset
 // endpoints and explorer pages.
 type AssetSpecific struct {
-	AssetGuid   string  `json:"assetGuid" ts_doc:"Syscoin SPT asset GUID."`
-	Contract    string  `json:"contract,omitempty" ts_doc:"NEVM contract address associated with this asset, if any."`
-	Symbol      string  `json:"symbol" ts_doc:"Asset symbol."`
-	TotalSupply *Amount `json:"totalSupply" ts_doc:"Current total supply in base units."`
-	MaxSupply   *Amount `json:"maxSupply" ts_doc:"Maximum supply in base units."`
-	Decimals    int     `json:"decimals" ts_doc:"Number of asset decimal places."`
-	MetaData    string  `json:"metaData,omitempty" ts_doc:"Raw Syscoin asset metadata."`
+	AssetGuid      string  `json:"assetGuid" ts_doc:"Syscoin SPT asset GUID."`
+	AssetType      string  `json:"assetType,omitempty" ts_doc:"Origin bridge asset standard (SYSX, ERC20, ERC721, or ERC1155)."`
+	Contract       string  `json:"contract,omitempty" ts_doc:"NEVM contract address associated with this asset, if any."`
+	Symbol         string  `json:"symbol" ts_doc:"Asset symbol."`
+	TotalSupply    *Amount `json:"totalSupply" ts_doc:"Current total supply in base units."`
+	MaxSupply      *Amount `json:"maxSupply" ts_doc:"Maximum supply in base units."`
+	Decimals       int     `json:"decimals" ts_doc:"Number of asset decimal places."`
+	OriginDecimals *int    `json:"originDecimals,omitempty" ts_doc:"Decimals registered by the bridge for the origin asset."`
+	TokenID        string  `json:"tokenId,omitempty" ts_doc:"Origin token ID for ERC721 and ERC1155 assets."`
+	MetaData       string  `json:"metaData,omitempty" ts_doc:"Raw Syscoin asset metadata."`
 }
 
 // SYSCOIN: AssetsSpecific is the compact Syscoin SPT row used by asset search.
 type AssetsSpecific struct {
-	AssetGuid   string  `json:"assetGuid" ts_doc:"Syscoin SPT asset GUID."`
-	Contract    string  `json:"contract" ts_doc:"NEVM contract address associated with this asset, if any."`
-	Symbol      string  `json:"symbol" ts_doc:"Asset symbol."`
-	TotalSupply *Amount `json:"totalSupply" ts_doc:"Current total supply in base units."`
-	Decimals    int     `json:"precision" ts_doc:"Number of asset decimal places."`
-	Txs         int     `json:"txs" ts_doc:"Number of indexed transactions touching this asset."`
-	MetaData    string  `json:"metaData,omitempty" ts_doc:"Raw Syscoin asset metadata."`
+	AssetGuid      string  `json:"assetGuid" ts_doc:"Syscoin SPT asset GUID."`
+	AssetType      string  `json:"assetType,omitempty" ts_doc:"Origin bridge asset standard (SYSX, ERC20, ERC721, or ERC1155)."`
+	Contract       string  `json:"contract" ts_doc:"NEVM contract address associated with this asset, if any."`
+	Symbol         string  `json:"symbol" ts_doc:"Asset symbol."`
+	TotalSupply    *Amount `json:"totalSupply" ts_doc:"Current total supply in base units."`
+	Decimals       int     `json:"precision" ts_doc:"Number of asset decimal places."`
+	OriginDecimals *int    `json:"originDecimals,omitempty" ts_doc:"Decimals registered by the bridge for the origin asset."`
+	TokenID        string  `json:"tokenId,omitempty" ts_doc:"Origin token ID for ERC721 and ERC1155 assets."`
+	Txs            int     `json:"txs" ts_doc:"Number of indexed transactions touching this asset."`
+	MetaData       string  `json:"metaData,omitempty" ts_doc:"Raw Syscoin asset metadata."`
 }
 
 // Vin contains information about single transaction input
@@ -286,6 +292,9 @@ type Token struct {
 	UnconfirmedBalanceSat *Amount        `json:"unconfirmedBalance,omitempty" ts_doc:"Unconfirmed token balance delta."`
 	UnconfirmedTransfers  int            `json:"unconfirmedTransfers,omitempty" ts_doc:"Number of unconfirmed Syscoin SPT transfers."`
 	AssetGuid             string         `json:"assetGuid,omitempty" ts_doc:"Syscoin SPT asset GUID."`
+	AssetType             string         `json:"assetType,omitempty" ts_doc:"Origin bridge asset standard for a Syscoin SPT."`
+	OriginDecimals        *int           `json:"originDecimals,omitempty" ts_doc:"Decimals registered by the bridge for the origin asset."`
+	TokenID               string         `json:"tokenId,omitempty" ts_doc:"Origin token ID for bridged ERC721 and ERC1155 assets."`
 	Protocols             TokenProtocols `json:"protocols,omitempty" ts_type:"string[]" ts_doc:"Protocol identifiers the contract participates in (e.g., \"erc4626\"); for fresh per-vault data, use getContractInfo."`
 	ContractIndex         string         `json:"-"`
 }

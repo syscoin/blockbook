@@ -78,6 +78,32 @@ type syscoinAssetMaskParser interface {
 	GetAssetsMaskFromVersion(nVersion int32) bchain.AssetsMask
 }
 
+type syscoinBridgeAssetMetadata struct {
+	Description    string `json:"description"`
+	AssetType      string `json:"assetType"`
+	OriginDecimals *int   `json:"originDecimals,omitempty"`
+	TokenID        string `json:"tokenId,omitempty"`
+}
+
+func decodeSyscoinBridgeAssetMetadata(assetGuid string, raw []byte) syscoinBridgeAssetMetadata {
+	metadata := syscoinBridgeAssetMetadata{Description: string(raw)}
+	if len(raw) == 0 {
+		if assetGuid == "123456" {
+			metadata.AssetType = "SYSX"
+		}
+		return metadata
+	}
+
+	var decoded syscoinBridgeAssetMetadata
+	if err := json.Unmarshal(raw, &decoded); err != nil || decoded.AssetType == "" {
+		if assetGuid == "123456" {
+			metadata.AssetType = "SYSX"
+		}
+		return metadata
+	}
+	return decoded
+}
+
 // SYSCOIN
 func assetTypeFromVersion(parser bchain.BlockChainParser, version int32) *bchain.TokenType {
 	p, ok := parser.(syscoinAssetTypeParser)
@@ -200,6 +226,11 @@ func (w *Worker) getSyscoinAddressAssetTokens(address string, balances map[uint6
 			dbAsset.AssetObj.Symbol = []byte(assetGuid)
 			dbAsset.AssetObj.Precision = 8
 		}
+		metadata := decodeSyscoinBridgeAssetMetadata(assetGuid, dbAsset.MetaData)
+		contract := ""
+		if len(dbAsset.AssetObj.Contract) > 0 {
+			contract = ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex()
+		}
 		totalReceived := new(big.Int).Add(balance.BalanceSat, balance.SentSat)
 		var unconfirmed *Amount
 		unconfirmedTransfers := 0
@@ -220,6 +251,10 @@ func (w *Worker) getSyscoinAddressAssetTokens(address string, balances map[uint6
 			TotalReceivedSat:      (*Amount)(totalReceived),
 			TotalSentSat:          (*Amount)(balance.SentSat),
 			AssetGuid:             assetGuid,
+			AssetType:             metadata.AssetType,
+			Contract:              contract,
+			OriginDecimals:        metadata.OriginDecimals,
+			TokenID:               metadata.TokenID,
 			Transfers:             int(balance.Transfers),
 		})
 	}
@@ -238,6 +273,11 @@ func (w *Worker) getSyscoinAddressAssetTokens(address string, balances map[uint6
 			dbAsset.AssetObj.Precision = 8
 		}
 		zero := Amount(*new(big.Int))
+		metadata := decodeSyscoinBridgeAssetMetadata(assetGuid, dbAsset.MetaData)
+		contract := ""
+		if len(dbAsset.AssetObj.Contract) > 0 {
+			contract = ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex()
+		}
 		tokens = append(tokens, Token{
 			Type:                  bchain.SPTTokenType,
 			Standard:              bchain.SPTTokenType,
@@ -250,6 +290,10 @@ func (w *Worker) getSyscoinAddressAssetTokens(address string, balances map[uint6
 			TotalReceivedSat:      &zero,
 			TotalSentSat:          &zero,
 			AssetGuid:             assetGuid,
+			AssetType:             metadata.AssetType,
+			Contract:              contract,
+			OriginDecimals:        metadata.OriginDecimals,
+			TokenID:               metadata.TokenID,
 		})
 	}
 	sort.Sort(tokens)
@@ -1236,6 +1280,8 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 	filterLower := strings.ToLower(strings.ReplaceAll(filter, "0x", ""))
 	assetDetails := make([]*AssetsSpecific, 0)
 	for guid, assetCached := range *w.db.GetAssetCache() {
+		assetGuid := strconv.FormatUint(guid, 10)
+		metadata := decodeSyscoinBridgeAssetMetadata(assetGuid, assetCached.MetaData)
 		symbol := string(assetCached.AssetObj.Symbol)
 		symbolLower := strings.ToLower(symbol)
 		foundAsset := strings.Contains(symbolLower, filterLower)
@@ -1251,13 +1297,16 @@ func (w *Worker) FindAssetsFromFilter(filter string) []*AssetsSpecific {
 		}
 		txs := int(assetCached.Transactions)
 		assetDetails = append(assetDetails, &AssetsSpecific{
-			AssetGuid:   strconv.FormatUint(guid, 10),
-			Symbol:      symbol,
-			Contract:    contract,
-			TotalSupply: (*Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
-			Decimals:    int(assetCached.AssetObj.Precision),
-			Txs:         txs,
-			MetaData:    string(assetCached.MetaData),
+			AssetGuid:      assetGuid,
+			AssetType:      metadata.AssetType,
+			Symbol:         symbol,
+			Contract:       contract,
+			TotalSupply:    (*Amount)(big.NewInt(assetCached.AssetObj.TotalSupply)),
+			Decimals:       int(assetCached.AssetObj.Precision),
+			Txs:            txs,
+			OriginDecimals: metadata.OriginDecimals,
+			TokenID:        metadata.TokenID,
+			MetaData:       metadata.Description,
 		})
 	}
 	sort.Slice(assetDetails, func(i, j int) bool {
@@ -1431,15 +1480,19 @@ func (w *Worker) GetAsset(asset string, page int, txsOnPage int, option AccountD
 	if len(dbAsset.AssetObj.Contract) > 0 {
 		contract = ethcommon.BytesToAddress(dbAsset.AssetObj.Contract).Hex()
 	}
+	metadata := decodeSyscoinBridgeAssetMetadata(asset, dbAsset.MetaData)
 	r := &Asset{
 		AssetDetails: &AssetSpecific{
-			AssetGuid:   asset,
-			Symbol:      string(dbAsset.AssetObj.Symbol),
-			Contract:    contract,
-			TotalSupply: (*Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
-			MaxSupply:   (*Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
-			Decimals:    int(dbAsset.AssetObj.Precision),
-			MetaData:    string(dbAsset.MetaData),
+			AssetGuid:      asset,
+			AssetType:      metadata.AssetType,
+			Symbol:         string(dbAsset.AssetObj.Symbol),
+			Contract:       contract,
+			TotalSupply:    (*Amount)(big.NewInt(dbAsset.AssetObj.TotalSupply)),
+			MaxSupply:      (*Amount)(big.NewInt(dbAsset.AssetObj.MaxSupply)),
+			Decimals:       int(dbAsset.AssetObj.Precision),
+			OriginDecimals: metadata.OriginDecimals,
+			TokenID:        metadata.TokenID,
+			MetaData:       metadata.Description,
 		},
 		Paging:                pg,
 		UnconfirmedBalanceSat: (*Amount)(&uBalSat),
