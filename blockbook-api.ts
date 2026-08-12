@@ -357,6 +357,18 @@ export interface Token {
     totalReceived?: string;
     /** Total amount of tokens sent. */
     totalSent?: string;
+    /** Unconfirmed token balance delta. */
+    unconfirmedBalance?: string;
+    /** Number of unconfirmed Syscoin SPT transfers. */
+    unconfirmedTransfers?: number;
+    /** Syscoin SPT asset GUID. */
+    assetGuid?: string;
+    /** Origin bridge asset standard for a Syscoin SPT. */
+    assetType?: string;
+    /** Decimals registered by the bridge for the origin asset. */
+    originDecimals?: number;
+    /** Origin token ID for bridged ERC721 and ERC1155 assets. */
+    tokenId?: string;
     /** Protocol identifiers the contract participates in (e.g., "erc4626"); for fresh per-vault data, use getContractInfo. */
     protocols?: string[];
 }

@@ -2284,6 +2284,24 @@ components:
           $ref: "#/components/schemas/AmountString"
         totalSent:
           $ref: "#/components/schemas/AmountString"
+        unconfirmedBalance:
+          description: Unconfirmed token balance delta.
+          $ref: "#/components/schemas/AmountString"
+        unconfirmedTransfers:
+          description: Number of unconfirmed Syscoin SPT transfers.
+          type: integer
+        assetGuid:
+          description: Syscoin SPT asset GUID.
+          type: string
+        assetType:
+          description: Origin bridge asset standard for a Syscoin SPT.
+          type: string
+        originDecimals:
+          description: Decimals registered by the bridge for the origin asset.
+          type: integer
+        tokenId:
+          description: Origin token ID for bridged ERC721 and ERC1155 assets.
+          type: string
         protocols:
           type: array
           description: Indexed protocol identifiers such as erc4626.
