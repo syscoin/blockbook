@@ -1599,8 +1599,12 @@ func (w *Worker) summarizeTxForAccount(tx *Tx, addrDescs map[string]struct{}) *T
 	}
 	var valueIn, valueOut big.Int
 	assetTransfers := make(map[string]*accountAssetTransferSummary)
+	accountOwnsAllInputs := len(tx.Vin) > 0
 	for i := range tx.Vin {
 		vin := &tx.Vin[i]
+		if len(vin.AddrDesc) == 0 || vin.ValueSat == nil || (*big.Int)(vin.ValueSat).Sign() <= 0 || !addrDescInSet(vin.AddrDesc, addrDescs) {
+			accountOwnsAllInputs = false
+		}
 		if !addrDescInSet(vin.AddrDesc, addrDescs) {
 			continue
 		}
@@ -1641,6 +1645,7 @@ func (w *Worker) summarizeTxForAccount(tx *Tx, addrDescs map[string]struct{}) *T
 		Direction:              direction,
 		AddressValueInSat:      (*Amount)(&valueIn),
 		AddressValueOutSat:     (*Amount)(&valueOut),
+		AccountOwnsAllInputs:   &accountOwnsAllInputs,
 		AccountAssetTransfers:  accountAssetTransfers,
 		TokenType:              tx.TokenType,
 		Memo:                   tx.Memo,

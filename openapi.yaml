@@ -2137,6 +2137,9 @@ components:
           allOf:
             - $ref: "#/components/schemas/AmountString"
           description: Total output value belonging to the queried account, when returned by account summary endpoints.
+        accountOwnsAllInputs:
+          type: boolean
+          description: Whether every input has a known positive native value and belongs to the queried account. Present only in compact account summaries.
         accountAssetTransfers:
           type: array
           description: Syscoin SPT transfers summarized relative to the queried account.

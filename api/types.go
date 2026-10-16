@@ -409,6 +409,7 @@ type Tx struct {
 	Direction             string          `json:"direction,omitempty" ts_doc:"Transaction direction relative to the queried account, when returned by account summary endpoints."`
 	AddressValueInSat     *Amount         `json:"addressValueIn,omitempty" ts_doc:"Total input value belonging to the queried account, when returned by account summary endpoints."`
 	AddressValueOutSat    *Amount         `json:"addressValueOut,omitempty" ts_doc:"Total output value belonging to the queried account, when returned by account summary endpoints."`
+	AccountOwnsAllInputs  *bool           `json:"accountOwnsAllInputs,omitempty" ts_doc:"Whether every input has a known positive native value and belongs to the queried account. Present only in compact account summaries."`
 	AccountAssetTransfers []TokenTransfer `json:"accountAssetTransfers,omitempty" ts_doc:"Syscoin SPT transfers summarized relative to the queried account."`
 	// SYSCOIN: SPT transaction type and optional decoded memo.
 	TokenType        *bchain.TokenType `json:"tokenType,omitempty" ts_doc:"Syscoin SPT transaction type."`

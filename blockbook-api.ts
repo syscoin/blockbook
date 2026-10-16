@@ -258,6 +258,8 @@ export interface Tx {
     addressValueIn?: string;
     /** Total output value belonging to the queried account, when returned by account summary endpoints. */
     addressValueOut?: string;
+    /** Whether every input has a known positive native value and belongs to the queried account. Present only in compact account summaries. */
+    accountOwnsAllInputs?: boolean;
     /** Syscoin SPT transfers summarized relative to the queried account. */
     accountAssetTransfers?: TokenTransfer[];
     /** Syscoin SPT transaction type. */
