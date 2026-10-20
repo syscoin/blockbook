@@ -59,7 +59,7 @@
             "mempool_sub_workers": 2,
             "block_addresses_to_keep": 600,
             "additional_params": {
-                "averageBlockTimeMs": 3000,
+                "averageBlockTimeMs": 450,
                 "missingBlockRetry": {
                     "retryDelayMs": 1000,
                     "recheckThreshold": 10,
@@ -71,6 +71,8 @@
                 "alternative_estimate_fee": "infura-disabled",
                 "alternative_estimate_fee_params": "{\"url\": \"https://gas.api.infura.io/v3/${api_key}/networks/56/suggestedGasFees\", \"periodSeconds\": 60}",
                 "mempoolTxTimeoutHours": 12,
+                "mempoolTxTimeout": "12h",
+                "alternativeMempoolTxTimeout": "12h",
                 "processInternalTransactions": true,
                 "trace_timeout": "10s",
                 "queryBackendOnMempoolResync": false,

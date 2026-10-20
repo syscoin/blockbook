@@ -37,6 +37,11 @@ const debounceResyncMempoolMs = 1009
 // store internal state about once every minute
 const storeInternalStatePeriodMs = 59699
 
+// the first internal data healing pass runs soon after the initial sync, while the backend
+// cache is still warm from the fetches that failed during the previous run, then hourly
+const healInternalDataStartupDelay = time.Minute
+const healInternalDataPeriod = time.Hour
+
 // exit codes from the main function
 const exitCodeOK = 0
 const exitCodeFatal = 255
@@ -53,7 +58,8 @@ var (
 	rollbackHeight = flag.Int("rollback", -1, "rollback to the given height and quit")
 
 	synchronize = flag.Bool("sync", false, "synchronizes until tip, if together with zeromq, keeps index synchronized")
-	repair      = flag.Bool("repair", false, "repair the database")
+	repair      = flag.Bool("repair", false, "repair physical RocksDB corruption and exit; does NOT recover an interrupted bulk import (use -fixutxo for UTXO index drift)")
+	forceRepair = flag.Bool("forcerepair", false, "with -repair, force a database left in inconsistent state (interrupted initial/bulk import) into open state; the index may be incomplete and a full resync is strongly advised")
 	fixUtxo     = flag.Bool("fixutxo", false, "check and fix utxo db and exit")
 	prof        = flag.String("prof", "", "http server binding [address]:port of the interface to profiling data /debug/pprof/ (default no profiling)")
 
@@ -102,6 +108,7 @@ var (
 	chanSyncIndexDone             = make(chan struct{})
 	chanSyncMempoolDone           = make(chan struct{})
 	chanStoreInternalStateDone    = make(chan struct{})
+	chanHealInternalDataDone      = make(chan struct{})
 	chain                         bchain.BlockChain
 	mempool                       bchain.Mempool
 	index                         *db.RocksDB
@@ -168,8 +175,13 @@ func mainWithExitCode() int {
 		}()
 	}
 
+	if *forceRepair && !*repair {
+		glog.Error("-forcerepair has no effect without -repair; re-run with both flags to force an inconsistent database into open state")
+		return exitCodeFatal
+	}
+
 	if *repair {
-		if err := db.RepairRocksDB(*dbPath); err != nil {
+		if err := db.RepairRocksDB(*dbPath, *forceRepair); err != nil {
 			glog.Errorf("RepairRocksDB %s: %v", *dbPath, err)
 			return exitCodeFatal
 		}
@@ -189,7 +201,11 @@ func mainWithExitCode() int {
 	}
 
 	if chain, mempool, err = getBlockChainWithRetry(config.CoinName, *configFile, pushSynchronizationHandler, metrics, 120); err != nil {
-		glog.Error("rpc: ", err)
+		if bchain.IsConfigurationError(err) {
+			glog.Error("config: ", err)
+		} else {
+			glog.Error("rpc: ", err)
+		}
 		return exitCodeFatal
 	}
 
@@ -358,8 +374,29 @@ func mainWithExitCode() int {
 
 	if *synchronize {
 		internalState.SyncMode = true
-		internalState.InitialSync = true
-		if err := syncWorker.ResyncIndex(nil, true); err != nil {
+		internalState.SetInitialSync(true)
+		refreshSyncMetrics()
+		// Keep the sync gauges live during the initial build/reindex. It can run for hours
+		// to days, and syncIndexLoop and storeInternalStateLoop - the usual refreshers -
+		// are only started after it returns, so without this ticker the single sample
+		// above would be the only one taken during the whole initial sync and a stall
+		// partway through would be invisible on initial_sync and synchronized.
+		stopInitialRefresh := make(chan struct{})
+		go func() {
+			t := time.NewTicker(30 * time.Second)
+			defer t.Stop()
+			for {
+				select {
+				case <-stopInitialRefresh:
+					return
+				case <-t.C:
+					refreshSyncMetrics()
+				}
+			}
+		}()
+		err := syncWorker.ResyncIndex(nil, true)
+		close(stopInitialRefresh)
+		if err != nil {
 			if err != db.ErrOperationInterrupted {
 				glog.Error("resyncIndex ", err)
 				return exitCodeFatal
@@ -384,7 +421,9 @@ func mainWithExitCode() int {
 		internalState.FinishedMempoolSync(mempoolCount)
 		go syncIndexLoop()
 		go syncMempoolLoop()
-		internalState.InitialSync = false
+		go healInternalDataLoop()
+		internalState.SetInitialSync(false)
+		refreshSyncMetrics()
 	}
 	go storeInternalStateLoop()
 
@@ -427,6 +466,9 @@ func mainWithExitCode() int {
 		close(chanSyncMempool)
 		<-chanSyncIndexDone
 		<-chanSyncMempoolDone
+		// a healing pass writes to rocksdb from its own goroutine, so it has to be joined
+		// here, before the deferred index.Close destroys the column family handles
+		<-chanHealInternalDataDone
 	}
 	<-chanStoreInternalStateDone
 	return exitCodeOK
@@ -439,6 +481,11 @@ func getBlockChainWithRetry(coin string, configFile string, pushHandler func(bch
 	timer := time.NewTimer(time.Second)
 	for i := 0; ; i++ {
 		if chain, mempool, err = coins.NewBlockChain(coin, configFile, pushHandler, metrics); err != nil {
+			// a static configuration error cannot resolve on a retry, and reporting it once a second
+			// for two minutes under an "rpc:" prefix hides what it actually is
+			if bchain.IsConfigurationError(err) {
+				return nil, nil, err
+			}
 			if i < seconds {
 				glog.Error("rpc: ", err, " Retrying...")
 				select {
@@ -522,37 +569,67 @@ func performRollback() error {
 	return nil
 }
 
+// refreshSyncMetrics publishes the sync-state gauges (synchronized, initial_sync and both
+// heights) from internal state, with no backend round trip. It is called on every
+// storeInternalStateLoop tick (~60s), after every sync iteration, at the two points
+// is.InitialSync flips, on a ~30s ticker during the initial build (before those loops
+// start), and from the app-info loop, so none of these gauges depends on the ~15-minute
+// app-info loop for its cadence.
+func refreshSyncMetrics() {
+	if chain == nil {
+		return
+	}
+	api.RefreshSyncMetrics(internalState, chain, metrics)
+}
+
 func blockbookAppInfoMetric(db *db.RocksDB, chain bchain.BlockChain, txCache *db.TxCache, is *common.InternalState, metrics *common.Metrics) error {
-	api, err := api.NewWorker(db, chain, mempool, txCache, metrics, is, fiatRates)
+	// not named `api`: that shadowed the package for the rest of the function.
+	w, err := api.NewWorker(db, chain, mempool, txCache, metrics, is, fiatRates)
 	if err != nil {
 		return err
 	}
-	si, err := api.GetSystemInfo(false)
+	si, err := w.GetSystemInfo(false)
 	if err != nil {
 		return err
 	}
-	subversion := si.Backend.Subversion
+	// app_info carries purely local blockbook_* labels (version/commit/buildtime) that
+	// identify the instance and need no backend, so the series must be published even when
+	// the backend is unreachable - that is exactly the instance an operator needs to find.
+	// On a backend error the backend_* labels and the height fall back to the last known
+	// good BackendInfo this build retains, instead of blanking the whole series to zero.
+	backend := *si.Backend // value copy: si.Backend is a pointer, don't mutate it in place
+	if backend.BackendError != "" {
+		bi := is.GetBackendInfo()
+		backend.Version = bi.Version
+		backend.Subversion = bi.Subversion
+		backend.ConsensusVersion = bi.ConsensusVersion
+		backend.ProtocolVersion = bi.ProtocolVersion
+		backend.Blocks = bi.Blocks
+	}
+	subversion := backend.Subversion
 	if subversion == "" {
 		// for coins without subversion (ETH) use ConsensusVersion as subversion in metrics
-		subversion = si.Backend.ConsensusVersion
+		subversion = backend.ConsensusVersion
 	}
-
 	metrics.BlockbookAppInfo.Reset()
 	metrics.BlockbookAppInfo.With(common.Labels{
 		"blockbook_version":        si.Blockbook.Version,
 		"blockbook_commit":         si.Blockbook.GitCommit,
 		"blockbook_buildtime":      si.Blockbook.BuildTime,
-		"backend_version":          si.Backend.Version,
+		"backend_version":          backend.Version,
 		"backend_subversion":       subversion,
-		"backend_protocol_version": si.Backend.ProtocolVersion}).Set(float64(0))
-	metrics.BackendBestHeight.Set(float64(si.Backend.Blocks))
-	metrics.BackendTipAgeSeconds.Set(time.Since(is.GetBackendTipLastAdvance()).Seconds())
-	metrics.BlockbookBestHeight.Set(float64(si.Blockbook.BestHeight))
-	synchronized := 0.0
-	if si.Blockbook.InSync {
-		synchronized = 1
+		"backend_protocol_version": backend.ProtocolVersion}).Set(float64(0))
+	if backend.Blocks > 0 {
+		metrics.BackendBestHeight.Set(float64(backend.Blocks))
 	}
-	metrics.Synchronized.Set(synchronized)
+	metrics.BackendTipAgeSeconds.Set(time.Since(is.GetBackendTipLastAdvance()).Seconds())
+	// blockbook_synchronized, blockbook_best_height and blockbook_backend_best_height are
+	// owned by RefreshSyncMetrics (called from the sync loop and the ~60s state loop).
+	// Writing blockbook_synchronized here as well made two writers disagree - this path
+	// derived it from a live GetChainInfo tip while RefreshSyncMetrics uses the cached one
+	// - so the gauge oscillated on the app-info period. Publish it from the single shared
+	// path instead of recomputing it here.
+	api.RefreshSyncMetrics(is, chain, metrics)
 	return nil
 }
 
@@ -573,7 +650,12 @@ func newInternalState(config *common.Config, d *db.RocksDB, enableSubNewTx bool)
 		is.Host = name
 	}
 
-	is.WsGetAccountInfoLimit, _ = strconv.Atoi(os.Getenv(strings.ToUpper(is.GetNetwork()) + "_WS_GETACCOUNTINFO_LIMIT"))
+	limitStr := os.Getenv(strings.ToUpper(is.GetNetwork()) + "_WS_GETACCOUNTINFO_LIMIT")
+	if limitStr == "" {
+		is.WsGetAccountInfoLimit = 42
+	} else {
+		is.WsGetAccountInfoLimit, _ = strconv.Atoi(limitStr)
+	}
 	if is.WsGetAccountInfoLimit > 0 {
 		glog.Info("WsGetAccountInfoLimit enabled with limit ", is.WsGetAccountInfoLimit)
 		is.WsLimitExceedingIPs = make(map[string]int)
@@ -624,6 +706,12 @@ func syncIndexLoop() {
 	glog.Info("syncIndexLoop starting")
 	// resync index about every 15 minutes if there are no chanSyncIndex requests, with debounce 1 second
 	common.TickAndDebounce(time.Duration(*resyncIndexPeriodMs)*time.Millisecond, time.Duration(*resyncIndexDebounceMs)*time.Millisecond, chanSyncIndex, func() {
+		// Publish the sync-state gauges after every iteration whatever its outcome. The
+		// early returns below make a defer the only placement that covers all of them,
+		// and the interesting case is precisely the quiet one: during a silent stall
+		// resyncIndex keeps returning syncNotNeeded, so nothing else would move the
+		// gauges until the ~60s storeInternalStateLoop tick.
+		defer refreshSyncMetrics()
 		if err := syncWorker.ResyncIndex(onNewBlock, false); err != nil {
 			if err == db.ErrOperationInterrupted || common.IsInShutdown() {
 				return
@@ -681,6 +769,39 @@ func syncMempoolLoop() {
 	glog.Info("syncMempoolLoop stopped")
 }
 
+// healInternalDataLoop drains the internal data error queue without operator action:
+// blocks whose internal data failed during sync are refetched and reconnected to the
+// index. It returns on shutdown; the caller joins it before the database is closed.
+func healInternalDataLoop() {
+	defer close(chanHealInternalDataDone)
+	// nothing can be queued unless internal data are processed on an ethereum-type chain
+	if chain.GetChainParser().GetChainType() != bchain.ChainEthereumType || !bchain.ProcessInternalTransactions {
+		return
+	}
+	w, err := api.NewWorker(index, chain, mempool, txCache, metrics, internalState, fiatRates)
+	if err != nil {
+		glog.Error("healInternalDataLoop: NewWorker ", err)
+		return
+	}
+	glog.Info("healInternalDataLoop starting")
+	defer glog.Info("healInternalDataLoop stopped")
+	timer := time.NewTimer(healInternalDataStartupDelay)
+	defer timer.Stop()
+	for pass := uint64(0); ; pass++ {
+		select {
+		// closed on shutdown, so this is a broadcast to every waiting loop
+		case <-chanOsSignal:
+			return
+		case <-timer.C:
+		}
+		timer.Reset(healInternalDataPeriod)
+		if common.IsInShutdown() {
+			return
+		}
+		w.HealInternalData(pass, chanOsSignal)
+	}
+}
+
 func storeInternalStateLoop() {
 	defer func() {
 		close(chanStoreInternalStateDone)
@@ -699,6 +820,12 @@ func storeInternalStateLoop() {
 		glog.Info("storeInternalStateLoop starting with db stats compute disabled")
 	}
 	common.TickAndDebounce(storeInternalStatePeriodMs*time.Millisecond, (storeInternalStatePeriodMs-1)*time.Millisecond, chanStoreInternalState, func() {
+		// Republish the sync-state gauges every tick (~60s) - the guaranteed freshness
+		// floor. syncIndexLoop also refreshes them, but a blockbook whose tip feed went
+		// quiet only wakes on the resyncindexperiod backstop (~15.6 min), which is how far
+		// blockbook_synchronized used to lag reality. RefreshSyncMetrics reads internal
+		// state only, no backend RPCs, so it is cheap to run unconditionally.
+		refreshSyncMetrics()
 		if (*dbStatsPeriodHours) > 0 && !computeRunning && lastCompute.Add(computePeriod).Before(time.Now()) {
 			computeRunning = true
 			go func() {

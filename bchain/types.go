@@ -34,6 +34,11 @@ var (
 	// ErrTxidMissing is returned if txid is not specified
 	// for example coinbase transactions in Bitcoin
 	ErrTxidMissing = errors.New("Txid missing")
+	// ErrConfiguration marks a failure caused by static configuration rather than by an unavailable
+	// backend. Startup retries an unavailable backend for two minutes; a configuration error cannot
+	// resolve in that time and must not be reported as an RPC fault, so it is wrapped in this and
+	// checked with IsConfigurationError.
+	ErrConfiguration = errors.New("invalid configuration")
 	// ErrTxNotFound is returned if transaction was not found
 	ErrTxNotFound = errors.New("Tx not found")
 )
@@ -210,24 +215,6 @@ type BlockInfo struct {
 	Bits       string            `json:"bits" ts_doc:"Compact representation of the target threshold."`
 	Difficulty common.JSONNumber `json:"difficulty" ts_doc:"Difficulty target for mining this block."`
 	Txids      []string          `json:"tx,omitempty" ts_doc:"List of transaction IDs included in this block."`
-}
-
-// MempoolEntry is used to get data about mempool entry
-type MempoolEntry struct {
-	Size            uint32            `json:"size" ts_doc:"Size of the transaction in bytes, as stored in mempool."`
-	FeeSat          big.Int           `ts_doc:"Transaction fee in satoshi/base units."`
-	Fee             common.JSONNumber `json:"fee" ts_doc:"String-based fee for JSON usage."`
-	ModifiedFeeSat  big.Int           `ts_doc:"Modified fee in satoshi/base units after priority adjustments."`
-	ModifiedFee     common.JSONNumber `json:"modifiedfee" ts_doc:"String-based modified fee for JSON usage."`
-	Time            uint64            `json:"time" ts_doc:"Unix timestamp when the tx entered the mempool."`
-	Height          uint32            `json:"height" ts_doc:"Block height when the tx entered the mempool."`
-	DescendantCount uint32            `json:"descendantcount" ts_doc:"Number of descendant transactions in mempool."`
-	DescendantSize  uint32            `json:"descendantsize" ts_doc:"Total size of all descendant transactions in bytes."`
-	DescendantFees  uint32            `json:"descendantfees" ts_doc:"Combined fees of all descendant transactions."`
-	AncestorCount   uint32            `json:"ancestorcount" ts_doc:"Number of ancestor transactions in mempool."`
-	AncestorSize    uint32            `json:"ancestorsize" ts_doc:"Total size of all ancestor transactions in bytes."`
-	AncestorFees    uint32            `json:"ancestorfees" ts_doc:"Combined fees of all ancestor transactions."`
-	Depends         []string          `json:"depends" ts_doc:"List of txids this transaction depends on."`
 }
 
 // ChainInfo is used to get information about blockchain
@@ -512,14 +499,13 @@ type BlockChain interface {
 	EstimateFee(blocks int) (big.Int, error)
 	LongTermFeeRate() (*LongTermFeeRate, error)
 	SendRawTransaction(tx string, disableAlternativeRPC bool) (string, error)
-	GetMempoolEntry(txid string) (*MempoolEntry, error)
 	GetSPVProof(hash string) (json.RawMessage, error) // SYSCOIN
 	GetContractInfo(contractDesc AddressDescriptor) (*ContractInfo, error)
 	// parser
 	GetChainParser() BlockChainParser
 	// EthereumType specific
 	EthereumTypeGetBalance(addrDesc AddressDescriptor) (*big.Int, error)
-	EthereumTypeGetNonces(addrDesc AddressDescriptor, withConfirmed bool) (pending uint64, confirmed uint64, confirmedOK bool, err error)
+	EthereumTypeGetNonces(addrDesc AddressDescriptor, withConfirmed bool, privatePendingNonces ...uint64) (pending uint64, confirmed uint64, confirmedOK bool, err error)
 	EthereumTypeEstimateGas(params map[string]interface{}) (uint64, error)
 	EthereumTypeGetEip1559Fees() (*Eip1559Fees, error)
 	EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc AddressDescriptor) (*big.Int, error)
@@ -529,7 +515,16 @@ type BlockChain interface {
 	EthereumTypeRpcCall(data, to, from string) (string, error)
 	EthereumTypeGetRawTransaction(txid string) (string, error)
 	EthereumTypeGetTransactionReceipt(txid string) (*RpcReceipt, error)
+	EthereumTypeGetBestTip() (*EVMTip, error)
 	GetTokenURI(contractDesc AddressDescriptor, tokenID *big.Int) (string, error)
+}
+
+// EVMTip is one snapshot of the cached EVM tip header, so hash, parent and height
+// always describe the same block.
+type EVMTip struct {
+	Hash       string
+	ParentHash string
+	Height     uint32
 }
 
 // BlockChainParser defines common interface to parsing and conversions of block chain data
@@ -543,6 +538,8 @@ type BlockChainParser interface {
 	AmountDecimals() int
 	// UseAddressAliases returns true if address aliases are enabled
 	UseAddressAliases() bool
+	// UseEnsReverseAliases returns true if ENS reverse labels (address->name) are recorded and served
+	UseEnsReverseAliases() bool
 	// MinimumCoinbaseConfirmations returns minimum number of confirmations a coinbase transaction must have before it can be spent
 	MinimumCoinbaseConfirmations() int
 	// SupportsVSize returns true if vsize of a transaction should be computed and returned by API
@@ -578,6 +575,8 @@ type BlockChainParser interface {
 	DeriveAddressDescriptorsFromTo(descriptor *XpubDescriptor, change uint32, fromIndex uint32, toIndex uint32) ([]AddressDescriptor, error)
 	// EthereumType specific
 	EthereumTypeGetTokenTransfersFromTx(tx *Tx) (TokenTransfers, error)
+	// EthereumTypeIsIgnoredContract reports a contract whose already indexed holdings must not be served as a token
+	EthereumTypeIsIgnoredContract(contract AddressDescriptor) bool
 	GetEthereumTxData(tx *Tx) *EthereumTxData
 	GetChainExtraPayloadType() ChainExtraPayloadType
 	GetChainExtraData(tx *Tx) (json.RawMessage, error)
@@ -615,4 +614,32 @@ type MissingBlockRetry struct {
 	// MaxStallMs is the wall-clock budget per stuck block before the retry loop
 	// yields errResync to the outer machinery.
 	MaxStallMs int `json:"maxStallMs,omitempty"`
+}
+
+// XpubConfig carries per-chain overrides for xpub address expansion and
+// caching. All fields are optional; zero / missing values fall back to the
+// api package's built-in defaults. Operators set this under
+// `additional_params.xpubConfig` in `configs/coins/*.json`.
+type XpubConfig struct {
+	// MaxCacheExpirationSeconds is the TTL for cached xpub-to-address
+	// derivations (seconds). Zero / missing uses the default (3600).
+	MaxCacheExpirationSeconds int `json:"maxCacheExpirationSeconds,omitempty"`
+	// MaxCacheEntries is the hard cap on the number of cached xpubs.
+	// Zero / missing uses the default (5000).
+	MaxCacheEntries int `json:"maxCacheEntries,omitempty"`
+	// MaxCacheBytes is the hard cap on the estimated memory held by cached
+	// xpubs. Zero / missing uses the default (1 GiB).
+	MaxCacheBytes int `json:"maxCacheBytes,omitempty"`
+	// DefaultAddressesGap is the default BIP44 gap limit when the
+	// caller does not supply one (zero / missing → 20).
+	DefaultAddressesGap int `json:"defaultAddressesGap,omitempty"`
+	// MaxAddressesGap is the maximum user-supplied gap value the
+	// server will accept (zero / missing → 10000).
+	MaxAddressesGap int `json:"maxAddressesGap,omitempty"`
+}
+
+// IsConfigurationError reports whether err was caused by static configuration (see ErrConfiguration),
+// so a caller can fail fast instead of retrying something that cannot change.
+func IsConfigurationError(err error) bool {
+	return errors.Is(err, ErrConfiguration)
 }

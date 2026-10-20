@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,37 @@ func TestResolveTronHTTPURL_DerivesFromRPCURL(t *testing.T) {
 func TestResolveTronHTTPURL_InvalidRPCURL(t *testing.T) {
 	_, err := resolveTronHTTPURL("", "://missing", tronDefaultFullNodeHTTPPort)
 	require.Error(t, err)
+}
+
+// NewTronRPC sets Tron's non-canonical Multicall3 address on the embedded eth layer.
+func TestNewTronRPC_SetsMulticall3AddressOverride(t *testing.T) {
+	cfg := json.RawMessage(`{"coin_name":"Tron","averageBlockTimeMs":3000,"rpc_url":"http://127.0.0.1:8545/jsonrpc"}`)
+	bc, err := NewTronRPC(cfg, func(bchain.NotificationType) {})
+	require.NoError(t, err)
+	tronRPC := bc.(*TronRPC)
+	require.Equal(t, tronMulticall3Address, tronRPC.EthereumRPC.Multicall3AddressOverride)
+}
+
+func TestTronRPC_NormalizeMulticallCalls(t *testing.T) {
+	rpc := &TronRPC{
+		EthereumRPC: &eth.EthereumRPC{},
+		Parser:      NewTronParser(100, false),
+	}
+	calls := []bchain.EthereumMulticallCall{
+		{Target: "TEazPvZwDjDtFeJupyo7QunvnrnUjPH8ED", CallData: "0x1234", AllowFailure: true},
+		{Target: tronMulticall3Address},
+	}
+
+	normalized, err := rpc.normalizeMulticallCalls(calls)
+	require.NoError(t, err)
+	require.Equal(t, []bchain.EthereumMulticallCall{
+		{Target: tronMulticall3Address, CallData: "0x1234", AllowFailure: true},
+		{Target: tronMulticall3Address},
+	}, normalized)
+	require.Equal(t, "TEazPvZwDjDtFeJupyo7QunvnrnUjPH8ED", calls[0].Target)
+
+	_, err = rpc.normalizeMulticallCalls(append(calls, bchain.EthereumMulticallCall{Target: "invalid"}))
+	require.ErrorContains(t, err, "normalize multicall target 2")
 }
 
 type tronTestMempool struct {
@@ -581,6 +613,7 @@ func TestTronRPC_GetAddressChainExtraData(t *testing.T) {
 					"delegated_frozenV2_balance_for_energy": int64(3210000),
 				},
 				"delegated_frozenV2_balance_for_bandwidth": int64(654000),
+				"latest_withdraw_time":                     int64(1777000000000),
 			},
 			"/wallet/getReward": map[string]any{
 				"reward": int64(42767),
@@ -622,7 +655,8 @@ func TestTronRPC_GetAddressChainExtraData(t *testing.T) {
 			"votes":[{"address":"TJvaAeFb8Lykt9RQcVyyTFN2iDvGMuyD4M","voteCount":"20"}],
 			"unclaimedReward":"42767",
 			"delegatedBalanceEnergy":"3210000",
-			"delegatedBalanceBandwidth":"654000"
+			"delegatedBalanceBandwidth":"654000",
+			"latestWithdrawTime":1777000000
 		}
 	}`, string(payload))
 	paths, bodies := mockHTTP.SnapshotRequests()
@@ -784,6 +818,26 @@ func TestTronRPC_GetAddressChainExtraData_SkipsVotesWithoutPositiveCount(t *test
 			VoteCount: "7",
 		},
 	}, extra.StakingInfo.Votes)
+}
+
+func TestTronRPC_GetAddressChainExtraData_RejectsNonAccountDescriptor(t *testing.T) {
+	mockHTTP := &MockTronHTTPClient{Resp: map[string]any{}}
+	tronRPC := &TronRPC{
+		EthereumRPC: &eth.EthereumRPC{
+			Timeout: time.Second,
+		},
+		fullNodeHTTP:     mockHTTP,
+		solidityNodeHTTP: mockHTTP,
+	}
+
+	addrDesc, err := bchain.AddressDescriptorFromString("ad:" + strings.Repeat("ab", 4096))
+	require.NoError(t, err)
+
+	payload, err := tronRPC.GetAddressChainExtraData(addrDesc)
+	require.NoError(t, err)
+	require.Nil(t, payload)
+	paths, _ := mockHTTP.SnapshotRequests()
+	require.Empty(t, paths)
 }
 
 func TestTronRPC_GetAddressChainExtraData_NonExistentAccount_OmitsStakingInfo(t *testing.T) {
@@ -965,4 +1019,54 @@ func TestTronRPC_RequestLatestSolidifiedBlockHeight_MissingNumber(t *testing.T) 
 
 	_, err := tronRPC.requestLatestSolidifiedBlockHeight(context.Background())
 	require.Error(t, err)
+}
+
+// TestNewTronRPC_PropagatesEnsReverseOptIn guards the config->parser wiring, not just the
+// parser predicate: NewTronRPC recreates the parser that NewEthereumRPC configured, so a
+// dropped re-apply silently leaves Tron serving ENS reverse labels (the original
+// regression). Reads the flag back through EthereumLikeParser, the same way
+// api.NewWorker does.
+func TestNewTronRPC_PropagatesEnsReverseOptIn(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		configEns string
+		want      bool
+	}{
+		{name: "absent from config leaves it off", configEns: ""},
+		{name: "explicit false leaves it off", configEns: `"enable_ens_reverse_aliases": false,`},
+		{name: "explicit true opts in", configEns: `"enable_ens_reverse_aliases": true,`, want: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// NewEthereumRPC writes these process-wide; keep the test order-independent.
+			origProcessInternal := bchain.ProcessInternalTransactions
+			origStandards := bchain.EthereumTokenStandardMap
+			t.Cleanup(func() {
+				bchain.ProcessInternalTransactions = origProcessInternal
+				bchain.EthereumTokenStandardMap = origStandards
+			})
+
+			config := json.RawMessage(`{
+				"coin_name": "Tron",
+				"rpc_url": "http://127.0.0.1:18090",
+				"rpc_timeout": 25,
+				"block_addresses_to_keep": 300,
+				"address_aliases": true,
+				` + tt.configEns + `
+				"hot_address_min_hits": 7,
+				"averageBlockTimeMs": 3000,
+				"mempoolTxTimeoutHours": 4
+			}`)
+
+			chain, err := NewTronRPC(config, func(bchain.NotificationType) {})
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, chain.Shutdown(context.Background())) })
+
+			parser := chain.GetChainParser()
+			require.Equal(t, tt.want, parser.UseEnsReverseAliases())
+			// A second config-derived field, to prove NewTronRPC applies the whole config via
+			// ApplyToParser rather than cherry-picking the ENS flag.
+			require.Equal(t, 7, chain.(*TronRPC).Parser.HotAddressMinHits)
+			require.Equal(t, 300, chain.(*TronRPC).Parser.KeepBlockAddresses())
+		})
+	}
 }

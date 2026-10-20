@@ -1,6 +1,7 @@
 package eth
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"strconv"
@@ -55,7 +56,16 @@ type EthereumParser struct {
 	AddrContractsCacheBulkMaxBytes int64
 	FormatAddressFunc              func(addr string) string
 	FromDescToAddressFunc          func(addrDesc bchain.AddressDescriptor) string
+	// EnableEnsReverseAliases opts this chain into ENS reverse aliasing, off by default.
+	EnableEnsReverseAliases bool
+	ignoredContracts        []bchain.AddressDescriptor
 }
+
+// eip7708SystemAddress emits an ERC-20 shaped Transfer log for every ETH move since Glamsterdam.
+// It has no code, so it cannot emit logs on a chain without EIP-7708 and is ignored everywhere.
+const eip7708SystemAddress = "0xfffffffffffffffffffffffffffffffffffffffe"
+
+var eip7708SystemAddressDesc = mustAddrDescFromAddress(eip7708SystemAddress)
 
 // NewEthereumParser returns new EthereumParser instance
 func NewEthereumParser(b int, addressAliases bool) *EthereumParser {
@@ -74,7 +84,38 @@ func NewEthereumParser(b int, addressAliases bool) *EthereumParser {
 		AddrContractsCacheBulkMaxBytes: defaultAddressContractsCacheBulkMaxBytes,
 		FormatAddressFunc:              EIP55AddressFromAddress,
 		FromDescToAddressFunc:          EIP55Address,
+		ignoredContracts:               []bchain.AddressDescriptor{eip7708SystemAddressDesc},
 	}
+}
+
+func mustAddrDescFromAddress(address string) bchain.AddressDescriptor {
+	desc, err := (&EthereumParser{}).GetAddrDescFromAddress(address)
+	if err != nil {
+		panic(err)
+	}
+	return desc
+}
+
+// IgnoreContract makes the contract's Transfer logs not count as token transfers, for protocol
+// contracts mirroring native coin moves that are already indexed as internal transfers.
+// It must be called before the parser is in use.
+func (p *EthereumParser) IgnoreContract(address string) error {
+	desc, err := p.GetAddrDescFromAddress(address)
+	if err != nil {
+		return err
+	}
+	p.ignoredContracts = append(p.ignoredContracts, desc)
+	return nil
+}
+
+// EthereumTypeIsIgnoredContract reports a contract whose already indexed holdings must not be served as a token
+func (p *EthereumParser) EthereumTypeIsIgnoredContract(contract bchain.AddressDescriptor) bool {
+	for _, c := range p.ignoredContracts {
+		if bytes.Equal(c, contract) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *EthereumParser) HotAddressConfig() (minContracts, lruSize, minHits int) {
@@ -90,13 +131,16 @@ func (p *EthereumParser) AddressContractsCacheConfig() AddressContractsCacheConf
 }
 
 type rpcHeader struct {
-	Hash       string `json:"hash"`
-	ParentHash string `json:"parentHash"`
-	Difficulty string `json:"difficulty"`
-	Number     string `json:"number"`
-	Time       string `json:"timestamp"`
-	Size       string `json:"size"`
-	Nonce      string `json:"nonce"`
+	Hash          string `json:"hash"`
+	ParentHash    string `json:"parentHash"`
+	Difficulty    string `json:"difficulty"`
+	Number        string `json:"number"`
+	Time          string `json:"timestamp"`
+	Size          string `json:"size"`
+	Nonce         string `json:"nonce"`
+	GasUsed       string `json:"gasUsed"`
+	GasLimit      string `json:"gasLimit"`
+	BaseFeePerGas string `json:"baseFeePerGas"`
 }
 
 type rpcLogWithTxHash struct {
@@ -110,10 +154,6 @@ type rpcBlockTransactions struct {
 
 type rpcBlockTxids struct {
 	Transactions []string `json:"transactions"`
-}
-
-func (p *EthereumParser) SetEnsSuffix(suffix string) {
-	p.EnsSuffix = suffix
 }
 
 func ethNumber(n string) (int64, error) {
@@ -421,6 +461,11 @@ func (p *EthereumParser) PackTx(tx *bchain.Tx, height uint32, blockTime int64) (
 				return nil, errors.Annotatef(err, "L1GasUsed %v", r.Receipt.L1GasUsed)
 			}
 		}
+		if r.Receipt.EffectiveGasPrice != "" {
+			if pt.Receipt.EffectiveGasPrice, err = hexDecodeBig(r.Receipt.EffectiveGasPrice); err != nil {
+				return nil, errors.Annotatef(err, "EffectiveGasPrice %v", r.Receipt.EffectiveGasPrice)
+			}
+		}
 	}
 	if len(r.ChainExtraData) > 0 {
 		pt.ChainExtraData = r.ChainExtraData
@@ -492,6 +537,9 @@ func (p *EthereumParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 		}
 		if len(pt.Receipt.L1GasUsed) > 0 {
 			rr.L1GasUsed = hexEncodeBig(pt.Receipt.L1GasUsed)
+		}
+		if len(pt.Receipt.EffectiveGasPrice) > 0 {
+			rr.EffectiveGasPrice = hexEncodeBig(pt.Receipt.EffectiveGasPrice)
 		}
 	}
 	// TODO handle internal transactions
@@ -568,12 +616,12 @@ func (p *EthereumParser) EthereumTypeGetTokenTransfersFromTx(tx *bchain.Tx) (bch
 	csd, ok := tx.CoinSpecificData.(bchain.EthereumSpecificData)
 	if ok {
 		if csd.Receipt != nil {
-			r, err = contractGetTransfersFromLog(csd.Receipt.Logs)
-		} else {
+			r = contractGetTransfersFromLog(csd.Receipt.Logs, tx.Txid, p.ignoredContracts)
+		} else if !isIgnoredContract(p.ignoredContracts, csd.Tx.To) {
 			r, err = contractGetTransfersFromTx(csd.Tx)
-		}
-		if err != nil {
-			return nil, err
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	return r, nil
@@ -608,6 +656,7 @@ func GetEthereumTxDataFromSpecificData(coinSpecificData interface{}) *bchain.Eth
 				etd.Status = bchain.TxStatusFailure
 			}
 			etd.GasUsed, _ = hexutil.DecodeBig(csd.Receipt.GasUsed)
+			etd.EffectiveGasPrice, _ = hexutil.DecodeBig(csd.Receipt.EffectiveGasPrice)
 			etd.L1Fee, _ = hexutil.DecodeBig(csd.Receipt.L1Fee)
 			etd.L1GasPrice, _ = hexutil.DecodeBig(csd.Receipt.L1GasPrice)
 			etd.L1GasUsed, _ = hexutil.DecodeBig(csd.Receipt.L1GasUsed)

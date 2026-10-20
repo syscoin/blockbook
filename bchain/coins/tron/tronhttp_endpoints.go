@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/juju/errors"
@@ -49,11 +50,12 @@ type tronUnfrozenV2Entry struct {
 }
 
 type tronGetAccountResponse struct {
-	Address         string                `json:"address,omitempty"`
-	FrozenV2        []tronFrozenV2Entry   `json:"frozenV2,omitempty"`
-	UnfrozenV2      []tronUnfrozenV2Entry `json:"unfrozenV2,omitempty"`
-	Votes           []tronTxVote          `json:"votes,omitempty"`
-	AccountResource struct {
+	Address            string                `json:"address,omitempty"`
+	FrozenV2           []tronFrozenV2Entry   `json:"frozenV2,omitempty"`
+	UnfrozenV2         []tronUnfrozenV2Entry `json:"unfrozenV2,omitempty"`
+	Votes              []tronTxVote          `json:"votes,omitempty"`
+	LatestWithdrawTime *int64                `json:"latest_withdraw_time,omitempty"`
+	AccountResource    struct {
 		DelegatedFrozenV2BalanceForEnergy int64 `json:"delegated_frozenV2_balance_for_energy"`
 	} `json:"account_resource,omitempty"`
 	DelegatedFrozenV2BalanceForBandwidth int64 `json:"delegated_frozenV2_balance_for_bandwidth"`
@@ -68,6 +70,7 @@ type tronGetBlockResponse struct {
 }
 
 type tronGetBlockHeaderResponse struct {
+	BlockID     string `json:"blockID"`
 	BlockHeader struct {
 		RawData struct {
 			Number *uint64 `json:"number"`
@@ -110,6 +113,10 @@ func (b *TronRPC) GetMempoolTransactions() ([]string, error) {
 
 // GetAddressChainExtraData returns normalized Tron-specific account/address data.
 func (b *TronRPC) GetAddressChainExtraData(addrDesc bchain.AddressDescriptor) (json.RawMessage, error) {
+	// only a 20-byte account has chain data; a client-supplied ad: descriptor of any length would hit quadratic base58
+	if len(addrDesc) != TronTypeAddressDescriptorLen {
+		return nil, nil
+	}
 	ctx, cancel := context.WithTimeout(b.requestContext(), b.Timeout)
 	defer cancel()
 
@@ -257,6 +264,11 @@ func tronBuildStakingInfo(accountResp *tronGetAccountResponse, resourceResp *tro
 	delegatedEnergy := max(accountResp.AccountResource.DelegatedFrozenV2BalanceForEnergy, 0)
 	delegatedBandwidth := max(accountResp.DelegatedFrozenV2BalanceForBandwidth, 0)
 
+	latestWithdrawTime := int64(0)
+	if accountResp.LatestWithdrawTime != nil && *accountResp.LatestWithdrawTime > 0 {
+		latestWithdrawTime = *accountResp.LatestWithdrawTime / 1000
+	}
+
 	return &bchain.TronStakingInfo{
 		StakedBalance:             stakedBalance.String(),
 		StakedBalanceEnergy:       stakedEnergy.String(),
@@ -268,6 +280,7 @@ func tronBuildStakingInfo(accountResp *tronGetAccountResponse, resourceResp *tro
 		UnclaimedReward:           strconv.FormatInt(unclaimedReward, 10),
 		DelegatedBalanceEnergy:    strconv.FormatInt(delegatedEnergy, 10),
 		DelegatedBalanceBandwidth: strconv.FormatInt(delegatedBandwidth, 10),
+		LatestWithdrawTime:        latestWithdrawTime,
 	}
 }
 
@@ -275,18 +288,27 @@ func (b *TronRPC) SendRawTransaction(tx string, disableAlternativeRPC bool) (str
 	ctx, cancel := context.WithTimeout(b.requestContext(), b.Timeout)
 	defer cancel()
 
+	// A send is the only moment Blockbook sees a transaction the wallet cares about before it is
+	// indexed, so log the outcome and txid - a later "my tx vanished" report has nothing else to
+	// reconcile against on a chain with no pending-tx feed.
+	start := time.Now()
 	resp, err := b.requestBroadcastHex(ctx, strip0xPrefix(tx))
+	duration := time.Since(start).Round(time.Millisecond)
 	if err != nil {
+		glog.Errorf("tron broadcasthex failed after %v: %v", duration, err)
 		return "", err
 	}
 	if !resp.Result {
 		if resp.Code != "" || resp.Message != "" {
+			glog.Errorf("tron broadcasthex rejected txid %s after %v: %s %s", strip0xPrefix(resp.TxID), duration, resp.Code, resp.Message)
 			return "", errors.Errorf("Tron broadcasthex failed: %s %s", resp.Code, resp.Message)
 		}
+		glog.Errorf("tron broadcasthex rejected txid %s after %v without a reason", strip0xPrefix(resp.TxID), duration)
 		return "", errors.New("Tron broadcasthex failed")
 	}
 
 	txID := strip0xPrefix(resp.TxID)
+	glog.Infof("tron broadcasthex accepted txid %s in %v", txID, duration)
 	if b.ChainConfig != nil && b.ChainConfig.DisableMempoolSync && b.Mempool != nil {
 		b.Mempool.AddTransactionToMempool(txID)
 	}
@@ -465,6 +487,32 @@ func (b *TronRPC) requestBlockByID(ctx context.Context, blockHash string, isSoli
 		return nil, err
 	}
 	return &resp, nil
+}
+
+// requestBlockHashByNum resolves a block hash by height via the solidity node's
+// /walletsolidity/getblock endpoint. It is only called for already-solidified
+// heights (see GetBlockHash), so the lookup always targets the solidity node.
+func (b *TronRPC) requestBlockHashByNum(ctx context.Context, blockNum uint32) (string, error) {
+	req := map[string]any{
+		"id_or_num": strconv.FormatUint(uint64(blockNum), 10),
+		"detail":    false,
+	}
+	http := b.getLookupHTTPClient(true)
+	var resp tronGetBlockHeaderResponse
+	if err := http.Request(ctx, "/walletsolidity/getblock", req, &resp); err != nil {
+		return "", err
+	}
+	if resp.BlockHeader.RawData.Number == nil {
+		return "", errors.Errorf("Tron getblock returned missing block_header.raw_data.number for height %d", blockNum)
+	}
+	if *resp.BlockHeader.RawData.Number != uint64(blockNum) {
+		return "", errors.Errorf("Tron getblock returned height %d, want %d", *resp.BlockHeader.RawData.Number, blockNum)
+	}
+	hash := strip0xPrefix(resp.BlockID)
+	if hash == "" {
+		return "", errors.Errorf("Tron getblock returned empty blockID for height %d", blockNum)
+	}
+	return hash, nil
 }
 
 func (b *TronRPC) requestLatestSolidifiedBlockHeight(ctx context.Context) (uint64, error) {

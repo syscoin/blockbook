@@ -53,6 +53,8 @@ Column families used only by **Ethereum type** coins:
 
   Blockbook is checking on startup these values and does not allow to run against wrong coin, data format version and in inconsistent state. The database must be recreated if the internal state does not match.
 
+  Recovery options differ by problem: `--repair` fixes physical SST/MANIFEST corruption (rebuilds the manifest from surviving SST files); `-fixutxo` recomputes the UTXO/balance index for Bitcoin-type coins; a database left in the _inconsistent_ dbState by an interrupted initial/bulk import cannot be recovered by `--repair` and must be re-imported (resynced from scratch) — `-forcerepair` only forces it back to an _open_ state at the risk of an incomplete index.
+
 - **height**
 
   Maps _block height_ to _block hash_ and additional data about block.
@@ -246,7 +248,11 @@ Column families used only by **Ethereum type** coins:
 
 - **blockInternalDataErrors** (used only by Ethereum type coins)
 
-  Errors when fetching internal data from backend. Stored so that the action can be retried.
+  Errors when fetching internal data from backend. Stored so that the fetch can be retried;
+  the queue is drained automatically about every hour. `retryCount` counts the failures of
+  the block itself and schedules its next attempt, which is made on passes divisible by
+  2^retryCount (capped at 2^6, about 2.7 days of hourly passes) - a wait of up to, not
+  exactly, 2^retryCount passes - so a block is slowed down but never abandoned.
 
   ```
   (blockHeight uint32) -> (blockHash [32]byte)+(retryCount byte)+(errorMessage []byte)

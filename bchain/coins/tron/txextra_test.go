@@ -141,6 +141,61 @@ func TestTronBuildExtraData_StakeAndDelegateDetails(t *testing.T) {
 		require.Equal(t, "88000000", extra.UnstakeAmount)
 	})
 
+	t.Run("stake 2.0 unfreeze also reports the expired unstake it swept back", func(t *testing.T) {
+		contract := tronTxContract{Type: "UnfreezeBalanceV2Contract"}
+		contract.Parameter.Value.UnfreezeBalance = int64Ptr(400000000)
+		txByID := &tronGetTransactionByIDResponse{}
+		txByID.RawData.Contract = []tronTxContract{contract}
+
+		txInfo := &tronGetTransactionInfoByIDResponse{
+			WithdrawExpireAmount: int64Ptr(600000000),
+		}
+
+		extra := tronBuildExtraData(txByID, txInfo)
+		require.Equal(t, "unfreeze", extra.Operation)
+		require.Equal(t, "400000000", extra.UnstakeAmount)
+		require.Equal(t, "600000000", extra.WithdrawnUnfreeze)
+	})
+
+	t.Run("cancel all unfreeze reports its swept expired unstake", func(t *testing.T) {
+		contract := tronTxContract{Type: "CancelAllUnfreezeV2Contract"}
+		txByID := &tronGetTransactionByIDResponse{}
+		txByID.RawData.Contract = []tronTxContract{contract}
+
+		txInfo := &tronGetTransactionInfoByIDResponse{
+			WithdrawExpireAmount: int64Ptr(12345),
+		}
+
+		extra := tronBuildExtraData(txByID, txInfo)
+		require.Equal(t, "cancelUnfreeze", extra.Operation)
+		require.Equal(t, "12345", extra.WithdrawnUnfreeze)
+	})
+
+	t.Run("withdraw reports the swept amount only once", func(t *testing.T) {
+		contract := tronTxContract{Type: "WithdrawExpireUnfreezeContract"}
+		txByID := &tronGetTransactionByIDResponse{}
+		txByID.RawData.Contract = []tronTxContract{contract}
+
+		txInfo := &tronGetTransactionInfoByIDResponse{
+			WithdrawExpireAmount: int64Ptr(88000000),
+		}
+
+		extra := tronBuildExtraData(txByID, txInfo)
+		require.Equal(t, "withdraw", extra.Operation)
+		require.Equal(t, "88000000", extra.WithdrawnUnfreeze)
+		require.Empty(t, extra.UnstakeAmount)
+	})
+
+	t.Run("plain transfer carries no withdrawn unfreeze", func(t *testing.T) {
+		contract := tronTxContract{Type: "TransferContract"}
+		txByID := &tronGetTransactionByIDResponse{}
+		txByID.RawData.Contract = []tronTxContract{contract}
+		txInfo := &tronGetTransactionInfoByIDResponse{}
+
+		extra := tronBuildExtraData(txByID, txInfo)
+		require.Empty(t, extra.WithdrawnUnfreeze)
+	})
+
 	t.Run("delegate amount and receiver", func(t *testing.T) {
 		contract := tronTxContract{Type: "DelegateResourceContract"}
 		contract.Parameter.Value.Balance = int64Ptr(42000000)
@@ -511,4 +566,113 @@ func TestTronBuildTxFromHTTPData_WithSynthesizedGenesisData(t *testing.T) {
 	receipt := tronBuildRpcReceipt(txInfo)
 	require.NotNil(t, receipt)
 	require.Equal(t, "0x1", receipt.Status)
+}
+
+func TestTronBuildTxFromHTTPData_FailedDeploymentIsNotCreate(t *testing.T) {
+	txByID := &tronGetTransactionByIDResponse{
+		TxID: "0544ab15ada7051af68b57ca29d69c753b64e6701cfebe5cdbe53a2a9127a88d",
+	}
+	txByID.RawData.Contract = []tronTxContract{{
+		Type: "CreateSmartContract",
+	}}
+	txByID.RawData.Contract[0].Parameter.Value.OwnerAddress = "410746a05c314538e3e21faae3d702cc7939efc07a"
+
+	// java-tron precomputes contract_address even when the deployment failed
+	txInfo := &tronGetTransactionInfoByIDResponse{
+		ID:           txByID.TxID,
+		ContractAddr: "4139dd12a54e2bab7c82aa14a1e158b34263d2d510",
+		Result:       "FAILED",
+	}
+	txInfo.Receipt.Result = "OUT_OF_ENERGY"
+
+	tronRPC := &TronRPC{
+		Parser: NewTronParser(1, false),
+	}
+
+	// internal data as buildInternalDataFromTronInfos produces it for a failed deployment
+	internalData := &bchain.EthereumInternalData{Type: bchain.CALL, Error: "OUT_OF_ENERGY"}
+	tx, err := tronRPC.buildTxFromHTTPData(txByID, txInfo, 0, 1, internalData, true)
+	require.NoError(t, err)
+
+	require.Len(t, tx.Vout, 1)
+	require.Nil(t, tx.Vout[0].ScriptPubKey.Addresses)
+	csd, ok := tx.CoinSpecificData.(bchain.EthereumSpecificData)
+	require.True(t, ok)
+	require.NotNil(t, csd.InternalData)
+	require.Equal(t, bchain.CALL, csd.InternalData.Type)
+	require.Equal(t, "", csd.InternalData.Contract)
+	require.Equal(t, "OUT_OF_ENERGY", csd.InternalData.Error)
+
+	// the successful deployment keeps flowing through the receipt fallback,
+	// e.g. on the ad-hoc GetTransaction path where no internal data is passed
+	txInfo.Result = ""
+	txInfo.Receipt.Result = "SUCCESS"
+	tx, err = tronRPC.buildTxFromHTTPData(txByID, txInfo, 0, 1, nil, true)
+	require.NoError(t, err)
+
+	wantContract := ToTronAddressFromAddress("4139dd12a54e2bab7c82aa14a1e158b34263d2d510")
+	require.Len(t, tx.Vout, 1)
+	require.Equal(t, []string{wantContract}, tx.Vout[0].ScriptPubKey.Addresses)
+	csd, ok = tx.CoinSpecificData.(bchain.EthereumSpecificData)
+	require.True(t, ok)
+	require.NotNil(t, csd.InternalData)
+	require.Equal(t, bchain.CREATE, csd.InternalData.Type)
+	require.Equal(t, wantContract, csd.InternalData.Contract)
+}
+
+func TestTronBuildTxFromHTTPData_KeepReceiptControlsTokenLogs(t *testing.T) {
+	txByID := &tronGetTransactionByIDResponse{
+		TxID: "b7a97862b0c719b714f0cf7e250ebc2dcdf1e5f05c54ddb21ff3a748c1aa45e4",
+	}
+	txByID.RawData.Contract = []tronTxContract{{
+		Type: "TriggerSmartContract",
+	}}
+	txByID.RawData.Contract[0].Parameter.Value.OwnerAddress = "410746a05c314538e3e21faae3d702cc7939efc07a"
+	txByID.RawData.Contract[0].Parameter.Value.ContractAddress = "4139dd12a54e2bab7c82aa14a1e158b34263d2d510"
+	txByID.RawData.Contract[0].Parameter.Value.Data = "6f21b898"
+
+	txInfo := &tronGetTransactionInfoByIDResponse{
+		ID: txByID.TxID,
+		Log: []*bchain.RpcLog{
+			{
+				Address: "a614f803b6fd780986a42c78ec9c7f77e6ded13c",
+				Data:    "000000000000000000000000000000000000000000000000000000002d4cae00",
+				Topics: []string{
+					"ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+					"0000000000000000000000000746a05c314538e3e21faae3d702cc7939efc07a",
+					"000000000000000000000000f14cca91e8d5fff29cbcd42b26a19a7395b1aa84",
+				},
+			},
+		},
+	}
+	txInfo.Receipt.Result = "SUCCESS"
+
+	parser := NewTronParser(1, false)
+	tronRPC := &TronRPC{
+		Parser: parser,
+	}
+
+	pendingTx, err := tronRPC.buildTxFromHTTPData(txByID, txInfo, 0, 0, nil, false)
+	require.NoError(t, err)
+	pendingSpecific, ok := pendingTx.CoinSpecificData.(bchain.EthereumSpecificData)
+	require.True(t, ok)
+	require.Nil(t, pendingSpecific.Receipt)
+	pendingTransfers, err := parser.EthereumTypeGetTokenTransfersFromTx(pendingTx)
+	require.NoError(t, err)
+	require.Empty(t, pendingTransfers)
+
+	indexedTx, err := tronRPC.buildTxFromHTTPData(txByID, txInfo, 0, 1, nil, true)
+	require.NoError(t, err)
+	indexedSpecific, ok := indexedTx.CoinSpecificData.(bchain.EthereumSpecificData)
+	require.True(t, ok)
+	require.NotNil(t, indexedSpecific.Receipt)
+	require.Len(t, indexedSpecific.Receipt.Logs, 1)
+
+	indexedTransfers, err := parser.EthereumTypeGetTokenTransfersFromTx(indexedTx)
+	require.NoError(t, err)
+	require.Len(t, indexedTransfers, 1)
+	require.Equal(t, "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", indexedTransfers[0].Contract)
+	require.Equal(t, "TAdgLcNFZjeF1AspMobkz2bbxs5yDXpwYx", indexedTransfers[0].From)
+	require.Equal(t, "TXy5qqpAJNykdqsMU2dZM7B7mZbVF2izAN", indexedTransfers[0].To)
+	require.Equal(t, "760000000", indexedTransfers[0].Value.String())
 }

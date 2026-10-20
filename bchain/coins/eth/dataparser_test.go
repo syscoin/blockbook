@@ -3,7 +3,9 @@
 package eth
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/trezor/blockbook/bchain"
@@ -59,6 +61,24 @@ func Test_parseSimpleStringProperty(t *testing.T) {
 				t.Errorf("parseSimpleStringProperty = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// A malicious contract can make a free eth_call return an arbitrarily large ABI string;
+// parseSimpleStringProperty must cap the decode at maxParsedStringBytes instead of honoring the
+// attacker-declared length.
+func Test_parseSimpleStringProperty_CapsOversizedString(t *testing.T) {
+	const declared = maxParsedStringBytes * 4
+	offset := "0000000000000000000000000000000000000000000000000000000000000020"
+	lengthWord := fmt.Sprintf("%064x", declared)
+	payload := strings.Repeat("41", declared) // 'A' repeated `declared` times
+
+	got := parseSimpleStringProperty("0x" + offset + lengthWord + payload)
+	if len(got) != maxParsedStringBytes {
+		t.Fatalf("decoded length = %d, want ceiling %d", len(got), maxParsedStringBytes)
+	}
+	if strings.Trim(got, "A") != "" {
+		t.Errorf("decoded string contains unexpected bytes, want all 'A'")
 	}
 }
 
@@ -430,6 +450,54 @@ func TestParseInputData(t *testing.T) {
 	}
 }
 
+// TestParseInputDataMisalignedDynamicData is a regression test for a panic
+// ("index out of range [N] with length N") when a transaction's input data is
+// not 32-byte aligned. Standard ABI-encoded data is always word-aligned, but a
+// malformed/non-standard tx is not, and marking the words of a dynamic field
+// could step one slot past `processed` (sized len(data)/64). ParseInputData must
+// instead reject the signature and fall back to just the method id, without
+// panicking (and without the per-tx panic-recover log spam that masked it).
+func TestParseInputDataMisalignedDynamicData(t *testing.T) {
+	parser := NewEthereumParser(1, false)
+	signatures := []bchain.FourByteSignature{
+		{Name: "store", Parameters: []string{"bytes"}},
+	}
+	// 0x + 4-byte selector, then a "bytes" field: offset word (0x20), length
+	// word (0x21 = 33 bytes), and 66 hex chars of content. The post-selector
+	// data is 194 hex chars — not a multiple of 64 — so `processed` has only 3
+	// entries while the 33-byte field rounds up to a word at index 3.
+	data := "0xaabbccdd" +
+		"0000000000000000000000000000000000000000000000000000000000000020" +
+		"0000000000000000000000000000000000000000000000000000000000000021" +
+		"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021"
+	got := parser.ParseInputData(&signatures, data)
+	want := &bchain.EthereumParsedInputData{MethodId: "0xaabbccdd"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ParseInputData() = %#v, want %#v", got, want)
+	}
+}
+
+func TestParseInputDataOverflowDynamicLength(t *testing.T) {
+	parser := NewEthereumParser(1, false)
+	signatures := []bchain.FourByteSignature{
+		{Name: "store", Parameters: []string{"bytes"}},
+	}
+	// A "bytes" argument whose declared length word is 0x7FFFFFFFFFFFFFC0.
+	// In processParam count<<1 overflows int64 and wraps to -128, so
+	// de = d + (count<<1) = 128 - 128 = 0 while d = 128. Before the fix the old
+	// `de < 0` guard did not catch de==0 and data[128:0] panicked (recovered by
+	// ParseInputData, which then returned nil); with the `de < d` guard the field
+	// is rejected cleanly and ParseInputData returns the method id only.
+	data := "0xaabbccdd" +
+		"0000000000000000000000000000000000000000000000000000000000000020" +
+		"0000000000000000000000000000000000000000000000007fffffffffffffc0"
+	got := parser.ParseInputData(&signatures, data)
+	want := &bchain.EthereumParsedInputData{MethodId: "0xaabbccdd"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ParseInputData() = %#v, want %#v", got, want)
+	}
+}
+
 func Test_getEnsRecord(t *testing.T) {
 	tests := []struct {
 		name string
@@ -496,6 +564,43 @@ func Test_getEnsRecord(t *testing.T) {
 			},
 			want: nil,
 		},
+		{
+			// Regression: c = 0x7FFFFFFFFFFFFF7F makes int(c)<<1 wrap to -258, so
+			// de = 194+64+(-258) = 0. Before the fix this slipped past the old
+			// `de < 0` guard (0 is not < 0) and l.Data[258:0] panicked, crashing the
+			// sync goroutine. Must be rejected cleanly.
+			name: "overflow name length wrapping to de=0",
+			log: rpcLogWithTxHash{
+				RpcLog: bchain.RpcLog{
+					Address: "0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5",
+					Topics: []string{
+						"0xca6abbe9d7f11422cb6ca7629fbf6fe9efb1c621f71ce8f02b9f2a230097404f",
+						"0x40ce2aa8cd9ee9fef4bf3a68abab7fbcceb6bac89370518caf6a602cefe836bd",
+						"0x0000000000000000000000002c630b16aa53ae0189880e15c23323688acb607c",
+					},
+					Data: "0x00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000017629245f5a86f0000000000000000000000000000000000000000000000000000000069dbb21d0000000000000000000000000000000000000000000000007fffffffffffff7f756e726176656c65640000000000000000000000000000000000000000000000",
+				},
+			},
+			want: nil,
+		},
+		{
+			// Regression: c = 0x7FFFFFFFFFFFFFFF (MaxInt64) makes int(c)<<1 wrap to
+			// -2, so de = 256. Before the fix this passed both old guards and
+			// l.Data[258:256] panicked (start > end). Must be rejected cleanly.
+			name: "overflow name length wrapping to de=256",
+			log: rpcLogWithTxHash{
+				RpcLog: bchain.RpcLog{
+					Address: "0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5",
+					Topics: []string{
+						"0xca6abbe9d7f11422cb6ca7629fbf6fe9efb1c621f71ce8f02b9f2a230097404f",
+						"0x40ce2aa8cd9ee9fef4bf3a68abab7fbcceb6bac89370518caf6a602cefe836bd",
+						"0x0000000000000000000000002c630b16aa53ae0189880e15c23323688acb607c",
+					},
+					Data: "0x00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000017629245f5a86f0000000000000000000000000000000000000000000000000000000069dbb21d0000000000000000000000000000000000000000000000007fffffffffffffff756e726176656c65640000000000000000000000000000000000000000000000",
+				},
+			},
+			want: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -503,5 +608,36 @@ func Test_getEnsRecord(t *testing.T) {
 				t.Errorf("getEnsRecord() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseInputDataTruncatesOversizedCalldata(t *testing.T) {
+	parser := NewEthereumParser(1, false)
+	signatures := []bchain.FourByteSignature{
+		{Name: "cancelMultipleMakerOrders", Parameters: []string{"uint256[]"}},
+	}
+	// Canonical ABI calldata for a uint256[] of zero elements: selector,
+	// offset word (0x20), count word, then `count` zero-value words.
+	buildCalldata := func(count int) string {
+		return fmt.Sprintf("0x9e53a69a%064x%064x%s", 0x20, count, strings.Repeat("0", 64*count))
+	}
+
+	oversized := buildCalldata(3000)
+	if len(oversized) <= maxParseInputDataLen {
+		t.Fatalf("test calldata not oversized: len=%d, limit=%d", len(oversized), maxParseInputDataLen)
+	}
+	got := parser.ParseInputData(&signatures, oversized)
+	want := &bchain.EthereumParsedInputData{MethodId: "0x9e53a69a", Truncated: true}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ParseInputData(oversized) = %#v, want %#v", got, want)
+	}
+
+	// Negative control: a small array under the budget still decodes every value.
+	small := parser.ParseInputData(&signatures, buildCalldata(2))
+	if small.Truncated {
+		t.Errorf("ParseInputData(small) unexpectedly truncated: %#v", small)
+	}
+	if len(small.Params) != 1 || len(small.Params[0].Values) != 2 {
+		t.Errorf("ParseInputData(small) = %#v, want 1 param with 2 values", small)
 	}
 }

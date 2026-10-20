@@ -34,6 +34,7 @@ type InternalStateColumn struct {
 
 // BackendInfo is used to get information about blockchain
 type BackendInfo struct {
+	// served to clients on /api/ and /, so producers store it with URLs redacted (RedactURLs)
 	BackendError     string      `json:"error,omitempty" ts_doc:"Error message if something went wrong in the backend."`
 	Chain            string      `json:"chain,omitempty" ts_doc:"Name of the chain - e.g. 'main'."`
 	Blocks           int         `json:"blocks,omitempty" ts_doc:"Number of fully verified blocks in the chain."`
@@ -68,13 +69,21 @@ type InternalState struct {
 	// true if application is with flag --sync
 	SyncMode bool `json:"syncMode" ts_doc:"Flag indicating if the node is in sync mode."`
 
-	InitialSync    bool      `json:"initialSync" ts_doc:"If true, the system is in the initial sync phase."`
+	// InitialSync is a runtime flag, deliberately not persisted (json:"-"). A SIGTERM
+	// during the initial build would otherwise store initialSync=true, and a subsequent
+	// start without --sync never clears it, latching blockbook_initial_sync at 1 and
+	// permanently gating off any alert that excludes reindexes. A --sync run always sets
+	// it explicitly on startup, so nothing of value is lost by not persisting it.
+	InitialSync    bool      `json:"-" ts_doc:"If true, the system is in the initial sync phase (not persisted)."`
 	IsSynchronized bool      `json:"isSynchronized" ts_doc:"If true, the main index is fully synced to BestHeight."`
 	BestHeight     uint32    `json:"bestHeight" ts_doc:"Current best block height known to the indexer."`
 	StartSync      time.Time `json:"-" ts_doc:"Timestamp when sync started (not exposed via JSON)."`
 	LastSync       time.Time `json:"lastSync" ts_doc:"Timestamp of the last successful sync."`
 	BlockTimes     []uint32  `json:"-" ts_doc:"List of block timestamps (per height) for calculating historical stats (not exposed via JSON)."`
 	AvgBlockPeriod uint32    `json:"-" ts_doc:"Average time (in seconds) per block for the last 100 blocks (not exposed via JSON)."`
+	// AvgBlockPeriodSeconds is the same average in fractional seconds; the integer form
+	// above truncates to 0 on sub-second chains. See computeAvgBlockPeriod.
+	AvgBlockPeriodSeconds float64 `json:"-" ts_doc:"Average time (in fractional seconds) per block for the last 100 blocks (not exposed via JSON)."`
 
 	IsMempoolSynchronized bool      `json:"isMempoolSynchronized" ts_doc:"If true, mempool data is in sync."`
 	MempoolSize           int       `json:"mempoolSize" ts_doc:"Number of transactions in the current mempool."`
@@ -91,7 +100,13 @@ type InternalState struct {
 
 	BackendInfo BackendInfo `json:"-" ts_doc:"Information about the connected blockchain backend (not exposed in JSON)."`
 
-	BackendTipLastAdvance time.Time `json:"-" ts_doc:"Wall-clock time when BackendInfo.Blocks was last observed to advance (not exposed in JSON)."`
+	// BackendTipLastAdvance and BackendTipHeight are persisted so the derived
+	// blockbook_tip_age_seconds gauge survives a restart. BackendInfo itself is not
+	// persisted, so comparing against it would have made every process start look like
+	// a fresh tip advance and reset the age to zero - which is exactly what happened
+	// during a crash loop, leaving the gauge pinned near zero for a 17-hour stall.
+	BackendTipLastAdvance time.Time `json:"backendTipLastAdvance,omitempty" ts_doc:"Wall-clock time when the backend's block height was last observed to change."`
+	BackendTipHeight      int       `json:"backendTipHeight,omitempty" ts_doc:"Backend block height observed at BackendTipLastAdvance."`
 
 	// database migrations
 	UtxoChecked            bool `json:"utxoChecked" ts_doc:"Indicates if UTXO consistency checks have been performed."`
@@ -119,6 +134,67 @@ type InternalState struct {
 	// shared /64. Guarded by its own mutex (consulted on every connection attempt).
 	wsBlockMux   sync.Mutex
 	wsBlockedIPs map[string]*WsBlockedIP
+
+	// rpcCallAllowlists is the effective websocket rpcCall allowlist snapshot,
+	// resolved from the DB runtime-setting overrides and the environment
+	// defaults (see server initRpcCallAllowlists). Unexported so it is never
+	// serialized by Pack; replaced wholesale via the accessors below, giving
+	// the rpcCall hot path a lock-free, consistent view.
+	rpcCallAllowlists atomic.Pointer[RpcCallAllowlists]
+}
+
+// Sources of a runtime setting value, reported by the /admin runtime-settings
+// interface.
+const (
+	RuntimeSettingSourceUnset = "unset"
+	RuntimeSettingSourceEnv   = "env"
+	RuntimeSettingSourceDB    = "db"
+)
+
+// RpcCallAllowlists is an immutable snapshot of the websocket rpcCall
+// allowlists. Readers must not mutate the maps; writers build a new snapshot
+// and replace it via SetRpcCallAllowlists.
+type RpcCallAllowlists struct {
+	// To and Methods are the parsed allowlists; a nil map means that dimension
+	// is unconfigured. With both nil, rpcCall is unrestricted.
+	//
+	// Each dimension's key format must match what the rpcCall check looks up
+	// (server rpcCallAllowed), and the two deliberately differ:
+	//   - To keys are the configured entries trimmed and lowercased verbatim —
+	//     in practice 0x-prefixed hex addresses, because they are matched
+	//     against the lowercased `to` field of the request as sent by clients.
+	//   - Methods keys are 4-byte selectors as 8 lowercase hex characters
+	//     without the 0x prefix, because they are matched against selectors
+	//     hex-decoded from the request calldata (server evmCallSelector).
+	// A future dimension should document its key format here and keep the
+	// parser (server runtimeSettingDefs) and the rpcCall lookup in lockstep.
+	To      map[string]struct{}
+	Methods map[string]struct{}
+	// Raw comma-separated values and their sources (unset/env/db), kept for
+	// the admin interface and logging.
+	ToValue       string
+	MethodsValue  string
+	ToSource      string
+	MethodsSource string
+}
+
+// GetRpcCallAllowlists returns the current rpcCall allowlist snapshot, nil
+// when not yet initialized.
+func (is *InternalState) GetRpcCallAllowlists() *RpcCallAllowlists {
+	return is.rpcCallAllowlists.Load()
+}
+
+// SetRpcCallAllowlists atomically replaces the rpcCall allowlist snapshot.
+func (is *InternalState) SetRpcCallAllowlists(a *RpcCallAllowlists) {
+	is.rpcCallAllowlists.Store(a)
+}
+
+// InitRpcCallAllowlists publishes the initial snapshot only when none exists
+// yet and reports whether it did. The compare-and-swap keeps a snapshot that
+// was already published — possibly updated by the admin interface in the
+// meantime — intact when several server constructors initialize in any order.
+func (is *InternalState) InitRpcCallAllowlists(a *RpcCallAllowlists) bool {
+	return is.rpcCallAllowlists.CompareAndSwap(nil, a)
 }
 
 // WsBlockedIP records a websocket client key (IPv4 address or full IPv6 /128)
@@ -163,11 +239,38 @@ func (is *InternalState) FinishedSyncNoChange() {
 	is.IsSynchronized = true
 }
 
+// GetInitialSync reports whether the initial index build (or a full reindex) is running.
+// InitialSync is written from main while the sync loop and the metrics refresh read it, so
+// both sides go through the lock.
+func (is *InternalState) GetInitialSync() bool {
+	is.mux.Lock()
+	defer is.mux.Unlock()
+	return is.InitialSync
+}
+
+// SetInitialSync records whether the initial index build is running.
+func (is *InternalState) SetInitialSync(initialSync bool) {
+	is.mux.Lock()
+	defer is.mux.Unlock()
+	is.InitialSync = initialSync
+}
+
 // GetSyncState gets the state of synchronization
 func (is *InternalState) GetSyncState() (bool, uint32, time.Time, time.Time) {
 	is.mux.Lock()
 	defer is.mux.Unlock()
 	return is.IsSynchronized, is.BestHeight, is.LastSync, is.StartSync
+}
+
+// GetSyncMetricsSnapshot returns every value RefreshSyncMetrics needs under a single lock
+// acquisition. Taking BackendInfo, InitialSync and the sync state through three separate
+// locked accessors let a concurrent updateBackendInfo()/FinishedSync() land between them,
+// so the gap between a pre-resync backend height and a post-resync indexed height could
+// tear and flip the published gauge for one sample.
+func (is *InternalState) GetSyncMetricsSnapshot() (backendInfo BackendInfo, initialSync, isSynchronized bool, bestHeight uint32, lastSync, startSync time.Time) {
+	is.mux.Lock()
+	defer is.mux.Unlock()
+	return is.BackendInfo, is.InitialSync, is.IsSynchronized, is.BestHeight, is.LastSync, is.StartSync
 }
 
 // StartedMempoolSync signals start of mempool synchronization
@@ -263,8 +366,11 @@ func (is *InternalState) GetLastBlockTime() uint32 {
 	return 0
 }
 
-// SetBlockTimes initializes BlockTimes array, returns AvgBlockPeriod
-func (is *InternalState) SetBlockTimes(blockTimes []uint32) uint32 {
+// SetBlockTimes initializes BlockTimes array and returns the average block period in
+// fractional seconds (the value the metric uses); the integer form truncates sub-second
+// chains to 0. Returning it here keeps the single lock acquisition instead of forcing the
+// caller to re-enter GetAvgBlockPeriodSeconds.
+func (is *InternalState) SetBlockTimes(blockTimes []uint32) float64 {
 	is.mux.Lock()
 	defer is.mux.Unlock()
 	if len(is.BlockTimes) < len(blockTimes) {
@@ -275,11 +381,14 @@ func (is *InternalState) SetBlockTimes(blockTimes []uint32) uint32 {
 	}
 	is.computeAvgBlockPeriod()
 	glog.Info("set ", len(is.BlockTimes), " block times, average block period ", is.AvgBlockPeriod, "s")
-	return is.AvgBlockPeriod
+	return is.AvgBlockPeriodSeconds
 }
 
-// SetBlockTime sets block time to BlockTimes, allocating the slice as necessary, returns AvgBlockPeriod
-func (is *InternalState) SetBlockTime(height uint32, time uint32) uint32 {
+// SetBlockTime sets block time to BlockTimes, allocating the slice as necessary, and
+// returns the average block period in fractional seconds (see SetBlockTimes). This is the
+// hottest write path, so it computes and returns the value under the same lock the write
+// already holds rather than making the caller take the lock a second time.
+func (is *InternalState) SetBlockTime(height uint32, time uint32) float64 {
 	is.mux.Lock()
 	defer is.mux.Unlock()
 	if int(height) >= len(is.BlockTimes) {
@@ -291,7 +400,7 @@ func (is *InternalState) SetBlockTime(height uint32, time uint32) uint32 {
 		is.BlockTimes[height] = time
 	}
 	is.computeAvgBlockPeriod()
-	return is.AvgBlockPeriod
+	return is.AvgBlockPeriodSeconds
 }
 
 // RemoveLastBlockTimes removes last times from BlockTimes
@@ -335,14 +444,37 @@ func (is *InternalState) GetAvgBlockPeriod() uint32 {
 	return is.AvgBlockPeriod
 }
 
-// computeAvgBlockPeriod returns computes average of the last 100 blocks in seconds
+// GetAvgBlockPeriodSeconds returns the same observed average as GetAvgBlockPeriod but in
+// fractional seconds. 0 means "not yet computed" - fewer than avgBlockPeriodSample+2
+// block times are loaded, which is the case early in an initial build or reindex.
+func (is *InternalState) GetAvgBlockPeriodSeconds() float64 {
+	is.mux.Lock()
+	defer is.mux.Unlock()
+	return is.AvgBlockPeriodSeconds
+}
+
+// computeAvgBlockPeriod averages the spacing of the most recent block times, as integer
+// seconds for the sync ETA and fractional seconds for the metric. The integer form
+// truncates, so sub-second chains report 0 and drop out of any rule gated on
+// blockbook_avg_block_period > 0; it also divides a span of avgBlockPeriodSample+1
+// intervals by avgBlockPeriodSample (~1% high) and is left alone so the ETA is unchanged.
 func (is *InternalState) computeAvgBlockPeriod() {
 	last := len(is.BlockTimes) - 1
 	first := last - avgBlockPeriodSample - 1
 	if first < 0 {
 		return
 	}
-	is.AvgBlockPeriod = (is.BlockTimes[last] - is.BlockTimes[first]) / avgBlockPeriodSample
+	// Header timestamps are not guaranteed monotonic (see GetBlockHeightOfTime), and
+	// RemoveLastBlockTimes re-runs this on a truncated array after a disconnect. A
+	// uint32 subtraction with BlockTimes[last] < BlockTimes[first] would wrap to ~4.29e9,
+	// spiking both the ETA and the blockbook_avg_block_period gauge. Leave the previous
+	// averages in place for such a window rather than publishing a wrapped value.
+	if is.BlockTimes[last] <= is.BlockTimes[first] {
+		return
+	}
+	span := is.BlockTimes[last] - is.BlockTimes[first]
+	is.AvgBlockPeriod = span / avgBlockPeriodSample
+	is.AvgBlockPeriodSeconds = float64(span) / float64(last-first)
 }
 
 // GetNetwork returns network. If not set returns the same value as CoinShortcut
@@ -355,13 +487,25 @@ func (is *InternalState) GetNetwork() string {
 }
 
 // SetBackendInfo sets new BackendInfo and records the time when Blocks advances.
-// On the first observation the advance time is seeded to now so the
-// derived tip-age metric reads a meaningful value instead of "since epoch."
+// A failed query is recorded as an error on top of the last known good payload: callers
+// build BackendInfo from an empty ChainInfo on failure, and storing that would zero
+// blockbook_backend_best_height and reset the tip advance. The guard needs both an error
+// and no height, so a backend answering at genesis is still stored.
 func (is *InternalState) SetBackendInfo(bi *BackendInfo) {
 	is.mux.Lock()
 	defer is.mux.Unlock()
-	if bi.Blocks > is.BackendInfo.Blocks || is.BackendTipLastAdvance.IsZero() {
+	if bi.BackendError != "" && bi.Blocks == 0 {
+		is.BackendInfo.BackendError = bi.BackendError
+		return
+	}
+	// Any change of the reported height - not only an increase - means the backend is
+	// alive and answering, so a rollback or a replaced backend at a lower height cannot
+	// wedge the tip age at "climbing forever". The comparison is against the persisted
+	// BackendTipHeight rather than the in-memory BackendInfo, so a restart does not
+	// register as a fresh advance.
+	if is.BackendTipLastAdvance.IsZero() || bi.Blocks != is.BackendTipHeight {
 		is.BackendTipLastAdvance = time.Now()
+		is.BackendTipHeight = bi.Blocks
 	}
 	is.BackendInfo = *bi
 }
@@ -373,10 +517,11 @@ func (is *InternalState) GetBackendInfo() BackendInfo {
 	return is.BackendInfo
 }
 
-// GetBackendTipLastAdvance returns the wall-clock time when the backend's
-// Blocks height was last observed to advance. BackendTipLastAdvance is not
-// persisted, so on startup (before the first SetBackendInfo) it is zero; seed
-// it to now on first read so tip-age metrics don't report a bogus huge age.
+// GetBackendTipLastAdvance returns the wall-clock time when the backend's block
+// height was last observed to change. It is persisted, so it carries across a
+// restart; the zero seed below only covers a state that has never observed a
+// backend at all (a fresh database), where reporting an age "since epoch" would be
+// meaningless.
 func (is *InternalState) GetBackendTipLastAdvance() time.Time {
 	is.mux.Lock()
 	defer is.mux.Unlock()

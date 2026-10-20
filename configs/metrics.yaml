@@ -177,6 +177,10 @@ metrics:
     type: histogram
     help: EVM read operations coalesced into one backend request
     buckets: [1, 2, 5, 10, 20, 50, 100, 200]
+  eth_call_multicall_requests:
+    name: blockbook_eth_call_multicall_requests
+    type: counter
+    help: Physical Multicall3 aggregate3 eth_call requests issued to the backend, each coalescing many sub-calls
   eth_call_contract_info_requests:
     name: blockbook_eth_call_contract_info_requests
     type: counter_vec
@@ -195,7 +199,7 @@ metrics:
   index_resync_errors:
     name: blockbook_index_resync_errors
     type: counter_vec
-    help: Index resync loop failures, labeled by coarse error outcome
+    help: 'Index resync loop failures, labeled by where the failure came from - get_block_hash and get_block mean the backend did not answer, connect_block means fetching or connecting a block failed inside a sync worker, and resync means the resync iteration returned an error that was not attributed further. Sustained get_block_hash or get_block is a backend problem; sustained connect_block is a Blockbook or database problem. Retryable per-block misses are counted here too and may still recover within the same iteration, so alert on a sustained rate rather than on any single increment'
     labels: [error]
   index_block_not_found_retries:
     name: blockbook_index_block_not_found_retries
@@ -209,12 +213,21 @@ metrics:
   index_sync_yields:
     name: blockbook_index_sync_yields
     type: counter_vec
-    help: 'Number of times sync yielded to the outer resync machinery for non-reorg reasons (reason=deadline: MaxStallDuration elapsed in retry loop; reason=probe_failed: chain-state probe failed for the configured streak)'
+    help: 'Number of times sync yielded to the outer resync machinery for non-reorg reasons (reason=deadline: MaxStallDuration elapsed in retry loop; reason=probe_failed: chain-state probe failed for the configured streak; reason=fell_behind: sequential sync lagged too far behind the backend tip and yielded for parallel catch-up)'
     labels: [reason]
   index_db_size:
     name: blockbook_index_db_size
     type: gauge
     help: Whole RocksDB footprint on disk, in bytes
+  internal_data_error_queue:
+    name: blockbook_internal_data_error_queue
+    type: gauge
+    help: Blocks queued for internal data healing, refreshed by every healing pass; a value that never drops means the backend cannot serve the traces
+  internal_data_heals:
+    name: blockbook_internal_data_heals_total
+    type: counter_vec
+    help: 'Outcomes of internal data healing attempts (healed: reconnected to the index; failed: the block itself failed again and was backed off; fetch_error: backend-wide fetch failure, retried without backoff; reconnect_error: the write failed, retried next pass without backoff)'
+    labels: [result]
   explorer_views:
     name: blockbook_explorer_views
     type: counter_vec
@@ -223,22 +236,77 @@ metrics:
   mempool_size:
     name: blockbook_mempool_size
     type: gauge
-    help: Transactions retained from the last successful backend reload
+    help: Transactions retained from the last successful backend reload. Only written on success, so it freezes at the last good value when the reload loop breaks rather than signalling the failure - use mempool_last_sync_timestamp_seconds for that. Healthy magnitudes differ by orders of magnitude between chains (a Bitcoin peak near 1.6e5 against a Polygon peak above 5e6), so any threshold on it has to be per-coin or relative to the coin's own recent average
+  mempool_last_sync_timestamp_seconds:
+    name: blockbook_mempool_last_sync_timestamp_seconds
+    type: gauge_vec
+    labels: [chain]
+    help: Unix time of the last SUCCESSFUL mempool reload. Plot time() - this for reload staleness; a value climbing past a few multiples of resyncmempoolperiod (default ~60s) means the reload loop is failing or wedged. A gauge_vec rather than a plain gauge so the series is ABSENT until the first successful reload - a plain gauge would read 0 from process start and make time() - it page for the whole initial sync, before any reload has run. Exported as a timestamp rather than a computed *_age_seconds gauge on purpose - it is only written on success, so the age keeps rising while reloads fail, and it is restart-safe. This is the metric to alert on, in preference to the /api/ inSyncMempool flag - that flag is cleared at the START of every reload, so it reads "not syncing" for a large fraction of samples on a healthy node and cannot carry an alert
   eth_alternative_mempool_reconciliation_events_total:
     name: blockbook_eth_alternative_mempool_reconciliation_events_total
     type: counter_vec
-    help: Alternative send-transaction mempool cache lifecycle decisions, labeled by action - skipped_fresh and kept retain an entry for the next cycle, provider_error and provider_missing_pending keep an unconfirmed entry pending retry, and mined, nonce_superseded, provider_missing, timeout (from the reconcile loop or a read-path expiry) and rbf_replaced (fee replacement) remove it
+    help: Alternative send-transaction mempool cache lifecycle decisions, labeled by action. Retained - skipped_fresh, skipped_backoff (ageing entries are re-asked less often, see probeInterval), kept, provider_error, provider_missing_pending (a null relay answer younger than alternativeMissingTxTimeout). Removed - mined, nonce_superseded, provider_missing (missing from the relay for alternativeMissingTxTimeout, 2m by default - the relay answers from one consistent store over its whole pending window, so a run of nulls means dropped or cancelled), timeout, rbf_replaced, sync_removed (block sync indexed it, normally the dominant exit). A rising timeout share means private sends are dying rather than settling; provider_missing is the expected exit of a drop-mode cancel
     labels: [action]
   eth_alternative_mempool_tx_residence_seconds:
     name: blockbook_eth_alternative_mempool_tx_residence_seconds
     type: histogram_vec
-    help: Age in seconds (time since broadcast) of an alternative send-transaction cache entry at the moment it leaves the cache, labeled by the removing action (mined, nonce_superseded, provider_missing, timeout or rbf_replaced) - reveals how long unconfirmed txs actually survive before each exit reason fires
+    help: Age in seconds (time since broadcast) of an alternative send-transaction cache entry when it leaves the cache, labeled by the removing action (the exit actions of eth_alternative_mempool_reconciliation_events_total). provider_missing is the dropped/cancelled exit; residence counts age since broadcast, so a cancel N minutes after the send records ~N plus alternativeMissingTxTimeout - read the reason, not the age. Collapsing below one reconcile cycle would be the premature-eviction regression (#1573). An entry reaching the cache timeout leaves as timeout even when the relay answers null, so with the missing eviction configured off provider_missing stops firing rather than pinning at the timeout. Buckets run to 48h because the coin configs raise alternativeMempoolTxTimeout that far - a nonce-gapped private tx has been mined ~40h after broadcast, so where its exit lands is the evidence for whether the relay kept surfacing it that long
     labels: [action]
-    buckets: [30, 60, 120, 180, 300, 450, 600, 900, 1200, 1800, 3600]
+    buckets: [1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 900, 1800, 3600, 5400, 7200, 9000, 10800, 12600, 21600, 43200, 86400, 129600, 172800]
   eth_alternative_mempool_cache_size:
     name: blockbook_eth_alternative_mempool_cache_size
     type: gauge
     help: Transactions currently held in the alternative send-transaction mempool cache, sampled at the end of every reconcile cycle
+  sendtx_requests_total:
+    name: blockbook_sendtx_requests_total
+    type: counter_vec
+    help: Transactions submitted by clients through any API (websocket, REST, explorer form), labeled by status and, for failures, by the class of rejection. Caller-side classes (underpriced, nonce_too_low, insufficient_funds, already_known) mean the transaction was refused on its own merits and no action is needed on the Blockbook side, while rate_limited, unauthorized, timeout and unavailable mean the send never got a verdict from the backend or provider and are the classes worth alerting on. A rising share of "other" is the signal to extend the classifier, not an incident
+    labels: [status, reason]
+  eth_sendtx_path_total:
+    name: blockbook_eth_sendtx_path_total
+    type: counter_vec
+    help: EVM send-transaction attempts by the send_path that served them and by status - alternative (private relay, the only path when <COIN>_ALTERNATIVE_SENDTX_ONLY is true), primary (public RPC, either no alternative provider configured or the client asked to skip it) or primary_fallback (every alternative provider rejected and the public RPC was tried instead). Any primary_fallback traffic on a chain meant to broadcast privately means transactions are leaking to the public mempool
+    labels: [send_path, status]
+  eth_alternative_sendtx_total:
+    name: blockbook_eth_alternative_sendtx_total
+    type: counter_vec
+    help: eth_sendRawTransaction calls to individual alternative providers, labeled by provider_host, status and rejection class. A broadcast succeeds if ANY configured provider accepts it, so errors here are not failed sends on their own - compare against eth_sendtx_path_total to tell a degraded provider from a failed broadcast
+    labels: [provider_host, status, reason]
+  eth_alternative_sendtx_duration_seconds:
+    name: blockbook_eth_alternative_sendtx_duration_seconds
+    type: histogram_vec
+    help: Wall-clock duration of an eth_sendRawTransaction call to an alternative provider, labeled by provider_host and status. Private relays sit on the wallet's critical path, so this is the user-visible cost of the alternative send path; errors piling up in the buckets at the configured <COIN>_RPC_TIMEOUT are timeouts rather than rejections
+    labels: [provider_host, status]
+    buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 20, 30]
+  eth_alternative_mempool_oldest_age_seconds:
+    name: blockbook_eth_alternative_mempool_oldest_age_seconds
+    type: gauge
+    help: Age in seconds of the oldest transaction still held in the alternative send-transaction mempool cache, sampled at the end of every reconcile cycle (0 when empty). Residence only records an age once an entry leaves, so this is the live stuck-tx signal. Pinning near the cache timeout (alternativePendingTxWindow, 3h by default) at non-zero depth means private txs the relay still surfaces are dying underpriced rather than mining - a dropped or cancelled tx leaves much earlier through the missing eviction (alternativeMissingTxTimeout, 2m by default)
+  eth_alternative_send_not_surfaced_total:
+    name: blockbook_eth_alternative_send_not_surfaced_total
+    type: counter_vec
+    help: Private sends a relay ACCEPTED but whose post-send fetch-back (eth_getTransactionByHash) did not surface, labeled by reason - not_found (relay returned null), error (relay call failed) or dropped (refused under load, on the one path that alone can expose the send). Normally the transaction stays cached and pending from its own signed bytes; a relay that keeps not surfacing it retires the entry through the missing eviction (alternativeMissingTxTimeout), with the cache timeout as the backstop. On the undecodable-raw-hex path any reason means the send is exposed nowhere despite ~30s of retries. Should be ~0 - the relay answers from one consistent store, so even the immediate post-send fetch-back sees an accepted tx; a sustained rate means the relay stopped surfacing what it accepts, the pre-alignment behavior Blockbook no longer assumes
+    labels: [reason]
+  eth_alternative_pending_floor_raised_total:
+    name: blockbook_eth_alternative_pending_floor_raised_total
+    type: counter_vec
+    help: eth_getTransactionCount answers where raiseToPendingFloor advanced the pending nonce above the backend's own, across the contiguous run of nonces the cache holds private txs for. Labeled by source - provider (the relay's pending count lagged a still-cached tx; with the relay counting pending over its whole window this should be near zero, and a sustained rate means its pending count regressed - the benign exception is a revert-protected send between its 96s retention lapsing and the missing eviction firing) or primary (the RPC never knew the private tx - expected while a private send is in flight). The cost is bounded - a send that never mines holds its nonce slot until the missing eviction (alternativeMissingTxTimeout) retires it. A nonce the caller declared on the request (privatePending) counts as in flight the same as a cached tx, except no eviction bounds it - the declaration raises only the caller's own answer, for as long as the caller keeps sending it
+    labels: [source]
+  eth_alternative_pending_floor_stranded_total:
+    name: blockbook_eth_alternative_pending_floor_stranded_total
+    type: counter_vec
+    help: eth_getTransactionCount answers where the cache held a private tx for a nonce ABOVE the contiguous run the floor could advance over, i.e. with a hole below it that nothing Blockbook knows of fills. Labeled by source as in the raised counter; each sample is one request, not one transaction. The floor deliberately stops below the hole rather than advertising past it (#1675), so the stranded tx cannot mine until the hole is filled. Should be ~0; a sustained rate on source=provider means relay-accepted sends are not reaching the cache. Counts a caller-declared nonce above the run as well as a cached one, so a client declaring odd nonces shows up here too
+    labels: [source]
+  eth_alternative_nonce_requests_total:
+    name: blockbook_eth_alternative_nonce_requests_total
+    type: counter_vec
+    help: eth_getTransactionCount lookups actually routed to the alternative send-transaction provider, labeled by result - success (the provider answered, its pending nonce raised to the mempool floor) or error (the lookup fell back to the primary RPC). Only addresses that sent privately through the provider within the routing window (15 min, see useForNonces) are routed here - the small gated subset, not every address request. A low, mostly-success rate confirms the gating is sparing the provider's rate quota
+    labels: [result]
+  eth_alternative_estimate_gas_requests_total:
+    name: blockbook_eth_alternative_estimate_gas_requests_total
+    type: counter_vec
+    help: eth_estimateGas calls actually routed to the alternative send-transaction provider, labeled by result - success (the provider answered) or error (the estimate fell back to the primary RPC). Only addresses that sent privately through the provider within the routing window (15 min, see useForNonces) are routed here - the small gated subset, not every estimateFee request. A low, mostly-success rate confirms the gating is keeping this hot endpoint off the provider's rate quota
+    labels: [result]
   estimated_fee:
     name: blockbook_estimated_fee
     type: gauge_vec
@@ -247,7 +315,7 @@ metrics:
   avg_block_period:
     name: blockbook_avg_block_period
     type: gauge
-    help: Observed average spacing of the last 100 blocks' header timestamps, in seconds (chain pace, not indexing cadence)
+    help: Observed average spacing of the last 100 blocks' header timestamps, in fractional seconds (chain pace, not indexing cadence). 0 means "not yet computed" - fewer than 102 block times are loaded, which is the case early in an initial build or a reindex, and for a while after a restart until the block-time array is reloaded. A rule that gates on this being > 0 therefore switches itself off during exactly those windows; normalize by average_block_time_seconds instead, which comes from the coin's configuration and is stable across restarts
   sync_block_stats:
     name: blockbook_sync_block_stats
     type: gauge_vec
@@ -298,10 +366,14 @@ metrics:
     name: blockbook_best_height
     type: gauge
     help: Newest block height persisted in Blockbook's index
+  initial_sync:
+    name: blockbook_initial_sync
+    type: gauge
+    help: 1 while the initial index build (or a full reindex) is running, 0 in steady state. Mirrors the initialSync field of /api/ and flips at the moment the flag does, not on the next periodic refresh. blockbook_synchronized is 0 for the whole of such a build - hours on a UTXO chain, days on an EVM archive - so a bare synchronized == 0 alert pages continuously through every planned resync and ends up silenced; gate it on this gauge instead (synchronized == 0 unless initial_sync == 1) so the alert only fires for an unplanned stall
   synchronized:
     name: blockbook_synchronized
     type: gauge
-    help: 1 when /api/status reports inSync, 0 otherwise; sustained 0 outside initial sync means the index is not keeping up with the tip, for example after a stalled tip feed
+    help: 1 when /api/status reports inSync, 0 otherwise; sustained 0 outside initial sync means the index is not keeping up with the tip, for example after a stalled tip feed. Refreshed on every sync-loop iteration, so a stall shows up within one resync rather than on the next periodic metrics tick; pair it with blockbook_initial_sync to exclude planned reindexes. The index may trail the tip by up to 30s worth of blocks and still read 1 - 120 blocks on a 250ms chain, 2 on Ethereum, 1 on anything spaced over 15s - so this is a "not keeping up" signal, not a "one block behind" signal
   backend_best_height:
     name: blockbook_backend_best_height
     type: gauge
@@ -309,7 +381,7 @@ metrics:
   tip_age_seconds:
     name: blockbook_tip_age_seconds
     type: gauge
-    help: Seconds since polling last observed the backend best height advance
+    help: Seconds since the backend's reported block height was last observed to change. The reference timestamp is persisted, so the age survives a restart; any change counts, so a rollback or a replaced backend at a lower height cannot wedge it. This tracks the BACKEND, not the index - a stalled indexer sitting behind a healthy backend keeps this near zero, and was observed doing exactly that through a 17-hour outage. Use delta(blockbook_best_height) against delta(blockbook_backend_best_height) to detect a stalled indexer, and this gauge to detect a backend or tip feed that went quiet
   backend_subscription_age_seconds:
     name: blockbook_backend_subscription_age_seconds
     type: gauge
@@ -337,6 +409,19 @@ metrics:
     name: blockbook_xpub_cache_size
     type: gauge
     help: UTXO-only population of in-memory extended public-key lookup entries
+  xpub_cache_bytes:
+    name: blockbook_xpub_cache_bytes
+    type: gauge
+    help: Estimated memory used by the xpub cache (derived addresses, balances, utxos and txid lists)
+  xpub_cache_hits_total:
+    name: blockbook_xpub_cache_hits_total
+    type: counter
+    help: xpub lookups served from the cache without rescanning any address
+  xpub_cache_misses_total:
+    name: blockbook_xpub_cache_misses_total
+    type: counter_vec
+    help: xpub lookups that had to derive (absent), re-derive a different gap (gap), rescan every address after a new block (stale) or load txids from the db (history)
+    labels: [reason]
   coingecko_requests:
     name: blockbook_coingecko_requests
     type: counter_vec
@@ -352,7 +437,7 @@ metrics:
     type: histogram_vec
     help: Time spent in fiat-rate downloader stages such as current, hourly, historical and token ticker updates
     labels: [stage, status]
-    buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30, 60, 120, 300]
+    buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 900, 1800, 3600]
   fiat_rates_fetched_units_total:
     name: blockbook_fiat_rates_fetched_units_total
     type: counter_vec
@@ -373,6 +458,44 @@ metrics:
     type: counter_vec
     help: Requests to external fee providers, labeled by provider and outcome status
     labels: [provider, status]
+  alternative_fee_provider_last_sync_timestamp_seconds:
+    name: blockbook_alternative_fee_provider_last_sync_timestamp_seconds
+    type: gauge_vec
+    help: Unix time of the last successful refresh of the cached EVM alternative-provider fees, labeled by provider (infura or 1inch). Plot time() - this for cache age; the pull path falls back to on-chain once the cache is older than the provider's stale window (default 600s / 10m, configurable per coin via staleSeconds, independent of the periodSeconds cache TTL). Fees are fetched on demand, so on a quiet instance the age legitimately grows - alert on it only together with alternative_fee_provider_cache showing demand (fetched/coalesced/stale/miss rates). Exported as a timestamp rather than a computed *_age_seconds gauge on purpose - it is only written on a successful refresh, so age keeps rising when a provider wedges and it is restart-safe
+    labels: [provider]
+  alternative_fee_provider_cache:
+    name: blockbook_alternative_fee_provider_cache
+    type: counter_vec
+    help: EVM alternative-provider fee estimates served, by provider and cache result - fresh (cache hit within the periodSeconds TTL), fetched (this request triggered the upstream fetch), coalesced (waited on another request's fetch), stale (fetch failed, served last value within the stale window), miss (nothing to serve, caller falls back to on-chain estimation). Distinguishes an idle instance (no traffic at all) from a broken provider (stale/miss dominating) now that fees are fetched on demand
+    labels: [provider, result]
+  eth_eip1559_fee:
+    name: blockbook_eth_eip1559_fee
+    type: gauge_vec
+    help: Most recent EIP-1559 fee tier served by the pull path (estimateFee / EthereumTypeGetEip1559Fees), in wei - divide by 1e9 for Gwei; labeled by tier (low/medium/high/instant) and kind (max_fee = maxFeePerGas, priority_fee = maxPriorityFeePerGas). EVM fees are otherwise invisible (estimated_fee is UTXO-only). Last-writer-wins per estimate, like estimated_fee
+    labels: [tier, kind]
+  eth_eip1559_base_fee:
+    name: blockbook_eth_eip1559_base_fee
+    type: gauge
+    help: Base fee underlying the most recent pull-path EIP-1559 estimate, in wei - divide by 1e9 for Gwei. The alternative provider's reported base fee when served from a provider, otherwise eth_feeHistory's last requested-window base fee (baseFeePerGas[blocks-1]); on backends that drop the extra projected element (e.g. Erigon) that is already the next-block projection, on others it is the most recent included block. Pair with eth_block_base_fee to see projection vs realized
+  eth_eip1559_fee_source_total:
+    name: blockbook_eth_eip1559_fee_source_total
+    type: counter_vec
+    help: Served EIP-1559 pull-path estimates by source observed at the serve boundary - provider (alternative provider cache hit), onchain_fallback (provider configured but cache stale/unready, served from eth_feeHistory) or onchain (no provider configured). Complements alternative_fee_provider_requests (on-demand upstream fetch) and alternative_fee_provider_last_sync_timestamp_seconds (cache age), which together explain why a fallback happened
+    labels: [source]
+  eth_block_gas_used_ratio:
+    name: blockbook_eth_block_gas_used_ratio
+    type: gauge
+    help: gasUsed / gasLimit of the most recently connected EVM block (0..1), the congestion signal that drives the next base fee - above 0.5 the next block's base fee rises (up to +12.5% per block), below 0.5 it falls. This is the push path's view of why fees move; updated once per connected block, so it sweeps catch-up blocks and settles on the tip
+  eth_block_base_fee:
+    name: blockbook_eth_block_base_fee
+    type: gauge
+    help: Base fee per gas of the most recently connected EVM block, in wei - divide by 1e9 for Gwei. The realized base fee from the block header (push path); compare with eth_eip1559_base_fee (the pull path's next-block projection) to see whether the projection tracks the chain. Updated once per connected block
+  rpc_sync_latency:
+    name: blockbook_rpc_sync_latency
+    type: histogram_vec
+    help: Blockbook-to-backend round-trip time for sync-internal RPC calls (eth_getBlockByHash, eth_getLogs, debug_traceBlockByHash, etc.), in milliseconds, labeled by method and whether the call failed. Typically sub-100ms; multi-second values mean an overloaded backend, and observations near 10-15s are trace_timeout/rpc_timeout expiries rather than real round trips
+    labels: [method, error]
+    buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000, 10000, 20000]
   eth_sync_rpc_errors:
     name: blockbook_eth_sync_rpc_errors
     type: counter_vec

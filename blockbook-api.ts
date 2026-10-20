@@ -1,12 +1,9 @@
 /* Do not change, this code is generated from Golang structs */
+/* Regenerate with `make typescriptify` (see build/tools/typescriptify) */
 
+export type TxChainExtraData = { payloadType: 'tron'; payload?: TronChainExtraData };
+export type AccountChainExtraData = { payloadType: 'tron'; payload?: TronAccountExtraData };
 
-export interface APIError {
-    /** Human-readable error message describing the issue. */
-    Text: string;
-    /** Whether the error message can safely be shown to the end user. */
-    Public: boolean;
-}
 export interface TronVoteExtra {
     address?: string;
     count?: string;
@@ -18,10 +15,13 @@ export interface TronChainExtraData {
     resource?: string;
     stakeAmount?: string;
     unstakeAmount?: string;
+    claimedVoteReward?: string;
+    withdrawnUnfreeze?: string;
     delegateAmount?: string;
     delegateTo?: string;
     assetIssueID?: string;
     totalFee?: string;
+    feeLimit?: string;
     energyUsage?: string;
     energyUsageTotal?: string;
     energyFee?: string;
@@ -49,6 +49,7 @@ export interface TronStakingInfo {
     unclaimedReward: string;
     delegatedBalanceEnergy: string;
     delegatedBalanceBandwidth: string;
+    latestWithdrawTime: number;
 }
 export interface TronAccountExtraData {
     availableStakedBandwidth: number;
@@ -63,8 +64,12 @@ export interface TronAccountExtraData {
     totalBandwidthWeight: number;
     stakingInfo?: TronStakingInfo;
 }
-export type TxChainExtraData = { payloadType: 'tron'; payload?: TronChainExtraData } | { payloadType: string; payload?: any };
-export type AccountChainExtraData = { payloadType: 'tron'; payload?: TronAccountExtraData } | { payloadType: string; payload?: any };
+export interface APIError {
+    /** Human-readable error message describing the issue. */
+    Text: string;
+    /** Whether the error message can safely be shown to the end user. */
+    Public: boolean;
+}
 export interface AddressAlias {
     /** Type of alias, e.g., user-defined name or contract name. */
     Type: string;
@@ -96,6 +101,8 @@ export interface EthereumParsedInputData {
     function?: string;
     /** List of parsed parameters for this function call. */
     params?: EthereumParsedInputParam[];
+    /** True when input data exceeded the parse-size budget and parameters were not decoded. */
+    parsedDataTruncated?: boolean;
 }
 export interface EthereumSpecific {
     /** High-level type of the Ethereum tx (e.g., 'call', 'create'). */
@@ -112,8 +119,10 @@ export interface EthereumSpecific {
     gasLimit?: number;
     /** Actual gas consumed by the transaction execution. */
     gasUsed?: number;
-    /** Price (in Wei or base units) per gas unit. */
+    /** Price (in Wei or base units) per gas unit bid by the sender. */
     gasPrice?: string;
+    /** Actual gas price paid per gas unit; on L2 networks this differs from gasPrice and is used for the fee. */
+    effectiveGasPrice?: string;
     maxPriorityFeePerGas?: string;
     maxFeePerGas?: string;
     baseFeePerGas?: string;
@@ -140,8 +149,8 @@ export interface MultiTokenValue {
 }
 export interface TokenTransfer {
     /** @deprecated: Use standard instead. */
-    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
-    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
+    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT';
+    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT';
     /** Source address of the token transfer. */
     from: string;
     /** Destination address of the token transfer. */
@@ -158,6 +167,8 @@ export interface TokenTransfer {
     value?: string;
     /** List of multiple ID-value pairs for ERC1155 transfers. */
     multiTokenValues?: MultiTokenValue[];
+    /** Syscoin SPT asset GUID. */
+    assetGuid?: string;
 }
 export interface Vout {
     /** Amount (in satoshi or base units) of the output. */
@@ -184,6 +195,18 @@ export interface Vout {
     isOwn?: boolean;
     /** Output script type (e.g., 'P2PKH', 'P2SH'). */
     type?: string;
+    /** Syscoin SPT metadata for this output. */
+    assetInfo?: AssetInfo;
+}
+export interface AssetInfo {
+    /** Syscoin SPT asset GUID. */
+    assetGuid?: string;
+    /** SPT amount in base units. */
+    value?: string;
+    /** SPT amount as a decimal string. */
+    valueStr?: string;
+    /** Syscoin SPT asset symbol, if available. */
+    symbol?: string;
 }
 export interface Vin {
     /** ID/hash of the originating transaction (where the UTXO comes from). */
@@ -208,6 +231,8 @@ export interface Vin {
     asm?: string;
     /** Data for coinbase inputs (when mining). */
     coinbase?: string;
+    /** Syscoin SPT metadata for this input. */
+    assetInfo?: AssetInfo;
 }
 export interface Tx {
     /** Transaction ID (hash). */
@@ -252,7 +277,7 @@ export interface Tx {
     chainExtraData?: TxChainExtraData;
     /** List of token transfers that occurred in this transaction. */
     tokenTransfers?: TokenTransfer[];
-    /** SYSCOIN Transaction direction relative to the queried account, when returned by account summary endpoints. */
+    /** Transaction direction relative to the queried account, when returned by account summary endpoints. */
     direction?: string;
     /** Total input value belonging to the queried account, when returned by account summary endpoints. */
     addressValueIn?: string;
@@ -262,7 +287,7 @@ export interface Tx {
     accountAssetTransfers?: TokenTransfer[];
     /** Syscoin SPT transaction type. */
     tokenType?: string;
-    /** Syscoin SPT memo decoded from OP_RETURN. */
+    /** Base64-encoded Syscoin SPT memo decoded from OP_RETURN. */
     memo?: string;
     /** Ethereum-like blockchain specific data (if applicable). */
     ethereumSpecific?: EthereumSpecific;
@@ -310,7 +335,7 @@ export interface Erc4626TokenMetadata {
     decimals: number;
 }
 export interface Erc4626Token {
-    /** Metadata of the underlying asset token. */
+    /** Metadata of the underlying asset token. Omitted when decimals cannot be resolved. */
     asset?: Erc4626TokenMetadata;
     /** Metadata of the vault share token. */
     share?: Erc4626TokenMetadata;
@@ -327,10 +352,45 @@ export interface Erc4626Token {
     /** Error message for partial failures while fetching ERC4626 fields. */
     error?: string;
 }
-export interface Token {
+export interface ContractInfoProtocols {
+    /** ERC4626 vault details when explicitly requested and detected. */
+    erc4626?: Erc4626Token;
+}
+export interface ContractInfoRates {
+    /** Current price of one whole token in the chain base currency, when available. */
+    baseRate?: number;
+    /** Requested secondary currency code for the secondaryRate field, lower-cased. */
+    currency?: string;
+    /** Current price of one whole token in the requested secondary currency, when available. */
+    secondaryRate?: number;
+}
+export interface ContractInfoResult {
     /** @deprecated: Use standard instead. */
     type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
     standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
+    /** Smart contract address. */
+    contract: string;
+    /** Readable name of the contract. */
+    name: string;
+    /** Symbol for tokens under this contract, if applicable. */
+    symbol: string;
+    /** Number of decimal places, if applicable. */
+    decimals: number;
+    /** Block height where contract was first created. */
+    createdInBlock?: number;
+    /** Block height where contract was destroyed (if any). */
+    destructedInBlock?: number;
+    /** Current rate data for the contract when available. */
+    rates?: ContractInfoRates;
+    /** Optional protocol-specific enrichments requested by the caller. */
+    protocols?: ContractInfoProtocols;
+    /** Indexed best block height used as freshness metadata for this response. */
+    blockHeight: number;
+}
+export interface Token {
+    /** @deprecated: Use standard instead. */
+    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated';
+    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated';
     /** Readable name of the token. */
     name: string;
     /** Derivation path if this token is derived from an XPUB-based address. */
@@ -413,8 +473,12 @@ export interface Address {
     confirmedNonce?: string;
     /** Number of tokens with any historical usage at this address. */
     usedTokens?: number;
+    /** Number of Syscoin SPT assets with any historical usage at this address. */
+    usedAssetTokens?: number;
     /** List of tokens associated with this address. */
     tokens?: Token[];
+    /** List of Syscoin SPT assets associated with this address. */
+    tokensAsset?: Token[];
     /** Total value of the address in secondary currency (e.g. fiat). */
     secondaryValue?: number;
     /** Sum of token values in base currency. */
@@ -436,41 +500,6 @@ export interface Address {
     /** Additional normalized chain-specific account/address data. Use payloadType as discriminator for payload. */
     chainExtraData?: AccountChainExtraData;
 }
-export interface ContractInfoProtocols {
-    /** ERC4626 vault details when explicitly requested and detected. */
-    erc4626?: Erc4626Token;
-}
-export interface ContractInfoRates {
-    /** Current price of one whole token in the chain base currency, when available. */
-    baseRate?: number;
-    /** Requested secondary currency code for the secondaryRate field, lower-cased. */
-    currency?: string;
-    /** Current price of one whole token in the requested secondary currency, when available. */
-    secondaryRate?: number;
-}
-export interface ContractInfoResult {
-    /** @deprecated: Use standard instead. */
-    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
-    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
-    /** Smart contract address. */
-    contract: string;
-    /** Readable name of the contract. */
-    name: string;
-    /** Symbol for tokens under this contract, if applicable. */
-    symbol: string;
-    /** Number of decimal places, if applicable. */
-    decimals: number;
-    /** Block height where contract was first created. */
-    createdInBlock?: number;
-    /** Block height where contract was destroyed (if any). */
-    destructedInBlock?: number;
-    /** Current rate data for the contract when available. */
-    rates?: ContractInfoRates;
-    /** Optional protocol-specific enrichments requested by the caller. */
-    protocols?: ContractInfoProtocols;
-    /** Indexed best block height used as freshness metadata for this response. */
-    blockHeight: number;
-}
 export interface Utxo {
     /** Transaction ID in which this UTXO was created. */
     txid: string;
@@ -490,6 +519,8 @@ export interface Utxo {
     lockTime?: number;
     /** Indicates if this UTXO originated from a coinbase transaction. */
     coinbase?: boolean;
+    /** Syscoin SPT metadata for this UTXO. */
+    assetInfo?: AssetInfo;
 }
 export interface BalanceHistory {
     /** Unix timestamp for this point in the balance history. */
@@ -704,6 +735,12 @@ export interface WsRes {
     /** Payload of the response, structure depends on the request. */
     data: any;
 }
+export interface WsPrivatePending {
+    /** Account nonces of the wallet's in-flight private transactions for this address. Each entry is a literal in-flight nonce (0 is a valid value, not a sentinel) and is treated as an occupied nonce slot alongside Blockbook's own cached private transactions: the reported pending nonce advances from the backend's own answer across the contiguous run of occupied slots. Send the whole in-flight set, not just its maximum, and do not pad or default the array - a declared nonce above a slot nothing fills does not lift the answer over that slot. */
+    nonces?: number[];
+    /** Transaction hashes of the in-flight private transactions (reserved for future use). */
+    txids?: string[];
+}
 export interface WsAccountInfoReq {
     /** Address or XPUB descriptor to query. */
     descriptor: string;
@@ -729,6 +766,8 @@ export interface WsAccountInfoReq {
     gap?: number;
     /** If true, additionally return the confirmed nonce for Ethereum-like addresses (extra backend call). */
     confirmedNonce?: boolean;
+    /** Ethereum-like only: the sender's in-flight private (alternative send-tx / relay) transactions the wallet is tracking for this address. When it declares nonces, Blockbook answers the pending-nonce lookup from this authoritative wallet state instead of inferring it from recently accepted sends (see docs/evm-send.md). */
+    privatePending?: WsPrivatePending;
 }
 export interface WsContractInfoReq {
     /** Contract address to query. */
@@ -833,8 +872,8 @@ export interface WsTransactionSpecificReq {
 export interface WsEstimateFeeReq {
     /** Block confirmations targets for which fees should be estimated. */
     blocks?: number[];
-    /** Additional chain-specific parameters (e.g. for Ethereum). */
-    specific?: {conservative?: boolean; txsize?: number; from?: string; to?: string; data?: string; value?: string;};
+    /** Additional chain-specific parameters (e.g. for Ethereum). privatePending (Ethereum-like) declares the sender's in-flight private transactions so the gas estimate is routed to the alternative send-tx provider; see WsPrivatePending and docs/evm-send.md. */
+    specific?: {conservative?: boolean; txsize?: number; from?: string; to?: string; data?: string; value?: string; privatePending?: WsPrivatePending;};
 }
 export interface Eip1559Fee {
     maxFeePerGas?: string;
@@ -870,11 +909,31 @@ export interface WsLongTermFeeRateRes {
     /** Amount of blocks used for the long term fee rate estimation. */
     blocks: number;
 }
+export interface EthereumGasData {
+    /** Base fee per gas of the new block (post-London). */
+    baseFeePerGas?: string;
+    /** Total gas used by the new block (decimal). */
+    blockGasUsed?: string;
+    /** Gas limit of the new block (decimal). */
+    blockGasLimit?: string;
+}
+export interface WsNewBlock {
+    /** Height of the new block. */
+    height: number;
+    /** Hash of the new block. */
+    hash: string;
+    /** EVM gas data for the EIP-1559 base-fee projection; null on non-EVM chains. */
+    evmData: EthereumGasData | null;
+}
 export interface WsSendTransactionReq {
     /** Hex-encoded transaction data to broadcast (string format). */
     hex?: string;
     /** Use alternative RPC method to broadcast transaction. */
     disableAlternativeRpc: boolean;
+    /** Optional Syscoin Core maxfeerate parameter. */
+    maxfeerate?: string;
+    /** Optional Syscoin Core maxburnamount parameter. */
+    maxburnamount?: string;
 }
 export interface WsSubscribeAddressesReq {
     /** List of addresses to subscribe for updates (e.g., new transactions). */

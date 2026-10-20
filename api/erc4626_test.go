@@ -632,8 +632,8 @@ func TestEnrichErc4626Tokens_RecentNegativeSkipsReprobe(t *testing.T) {
 	store := fakeContractInfoStore{
 		strings.ToLower(fakeFungible): {Contract: fakeFungible, Standard: erc4626Standard},
 	}
-	negativeCache := newErc4626NegativeCache(4)
-	negativeCache.add(fakeFungible, 100, 2, 0)
+	negativeCache := newNegativeProbeCache(4)
+	negativeCache.add(erc4626ContractKey(fakeFungible), 100, 2, 0)
 	mc := &fakeMulticaller{
 		handlers: []func(calls []bchain.EthereumMulticallCall) ([]bchain.EthereumMulticallResult, error){
 			func(_ []bchain.EthereumMulticallCall) ([]bchain.EthereumMulticallResult, error) {
@@ -662,7 +662,7 @@ func TestEnrichErc4626Tokens_NegativeCacheExpiresAndReprobes(t *testing.T) {
 	store := fakeContractInfoStore{
 		strings.ToLower(fakeFungible): {Contract: fakeFungible, Standard: erc4626Standard},
 	}
-	negativeCache := newErc4626NegativeCache(4)
+	negativeCache := newNegativeProbeCache(4)
 	mc := &fakeMulticaller{
 		handlers: []func(calls []bchain.EthereumMulticallCall) ([]bchain.EthereumMulticallResult, error){
 			func(_ []bchain.EthereumMulticallCall) ([]bchain.EthereumMulticallResult, error) {
@@ -924,5 +924,33 @@ func TestErc4626MathAndEncodingBoundaries(t *testing.T) {
 	unit, err := erc4626UnitAmount(0)
 	if err != nil || unit.Cmp(big.NewInt(1)) != 0 {
 		t.Fatalf("unexpected 10^0 result: %v, %v", unit, err)
+	}
+}
+
+func TestBuildErc4626Token_MulticallErrorRedactsBackendURL(t *testing.T) {
+	// A dial failure on the multicall renders the backend url; the joined error string is served
+	// to the client and must keep only the host.
+	const vault = "0x00000000000000000000000000000000000000a1"
+	mc := &fakeMulticaller{
+		handlers: []func(calls []bchain.EthereumMulticallCall) ([]bchain.EthereumMulticallResult, error){
+			func(_ []bchain.EthereumMulticallCall) ([]bchain.EthereumMulticallResult, error) {
+				return nil, errors.New(`Post "https://rpc.example.io/v2/SECRET_PROVIDER_KEY": dial tcp: connection refused`)
+			},
+		},
+	}
+	persister := func(string, string) error { return nil }
+	getContractInfo := func(string, bchain.TokenStandardName) (*bchain.ContractInfo, bool, error) {
+		return &bchain.ContractInfo{Contract: "0x00000000000000000000000000000000000000b2", Name: "USDC", Symbol: "USDC", Decimals: 6}, true, nil
+	}
+	ci := &bchain.ContractInfo{Contract: vault, Decimals: 18, Erc4626AssetContract: "0x00000000000000000000000000000000000000b2"}
+	got, _ := buildErc4626TokenWithDeps(ci, mc, persister, getContractInfo, nil)
+	if got == nil {
+		t.Fatal("expected partial result on multicall error")
+	}
+	if strings.Contains(got.Error, "SECRET_PROVIDER_KEY") {
+		t.Fatalf("backend url must be redacted, got %q", got.Error)
+	}
+	if !strings.Contains(got.Error, `multicall: Post "https://rpc.example.io": dial tcp`) {
+		t.Fatalf("expected redacted multicall error, got %q", got.Error)
 	}
 }

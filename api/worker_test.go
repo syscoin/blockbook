@@ -4,13 +4,21 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/stretchr/testify/require"
 	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/btc"
 	"github.com/trezor/blockbook/common"
+	"github.com/trezor/blockbook/db"
 	"github.com/trezor/blockbook/fiat"
+	"github.com/trezor/blockbook/tests/dbtestdata"
 )
 
 func TestSystemInfoInSync(t *testing.T) {
@@ -44,15 +52,16 @@ func TestSystemInfoInSync(t *testing.T) {
 			chainType:     bchain.ChainEthereumType,
 			bestHeight:    100,
 			backendBlocks: 100,
-			lastBlockTime: now.Add(-25 * time.Second),
+			lastBlockTime: now.Add(-45 * time.Second),
 			startSync:     oldStart,
 			blockPeriod:   2 * time.Second,
 		},
 		{
+			// 20 blocks at 2s is 40s of lag, past the 15 the window allows there.
 			name:          "does not report synced while local height is behind",
 			chainType:     bchain.ChainEthereumType,
 			bestHeight:    90,
-			backendBlocks: 100,
+			backendBlocks: 110,
 			lastBlockTime: now.Add(-10 * time.Second),
 			startSync:     oldStart,
 			blockPeriod:   2 * time.Second,
@@ -78,18 +87,206 @@ func TestSystemInfoInSync(t *testing.T) {
 			want:          true,
 		},
 		{
-			name:          "does not report synced more than one block behind tip",
+			name:          "keeps sub-second chain synced inside the freshness floor",
 			chainType:     bchain.ChainEthereumType,
-			bestHeight:    98,
+			inSync:        true,
+			bestHeight:    100,
 			backendBlocks: 100,
+			// 12 x 250ms is 3s; without the floor this would already read stale.
+			lastBlockTime: now.Add(-10 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+			want:          true,
+		},
+		{
+			name:          "marks sub-second chain stale past the freshness floor",
+			chainType:     bchain.ChainEthereumType,
+			inSync:        true,
+			bestHeight:    100,
+			backendBlocks: 100,
+			lastBlockTime: now.Add(-45 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+		},
+		{
+			// Was "more than one block behind": the tolerance is now the blocks produced in
+			// 30s, so at 2s the limit is 15 and it takes 16 to fall out.
+			name:          "does not report synced past the tolerated window on a two-second chain",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100,
+			backendBlocks: 116,
 			lastBlockTime: now.Add(-10 * time.Second),
 			startSync:     oldStart,
 			blockPeriod:   2 * time.Second,
 		},
 		{
-			name:          "does not report synced during initial sync",
-			initialSync:   true,
+			// The boundary is 30s/250ms = 120 blocks, not 1. This is the shape that spent
+			// 203 min/week in the blockbookApiInSync alert on arb-b4.
+			name:          "reports synced trailing the sub-second tip inside the window",
 			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100000,
+			backendBlocks: 100120,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+			want:          true,
+		},
+		{
+			name:          "does not report synced one block past the window on a sub-second chain",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100000,
+			backendBlocks: 100121,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+		},
+		{
+			// 100ms is the fastest cadence any supported chain configures (Robinhood) and
+			// sits exactly on the systemInfoMinBlockPeriod floor: its full 30s window,
+			// 300 blocks, must survive the floor untouched.
+			name:          "reports synced trailing a 100ms tip inside the window",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100000,
+			backendBlocks: 100300,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   100 * time.Millisecond,
+			want:          true,
+		},
+		{
+			name:          "does not report synced one block past the window on a 100ms chain",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100000,
+			backendBlocks: 100301,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   100 * time.Millisecond,
+		},
+		{
+			// A cadence below any supported chain's is a config typo (25ms where Arbitrum
+			// means 250) or a degenerate observed average. Unfloored it would buy 30s/25ms
+			// = 1200 blocks of tolerance; the floor caps what it can buy at 300.
+			name:          "caps the tolerance bought by an implausibly fast cadence",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100000,
+			backendBlocks: 100301,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   25 * time.Millisecond,
+		},
+		{
+			// Regression anchor: the 2026-08-09 arb-b4 excursion peaked at 211 blocks, 53s
+			// of real lag, and must still read out-of-sync.
+			name:          "does not report synced during the measured 211-block arbitrum lag",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100000,
+			backendBlocks: 100211,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+		},
+		{
+			name:          "widens the ethereum tolerance to two blocks",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    98,
+			backendBlocks: 100,
+			lastBlockTime: now.Add(-10 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   12 * time.Second,
+			want:          true,
+		},
+		{
+			// 30s/12s is 2.5, and the truncation has to round down, not up.
+			name:          "does not widen the ethereum tolerance to three blocks",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    97,
+			backendBlocks: 100,
+			lastBlockTime: now.Add(-10 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   12 * time.Second,
+		},
+		{
+			name:          "keeps the one-block tolerance on a ten-minute chain",
+			chainType:     bchain.ChainBitcoinType,
+			bestHeight:    99,
+			backendBlocks: 100,
+			lastBlockTime: now.Add(-10 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   600 * time.Second,
+			want:          true,
+		},
+		{
+			// The UTXO constraint. Also the guard against deriving the window from the
+			// computed threshold, which would be 12 block times here - two hours of lag.
+			name:          "does not widen the tolerance on a ten-minute chain",
+			chainType:     bchain.ChainBitcoinType,
+			bestHeight:    98,
+			backendBlocks: 100,
+			lastBlockTime: now.Add(-10 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   600 * time.Second,
+		},
+		{
+			// RefreshSyncMetrics compares against a backend height cached at the end of the
+			// previous resync iteration, so the index is routinely past it.
+			name:          "reports synced when the index is ahead of the cached backend tip",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100,
+			backendBlocks: 98,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+			want:          true,
+		},
+		{
+			// isFresh still gates the tolerated path.
+			name:          "does not rescue an index ahead of a stale cached tip",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100,
+			backendBlocks: 98,
+			lastBlockTime: now.Add(-45 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+		},
+		{
+			// Ahead of the tip is tolerated to the same bound as behind it.
+			name:          "reports synced ahead of the tip up to the tolerated window",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100120,
+			backendBlocks: 100000,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+			want:          true,
+		},
+		{
+			// Freshness cannot end the ahead direction - a fork-suspect disconnect and
+			// reconnect loop refreshes LastSync on every writeHeight - so an index far
+			// past the tip (rolled back, replaced or wrong-chain backend) must fall out
+			// of the rescue on the gap bound alone.
+			name:          "does not rescue an index far ahead of a fresh tip",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100121,
+			backendBlocks: 100000,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   250 * time.Millisecond,
+		},
+		{
+			// Without the backendBlocks > 0 guard the clamp turns gap into 0 at cold start
+			// and rescues before any backend height was ever observed.
+			name:          "does not rescue before a backend height is known",
+			chainType:     bchain.ChainEthereumType,
+			bestHeight:    100,
+			backendBlocks: 0,
+			lastBlockTime: now.Add(-1 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   2 * time.Second,
+		},
+		{
+			name:          "does not report synced during initial sync",
+			chainType:     bchain.ChainEthereumType,
+			initialSync:   true,
 			bestHeight:    100,
 			backendBlocks: 100,
 			lastBlockTime: now.Add(-10 * time.Second),
@@ -105,18 +302,18 @@ func TestSystemInfoInSync(t *testing.T) {
 		},
 		{
 			name:          "marks already synced evm stale",
-			inSync:        true,
 			chainType:     bchain.ChainEthereumType,
+			inSync:        true,
 			bestHeight:    100,
 			backendBlocks: 100,
-			lastBlockTime: now.Add(-25 * time.Second),
+			lastBlockTime: now.Add(-45 * time.Second),
 			startSync:     oldStart,
 			blockPeriod:   2 * time.Second,
 		},
 		{
 			name:          "keeps already synced evm fresh",
-			inSync:        true,
 			chainType:     bchain.ChainEthereumType,
+			inSync:        true,
 			bestHeight:    100,
 			backendBlocks: 100,
 			lastBlockTime: now.Add(-10 * time.Second),
@@ -125,13 +322,42 @@ func TestSystemInfoInSync(t *testing.T) {
 			want:          true,
 		},
 		{
-			name:          "does not extend tip equality rescue to bitcoin",
+			// The tip/freshness rescue applies to any chain with a configured cadence, not
+			// only EVM: a UTXO chain at the tip mid-resync-iteration must not read stale.
+			name:          "reports synced at a fresh tip for a non-evm chain",
 			chainType:     bchain.ChainBitcoinType,
 			bestHeight:    100,
 			backendBlocks: 100,
 			lastBlockTime: now.Add(-10 * time.Second),
 			startSync:     oldStart,
 			blockPeriod:   2 * time.Second,
+			want:          true,
+		},
+		{
+			// The demotion, unlike the rescue, stays EVM-only. UTXO block arrival is
+			// Poisson, so a gap past 12 mean spacings happens on a healthy chain often
+			// enough to page; a stalled UTXO indexer is caught by comparing
+			// blockbook_best_height against blockbook_backend_best_height instead.
+			name:          "does not demote a stale non-evm chain",
+			chainType:     bchain.ChainBitcoinType,
+			inSync:        true,
+			bestHeight:    100,
+			backendBlocks: 100,
+			lastBlockTime: now.Add(-3 * time.Hour),
+			startSync:     oldStart,
+			blockPeriod:   600 * time.Second,
+			want:          true,
+		},
+		{
+			// No configured cadence (blockPeriod <= 0): fall back to the raw flag, no
+			// freshness rescue or demotion.
+			name:          "keeps the raw out-of-sync flag without a configured cadence",
+			chainType:     bchain.ChainBitcoinType,
+			bestHeight:    100,
+			backendBlocks: 100,
+			lastBlockTime: now.Add(-10 * time.Second),
+			startSync:     oldStart,
+			blockPeriod:   0,
 		},
 	}
 
@@ -194,6 +420,22 @@ func TestGetSecondaryTicker_PerformsLookupWithSecondaryCurrency(t *testing.T) {
 	}
 }
 
+func TestGetAddrDescAndNormalizeAddressPreservesNonStandardScript(t *testing.T) {
+	parser := btc.NewBitcoinParser(btc.GetChainParams("test"), &btc.Configuration{})
+	w := &Worker{chainParser: parser}
+	addrDesc := bchain.AddressDescriptor{0x51} // OP_TRUE is indexable but has no address representation
+
+	gotAddrDesc, gotAddress, err := w.getAddrDescAndNormalizeAddress(addrDesc.String())
+
+	require.NoError(t, err)
+	require.Equal(t, addrDesc, gotAddrDesc)
+	require.Equal(t, addrDesc.String(), gotAddress)
+	require.True(t, parser.IsAddrDescIndexable(addrDesc))
+	addresses, _, err := parser.GetAddressesFromAddrDesc(addrDesc)
+	require.NoError(t, err)
+	require.Empty(t, addresses)
+}
+
 func TestTronBalanceHistoryOverrides(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -214,22 +456,23 @@ func TestTronBalanceHistoryOverrides(t *testing.T) {
 			wantAmount:        "42000000",
 		},
 		{
-			name:              "withdraw uses unstake amount",
-			payload:           `{"operation":"withdraw","unstakeAmount":"77000000"}`,
+			// The principal arrives through the generic WithdrawnUnfreeze credit instead.
+			name:              "withdraw defers to the withdrawn unfreeze credit",
+			payload:           `{"operation":"withdraw","withdrawnUnfreeze":"77000000"}`,
 			fallbackAmount:    "1",
 			hasFallbackAmount: true,
 			wantOverride:      true,
-			wantDirection:     tronBalanceHistoryDirectionIncoming,
-			wantAmount:        "77000000",
+			wantDirection:     tronBalanceHistoryDirectionNone,
+			wantAmount:        "0",
 		},
 		{
-			name:              "withdraw falls back to tx value",
-			payload:           `{"operation":"withdraw"}`,
+			name:              "cancel unfreeze defers to the withdrawn unfreeze credit",
+			payload:           `{"operation":"cancelUnfreeze","withdrawnUnfreeze":"77000000"}`,
 			fallbackAmount:    "123",
 			hasFallbackAmount: true,
 			wantOverride:      true,
-			wantDirection:     tronBalanceHistoryDirectionIncoming,
-			wantAmount:        "123",
+			wantDirection:     tronBalanceHistoryDirectionNone,
+			wantAmount:        "0",
 		},
 		{
 			name:              "vote reward amount uses claimed vote reward",
@@ -259,7 +502,21 @@ func TestTronBalanceHistoryOverrides(t *testing.T) {
 			wantAmount:        "999",
 		},
 		{
-			name:          "unfreeze has explicit no-move override",
+			name:          "stake 2.0 unfreeze has explicit no-move override",
+			payload:       `{"operation":"unfreeze","contractType":"UnfreezeBalanceV2Contract","unstakeAmount":"77000000"}`,
+			wantOverride:  true,
+			wantDirection: tronBalanceHistoryDirectionNone,
+			wantAmount:    "0",
+		},
+		{
+			name:          "stake 1.0 unfreeze credits the principal immediately",
+			payload:       `{"operation":"unfreeze","contractType":"UnfreezeBalanceContract","unstakeAmount":"77000000"}`,
+			wantOverride:  true,
+			wantDirection: tronBalanceHistoryDirectionIncoming,
+			wantAmount:    "77000000",
+		},
+		{
+			name:          "unfreeze without a contract type stays neutral",
 			payload:       `{"operation":"unfreeze","unstakeAmount":"77000000"}`,
 			wantOverride:  true,
 			wantDirection: tronBalanceHistoryDirectionNone,
@@ -300,6 +557,361 @@ func TestTronBalanceHistoryOverrides(t *testing.T) {
 			}
 			if got := override.amount.String(); got != tt.wantAmount {
 				t.Fatalf("amount mismatch: got %s want %s", got, tt.wantAmount)
+			}
+		})
+	}
+}
+
+// TestGetEthereumFeesSat verifies the transaction fee is computed from the
+// receipt's effectiveGasPrice on L2 networks (issue #1227), while falling back
+// to the transaction gasPrice for older/legacy transactions, and that a
+// separately reported L1 data fee is added on top.
+func TestGetEthereumFeesSat(t *testing.T) {
+	bi := func(v int64) *big.Int { return big.NewInt(v) }
+	tests := []struct {
+		name    string
+		txData  *bchain.EthereumTxData
+		wantFee string
+	}{
+		{
+			name:    "L2 uses effectiveGasPrice, not the gasPrice bid",
+			txData:  &bchain.EthereumTxData{GasUsed: bi(21000), GasPrice: bi(1200), EffectiveGasPrice: bi(10)},
+			wantFee: "210000", // 21000 * 10, NOT 21000 * 1200
+		},
+		{
+			name:    "OP-stack adds l1Fee on top of the L2 execution fee",
+			txData:  &bchain.EthereumTxData{GasUsed: bi(21000), GasPrice: bi(1200), EffectiveGasPrice: bi(10), L1Fee: bi(5000)},
+			wantFee: "215000", // 21000 * 10 + 5000
+		},
+		{
+			name:    "legacy tx without effectiveGasPrice falls back to gasPrice",
+			txData:  &bchain.EthereumTxData{GasUsed: bi(21000), GasPrice: bi(1200)},
+			wantFee: "25200000", // 21000 * 1200
+		},
+		{
+			name:    "legacy fallback still adds l1Fee on top",
+			txData:  &bchain.EthereumTxData{GasUsed: bi(21000), GasPrice: bi(1200), L1Fee: bi(5000)},
+			wantFee: "25205000", // 21000 * 1200 + 5000 (nil effectiveGasPrice, l1Fee present)
+		},
+		{
+			name:    "zero effectiveGasPrice falls back to gasPrice",
+			txData:  &bchain.EthereumTxData{GasUsed: bi(21000), GasPrice: bi(1200), EffectiveGasPrice: bi(0)},
+			wantFee: "25200000",
+		},
+		{
+			name:    "mempool tx without gasUsed has no fee",
+			txData:  &bchain.EthereumTxData{GasPrice: bi(1200), EffectiveGasPrice: bi(10)},
+			wantFee: "0",
+		},
+		{
+			// pins that the gasUsed==nil guard returns before l1Fee is added
+			name:    "mempool tx with l1Fee but no gasUsed still has no fee",
+			txData:  &bchain.EthereumTxData{GasPrice: bi(1200), EffectiveGasPrice: bi(10), L1Fee: bi(5000)},
+			wantFee: "0",
+		},
+		{
+			name:    "no gas price at all does not panic and yields zero",
+			txData:  &bchain.EthereumTxData{GasUsed: bi(21000)},
+			wantFee: "0",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getEthereumFeesSat(tt.txData).String(); got != tt.wantFee {
+				t.Errorf("getEthereumFeesSat() = %s, want %s", got, tt.wantFee)
+			}
+		})
+	}
+}
+
+// TestAddEthereumFeesToBalanceHistory pins the balance-history fee accounting:
+// the sent amount must include the effectiveGasPrice-based execution fee plus any
+// L1 data fee. Before the fix this path used the bid gasPrice and omitted l1Fee.
+func TestAddEthereumFeesToBalanceHistory(t *testing.T) {
+	bi := func(v int64) *big.Int { return big.NewInt(v) }
+	tests := []struct {
+		name        string
+		txData      *bchain.EthereumTxData
+		initialSent int64
+		wantSent    string
+	}{
+		{
+			name:     "L2 execution fee plus l1Fee is added to sent",
+			txData:   &bchain.EthereumTxData{GasUsed: bi(21000), GasPrice: bi(1200), EffectiveGasPrice: bi(10), L1Fee: bi(5000)},
+			wantSent: "215000", // 21000 * 10 + 5000
+		},
+		{
+			name:        "fee accumulates onto an existing sent amount",
+			txData:      &bchain.EthereumTxData{GasUsed: bi(21000), GasPrice: bi(1200), EffectiveGasPrice: bi(10)},
+			initialSent: 1000,
+			wantSent:    "211000", // 1000 + 21000 * 10
+		},
+		{
+			name:     "mempool tx contributes no fee",
+			txData:   &bchain.EthereumTxData{GasPrice: bi(1200), EffectiveGasPrice: bi(10)},
+			wantSent: "0",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bh := &BalanceHistory{SentSat: (*Amount)(big.NewInt(tt.initialSent))}
+			addEthereumFeesToBalanceHistory(tt.txData, bh)
+			if got := (*big.Int)(bh.SentSat).String(); got != tt.wantSent {
+				t.Errorf("SentSat = %s, want %s", got, tt.wantSent)
+			}
+		})
+	}
+}
+
+// BenchmarkTxInputResolution measures GetTransactionFromBchainTx as a function of
+// a transaction's input fan-in, using the plain Bitcoin-testnet parser. Each input's
+// previous output is resolved from the database, so this tracks how per-transaction
+// allocation and time scale with the input count. The fan-in values span a wide range
+// to make that scaling visible and to guard against regressions in input resolution.
+//
+//	go test -tags unittest -run x -bench TxInputResolution -benchmem ./api/
+func BenchmarkTxInputResolution(b *testing.B) {
+	for _, fanIn := range []int{8, 32, 128, 512, 2048} {
+		b.Run("fanIn="+strconv.Itoa(fanIn), func(b *testing.B) {
+			worker, subjectTx := buildHighFanInWorker(b, fanIn)
+			addresses := make(map[string]struct{})
+
+			tx, err := worker.GetTransactionFromBchainTx(subjectTx, 2, false, false, addresses)
+			require.NoError(b, err)
+			require.Len(b, tx.Vin, fanIn)
+			require.True(b, tx.Vin[fanIn-1].IsAddress && tx.Vin[fanIn-1].ValueSat != nil)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := worker.GetTransactionFromBchainTx(subjectTx, 2, false, false, addresses); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// newIndexedWorkerDB indexes the blocks into a RocksDB in a test temp directory and
+// returns the database with its loaded internal state, both closed via tb.Cleanup.
+func newIndexedWorkerDB(tb testing.TB, parser bchain.BlockChainParser, blocks []*bchain.Block) (*db.RocksDB, *common.InternalState) {
+	tb.Helper()
+	database, err := db.NewRocksDB(tb.TempDir(), 100000, -1, parser, nil, false)
+	require.NoError(tb, err)
+	tb.Cleanup(func() { require.NoError(tb, database.Close()) })
+
+	is, err := database.LoadInternalState(&common.Config{CoinName: "coin-unittest"})
+	require.NoError(tb, err)
+	database.SetInternalState(is)
+
+	bulk, err := database.InitBulkConnect()
+	require.NoError(tb, err)
+	for i, block := range blocks {
+		require.NoError(tb, bulk.ConnectBlock(block, i == len(blocks)-1))
+	}
+	require.NoError(tb, bulk.Close())
+	var syncHeight uint32
+	if len(blocks) > 0 {
+		syncHeight = blocks[len(blocks)-1].Height
+	}
+	is.FinishedSync(syncHeight)
+	return database, is
+}
+
+// buildHighFanInWorker indexes a previous transaction with fanIn outputs and a
+// subject transaction whose fanIn inputs each spend one of them (all referencing the
+// same previous tx, concentrating resolution on a single large record), and returns
+// a Worker plus the subject tx. Only db + parser are needed: GetTransactionFromBchainTx
+// for a confirmed Bitcoin-type tx (specificJSON=false) does not touch the chain.
+func buildHighFanInWorker(tb testing.TB, fanIn int) (*Worker, *bchain.Tx) {
+	tb.Helper()
+	parser := btc.NewBitcoinParser(btc.GetChainParams("test"), &btc.Configuration{BlockAddressesToKeep: 1})
+	script := dbtestdata.AddressToPubKeyHex(dbtestdata.Addr1, parser)
+
+	prevTxid := fanInHash(1)
+	prevOuts := make([]bchain.Vout, fanIn)
+	subjectIns := make([]bchain.Vin, fanIn)
+	for j := 0; j < fanIn; j++ {
+		prevOuts[j] = fanInVout(uint32(j), script)
+		subjectIns[j] = bchain.Vin{Txid: prevTxid, Vout: uint32(j), Sequence: 0xffffffff}
+	}
+	prevTx := fanInTx(prevTxid, 1, []bchain.Vin{{Coinbase: "01", Sequence: 0xffffffff}}, prevOuts)
+	subjectTx := fanInTx(fanInHash(2), 2, subjectIns, []bchain.Vout{fanInVout(0, script), fanInVout(1, script)})
+
+	blocks := []*bchain.Block{
+		{BlockHeader: bchain.BlockHeader{Hash: fanInHash(1_000_001), Height: 1, Time: 1_700_000_001}, Txs: []bchain.Tx{*prevTx}},
+		{BlockHeader: bchain.BlockHeader{Hash: fanInHash(1_000_002), Height: 2, Time: 1_700_000_002}, Txs: []bchain.Tx{*subjectTx}},
+	}
+
+	database, is := newIndexedWorkerDB(tb, parser, blocks)
+	return &Worker{db: database, chainParser: parser, chainType: bchain.ChainBitcoinType, is: is}, subjectTx
+}
+
+func fanInTx(txid string, height uint32, vin []bchain.Vin, vout []bchain.Vout) *bchain.Tx {
+	return &bchain.Tx{
+		Txid:          txid,
+		Version:       1,
+		Vin:           vin,
+		Vout:          vout,
+		BlockHeight:   height,
+		Confirmations: 1,
+		Time:          int64(1_700_000_000 + height),
+		Blocktime:     int64(1_700_000_000 + height),
+	}
+}
+
+func fanInVout(n uint32, scriptHex string) bchain.Vout {
+	return bchain.Vout{
+		ValueSat:     *big.NewInt(100000),
+		N:            n,
+		ScriptPubKey: bchain.ScriptPubKey{Hex: scriptHex, Addresses: []string{dbtestdata.Addr1}},
+	}
+}
+
+func fanInHash(n uint64) string { return fmt.Sprintf("%064x", n) }
+
+// newRefreshTestMetrics returns a fresh Metrics for one test, registered on a private
+// registry swapped in for the duration. This keeps each test from sharing gauge state with
+// the others (which made them order-dependent under -shuffle) and from registering ~60
+// Blockbook collectors on the process-wide prometheus.DefaultRegisterer.
+//
+// The swap is of package-level globals, so a caller must not run under t.Parallel() - no
+// test in this package does. common.GetMetrics takes no registry, which is why the globals
+// are the seam; give it one if a parallel caller ever needs this.
+func newRefreshTestMetrics(t *testing.T) *common.Metrics {
+	t.Helper()
+	oldReg, oldGath := prometheus.DefaultRegisterer, prometheus.DefaultGatherer
+	registry := prometheus.NewRegistry()
+	prometheus.DefaultRegisterer = registry
+	prometheus.DefaultGatherer = registry
+	t.Cleanup(func() {
+		prometheus.DefaultRegisterer = oldReg
+		prometheus.DefaultGatherer = oldGath
+	})
+	m, err := common.GetMetrics("api_refresh_sync_metrics_test")
+	if err != nil {
+		t.Fatalf("GetMetrics: %v", err)
+	}
+	return m
+}
+
+func gaugeValue(t *testing.T, g prometheus.Gauge) float64 {
+	t.Helper()
+	var m dto.Metric
+	if err := g.Write(&m); err != nil {
+		t.Fatalf("gauge Write: %v", err)
+	}
+	return m.GetGauge().GetValue()
+}
+
+// TestRefreshSyncMetrics covers the gauges an alert on blockbook's sync state reads. They
+// used to be written only by the ~15-minute app-info loop (which needs three backend
+// RPCs), so a stall was invisible for up to 16 minutes; RefreshSyncMetrics publishes them
+// from internal state alone and must agree with what /api/ reports.
+func TestRefreshSyncMetrics(t *testing.T) {
+	m := newRefreshTestMetrics(t)
+
+	is := &common.InternalState{}
+	is.SetBackendInfo(&common.BackendInfo{Blocks: 900})
+	is.FinishedSync(900)
+
+	// Bitcoin-type: inSync is the raw flag, so a synced state publishes 1.
+	RefreshSyncMetrics(is, nil, m)
+	if got := gaugeValue(t, m.Synchronized); got != 1 {
+		t.Errorf("synchronized = %v, want 1", got)
+	}
+	if got := gaugeValue(t, m.BlockbookBestHeight); got != 900 {
+		t.Errorf("best_height = %v, want 900", got)
+	}
+	if got := gaugeValue(t, m.BackendBestHeight); got != 900 {
+		t.Errorf("backend_best_height = %v, want 900", got)
+	}
+	if got := gaugeValue(t, m.InitialSync); got != 0 {
+		t.Errorf("initial_sync = %v, want 0", got)
+	}
+
+	// A stalled index: the flag is cleared while the backend keeps advancing. This is the
+	// 2026-07-30 Tron shape, and the gauge has to read 0 for an alert to see it. StartSync
+	// is pushed back past systemInfoSyncStartGrace, which otherwise reports the first few
+	// seconds of any sync as still-synced to avoid flapping.
+	is.StartedSync()
+	is.StartSync = time.Now().UTC().Add(-time.Minute)
+	is.SetBackendInfo(&common.BackendInfo{Blocks: 1000})
+	RefreshSyncMetrics(is, nil, m)
+	if got := gaugeValue(t, m.Synchronized); got != 0 {
+		t.Errorf("synchronized = %v, want 0 while the index is behind", got)
+	}
+	if got := gaugeValue(t, m.BackendBestHeight); got != 1000 {
+		t.Errorf("backend_best_height = %v, want 1000", got)
+	}
+
+	// A reindex must be distinguishable from that stall, or the alert has to be silenced.
+	is.InitialSync = true
+	RefreshSyncMetrics(is, nil, m)
+	if got := gaugeValue(t, m.InitialSync); got != 1 {
+		t.Errorf("initial_sync = %v, want 1 during a reindex", got)
+	}
+}
+
+// TestRefreshSyncMetricsSkipsUnobservedBackend guards the one case where publishing the
+// cached backend height would be wrong: before the first successful GetChainInfo it is 0,
+// and a 0 reads as "the backend produced no blocks" to the backend-stuck rules.
+func TestRefreshSyncMetricsSkipsUnobservedBackend(t *testing.T) {
+	m := newRefreshTestMetrics(t)
+	m.BackendBestHeight.Set(12345)
+
+	RefreshSyncMetrics(&common.InternalState{}, nil, m)
+	if got := gaugeValue(t, m.BackendBestHeight); got != 12345 {
+		t.Errorf("backend_best_height = %v, want the previous 12345 left untouched", got)
+	}
+}
+
+// TestRefreshSyncMetricsKeepsLastGoodOnBackendError checks that a cached BackendError does
+// NOT force the gauge to 0. bi is only refreshed at the end of a resync iteration, so a
+// force would stay 0 for up to a full resync period after the backend recovered and would
+// disagree with /api, which re-queries live. The last known good backend height is still
+// published, so the backend-stuck rules see a flat series rather than a drop to 0.
+func TestRefreshSyncMetricsKeepsLastGoodOnBackendError(t *testing.T) {
+	m := newRefreshTestMetrics(t)
+
+	is := &common.InternalState{}
+	is.SetBackendInfo(&common.BackendInfo{Blocks: 700})
+	is.FinishedSync(700)
+	RefreshSyncMetrics(is, nil, m)
+	if got := gaugeValue(t, m.Synchronized); got != 1 {
+		t.Fatalf("synchronized = %v, want 1 before the backend fails", got)
+	}
+
+	is.SetBackendInfo(&common.BackendInfo{BackendError: "GetChainInfo: connection refused"})
+	RefreshSyncMetrics(is, nil, m)
+	if got := gaugeValue(t, m.Synchronized); got != 1 {
+		t.Errorf("synchronized = %v, want it to hold the last computed value, not be forced to 0 by a cached error", got)
+	}
+	if got := gaugeValue(t, m.BackendBestHeight); got != 700 {
+		t.Errorf("backend_best_height = %v, want the retained 700", got)
+	}
+}
+
+// Suite hides its EVM cancel/speed-up actions when a pending transaction is not rbf, so the
+// flag must stay true for EVM regardless of the (unset) input sequence.
+func TestIsReplaceableInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		chainType bchain.ChainType
+		sequence  uint32
+		want      bool
+	}{
+		{name: "evm with zero sequence", chainType: bchain.ChainEthereumType, sequence: 0, want: true},
+		{name: "evm with final sequence", chainType: bchain.ChainEthereumType, sequence: 0xffffffff, want: true},
+		{name: "utxo opted in per BIP125", chainType: bchain.ChainBitcoinType, sequence: 0xfffffffd, want: true},
+		{name: "utxo final sequence", chainType: bchain.ChainBitcoinType, sequence: 0xffffffff, want: false},
+		{name: "utxo max minus one is not opted in", chainType: bchain.ChainBitcoinType, sequence: 0xfffffffe, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &Worker{chainType: tt.chainType}
+			if got := w.isReplaceableInput(tt.sequence); got != tt.want {
+				t.Errorf("isReplaceableInput(%#x) = %v, want %v", tt.sequence, got, tt.want)
 			}
 		})
 	}

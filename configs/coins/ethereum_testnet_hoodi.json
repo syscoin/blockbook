@@ -23,13 +23,13 @@
         "package_name": "backend-ethereum-testnet-hoodi",
         "package_revision": "satoshilabs-1",
         "system_user": "ethereum",
-        "version": "3.3.3",
-        "binary_url": "https://github.com/erigontech/erigon/releases/download/v3.3.3/erigon_v3.3.3_linux_amd64.tar.gz",
+        "version": "3.5.5",
+        "binary_url": "https://github.com/erigontech/erigon/releases/download/v3.5.5/erigon_v3.5.5_linux_amd64.tar.gz",
         "verification_type": "sha256",
-        "verification_source": "f72e38acbd4581f8e652f11923c0b72d67a53ce1770894a2bdb881d64722b097",
+        "verification_source": "2e875794234dc06fdcd0c716b38e936b8c820e90e16cee2d43fdfaf74df09ced",
         "extract_command": "tar -C backend --strip-components=1 -xf",
         "exclude_files": [],
-        "exec_command_template": "/bin/sh -c '{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/erigon --chain hoodi --snap.keepblocks --db.size.limit 15TB --db.pagesize 16KB --prune.mode full --externalcl --nat none --datadir {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/erigon --port {{.Ports.BackendP2P}} --ws --ws.port {{.Ports.BackendRPC}} --http --http.port {{.Ports.BackendRPC}} --http.addr {{.Env.RPCBindHost}} --http.corsdomain \"*\" --http.vhosts \"*\" --http.api \"eth,net,web3,debug,txpool\" --authrpc.port {{.Ports.BackendAuthRpc}} --private.api.addr \"\" --torrent.port {{.Ports.BackendHttp}} --log.dir.path {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --log.dir.prefix {{.Coin.Alias}}'",
+        "exec_command_template": "/bin/sh -c '{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/erigon --chain hoodi --snap.keepblocks --db.size.limit 15TB --db.pagesize 16KB --prune.mode full --externalcl --nat none --datadir {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/erigon --port {{.Ports.BackendP2P}} --discovery.v4 --ws --ws.port {{.Ports.BackendRPC}} --http --http.port {{.Ports.BackendRPC}} --http.addr {{.Env.RPCBindHost}} --http.corsdomain \"*\" --http.vhosts \"*\" --http.api \"eth,net,web3,debug,txpool\" --rpc.logs.maxresults 200000 --authrpc.port {{.Ports.BackendAuthRpc}} --private.api.addr \"\" --torrent.port {{.Ports.BackendHttp}} --log.dir.path {{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --log.dir.prefix {{.Coin.Alias}}'",
         "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/{{.Coin.Alias}}.log",
         "postinst_script_template": "",
         "service_type": "simple",
@@ -40,8 +40,8 @@
         "client_config_file": "",
         "platforms": {
             "arm64": {
-                "binary_url": "https://github.com/erigontech/erigon/releases/download/v3.3.3/erigon_v3.3.3_linux_arm64.tar.gz",
-                "verification_source": "00fd630731eb95fd4c70bb921c6335b4a1c1a92ab60032c8bbc40a9497eae1b9"
+                "binary_url": "https://github.com/erigontech/erigon/releases/download/v3.5.5/erigon_v3.5.5_linux_arm64.tar.gz",
+                "verification_source": "1e2e917b15338047f4a41cfd2cfd486b272c856fd549a68e3fe63d64762f8113"
             }
         }
     },

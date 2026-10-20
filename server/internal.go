@@ -14,10 +14,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/juju/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/trezor/blockbook/api"
 	"github.com/trezor/blockbook/bchain"
@@ -45,6 +45,12 @@ type InternalServer struct {
 	adminAuthEnabled bool
 	adminUserHash    [32]byte
 	adminPassHash    [32]byte
+	// runtimeSettingsMux serializes runtime-setting writes (validate → store
+	// to DB → publish snapshot) so concurrent admin requests cannot publish a
+	// snapshot whose value lost the database write. runtimeSettings is the
+	// persistence backend of those writes (the RocksDB in production).
+	runtimeSettingsMux sync.Mutex
+	runtimeSettings    runtimeSettingStore
 }
 
 // NewInternalServer creates new internal http interface to blockbook and returns its handle
@@ -57,22 +63,28 @@ func NewInternalServer(binding, certFiles string, db *db.RocksDB, chain bchain.B
 	addr, path := splitBinding(binding)
 	serveMux := http.NewServeMux()
 	https := &http.Server{
-		Addr:    addr,
-		Handler: serveMux,
+		Addr:              addr,
+		Handler:           serveMux,
+		ReadHeaderTimeout: httpReadHeaderTimeout,
+		ReadTimeout:       httpReadTimeout,
+		WriteTimeout:      httpInternalWriteTimeout,
+		IdleTimeout:       httpIdleTimeout,
+		MaxHeaderBytes:    httpMaxHeaderBytes,
 	}
 	s := &InternalServer{
 		htmlTemplates: htmlTemplates[InternalTemplateData]{
 			debug: true,
 		},
-		https:       https,
-		certFiles:   certFiles,
-		db:          db,
-		txCache:     txCache,
-		chain:       chain,
-		chainParser: chain.GetChainParser(),
-		mempool:     mempool,
-		is:          is,
-		api:         api,
+		https:           https,
+		certFiles:       certFiles,
+		db:              db,
+		txCache:         txCache,
+		chain:           chain,
+		chainParser:     chain.GetChainParser(),
+		mempool:         mempool,
+		is:              is,
+		api:             api,
+		runtimeSettings: db,
 	}
 	s.htmlTemplates.newTemplateData = s.newTemplateData
 	s.htmlTemplates.newTemplateDataWithError = s.newTemplateDataWithError
@@ -103,6 +115,15 @@ func NewInternalServer(binding, certFiles string, db *db.RocksDB, chain bchain.B
 	serveMux.HandleFunc(adminPath, s.requireAdminAuth(s.htmlTemplateHandler(s.adminIndex)))
 	serveMux.HandleFunc(adminPath+"/", s.requireAdminAuth(s.adminSubtreeHandler(adminPath)))
 	serveMux.HandleFunc(adminPath+"/ws-limit-exceeding-ips", s.requireAdminAuth(s.htmlTemplateHandler(s.wsLimitExceedingIPs)))
+	// Runtime settings are chain-generic (initRpcCallAllowlists already runs
+	// unconditionally in NewWebsocketServer); the currently defined settings only
+	// affect EVM rpcCall and are simply unset on other chains. The init must stay
+	// before the route registration — currentRpcCallAllowlists relies on it.
+	if err := initRpcCallAllowlists(db, is); err != nil {
+		return nil, err
+	}
+	serveMux.HandleFunc(adminPath+"/runtime-settings", s.requireAdminAuth(s.htmlTemplateHandler(s.runtimeSettingsPage)))
+	serveMux.HandleFunc(adminPath+"/runtime-settings/", s.requireAdminAuth(s.jsonHandler(s.apiRuntimeSetting, 0)))
 	if s.chainParser.GetChainType() == bchain.ChainEthereumType {
 		serveMux.HandleFunc(adminPath+"/internal-data-errors", s.requireAdminAuth(s.htmlTemplateHandler(s.internalDataErrors)))
 		serveMux.HandleFunc(adminPath+"/contract-info", s.requireAdminAuth(s.htmlTemplateHandler(s.contractInfoPage)))
@@ -138,6 +159,20 @@ func (s *InternalServer) adminSubtreeHandler(adminPath string) http.HandlerFunc 
 	}
 }
 
+// urlPathSegment returns the last segment of the request path with surrounding
+// whitespace trimmed, or "" when the path ends in "/" or has no sub-segment
+// below a registered subtree (a root-level path like "/admin" yields ""). Callers
+// apply their own normalization on top (runtime-setting keys are uppercased,
+// contract addresses are left to the chain parser, the authority on case and
+// checksum handling).
+func urlPathSegment(r *http.Request) string {
+	var seg string
+	if i := strings.LastIndexByte(r.URL.Path, '/'); i > 0 {
+		seg = r.URL.Path[i+1:]
+	}
+	return strings.TrimSpace(seg)
+}
+
 // requireAdminAuth wraps an internal-server handler so it is reachable only with
 // valid HTTP Basic credentials. The admin surface is fail-closed: when the
 // credentials are not configured the endpoints return 503 rather than serving
@@ -154,8 +189,47 @@ func (s *InternalServer) requireAdminAuth(next http.HandlerFunc) http.HandlerFun
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		// Browsers replay cached Basic credentials cross-origin, so reject
+		// state-changing requests forged by a page the admin visits (CSRF).
+		if isStateChangingMethod(r.Method) && !s.sameOrigin(r) {
+			// Logged so a Host-rewriting reverse proxy (which makes the Origin
+			// mismatch r.Host) is diagnosable rather than a silent 403.
+			glog.Warningf("admin: rejected cross-origin %s %s (Origin=%q Referer=%q Host=%q, client %s)",
+				r.Method, r.URL.Path, r.Header.Get("Origin"), r.Header.Get("Referer"), r.Host, r.RemoteAddr)
+			http.Error(w, "cross-origin request forbidden", http.StatusForbidden)
+			return
+		}
 		next(w, r)
 	}
+}
+
+// isStateChangingMethod reports whether a method can mutate state and needs CSRF
+// protection; the safe GET/HEAD/OPTIONS methods only read and are exempt.
+func isStateChangingMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	}
+	return true
+}
+
+// sameOrigin reports whether a state-changing request is same-origin. Browsers
+// send Origin/Referer cross-origin; clients that send neither (curl) are allowed.
+func (s *InternalServer) sameOrigin(r *http.Request) bool {
+	raw := r.Header.Get("Origin")
+	if raw == "" {
+		raw = r.Header.Get("Referer")
+	}
+	if raw == "" {
+		return true
+	}
+	scheme, host, ok := parseOrigin(raw)
+	if !ok || !strings.EqualFold(host, r.Host) {
+		return false
+	}
+	// When this server terminates TLS, a same-host request must also be https, so a
+	// plaintext page an on-path attacker serves on the port cannot forge to it.
+	return s.certFiles == "" || scheme == "https"
 }
 
 // validBasicAuth reports whether the request carries the configured admin Basic
@@ -219,6 +293,7 @@ const (
 	adminInternalErrorsTpl
 	adminLimitExceedingIPSTpl
 	adminContractInfoTpl
+	adminRuntimeSettingsTpl
 
 	internalTplCount
 )
@@ -242,16 +317,16 @@ type WsBlockedIPView struct {
 
 // InternalTemplateData is used to transfer data to the templates
 type InternalTemplateData struct {
-	CoinName               string
-	CoinShortcut           string
-	CoinLabel              string
-	ChainType              bchain.ChainType
-	Error                  *api.APIError
-	InternalDataErrors     []db.BlockInternalDataError
-	RefetchingInternalData bool
-	WsGetAccountInfoLimit  int
-	WsLimitExceedingIPs    []WsLimitExceedingIP
-	WsBlockedIPs           []WsBlockedIPView
+	CoinName              string
+	CoinShortcut          string
+	CoinLabel             string
+	ChainType             bchain.ChainType
+	Error                 *api.APIError
+	InternalDataErrors    []db.BlockInternalDataError
+	WsGetAccountInfoLimit int
+	WsLimitExceedingIPs   []WsLimitExceedingIP
+	WsBlockedIPs          []WsBlockedIPView
+	RuntimeSettings       []RuntimeSettingView
 }
 
 func (s *InternalServer) newTemplateData(r *http.Request) *InternalTemplateData {
@@ -287,6 +362,7 @@ func (s *InternalServer) parseTemplates() []*template.Template {
 	t[adminInternalErrorsTpl] = createTemplate("./static/internal_templates/block_internal_data_errors.html", "./static/internal_templates/base.html")
 	t[adminLimitExceedingIPSTpl] = createTemplate("./static/internal_templates/ws_limit_exceeding_ips.html", "./static/internal_templates/base.html")
 	t[adminContractInfoTpl] = createTemplate("./static/internal_templates/contract_info.html", "./static/internal_templates/base.html")
+	t[adminRuntimeSettingsTpl] = createTemplate("./static/internal_templates/runtime_settings.html", "./static/internal_templates/base.html")
 	return t
 }
 
@@ -295,20 +371,15 @@ func (s *InternalServer) adminIndex(w http.ResponseWriter, r *http.Request) (tpl
 	return adminIndexTpl, data, nil
 }
 
+// internalDataErrors lists the blocks queued for internal data healing. The queue is
+// drained by healInternalDataLoop, so the page is read-only.
 func (s *InternalServer) internalDataErrors(w http.ResponseWriter, r *http.Request) (tpl, *InternalTemplateData, error) {
-	if r.Method == http.MethodPost {
-		err := s.api.RefetchInternalData()
-		if err != nil {
-			return errorTpl, nil, err
-		}
-	}
 	data := s.newTemplateData(r)
 	internalErrors, err := s.db.GetBlockInternalDataErrorsEthereumType()
 	if err != nil {
 		return errorTpl, nil, err
 	}
 	data.InternalDataErrors = internalErrors
-	data.RefetchingInternalData = s.api.IsRefetchingInternalData()
 	return adminInternalErrorsTpl, data, nil
 }
 
@@ -356,20 +427,81 @@ func (s *InternalServer) contractInfoPage(w http.ResponseWriter, r *http.Request
 	return adminContractInfoTpl, data, nil
 }
 
-func (s *InternalServer) apiContractInfo(r *http.Request, apiVersion int) (interface{}, error) {
-	if r.Method == http.MethodPost {
-		return s.updateContracts(r)
-	}
-	var contractAddress string
-	i := strings.LastIndexByte(r.URL.Path, '/')
-	if i > 0 {
-		contractAddress = r.URL.Path[i+1:]
-	}
-	if len(contractAddress) == 0 {
-		return nil, api.NewAPIError("Missing contract address", true)
-	}
+// contractInfoUpdateResponse is the JSON shape returned by POST /admin/contract-info/.
+type contractInfoUpdateResponse struct {
+	Updated int `json:"updated"`
+}
 
-	contractInfo, valid, err := s.api.GetContractInfo(contractAddress, bchain.UnknownTokenStandard)
+// contractInfoListResponse is the JSON shape returned by GET /admin/contract-info/.
+// Next, when present, is the from parameter of the next page.
+type contractInfoListResponse struct {
+	Contracts []bchain.ContractInfo `json:"contracts"`
+	Next      string                `json:"next,omitempty"`
+}
+
+const (
+	contractInfoListDefaultLimit = 1000
+	contractInfoListMaxLimit     = 10000
+)
+
+// contractInfoDeleteResponse is the JSON shape returned by
+// DELETE /admin/contract-info/<address>. Purged carries the removed record so
+// the operator can restore it verbatim with a POST — the row includes the
+// sync-owned createdInBlock/destructedInBlock fields, which the backend
+// re-fetch on the next read cannot recover.
+type contractInfoDeleteResponse struct {
+	Contract string               `json:"contract"`
+	Deleted  bool                 `json:"deleted"`
+	Purged   *bchain.ContractInfo `json:"purged,omitempty"`
+}
+
+// apiContractInfo handles GET/POST/PUT/DELETE of cached contract metadata at
+// /admin/contract-info/<address> (POST/PUT write the collection path
+// /admin/contract-info/ with a JSON array body; a GET of the collection path
+// lists the stored records page by page).
+func (s *InternalServer) apiContractInfo(r *http.Request, apiVersion int) (interface{}, error) {
+	address := urlPathSegment(r)
+	switch r.Method {
+	case http.MethodGet:
+		if address == "" {
+			return s.listContractInfos(r)
+		}
+		return s.getContractInfo(address)
+	case http.MethodPost, http.MethodPut:
+		// The bulk write addresses each contract in its body; reject a POST to
+		// an address path instead of silently ignoring the address segment.
+		if address != "" {
+			return nil, api.NewAPIError("POST updates the collection; use /admin/contract-info/ with a JSON array body", true)
+		}
+		return s.updateContracts(r)
+	case http.MethodDelete:
+		return s.deleteContractInfo(address, r)
+	}
+	return nil, api.NewAPIError("Unsupported method "+r.Method, true)
+}
+
+// listContractInfos returns one page of the stored contract records. Unlike
+// the runtime-settings list, the collection is unbounded (sync stores a row
+// per contract creation), so the page size is limited and the response
+// carries a next cursor.
+func (s *InternalServer) listContractInfos(r *http.Request) (interface{}, error) {
+	limit := contractInfoListDefaultLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > contractInfoListMaxLimit {
+			return nil, api.NewAPIError("Invalid limit, expecting a number in 1.."+strconv.Itoa(contractInfoListMaxLimit), true)
+		}
+		limit = n
+	}
+	contracts, next, err := s.db.ListContractInfos(r.URL.Query().Get("from"), limit)
+	if err != nil {
+		return nil, api.NewAPIError(err.Error(), true)
+	}
+	return &contractInfoListResponse{Contracts: contracts, Next: next}, nil
+}
+
+func (s *InternalServer) getContractInfo(address string) (interface{}, error) {
+	contractInfo, valid, err := s.api.GetContractInfo(address, bchain.UnknownTokenStandard)
 	if err != nil {
 		return nil, api.NewAPIError(err.Error(), true)
 	}
@@ -387,7 +519,7 @@ func (s *InternalServer) updateContracts(r *http.Request) (interface{}, error) {
 	var contractInfos []bchain.ContractInfo
 	err = json.Unmarshal(data, &contractInfos)
 	if err != nil {
-		return nil, errors.Annotatef(err, "Cannot unmarshal body to array of ContractInfo objects")
+		return nil, api.NewAPIError("Cannot unmarshal body to array of ContractInfo objects: "+err.Error(), true)
 	}
 	for i := range contractInfos {
 		c := &contractInfos[i]
@@ -397,5 +529,26 @@ func (s *InternalServer) updateContracts(r *http.Request) (interface{}, error) {
 		}
 
 	}
-	return "{\"success\":\"Updated " + strconv.Itoa(len(contractInfos)) + " contracts\"}", nil
+	return &contractInfoUpdateResponse{Updated: len(contractInfos)}, nil
+}
+
+// deleteContractInfo purges the stored metadata of one contract so the next
+// read re-fetches it from the backend node. The whole row is discarded — the
+// backend re-fetch restores only name/symbol/decimals, not the sync-owned
+// createdInBlock/destructedInBlock, so the purged record is logged and
+// returned for a POST restore. Deleting is idempotent: a missing row reports
+// deleted=false rather than an error, matching the runtime-settings DELETE
+// semantics.
+func (s *InternalServer) deleteContractInfo(address string, r *http.Request) (interface{}, error) {
+	if address == "" {
+		return nil, api.NewAPIError("Missing contract address", true)
+	}
+	purged, err := s.db.DeleteContractInfoForAddress(address)
+	if err != nil {
+		return nil, api.NewAPIError(err.Error(), true)
+	}
+	if purged != nil {
+		glog.Infof("admin: contract info %s purged (%+v), client %s", address, *purged, r.RemoteAddr)
+	}
+	return &contractInfoDeleteResponse{Contract: address, Deleted: purged != nil, Purged: purged}, nil
 }

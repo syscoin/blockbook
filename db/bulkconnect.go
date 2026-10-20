@@ -609,6 +609,7 @@ func (b *BulkConnect) connectBlockEthereumType(block *bchain.Block, storeBlockTx
 			return err
 		}
 	}
+	b.d.storeAddrContractsCacheIfDue()
 	return nil
 }
 

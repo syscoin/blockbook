@@ -21,6 +21,7 @@ import (
 	"github.com/trezor/blockbook/common"
 	"github.com/trezor/blockbook/db"
 	"github.com/trezor/blockbook/fiat"
+	"golang.org/x/sync/singleflight"
 )
 
 // Worker is handle to api worker
@@ -31,10 +32,18 @@ type Worker struct {
 	chainParser       bchain.BlockChainParser
 	chainType         bchain.ChainType
 	useAddressAliases bool
-	mempool           bchain.Mempool
-	is                *common.InternalState
-	fiatRates         *fiat.FiatRates
-	metrics           *common.Metrics
+	// useEnsReverseAliases gates serving ENS reverse labels (EthereumType only).
+	useEnsReverseAliases bool
+	mempool              bchain.Mempool
+	is                   *common.InternalState
+	fiatRates            *fiat.FiatRates
+	metrics              *common.Metrics
+	xpubConfig           XpubConfig
+	// contractProbeCache remembers contracts the chain reported as holding no token. The
+	// index never records that verdict, so without the cache every request re-probes them.
+	contractProbeCache *negativeProbeCache
+	// contractProbeGroup collapses concurrent probes of the same contract into one read.
+	contractProbeGroup singleflight.Group
 }
 
 var getTickersForTimestamps = func(fr *fiat.FiatRates, timestamps []int64, vsCurrency string, token string) (*[]*common.CurrencyRatesTicker, error) {
@@ -50,17 +59,31 @@ type contractInfoCache = map[string]*bchain.ContractInfo
 
 // NewWorker creates new api worker
 func NewWorker(db *db.RocksDB, chain bchain.BlockChain, mempool bchain.Mempool, txCache *db.TxCache, metrics *common.Metrics, is *common.InternalState, fiatRates *fiat.FiatRates) (*Worker, error) {
+	// Resolve per-chain xpub config override, if any.
+	xpubCfg := DefaultXpubConfig()
+	if provider, ok := chain.(interface {
+		XpubConfigOverride() *bchain.XpubConfig
+	}); ok {
+		if override := provider.XpubConfigOverride(); override != nil {
+			xpubCfg = ApplyXpubConfig(override)
+			glog.Infof("xpub: xpubConfig override applied: maxCacheEntries=%d maxCacheBytes=%d maxCacheExpirationSeconds=%d defaultAddressesGap=%d maxAddressesGap=%d",
+				xpubCfg.MaxCacheEntries, xpubCfg.MaxCacheBytes, xpubCfg.MaxCacheExpirationSeconds, xpubCfg.DefaultAddressesGap, xpubCfg.MaxAddressesGap)
+		}
+	}
 	w := &Worker{
-		db:                db,
-		txCache:           txCache,
-		chain:             chain,
-		chainParser:       chain.GetChainParser(),
-		chainType:         chain.GetChainParser().GetChainType(),
-		useAddressAliases: chain.GetChainParser().UseAddressAliases(),
-		mempool:           mempool,
-		is:                is,
-		fiatRates:         fiatRates,
-		metrics:           metrics,
+		db:                   db,
+		txCache:              txCache,
+		chain:                chain,
+		chainParser:          chain.GetChainParser(),
+		chainType:            chain.GetChainParser().GetChainType(),
+		useAddressAliases:    chain.GetChainParser().UseAddressAliases(),
+		useEnsReverseAliases: chain.GetChainParser().UseEnsReverseAliases(),
+		mempool:              mempool,
+		is:                   is,
+		fiatRates:            fiatRates,
+		metrics:              metrics,
+		xpubConfig:           xpubCfg,
+		contractProbeCache:   newNegativeProbeCache(contractProbeCacheCapacity),
 	}
 	if w.chainType == bchain.ChainBitcoinType {
 		w.initXpubCache()
@@ -329,7 +352,9 @@ func (w *Worker) setSpendingTxToVout(vout *Vout, txid string, height uint32) err
 							glog.Warning("Tx ", t, ": not found")
 						} else {
 							if len(spentTx.Vin) > int(index) {
-								if spentTx.Vin[index].Txid == txid {
+								// the outpoint must match, not just the tx: sibling outputs
+								// sharing this address and value would match on txid alone
+								if spentTx.Vin[index].Txid == txid && spentTx.Vin[index].Vout == uint32(vout.N) {
 									vout.SpentTxID = t
 									vout.SpentHeight = int(spentHeight)
 									vout.SpentIndex = int(index)
@@ -368,6 +393,11 @@ func (w *Worker) GetSpendingTxid(txid string, n int) (string, error) {
 	}
 	if n >= len(tx.Vout) || n < 0 {
 		return "", NewAPIError(fmt.Sprintf("Passed incorrect vout index %v for tx %v, len vout %v", n, tx.Txid, len(tx.Vout)), false)
+	}
+	// an unspent output has no spender, and the scan below has no early exit for
+	// that case - it would walk the address index all the way to the chain tip
+	if !tx.Vout[n].Spent {
+		return "", nil
 	}
 	err = w.setSpendingTxToVout(&tx.Vout[n], tx.Txid, uint32(tx.Blockheight))
 	if err != nil {
@@ -455,6 +485,10 @@ func (w *Worker) getAddressAliases(addresses map[string]struct{}) AddressAliases
 					if err == nil && ci != nil && ci.Name != "" {
 						aliases[a] = AddressAlias{Type: "Contract", Alias: ci.Name}
 					}
+				}
+				// keep the contract/token name, skip the ENS label when disabled
+				if !w.useEnsReverseAliases {
+					continue
 				}
 			}
 			n := w.db.GetAddressAlias(a)
@@ -555,6 +589,12 @@ func (w *Worker) getConfirmationETA(tx *Tx) (int64, uint32) {
 	return etaSeconds, etaBlocks
 }
 
+// isReplaceableInput reports whether an unconfirmed input lets the tx be replaced: UTXO inputs opt in via
+// the BIP125 sequence, while any EVM tx is replaceable at its nonce and Suite gates cancel/speed-up on it.
+func (w *Worker) isReplaceableInput(sequence uint32) bool {
+	return w.chainType == bchain.ChainEthereumType || sequence < 0xffffffff-1
+}
+
 // GetTransactionFromBchainTx reads transaction data from txid
 func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spendingTxs bool, specificJSON bool, addresses map[string]struct{}) (*Tx, error) {
 	var err error
@@ -585,8 +625,7 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		vin.N = i
 		vin.Vout = bchainVin.Vout
 		vin.Sequence = int64(bchainVin.Sequence)
-		// detect explicit Replace-by-Fee transactions as defined by BIP125
-		if bchainTx.Confirmations == 0 && bchainVin.Sequence < 0xffffffff-1 {
+		if bchainTx.Confirmations == 0 && w.isReplaceableInput(bchainVin.Sequence) {
 			rbf = true
 		}
 		vin.Hex = bchainVin.ScriptSig.Hex
@@ -594,12 +633,13 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 		if w.chainType == bchain.ChainBitcoinType {
 			//  bchainVin.Txid=="" is coinbase transaction
 			if bchainVin.Txid != "" {
-				// load spending addresses from TxAddresses
-				tas, err := w.db.GetTxAddresses(bchainVin.Txid)
+				// load the spending address from TxAddresses; only the spent output
+				// is needed, so avoid unpacking the whole previous-tx record
+				output, err := w.db.GetTxAddressesOutput(bchainVin.Txid, vin.Vout)
 				if err != nil {
-					return nil, errors.Annotatef(err, "GetTxAddresses %v", bchainVin.Txid)
+					return nil, errors.Annotatef(err, "GetTxAddressesOutput %v", bchainVin.Txid)
 				}
-				if tas == nil {
+				if output == nil {
 					// try to load from backend
 					otx, _, err := w.txCache.GetTransaction(bchainVin.Txid)
 					if err != nil {
@@ -632,18 +672,14 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 						aggregateAddresses(addresses, vin.Addresses, vin.IsAddress)
 					}
 				} else {
-					if len(tas.Outputs) > int(vin.Vout) {
-						output := &tas.Outputs[vin.Vout]
-						vin.ValueSat = (*Amount)(&output.ValueSat)
-						// SYSCOIN
-						vin.AssetInfo = w.assetInfoToAPI(output.AssetInfo)
-						vin.AddrDesc = output.AddrDesc
-						vin.Addresses, vin.IsAddress, err = output.Addresses(w.chainParser)
-						if err != nil {
-							glog.Errorf("output.Addresses error %v, tx %v, output %v", err, bchainVin.Txid, i)
-						}
-						aggregateAddresses(addresses, vin.Addresses, vin.IsAddress)
+					vin.ValueSat = (*Amount)(&output.ValueSat)
+					vin.AssetInfo = w.assetInfoToAPI(output.AssetInfo) // SYSCOIN
+					vin.AddrDesc = output.AddrDesc
+					vin.Addresses, vin.IsAddress, err = output.Addresses(w.chainParser)
+					if err != nil {
+						glog.Errorf("output.Addresses error %v, tx %v, output %v", err, bchainVin.Txid, i)
 					}
+					aggregateAddresses(addresses, vin.Addresses, vin.IsAddress)
 				}
 				if vin.ValueSat != nil {
 					valInSat.Add(&valInSat, (*big.Int)(vin.ValueSat))
@@ -718,19 +754,14 @@ func (w *Worker) GetTransactionFromBchainTx(bchainTx *bchain.Tx, height int, spe
 
 		parsedInputData := w.getParsedEthereumInputData(ethTxData.Data)
 
-		// mempool txs do not have fees yet
-		if ethTxData.GasUsed != nil {
-			feesSat.Mul(ethTxData.GasPrice, ethTxData.GasUsed)
-			if ethTxData.L1Fee != nil {
-				feesSat.Add(&feesSat, ethTxData.L1Fee)
-			}
-		}
+		feesSat = *getEthereumFeesSat(ethTxData)
 		if len(bchainTx.Vout) > 0 {
 			valOutSat = bchainTx.Vout[0].ValueSat
 		}
 		ethSpecific = &EthereumSpecific{
 			GasLimit:             ethTxData.GasLimit,
 			GasPrice:             (*Amount)(ethTxData.GasPrice),
+			EffectiveGasPrice:    (*Amount)(ethTxData.EffectiveGasPrice),
 			MaxPriorityFeePerGas: (*Amount)(ethTxData.MaxPriorityFeePerGas),
 			MaxFeePerGas:         (*Amount)(ethTxData.MaxFeePerGas),
 			BaseFeePerGas:        (*Amount)(ethTxData.BaseFeePerGas),
@@ -826,8 +857,7 @@ func (w *Worker) GetTransactionFromMempoolTx(mempoolTx *bchain.MempoolTx) (*Tx, 
 		vin.N = i
 		vin.Vout = bchainVin.Vout
 		vin.Sequence = int64(bchainVin.Sequence)
-		// detect explicit Replace-by-Fee transactions as defined by BIP125
-		if bchainVin.Sequence < 0xffffffff-1 {
+		if w.isReplaceableInput(bchainVin.Sequence) {
 			rbf = true
 		}
 		vin.Hex = bchainVin.ScriptSig.Hex
@@ -942,41 +972,46 @@ func (w *Worker) GetContractInfo(contract string, standardFromContext bchain.Tok
 }
 
 func (w *Worker) getContractDescriptorInfo(cd bchain.AddressDescriptor, standardFromContext bchain.TokenStandardName) (*bchain.ContractInfo, bool, error) {
-	var err error
-	validContract := true
+	return w.getProbedContractDescriptorInfo(cd, standardFromContext, nil)
+}
+
+// getProbedContractDescriptorInfo serves contract metadata from the index, falling back to a chain
+// read. probes carries what a batched pre-pass resolved; nil means read the chain per contract.
+func (w *Worker) getProbedContractDescriptorInfo(cd bchain.AddressDescriptor, standardFromContext bchain.TokenStandardName, probes contractInfoProbes) (*bchain.ContractInfo, bool, error) {
 	contractInfo, err := w.db.GetContractInfo(cd, standardFromContext)
 	if err != nil {
 		return nil, false, err
 	}
 	if contractInfo == nil {
+		bestHeight, reorgGen := w.contractProbeCacheState()
+		// already reported as holding no token: nothing left to read, and nothing to warn about
+		if w.contractProbeCache.contains(string(cd), bestHeight, reorgGen) {
+			return w.unknownContractInfo(cd), false, nil
+		}
 		// log warning only if the contract should have been known from processing of the internal data
 		if bchain.ProcessInternalTransactions {
 			glog.Warningf("Contract %v %v not found in DB", cd, standardFromContext)
 		}
-		contractInfo, err = w.chain.GetContractInfo(cd)
-		if err != nil {
-			glog.Errorf("GetContractInfo from chain error %v, contract %v", err, cd)
-		}
+		contractInfo, err = w.resolveContractInfo(cd, probes)
 		if contractInfo == nil {
-			contractInfo = &bchain.ContractInfo{Standard: bchain.UnknownTokenStandard, Decimals: w.chainParser.AmountDecimals()}
-			addresses, _, _ := w.chainParser.GetAddressesFromAddrDesc(cd)
-			if len(addresses) > 0 {
-				contractInfo.Contract = addresses[0]
+			if err != nil {
+				// a failed read says nothing about the contract, so it must not be cached
+				glog.Errorf("GetContractInfo from chain error %v, contract %v", err, cd)
+			} else {
+				w.contractProbeCache.add(string(cd), bestHeight, w.negativeProbeTTLBlocks(defaultNegativeProbeTTL), reorgGen)
 			}
-
-			validContract = false
-		} else {
-			if standardFromContext != bchain.UnknownTokenStandard && contractInfo.Standard == bchain.UnknownTokenStandard {
-				contractInfo.Standard = standardFromContext
-				contractInfo.Type = standardFromContext
-			}
-			if err = w.db.StoreContractInfo(contractInfo); err != nil {
-				glog.Errorf("StoreContractInfo error %v, contract %v", err, cd)
-			}
+			return w.unknownContractInfo(cd), false, nil
 		}
-	} else if (contractInfo.Standard == bchain.UnhandledTokenStandard || len(contractInfo.Name) > 0 && contractInfo.Name[0] == 0) || (len(contractInfo.Symbol) > 0 && contractInfo.Symbol[0] == 0) {
+		if standardFromContext != bchain.UnknownTokenStandard && contractInfo.Standard == bchain.UnknownTokenStandard {
+			contractInfo.Standard = standardFromContext
+			contractInfo.Type = standardFromContext
+		}
+		if err = w.db.StoreContractInfo(contractInfo); err != nil {
+			glog.Errorf("StoreContractInfo error %v, contract %v", err, cd)
+		}
+	} else if contractNeedsChainRefresh(contractInfo) {
 		// fix contract name/symbol that was parsed as a string consisting of zeroes
-		blockchainContractInfo, err := w.chain.GetContractInfo(cd)
+		blockchainContractInfo, err := w.resolveContractInfo(cd, probes)
 		if err != nil {
 			glog.Errorf("GetContractInfo from chain error %v, contract %v", err, cd)
 		} else {
@@ -1015,25 +1050,27 @@ func (w *Worker) getContractDescriptorInfo(cd bchain.AddressDescriptor, standard
 	if contractInfo.Decimals == 0 && contractInfo.Standard == bchain.UnhandledTokenStandard {
 		contractInfo.Decimals = w.chainParser.AmountDecimals()
 	}
-	return contractInfo, validContract, nil
+	// unresolved contracts already returned above, with validContract false
+	return contractInfo, true, nil
 }
 
+// getEthereumTokensTransfers maps parsed transfers to the API shape. Addresses and value come from
+// the log or calldata, so a transfer whose contract metadata cannot be read is kept with the coin's
+// decimals rather than dropped or left as a zero value (trezor/blockbook#1715).
 func (w *Worker) getEthereumTokensTransfers(transfers bchain.TokenTransfers, addresses map[string]struct{}) []TokenTransfer {
-	tokens := make([]TokenTransfer, len(transfers))
+	tokens := make([]TokenTransfer, 0, len(transfers))
 	if len(transfers) > 0 {
 		sort.Sort(transfers)
 		contractCache := make(contractInfoCache)
 		for i := range transfers {
 			t := transfers[i]
 			standard := bchain.EthereumTokenStandardMap[t.Standard]
-			var contractInfo *bchain.ContractInfo
-			if info, ok := contractCache[t.Contract]; ok {
-				contractInfo = info
-			} else {
+			contractInfo, ok := contractCache[t.Contract]
+			if !ok {
 				info, _, err := w.GetContractInfo(t.Contract, standard)
 				if err != nil {
 					glog.Errorf("getContractInfo error %v, contract %v", err, t.Contract)
-					continue
+					info = &bchain.ContractInfo{Standard: standard, Decimals: w.chainParser.AmountDecimals()}
 				}
 				contractInfo = info
 				contractCache[t.Contract] = info
@@ -1051,7 +1088,7 @@ func (w *Worker) getEthereumTokensTransfers(transfers bchain.TokenTransfers, add
 			}
 			aggregateAddress(addresses, t.From)
 			aggregateAddress(addresses, t.To)
-			tokens[i] = TokenTransfer{
+			tokens = append(tokens, TokenTransfer{
 				Type:             standard,
 				Standard:         standard,
 				Contract:         t.Contract,
@@ -1062,7 +1099,7 @@ func (w *Worker) getEthereumTokensTransfers(transfers bchain.TokenTransfers, add
 				Decimals:         contractInfo.Decimals,
 				Name:             contractInfo.Name,
 				Symbol:           contractInfo.Symbol,
-			}
+			})
 		}
 	}
 	return tokens
@@ -1088,6 +1125,12 @@ func (w *Worker) GetEthereumTokenURI(contract string, id string) (string, *bchai
 	return uri, ci, nil
 }
 
+// maxFilteredAddressScanNonMatching caps entries a filtered walk may skip; matches are already bounded by maxResults.
+var maxFilteredAddressScanNonMatching = 200000
+
+// errFilteredScanLimit is public so callers narrow from/to instead of reading a short page as the end of history.
+var errFilteredScanLimit = NewAPIError("Filtered history is too large to scan, narrow the range with from/to", true)
+
 func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
@@ -1105,29 +1148,26 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 		}
 		return uint32(filter.AssetsMask)&uint32(mask) == uint32(mask), nil
 	}
-	var callback db.GetTransactionsCallback
-	if filter.Vout == AddressFilterVoutOff {
-		callback = func(txid string, height uint32, indexes []int32) error {
-			if !mempool {
-				matches, err := txMatchesAssetMask(txid) // SYSCOIN
-				if err != nil || !matches {
-					return err
-				}
-			}
-			txids = append(txids, txid)
-			if len(txids) >= maxResults {
-				return &db.StopIteration{}
-			}
-			return nil
+	nonMatching := 0
+	skipNonMatching := func() error {
+		nonMatching++
+		if nonMatching > maxFilteredAddressScanNonMatching {
+			return errFilteredScanLimit
 		}
-	} else {
-		callback = func(txid string, height uint32, indexes []int32) error {
-			if !mempool {
-				matches, err := txMatchesAssetMask(txid) // SYSCOIN
-				if err != nil || !matches {
-					return err
-				}
+		return nil
+	}
+	callback := func(txid string, height uint32, indexes []int32) error {
+		if !mempool {
+			matches, err := txMatchesAssetMask(txid) // SYSCOIN
+			if err != nil {
+				return err
 			}
+			if !matches {
+				return skipNonMatching()
+			}
+		}
+		matches := filter.Vout == AddressFilterVoutOff
+		if !matches {
 			for _, index := range indexes {
 				vout := index
 				if vout < 0 {
@@ -1136,15 +1176,19 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 				if (filter.Vout == AddressFilterVoutInputs && index < 0) ||
 					(filter.Vout == AddressFilterVoutOutputs && index >= 0) ||
 					(vout == int32(filter.Vout)) {
-					txids = append(txids, txid)
-					if len(txids) >= maxResults {
-						return &db.StopIteration{}
-					}
+					matches = true
 					break
 				}
 			}
-			return nil
 		}
+		if !matches {
+			return skipNonMatching()
+		}
+		txids = append(txids, txid)
+		if len(txids) >= maxResults {
+			return &db.StopIteration{}
+		}
+		return nil
 	}
 	if mempool {
 		uniqueTxs := make(map[string]struct{})
@@ -1866,39 +1910,24 @@ func computePaging(count, page, itemsOnPage int) (Paging, int, int, int) {
 	}, from, to, page
 }
 
-// SYSCOIN
-func computePagingWithFirstPageMempool(confirmedCount, mempoolCount, page, itemsOnPage int) (Paging, int, int, int) {
-	if itemsOnPage <= 0 {
-		itemsOnPage = 1
-	}
-	mempoolSlots := mempoolCount
-	if mempoolSlots > itemsOnPage {
-		mempoolSlots = itemsOnPage
-	}
-	if mempoolSlots < 0 {
-		mempoolSlots = 0
-	}
-	pg, from, to, page := computePaging(confirmedCount+mempoolSlots, page, itemsOnPage)
-	from -= mempoolSlots
-	if from < 0 {
-		from = 0
-	}
-	to -= mempoolSlots
-	if to < 0 {
-		to = 0
-	}
-	if from > confirmedCount {
-		from = confirmedCount
-	}
-	if to > confirmedCount {
-		to = confirmedCount
-	}
-	return pg, from, to, page
+// computeAccountPaging pages over mempool entries followed by confirmed txids as a single
+// sequence, so that a page never exceeds itemsOnPage and no tx falls between two pages.
+func computeAccountPaging(mempoolCount, confirmedCount, page, itemsOnPage int) (pg Paging, mempoolFrom, mempoolTo, confirmedFrom, confirmedTo, normalizedPage int) {
+	pg, from, to, normalizedPage := computePaging(mempoolCount+confirmedCount, page, itemsOnPage)
+	mempoolFrom, mempoolTo = clampRange(from, to, mempoolCount)
+	confirmedFrom, confirmedTo = clampRange(from-mempoolCount, to-mempoolCount, confirmedCount)
+	return
 }
 
-func (w *Worker) getEthereumContractBalance(addrDesc bchain.AddressDescriptor, index int, c *db.AddrContract, details AccountDetails, ticker *common.CurrencyRatesTicker, secondaryCoin string, erc20Balance *big.Int, erc20Batched bool) (*Token, error) {
+// clampRange limits a window of the merged sequence to the bounds of one of its parts.
+func clampRange(from, to, length int) (int, int) {
+	from = min(max(from, 0), length)
+	return from, min(max(to, from), length)
+}
+
+func (w *Worker) getEthereumContractBalance(addrDesc bchain.AddressDescriptor, index int, c *db.AddrContract, details AccountDetails, ticker *common.CurrencyRatesTicker, secondaryCoin string, erc20Balance *big.Int, erc20Batched bool, probes contractInfoProbes) (*Token, error) {
 	standard := bchain.EthereumTokenStandardMap[c.Standard]
-	ci, validContract, err := w.getContractDescriptorInfo(c.Contract, standard)
+	ci, validContract, err := w.getProbedContractDescriptorInfo(c.Contract, standard, probes)
 	if err != nil {
 		return nil, errors.Annotatef(err, "getEthereumContractBalance %v", c.Contract)
 	}
@@ -1925,7 +1954,13 @@ func (w *Worker) getEthereumContractBalance(addrDesc bchain.AddressDescriptor, i
 				b, err = w.chain.EthereumTypeGetErc20ContractBalance(addrDesc, c.Contract)
 				if err != nil {
 					// return nil, nil, nil, errors.Annotatef(err, "EthereumTypeGetErc20ContractBalance %v %v", addrDesc, c.Contract)
-					glog.Warningf("EthereumTypeGetErc20ContractBalance addr %v, contract %v, %v", addrDesc, c.Contract, err)
+					if errors.Cause(err) == eth.ErrInvalidErc20Balance {
+						// Benign and high-volume: unparseable/empty balanceOf from a dead or non-ERC20-conforming
+						// token. Tracked via the "invalid" metric; logged at V(2) to avoid flooding logs.
+						glog.V(2).Infof("EthereumTypeGetErc20ContractBalance addr %v, contract %v, %v", addrDesc, c.Contract, err)
+					} else {
+						glog.Warningf("EthereumTypeGetErc20ContractBalance addr %v, contract %v, %v", addrDesc, c.Contract, err)
+					}
 				}
 			}
 			if b != nil {
@@ -1993,7 +2028,11 @@ func (w *Worker) getEthereumContractBalanceFromBlockchain(addrDesc, contract bch
 		b, err = w.chain.EthereumTypeGetErc20ContractBalance(addrDesc, contract)
 		if err != nil {
 			// return nil, nil, nil, errors.Annotatef(err, "EthereumTypeGetErc20ContractBalance %v %v", addrDesc, c.Contract)
-			glog.Warningf("EthereumTypeGetErc20ContractBalance addr %v, contract %v, %v", addrDesc, contract, err)
+			if errors.Cause(err) == eth.ErrInvalidErc20Balance {
+				glog.V(2).Infof("EthereumTypeGetErc20ContractBalance addr %v, contract %v, %v", addrDesc, contract, err)
+			} else {
+				glog.Warningf("EthereumTypeGetErc20ContractBalance addr %v, contract %v, %v", addrDesc, contract, err)
+			}
 		}
 	} else {
 		b = nil
@@ -2065,8 +2104,8 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 	var confirmedNonceOK bool
 	// unknown number of results for paging initially
 	d := ethereumTypeAddressData{totalResults: -1}
-	// Load cached contract list and totals from the index; this drives token lookups.
-	ca, err := w.db.GetAddrDescContracts(addrDesc)
+	// details=basic consumes only the header counters; nothing it returns reads the contract array
+	ca, err := w.db.GetAddrDescContracts(addrDesc, details == AccountDetailsBasic)
 	if err != nil {
 		return nil, nil, NewAPIError(fmt.Sprintf("Address not found, %v", err), true)
 	}
@@ -2091,7 +2130,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 		if b != nil {
 			ba.BalanceSat = *b
 		}
-		nPending, nConfirmed, confirmedNonceOK, err = w.chain.EthereumTypeGetNonces(addrDesc, filter.WithConfirmedNonce)
+		nPending, nConfirmed, confirmedNonceOK, err = w.chain.EthereumTypeGetNonces(addrDesc, filter.WithConfirmedNonce, filter.PrivatePendingNonces...)
 		if err != nil {
 			return nil, nil, errors.Annotatef(err, "EthereumTypeGetNonces %v", addrDesc)
 		}
@@ -2103,7 +2142,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 			for i := range ca.Contracts {
 				c := &ca.Contracts[i]
 				// Only fungible tokens are eligible; respect a contract filter if present.
-				if c.Standard != bchain.FungibleToken {
+				if c.Standard != bchain.FungibleToken || w.chainParser.EthereumTypeIsIgnoredContract(c.Contract) {
 					continue
 				}
 				if len(filterDesc) > 0 && !bytes.Equal(filterDesc, c.Contract) {
@@ -2128,10 +2167,19 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 			}
 		}
 		if details > AccountDetailsBasic {
+			// a single-contract filter is never worth a batch - the per-contract path is as cheap
+			var probes contractInfoProbes
+			if len(filterDesc) == 0 {
+				probes = w.prefetchContractInfos(ca.Contracts)
+			}
 			d.tokens = make([]Token, len(ca.Contracts))
 			var j int
 			for i := range ca.Contracts {
 				c := &ca.Contracts[i]
+				// skip, not remove: filter.Vout below relies on the index into ca.Contracts
+				if w.chainParser.EthereumTypeIsIgnoredContract(c.Contract) {
+					continue
+				}
 				if len(filterDesc) > 0 {
 					if !bytes.Equal(filterDesc, c.Contract) {
 						continue
@@ -2146,7 +2194,7 @@ func (w *Worker) getEthereumTypeAddressBalances(addrDesc bchain.AddressDescripto
 				if erc20Balances != nil {
 					erc20Balance, erc20Batched = erc20Balances[string(c.Contract)]
 				}
-				t, err := w.getEthereumContractBalance(addrDesc, i+db.ContractIndexOffset, c, details, ticker, secondaryCoin, erc20Balance, erc20Batched)
+				t, err := w.getEthereumContractBalance(addrDesc, i+db.ContractIndexOffset, c, details, ticker, secondaryCoin, erc20Balance, erc20Batched, probes)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -2303,8 +2351,8 @@ func (w *Worker) txFromTxid(txid string, bestHeight uint32, option AccountDetail
 func (w *Worker) getAddrDescAndNormalizeAddress(address string) (bchain.AddressDescriptor, string, error) {
 	addrDesc, err := w.chainParser.GetAddrDescFromAddress(address)
 	if err != nil {
-		var errAd error
 		// try if the address is not address descriptor converted to string
+		var errAd error
 		addrDesc, errAd = bchain.AddressDescriptorFromString(address)
 		if errAd != nil {
 			return nil, "", NewAPIError(fmt.Sprintf("Invalid address, %v", err), true)
@@ -2385,6 +2433,8 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 	var (
 		ba                       *db.AddrBalance
 		txm                      []string
+		mempoolTxs               []*Tx
+		mempoolTxCount           int
 		txs                      []*Tx
 		txids                    []string
 		accountChainExtraData    *AccountChainExtraData
@@ -2427,10 +2477,9 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 			}
 		}
 	}
-	// if there are only unconfirmed transactions, there is no paging
+	// address only in mempool; the paged sequence is then the pending txs alone
 	if ba == nil {
 		ba = &db.AddrBalance{}
-		page = 0
 	}
 	addresses := w.newAddressesMapForAliases()
 	assetMempool := make(map[string]*syscoinTokenMempoolInfo) // SYSCOIN
@@ -2465,24 +2514,38 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 							uBalSending.Add(&uBalSending, tx.getAddrVinValue(addrDesc))
 							tx.addAddrVinAssetMempool(addrDesc, assetMempool) // SYSCOIN
 						}
-						if page == 0 {
-							if option == AccountDetailsTxidHistory {
-								txids = append(txids, tx.Txid)
-							} else if option == AccountDetailsTxHistorySummary {
-								txs = append(txs, w.summarizeTxForAccount(tx, accountAddrDescs)) // SYSCOIN
-							} else if option >= AccountDetailsTxHistoryLight {
-								setIsOwnAddress(tx, address)
-								txs = append(txs, tx)
+						if option >= AccountDetailsTxidHistory {
+							// entries past (page+1)*txsOnPage can never fall into the page window;
+							// not retaining them bounds memory on addresses with a huge pending set
+							if filter.Vout == AddressFilterVoutQueryNotNecessary || len(mempoolTxs) < (page+1)*txsOnPage {
+								mempoolTxs = append(mempoolTxs, tx)
 							}
+							mempoolTxCount++
 						}
 					}
 				}
 			}
 		}
 	}
+	appendMempoolTxs := func(from, to int) {
+		for _, tx := range mempoolTxs[from:to] {
+			if option == AccountDetailsTxidHistory {
+				txids = append(txids, tx.Txid)
+			} else if option == AccountDetailsTxHistorySummary {
+				txs = append(txs, w.summarizeTxForAccount(tx, accountAddrDescs)) // SYSCOIN
+			} else if option >= AccountDetailsTxHistoryLight {
+				setIsOwnAddress(tx, address)
+				txs = append(txs, tx)
+			}
+		}
+	}
 	// get tx history if requested by option or check mempool if there are some transactions for a new address
 	if option >= AccountDetailsTxidHistory && filter.Vout != AddressFilterVoutQueryNotNecessary {
 		txc, err := w.getAddressTxids(addrDesc, false, filter, (page+1)*txsOnPage)
+		if err == errFilteredScanLimit {
+			// unwrapped: the servers recognise public errors only by a plain *APIError assertion
+			return nil, err
+		}
 		if err != nil {
 			return nil, errors.Annotatef(err, "getAddressTxids %v false", addrDesc)
 		}
@@ -2490,24 +2553,19 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 		if err != nil {
 			return nil, errors.Annotatef(err, "GetBestBlock")
 		}
-		var from, to int
-		if option == AccountDetailsTxHistorySummary {
-			pg, from, to, page = computePagingWithFirstPageMempool(len(txc), unconfirmedTxs, page, txsOnPage) // SYSCOIN
-		} else {
-			pg, from, to, page = computePaging(len(txc), page, txsOnPage)
-		}
+		var from, to, mempoolFrom, mempoolTo int
+		pg, mempoolFrom, mempoolTo, from, to, page = computeAccountPaging(mempoolTxCount, len(txc), page, txsOnPage)
+		// len(txc) >= txsOnPage means txc may have been truncated by maxResults, so the exact
+		// TotalPages must come from totalResults; the mempool is always fetched in full
 		if len(txc) >= txsOnPage {
 			if totalResults < 0 {
 				pg.TotalPages = -1
 			} else {
-				// SYSCOIN
-				if option == AccountDetailsTxHistorySummary {
-					pg, _, _, _ = computePagingWithFirstPageMempool(totalResults, unconfirmedTxs, page, txsOnPage)
-				} else {
-					pg, _, _, _ = computePaging(totalResults, page, txsOnPage)
-				}
+				pg, _, _, _ = computePaging(totalResults+mempoolTxCount, page, txsOnPage)
 			}
 		}
+		// mempool txs take the first slots of the paged sequence, before confirmed history
+		appendMempoolTxs(mempoolFrom, mempoolTo)
 		for i := from; i < to; i++ {
 			txid := txc[i]
 			if option == AccountDetailsTxidHistory {
@@ -2525,16 +2583,9 @@ func (w *Worker) GetAddress(address string, page int, txsOnPage int, option Acco
 				}
 			}
 		}
-	}
-	// On page 1, mempool items are prepended before confirmed history.
-	// Keep response bounded by requested page size for txid/txs details.
-	if page == 0 && txsOnPage > 0 {
-		if option == AccountDetailsTxidHistory && len(txids) > txsOnPage {
-			txids = txids[:txsOnPage]
-		} else if option >= AccountDetailsTxHistorySummary && len(txs) > txsOnPage {
-			// SYSCOIN
-			txs = txs[:txsOnPage]
-		}
+	} else if page == 0 {
+		// no confirmed history is queried, so there is nothing to page against
+		appendMempoolTxs(0, len(mempoolTxs))
 	}
 	if w.chainType == bchain.ChainBitcoinType {
 		totalReceived = ba.ReceivedSat()
@@ -2677,13 +2728,32 @@ func (w *Worker) processInternalTransactionsForBalanceHistory(addrDesc bchain.Ad
 	return nil
 }
 
-func addEthereumFeesToBalanceHistory(ethTxData *bchain.EthereumTxData, bh *BalanceHistory) {
-	var feesSat big.Int
-	// mempool txs do not have fees yet
-	if ethTxData.GasUsed != nil && ethTxData.GasPrice != nil {
-		feesSat.Mul(ethTxData.GasPrice, ethTxData.GasUsed)
+// getEthereumFeesSat computes the transaction fee actually paid, in the smallest
+// unit of the chain. On L2 networks (Arbitrum, Optimism, Base, ...) the transaction
+// gasPrice is only the bid price, while the receipt's effectiveGasPrice is the price
+// actually charged, so it is preferred when available. Rollups that report a separate
+// L1 data fee (l1Fee, e.g. the OP stack) have it added on top. Mempool transactions
+// have no gasUsed yet and therefore no fee.
+func getEthereumFeesSat(ethTxData *bchain.EthereumTxData) *big.Int {
+	feesSat := new(big.Int)
+	if ethTxData.GasUsed == nil {
+		return feesSat
 	}
-	(*big.Int)(bh.SentSat).Add((*big.Int)(bh.SentSat), &feesSat)
+	gasPrice := ethTxData.GasPrice
+	if ethTxData.EffectiveGasPrice != nil && ethTxData.EffectiveGasPrice.Sign() > 0 {
+		gasPrice = ethTxData.EffectiveGasPrice
+	}
+	if gasPrice != nil {
+		feesSat.Mul(gasPrice, ethTxData.GasUsed)
+	}
+	if ethTxData.L1Fee != nil {
+		feesSat.Add(feesSat, ethTxData.L1Fee)
+	}
+	return feesSat
+}
+
+func addEthereumFeesToBalanceHistory(ethTxData *bchain.EthereumTxData, bh *BalanceHistory) {
+	(*big.Int)(bh.SentSat).Add((*big.Int)(bh.SentSat), getEthereumFeesSat(ethTxData))
 }
 
 func (w *Worker) processPrimaryVoutForBalanceHistory(
@@ -2885,7 +2955,7 @@ func (w *Worker) balanceHistoryForTxid(addrDesc bchain.AddressDescriptor, txid s
 // (0) via <NET>_{WS,REST}_BALANCE_HISTORY_MAX_TXS (<NET>_BALANCE_HISTORY_MAX_TXS
 // sets both).
 const (
-	DefaultBalanceHistoryMaxTxsREST = 250000
+	DefaultBalanceHistoryMaxTxsREST = 100000
 	DefaultBalanceHistoryMaxTxsWS   = 1000000
 )
 
@@ -2901,7 +2971,11 @@ const (
 // the caller supplies the transport-specific cap (WS vs REST). transport labels
 // the emitted metrics with the serving surface.
 func (w *Worker) GetBalanceHistory(address string, fromTimestamp, toTimestamp int64, currencies []string, groupBy uint32, maxTxs int, transport string) (BalanceHistories, error) {
-	currencies = removeEmpty(currencies)
+	var err error
+	currencies, err = normalizeFiatCurrencies(currencies)
+	if err != nil {
+		return nil, err
+	}
 	bhs := make(BalanceHistories, 0)
 	start := time.Now()
 	addrDesc, _, err := w.getAddrDescAndNormalizeAddress(address)
@@ -2958,10 +3032,7 @@ func (w *Worker) GetBalanceHistory(address string, fromTimestamp, toTimestamp in
 	if w.metrics != nil {
 		w.metrics.BalanceHistoryPoints.With(common.Labels{"path": "address"}).Observe(float64(len(bha)))
 	}
-	err = w.setFiatRateToBalanceHistories(bha, currencies, "address")
-	if err != nil {
-		return nil, err
-	}
+	w.setFiatRateToBalanceHistories(bha, currencies, "address")
 	glog.V(1).Info("GetBalanceHistory ", address, ", blocks ", fromHeight, "-", toHeight, ", count ", len(bha), ", ", time.Since(start))
 	return bha, nil
 }
@@ -3480,15 +3551,37 @@ func nonZeroTime(t time.Time) *time.Time {
 }
 
 const (
-	systemInfoSyncStartGrace      = 5 * time.Second
-	systemInfoEthereumStaleBlocks = 12
-	// systemInfoEthereumSyncedGap is how far the indexed height may trail the
-	// backend tip and still count as synchronized. It covers the one-block window
-	// between the feed tip advancing and that block being connected, which would
-	// otherwise flap the status on a fast/archive EVM chain.
-	systemInfoEthereumSyncedGap = 1
+	systemInfoSyncStartGrace = 5 * time.Second
+	systemInfoStaleBlocks    = 12
+	// systemInfoMinStale floors the window systemInfoStaleBlocks derives from the chain
+	// cadence. Twelve block times is 3s on Arbitrum and 1.2s on Robinhood, under ordinary
+	// RPC and GC jitter. eth.TipStaleThreshold clamps its analogous window the same way,
+	// and the floor is what lets a fast chain's configured cadence be corrected downwards
+	// without tightening this check.
+	systemInfoMinStale = 30 * time.Second
+	// systemInfoSyncedGap is the floor for how far the indexed height may trail the backend
+	// tip and still count as synchronized. It covers the one-block window between the tip
+	// advancing and that block being connected, which would otherwise flap the status.
+	systemInfoSyncedGap = 1
+	// systemInfoSyncedGapWindow turns that floor into wall clock. One block is 12s of slack
+	// on Ethereum but 0.25s on Arbitrum, where an excursion peaking at 211 blocks - 53s of
+	// real lag - read as out-of-sync and paged. Same value as systemInfoMinStale on purpose:
+	// under 30s is jitter for both checks.
+	systemInfoSyncedGapWindow = systemInfoMinStale
+	// systemInfoMinBlockPeriod floors the cadence the window is divided by, capping the
+	// derived tolerance at 300 blocks. 100ms is the fastest cadence any supported chain
+	// configures (Robinhood); anything smaller is a misconfigured averageBlockTimeMs or
+	// a degenerate observed average.
+	systemInfoMinBlockPeriod = 100 * time.Millisecond
 )
 
+// systemInfoInSync decides the externally reported in-sync state from the raw
+// IsSynchronized flag plus a freshness/tip check. The tip rescue (out-of-sync -> synced)
+// applies to any chain with a known block period, not only EVM: the raw flag is cleared for
+// the whole of every resync iteration, so without it a chain that takes longer than the
+// start grace to connect a batch reads out-of-sync mid-iteration even though its index is
+// at the tip. The demotion (synced -> out-of-sync on a stale index) stays EVM-only; see the
+// comment on it. A chain with no configured cadence (blockPeriod <= 0) keeps the raw flag.
 func systemInfoInSync(inSync bool, initialSync bool, chainType bchain.ChainType, bestHeight uint32, backendBlocks int, lastBlockTime, startSync, now time.Time, blockPeriod time.Duration) bool {
 	if !inSync && !initialSync {
 		// If less than 5 seconds into syncing, return inSync=true to avoid short
@@ -3498,28 +3591,131 @@ func systemInfoInSync(inSync bool, initialSync bool, chainType bchain.ChainType,
 		}
 	}
 
-	if chainType != bchain.ChainEthereumType || blockPeriod <= 0 {
+	if blockPeriod <= 0 {
 		return inSync
 	}
+	// Neither input path validates the cadence beyond > 0, and the gap tolerance below
+	// scales linearly with it, so floor it to bound what a bad value can buy.
+	if blockPeriod < systemInfoMinBlockPeriod {
+		blockPeriod = systemInfoMinBlockPeriod
+	}
 
-	threshold := systemInfoEthereumStaleBlocks * blockPeriod
+	threshold := systemInfoStaleBlocks * blockPeriod
+	if threshold < systemInfoMinStale {
+		threshold = systemInfoMinStale
+	}
 	isFresh := !lastBlockTime.Add(threshold).Before(now)
 
-	// Long EVM archive syncs can stay inside ResyncIndex while new blocks keep
-	// arriving. If the indexed height is at (or within one block of) the backend
-	// tip and the index was updated recently, report the externally observable
-	// state as synchronized. int64 avoids underflow if the backend momentarily
-	// reports a lower tip; gap >= 0 keeps an "ahead of tip" read from qualifying.
+	// Tolerate the blocks the chain produces inside the window, never fewer than one.
+	// Derived from the constant, not from threshold above: 12 block times divided by the
+	// block time is 12 blocks on every chain, which would stretch Bitcoin to two hours.
+	syncedGap := int64(systemInfoSyncedGap)
+	if lag := int64(systemInfoSyncedGapWindow / blockPeriod); lag > syncedGap {
+		syncedGap = lag
+	}
+
+	// A sync loop can stay inside ResyncIndex while new blocks keep arriving. If the indexed
+	// height is at (or close behind) the backend tip and the index was updated recently,
+	// report the externally observable state as synchronized. int64 avoids underflow if the
+	// backend reports a lower tip.
 	gap := int64(backendBlocks) - int64(bestHeight)
-	if !inSync && !initialSync && gap >= 0 && gap <= systemInfoEthereumSyncedGap && isFresh {
+	// A negative gap is the steady state for RefreshSyncMetrics, whose backend tip is a
+	// snapshot from the end of the previous resync iteration, so the same distance is
+	// tolerated in both directions. backendBlocks > 0 keeps the rescue from firing before
+	// any tip was observed.
+	if gap < 0 {
+		// Bounded, not clamped to zero: disconnect/reconnect churn refreshes LastSync,
+		// so an index far past a live tip would read fresh indefinitely.
+		gap = -gap
+	}
+	if !inSync && !initialSync && backendBlocks > 0 && gap <= syncedGap && isFresh {
 		return true
 	}
 
-	if inSync && !isFresh {
+	// Demote a synced-but-stale index on EVM chains only. Their tip arrives over a newHeads
+	// subscription that can die silently, their spacing is near-deterministic, and 12 block
+	// times floored at 30s leaves large headroom. UTXO block arrival is Poisson: a natural
+	// gap past 12 mean spacings is ~6e-6 per block, and Bitcoin's configured 600s against
+	// an observed ~682s makes the window tighter than nominal, so across the fleet this
+	// would demote healthy nodes a few times a year and page via blockbookApiInSync. A
+	// stalled UTXO indexer is caught by BlockbookIndexStalled (blockbook_best_height against
+	// blockbook_backend_best_height), which is chain-agnostic and does not read this flag.
+	if inSync && !isFresh && chainType == bchain.ChainEthereumType {
 		return false
 	}
 
 	return inSync
+}
+
+// syncBlockPeriod returns the block cadence the sync freshness checks normalize by.
+// It prefers the configured averageBlockTimeMs - stable, available before enough blocks
+// are observed, sub-second capable, and the same value the tip watchdog uses - and falls
+// back to the observed average. Shared by GetSystemInfo and RefreshSyncMetrics so the
+// /api/ inSync field and the blockbook_synchronized gauge cannot disagree.
+func syncBlockPeriod(chain bchain.BlockChain, is *common.InternalState) time.Duration {
+	// Fractional seconds: the integer GetAvgBlockPeriod truncates a sub-second cadence to
+	// 0, and a 0 here makes systemInfoInSync return at blockPeriod <= 0, silently skipping
+	// the freshness and tip-gap checks on exactly the sub-second EVM chains this targets.
+	blockPeriod := time.Duration(is.GetAvgBlockPeriodSeconds() * float64(time.Second))
+	if p, ok := chain.(interface {
+		AverageBlockTimeDuration() (time.Duration, error)
+	}); ok {
+		if d, err := p.AverageBlockTimeDuration(); err == nil && d > 0 {
+			blockPeriod = d
+		}
+	}
+	return blockPeriod
+}
+
+// syncChainType returns the chain type systemInfoInSync gates its demotion on. A chain or
+// parser that is not wired up yet (startup, and the unit tests) degrades to the UTXO type,
+// which is the side of the gate that leaves the raw flag alone.
+func syncChainType(chain bchain.BlockChain) bchain.ChainType {
+	if chain == nil {
+		return bchain.ChainBitcoinType
+	}
+	if p := chain.GetChainParser(); p != nil {
+		return p.GetChainType()
+	}
+	return bchain.ChainBitcoinType
+}
+
+// RefreshSyncMetrics publishes the sync-state gauges from internal state and the cached
+// backend info with no backend round trip, so it can run on a short timer. These gauges
+// used to be written only by the ~15-minute app-info loop, which needs three RPCs, so a
+// stall stayed invisible for up to 16 minutes. backend_best_height is held back until a
+// height has been observed, since a 0 reads as "no blocks produced" to the stuck rules.
+func RefreshSyncMetrics(is *common.InternalState, chain bchain.BlockChain, metrics *common.Metrics) {
+	if is == nil || metrics == nil {
+		return
+	}
+	// One locked snapshot: taking backend info, the initial-sync flag and the sync state
+	// through separate accessors let a concurrent resync land between them and tear the
+	// backend-vs-indexed height comparison.
+	bi, initialSync, isSynchronized, bestHeight, lastSync, startSync := is.GetSyncMetricsSnapshot()
+	// Note: a cached BackendError is deliberately not forced to inSync=false here. That
+	// force was sticky for up to a full resync period after the backend recovered (bi is
+	// only refreshed at the end of a resync iteration) and disagreed with /api, which
+	// re-queries live. A genuine backend outage freezes bi.Blocks and lastSync, so the
+	// freshness check below degrades EVM chains to 0 on its own; a stalled backend is the
+	// job of blockbook_tip_age_seconds and the backend-stuck rules, not this gauge.
+	inSync := systemInfoInSync(isSynchronized, initialSync, syncChainType(chain), bestHeight,
+		bi.Blocks, lastSync, startSync, time.Now().UTC(), syncBlockPeriod(chain, is))
+
+	metrics.BlockbookBestHeight.Set(float64(bestHeight))
+	if bi.Blocks > 0 {
+		metrics.BackendBestHeight.Set(float64(bi.Blocks))
+	}
+	synchronized := 0.0
+	if inSync {
+		synchronized = 1
+	}
+	metrics.Synchronized.Set(synchronized)
+	initial := 0.0
+	if initialSync {
+		initial = 1
+	}
+	metrics.InitialSync.Set(initial)
 }
 
 // GetSystemInfo returns information about system
@@ -3527,32 +3723,20 @@ func (w *Worker) GetSystemInfo(internal bool) (*SystemInfo, error) {
 	start := time.Now().UTC()
 	vi := common.GetVersionInfo()
 	inSync, bestHeight, lastBlockTime, startSync := w.is.GetSyncState()
-	blockPeriod := time.Duration(w.is.GetAvgBlockPeriod()) * time.Second
-	// Prefer the configured per-coin cadence (averageBlockTimeMs): it is stable,
-	// available before enough blocks are observed for GetAvgBlockPeriod to be
-	// computed (which otherwise returns 0 and disables the EVM sync checks below),
-	// and is the same value the tip watchdog uses. Using the duration directly also
-	// covers sub-second chains (e.g. Arbitrum at 250ms) that round to 0 seconds.
-	// Fall back to the runtime-observed average when the coin does not configure one.
-	if p, ok := w.chain.(interface {
-		AverageBlockTimeDuration() (time.Duration, error)
-	}); ok {
-		if d, err := p.AverageBlockTimeDuration(); err == nil && d > 0 {
-			blockPeriod = d
-		}
-	}
+	blockPeriod := syncBlockPeriod(w.chain, w.is)
 	inSyncMempool, lastMempoolTime, mempoolSize := w.is.GetMempoolSyncState()
 	ci, err := w.chain.GetChainInfo()
 	var backendError string
 	if err != nil {
 		glog.Error("GetChainInfo error ", err)
-		backendError = errors.Annotatef(err, "GetChainInfo").Error()
+		// served verbatim on /api/ and /, and a dial error carries the full backend url
+		backendError = common.RedactURLs(errors.Annotatef(err, "GetChainInfo").Error())
 		ci = &bchain.ChainInfo{}
 		// set not in sync in case of backend error
 		inSync = false
 		inSyncMempool = false
 	} else {
-		inSync = systemInfoInSync(inSync, w.is.InitialSync, w.chainType, bestHeight, ci.Blocks, lastBlockTime, startSync, time.Now().UTC(), blockPeriod)
+		inSync = systemInfoInSync(inSync, w.is.GetInitialSync(), w.chainType, bestHeight, ci.Blocks, lastBlockTime, startSync, time.Now().UTC(), blockPeriod)
 	}
 	var columnStats []common.InternalStateColumn
 	var internalDBSize int64
@@ -3573,7 +3757,7 @@ func (w *Worker) GetSystemInfo(internal bool) (*SystemInfo, error) {
 		GitCommit:                    vi.GitCommit,
 		BuildTime:                    vi.BuildTime,
 		SyncMode:                     w.is.SyncMode,
-		InitialSync:                  w.is.InitialSync,
+		InitialSync:                  w.is.GetInitialSync(),
 		InSync:                       inSync,
 		BestHeight:                   bestHeight,
 		LastBlockTime:                lastBlockTime,

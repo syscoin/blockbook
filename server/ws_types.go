@@ -17,6 +17,8 @@ type WsReq struct {
 type WsRes struct {
 	ID   string      `json:"id" ts_doc:"Corresponding request identifier."`
 	Data interface{} `json:"data" ts_doc:"Payload of the response, structure depends on the request."`
+	// release, if non-nil, is invoked exactly once when this response leaves the out pipeline
+	release func()
 }
 
 type resultError struct {
@@ -27,19 +29,31 @@ type resultError struct {
 
 // WsAccountInfoReq carries parameters for the 'getAccountInfo' method.
 type WsAccountInfoReq struct {
-	Descriptor string `json:"descriptor" ts_doc:"Address or XPUB descriptor to query."`
-	// SYSCOIN: txsummary is a compact account-context history mode for wallet lists.
-	Details           string   `json:"details,omitempty" ts_type:"'basic' | 'tokens' | 'tokenBalances' | 'txids' | 'txsummary' | 'txslight' | 'txs'" ts_doc:"Level of detail to retrieve about the account."`
-	Tokens            string   `json:"tokens,omitempty" ts_type:"'derived' | 'used' | 'nonzero'" ts_doc:"Which tokens to include in the account info."`
-	Protocols         []string `json:"protocols,omitempty" ts_doc:"Optional protocol enrichments to include. Supported values currently include 'erc4626'."`
-	PageSize          int      `json:"pageSize,omitempty" ts_doc:"Number of items per page, if paging is used."`
-	Page              int      `json:"page,omitempty" ts_doc:"Requested page index, if paging is used."`
-	FromHeight        int      `json:"from,omitempty" ts_doc:"Starting block height for transaction filtering."`
-	ToHeight          int      `json:"to,omitempty" ts_doc:"Ending block height for transaction filtering."`
-	ContractFilter    string   `json:"contractFilter,omitempty" ts_doc:"Filter by specific contract address (for token data)."`
-	SecondaryCurrency string   `json:"secondaryCurrency,omitempty" ts_doc:"Currency code to convert values into (e.g. 'USD')."`
-	Gap               int      `json:"gap,omitempty" ts_doc:"Gap limit for XPUB scanning, if relevant."`
-	ConfirmedNonce    bool     `json:"confirmedNonce,omitempty" ts_doc:"If true, additionally return the confirmed nonce for Ethereum-like addresses (extra backend call)."`
+	Descriptor        string            `json:"descriptor" ts_doc:"Address or XPUB descriptor to query."`
+	Details           string            `json:"details,omitempty" ts_type:"'basic' | 'tokens' | 'tokenBalances' | 'txids' | 'txsummary' | 'txslight' | 'txs'" ts_doc:"Level of detail to retrieve about the account."`
+	Tokens            string            `json:"tokens,omitempty" ts_type:"'derived' | 'used' | 'nonzero'" ts_doc:"Which tokens to include in the account info."`
+	Protocols         []string          `json:"protocols,omitempty" ts_doc:"Optional protocol enrichments to include. Supported values currently include 'erc4626'."`
+	PageSize          int               `json:"pageSize,omitempty" ts_doc:"Number of items per page, if paging is used."`
+	Page              int               `json:"page,omitempty" ts_doc:"Requested page index, if paging is used."`
+	FromHeight        int               `json:"from,omitempty" ts_doc:"Starting block height for transaction filtering."`
+	ToHeight          int               `json:"to,omitempty" ts_doc:"Ending block height for transaction filtering."`
+	ContractFilter    string            `json:"contractFilter,omitempty" ts_doc:"Filter by specific contract address (for token data)."`
+	SecondaryCurrency string            `json:"secondaryCurrency,omitempty" ts_doc:"Currency code to convert values into (e.g. 'USD')."`
+	Gap               int               `json:"gap,omitempty" ts_doc:"Gap limit for XPUB scanning, if relevant."`
+	ConfirmedNonce    bool              `json:"confirmedNonce,omitempty" ts_doc:"If true, additionally return the confirmed nonce for Ethereum-like addresses (extra backend call)."`
+	PrivatePending    *WsPrivatePending `json:"privatePending,omitempty" ts_doc:"Ethereum-like only: the sender's in-flight private (alternative send-tx / relay) transactions the wallet is tracking for this address. When it declares nonces, Blockbook answers the pending-nonce lookup from this authoritative wallet state instead of inferring it from recently accepted sends (see docs/evm-send.md)."`
+}
+
+// WsPrivatePending declares the private (alternative send-tx / relay) transactions a wallet knows
+// are in flight for the queried Ethereum-like address. A private relay exposes no mempool, so a tx
+// pending only there is invisible to the public backend RPC; declaring it lets Blockbook route the
+// nonce lookup to the relay and count each declared nonce as an occupied slot in the pending-nonce
+// walk (see the Nonces doc), rather than guessing from which addresses recently sent through this
+// instance. Only Nonces drive behavior today; Txids are accepted for forward compatibility (future
+// pending-tx correlation).
+type WsPrivatePending struct {
+	Nonces []uint64 `json:"nonces,omitempty" ts_doc:"Account nonces of the wallet's in-flight private transactions for this address. Each entry is a literal in-flight nonce (0 is a valid value, not a sentinel) and is treated as an occupied nonce slot alongside Blockbook's own cached private transactions: the reported pending nonce advances from the backend's own answer across the contiguous run of occupied slots. Send the whole in-flight set, not just its maximum, and do not pad or default the array - a declared nonce above a slot nothing fills does not lift the answer over that slot."`
+	Txids  []string `json:"txids,omitempty" ts_doc:"Transaction hashes of the in-flight private transactions (reserved for future use)."`
 }
 
 // WsContractInfoReq carries parameters for the 'getContractInfo' method.
@@ -138,7 +152,7 @@ type WsTransactionSpecificReq struct {
 // WsEstimateFeeReq requests an estimation of transaction fees for a set of blocks or with specific parameters.
 type WsEstimateFeeReq struct {
 	Blocks   []int                  `json:"blocks,omitempty" ts_doc:"Block confirmations targets for which fees should be estimated."`
-	Specific map[string]interface{} `json:"specific,omitempty" ts_type:"{conservative?: boolean; txsize?: number; from?: string; to?: string; data?: string; value?: string;}" ts_doc:"Additional chain-specific parameters (e.g. for Ethereum)."`
+	Specific map[string]interface{} `json:"specific,omitempty" ts_type:"{conservative?: boolean; txsize?: number; from?: string; to?: string; data?: string; value?: string; privatePending?: WsPrivatePending;}" ts_doc:"Additional chain-specific parameters (e.g. for Ethereum). privatePending (Ethereum-like) declares the sender's in-flight private transactions so the gas estimate is routed to the alternative send-tx provider; see WsPrivatePending and docs/evm-send.md."`
 }
 
 // WsEstimateFeeRes is returned in response to a fee estimation request.
@@ -147,6 +161,21 @@ type WsEstimateFeeRes struct {
 	FeePerUnit string           `json:"feePerUnit,omitempty" ts_doc:"Estimated fee per unit (sat/byte, Wei/gas, etc.)."`
 	FeeLimit   string           `json:"feeLimit,omitempty" ts_doc:"Max fee limit for blockchains like Ethereum."`
 	Eip1559    *api.Eip1559Fees `json:"eip1559,omitempty"`
+}
+
+// EthereumGasData carries EVM block-level gas figures used by the frontend to deterministically
+// project the next block's EIP-1559 base fee. Decimal strings, omitted for pre-London blocks.
+type EthereumGasData struct {
+	BaseFeePerGas *api.Amount `json:"baseFeePerGas,omitempty" ts_doc:"Base fee per gas of the new block (post-London)."`
+	BlockGasUsed  *api.Amount `json:"blockGasUsed,omitempty" ts_doc:"Total gas used by the new block (decimal)."`
+	BlockGasLimit *api.Amount `json:"blockGasLimit,omitempty" ts_doc:"Gas limit of the new block (decimal)."`
+}
+
+// WsNewBlock is pushed to subscribeNewBlock subscribers when a new block is connected.
+type WsNewBlock struct {
+	Height  uint32           `json:"height" ts_doc:"Height of the new block."`
+	Hash    string           `json:"hash" ts_doc:"Hash of the new block."`
+	EVMData *EthereumGasData `json:"evmData" ts_nullable:"true" ts_doc:"EVM gas data for the EIP-1559 base-fee projection; null on non-EVM chains."`
 }
 
 // WsLongTermFeeRateRes is returned in response to a long term fee rate request.

@@ -49,7 +49,9 @@ Inputs:
   - `dev` keeps the current per-coin dev runner mapping
   - `prod` builds selected coins on the `production-builder` runner regardless of `BB_RUNNER_*`
   - default is `dev`
-  - selected value is exported downstream as `BB_BUILD_ENV`
+  - selected value is exported downstream as `BB_BUILD_ENV`, which also decides whether each coin's
+    `blockbook.block_chain.additional_params_dev` overrides are merged into the generated `blockchaincfg.json`
+    (`dev` merges them, `prod` ignores them) — see [config.md](config.md)
   - ignored when `mode=deploy`
 - `backend_mode`:
   - `auto` derives backend builds per coin from the selected `BB_{DEV|PROD}_RPC_URL_HTTP_<coin_alias>` value
@@ -64,7 +66,8 @@ Inputs:
 
 In `mode=build`, selected coins are grouped by runner so one build job can build multiple
 `deb-blockbook-<coin>` targets in a single invocation on the same self-hosted machine.
-Deploy and test-related workflow steps use `BB_BUILD_ENV=dev`.
+Deploy and test-related workflow steps use `BB_BUILD_ENV=dev`, so a deployed instance and the integration/e2e
+suites both get the dev `additional_params` overrides.
 Generated dev Blockbook services start with pprof enabled on `:<blockbook_internal + 20000>`, for example Ethereum
 uses `:29036`. Generated prod services do not include `-prof`.
 
@@ -84,6 +87,8 @@ Special cases:
 - `mode=build` + `env=prod` + `coins=ALL` builds all configured coins with `BB_RUNNER_*` mappings on the `production-builder` runner
 - `mode=build` + `env=dev` fails if you explicitly request a coin whose `BB_RUNNER_*` is `production_builder`
 - `mode=deploy` is dev-only and fails fast if any selected coin is mapped to `production_builder`
+- a coin listed in the `BB_STAGING` repository variable is skipped where its `configs/coins/<coin>.json` is absent, so a work-in-progress coin's repo-wide `BB_*` variables don't fail builds/deploys on branches that lack its config yet
+- tolerance is opt-in, so a mistyped or abandoned `BB_STAGING` entry (no config on any branch) is silently skipped rather than erroring — the skip is logged, and entries should be removed once the coin merges
 
 ## Naming Matrix
 

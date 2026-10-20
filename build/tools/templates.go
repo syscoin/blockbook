@@ -44,6 +44,14 @@ type Backend struct {
 	Platforms                       map[string]Backend `json:"platforms,omitempty"`
 }
 
+// MessageQueueCurve is optional ZMQ CURVE key material from a coin definition
+// (`ipc.message_queue_curve`). Copied into blockchaincfg.json as message_queue_curve.
+type MessageQueueCurve struct {
+	PublicKey string `json:"public_key,omitempty"`
+	SecretKey string `json:"secret_key,omitempty"`
+	ServerKey string `json:"server_key,omitempty"`
+}
+
 // Config contains the structure of the config
 type Config struct {
 	Coin struct {
@@ -64,12 +72,13 @@ type Config struct {
 		BlockbookPublic     int `json:"blockbook_public"`
 	} `json:"ports"`
 	IPC struct {
-		RPCURLTemplate              string `json:"rpc_url_template"`
-		RPCURLWSTemplate            string `json:"rpc_url_ws_template"`
-		RPCUser                     string `json:"rpc_user"`
-		RPCPass                     string `json:"rpc_pass"`
-		RPCTimeout                  int    `json:"rpc_timeout"`
-		MessageQueueBindingTemplate string `json:"message_queue_binding_template"`
+		RPCURLTemplate              string             `json:"rpc_url_template"`
+		RPCURLWSTemplate            string             `json:"rpc_url_ws_template"`
+		RPCUser                     string             `json:"rpc_user"`
+		RPCPass                     string             `json:"rpc_pass"`
+		RPCTimeout                  int                `json:"rpc_timeout"`
+		MessageQueueBindingTemplate string             `json:"message_queue_binding_template"`
+		MessageQueueCurve           *MessageQueueCurve `json:"message_queue_curve,omitempty"`
 	} `json:"ipc"`
 	Backend   Backend `json:"backend"`
 	Blockbook struct {
@@ -97,6 +106,9 @@ type Config struct {
 			Web3Explorer     string `json:"web3_explorer_url,omitempty"`
 
 			AdditionalParams map[string]json.RawMessage `json:"additional_params"`
+			// Overrides merged over AdditionalParams only when BB_BUILD_ENV=dev, so a value
+			// tuned for a dev instance cannot reach a production package.
+			AdditionalParamsDev map[string]json.RawMessage `json:"additional_params_dev,omitempty"`
 		} `json:"block_chain"`
 	} `json:"blockbook"`
 	Meta struct {
@@ -128,11 +140,12 @@ const (
 	prodRPCURLHTTPPrefix        = "BB_PROD_RPC_URL_HTTP_"
 	prodRPCURLWSPrefix          = "BB_PROD_RPC_URL_WS_"
 	prodMQURLPrefix             = "BB_PROD_MQ_URL_"
+	backendAddnodePrefix        = "BB_ADDNODE_"
 	devBlockbookPprofPortOffset = 20000
 )
 
-func jsonToString(msg json.RawMessage) (string, error) {
-	d, err := msg.MarshalJSON()
+func jsonToString(msg any) (string, error) {
+	d, err := json.Marshal(msg)
 	if err != nil {
 		return "", err
 	}
@@ -150,18 +163,38 @@ func generateRPCAuth(user, pass string) (string, error) {
 	return out.String(), nil
 }
 
+const stagingEnvVar = "BB_STAGING"
+
 func validateRPCEnvVars(configsDir string) error {
 	// Use coin aliases as the source of truth so env naming matches coin config and deployment conventions.
 	validAliases, err := loadCoinAliases(configsDir)
 	if err != nil {
 		return err
 	}
+	// Tolerate BB_STAGING work-in-progress coins whose config lives only on a feature branch.
+	for alias := range stagingAliases() {
+		validAliases[alias] = struct{}{}
+	}
 	unknown := collectUnknownRPCEnvVars(validAliases, rpcEnvPrefixes())
 	if len(unknown) == 0 {
 		return nil
 	}
 	sort.Strings(unknown)
-	return fmt.Errorf("RPC env vars reference unknown coin aliases: %s", strings.Join(unknown, ", "))
+	return fmt.Errorf("RPC env vars reference unknown coin aliases: %s (add work-in-progress coins to BB_STAGING)", strings.Join(unknown, ", "))
+}
+
+// stagingAliases parses BB_STAGING (comma/space separated work-in-progress coins)
+// into an alias set with '-'/'_' variants so their RPC vars validate on branches
+// that do not yet carry the coin config.
+func stagingAliases() map[string]struct{} {
+	aliases := map[string]struct{}{}
+	for _, field := range strings.Fields(strings.ReplaceAll(os.Getenv(stagingEnvVar), ",", " ")) {
+		name := strings.ToLower(field)
+		aliases[name] = struct{}{}
+		aliases[strings.ReplaceAll(name, "-", "_")] = struct{}{}
+		aliases[strings.ReplaceAll(name, "_", "-")] = struct{}{}
+	}
+	return aliases
 }
 
 type coinAliasHolder struct {
@@ -228,6 +261,7 @@ func rpcEnvPrefixes() []string {
 		prodMQURLPrefix,
 		"BB_RPC_BIND_HOST_",
 		"BB_RPC_ALLOW_IP_",
+		backendAddnodePrefix,
 	}
 }
 
@@ -397,6 +431,18 @@ func LoadConfig(configsDir, coin string) (*Config, error) {
 		return nil, err
 	}
 
+	blockChain := &config.Blockbook.BlockChain
+	// Validate in every build env so a typo in a dev override fails a production build too.
+	if err := validateAdditionalParamsOverlay(blockChain.AdditionalParams, blockChain.AdditionalParamsDev); err != nil {
+		return nil, fmt.Errorf("%s: %w", coin, err)
+	}
+	if buildEnv == buildEnvDev {
+		blockChain.AdditionalParams, err = mergeAdditionalParams(blockChain.AdditionalParams, blockChain.AdditionalParamsDev)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", coin, err)
+		}
+	}
+
 	config.Meta.BuildDatetime = time.Now().Format("Mon, 02 Jan 2006 15:04:05 -0700")
 	config.Env.Architecture = runtime.GOARCH
 	config.Env.BlockbookPprofBinding = blockbookPprofBindingForBuildEnv(config, buildEnv)
@@ -452,12 +498,33 @@ func LoadConfig(configsDir, coin string) (*Config, error) {
 		}
 	}
 
+	if err := applyBackendAddnodesFromEnv(config); err != nil {
+		return nil, fmt.Errorf("%s: %w", coin, err)
+	}
+
 	config.Env.WantsBackendService, err = wantsBackendService(config)
 	if err != nil {
 		return nil, err
 	}
 
 	return config, nil
+}
+
+// applyBackendAddnodesFromEnv appends private backend peers from the build env, which keeps
+// them out of the public coin config.
+func applyBackendAddnodesFromEnv(config *Config) error {
+	peers, ok := lookupAliasEnv(backendAddnodePrefix, config.Coin.Alias)
+	if !ok {
+		return nil
+	}
+	key := backendAddnodePrefix + config.Coin.Alias
+	if isEmpty(config, "backend") {
+		return fmt.Errorf("%s is set but the coin has no backend package", key)
+	}
+	if err := appendBackendAddnodes(&config.Backend, peers); err != nil {
+		return fmt.Errorf("%s: %w", key, err)
+	}
+	return nil
 }
 
 func isEmpty(config *Config, target string) bool {
@@ -479,6 +546,19 @@ func lookupEnvWithArchiveFallback(prefix, alias string) (string, bool) {
 	}
 
 	for _, candidate := range aliasCandidates(alias) {
+		if value, ok := os.LookupEnv(prefix + candidate); ok && value != "" {
+			return value, true
+		}
+	}
+	return "", false
+}
+
+// lookupAliasEnv reads prefix+alias, also accepting the underscore form of a hyphenated alias.
+func lookupAliasEnv(prefix, alias string) (string, bool) {
+	if alias == "" {
+		return "", false
+	}
+	for _, candidate := range withEnvAliasVariants([]string{alias}) {
 		if value, ok := os.LookupEnv(prefix + candidate); ok && value != "" {
 			return value, true
 		}

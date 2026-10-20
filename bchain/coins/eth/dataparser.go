@@ -32,6 +32,11 @@ func parseSimpleNumericProperty(data string) *big.Int {
 	return nil
 }
 
+// maxParsedStringBytes caps how many bytes any decoded contract string (name/symbol/tokenURI) may
+// hold. A malicious contract can make a free eth_call return an arbitrarily large string; without
+// this ceiling the live, unstored tokenURI path would decode the whole blob on every request.
+const maxParsedStringBytes = 64 << 10
+
 func parseSimpleStringProperty(data string) string {
 	if has0xPrefix(data) {
 		data = data[2:]
@@ -41,6 +46,9 @@ func parseSimpleStringProperty(data string) string {
 		if n != nil {
 			l := n.Int64()
 			if l > 0 && int(l) <= ((len(data)-128)>>1) {
+				if l > maxParsedStringBytes {
+					l = maxParsedStringBytes
+				}
 				b, err := hex.DecodeString(data[128 : 128+2*l])
 				if err == nil {
 					return string(b)
@@ -49,7 +57,7 @@ func parseSimpleStringProperty(data string) string {
 		}
 	}
 	// allow string properties as UTF-8 data
-	b, err := hex.DecodeString(data)
+	b, err := hex.DecodeString(data[:min(len(data), 2*maxParsedStringBytes)])
 	if err == nil {
 		i := min(bytes.Index(b, []byte{0}), 32)
 		if i > 0 {
@@ -95,6 +103,10 @@ func GetSignatureFromData(data string) uint32 {
 }
 
 const ErrorTy byte = 255
+
+// maxParseInputDataLen bounds the hex length of calldata that ParseInputData will decode;
+// real calls rarely exceed a few KB, so ~64 KB keeps parse work off the chain gas limit.
+const maxParseInputDataLen = 128 * 1024
 
 func processParam(data string, index int, dataOffset int, t *abi.Type, processed []bool) ([]string, int, bool) {
 	var retval []string
@@ -156,7 +168,7 @@ func processParam(data string, index int, dataOffset int, t *abi.Type, processed
 		offset <<= 1
 		d = int(offset) + dataOffset
 		dynIndex := d >> 6
-		if d+64 > len(data) || d < 0 {
+		if d+64 > len(data) || d < 0 || d+64 < d {
 			return nil, 0, false
 		}
 		// get element count of dynamic type
@@ -169,8 +181,12 @@ func processParam(data string, index int, dataOffset int, t *abi.Type, processed
 		dynIndex++
 		if t.T == abi.StringTy || t.T == abi.BytesTy {
 			d += 64
+			// count<<1 can overflow and wrap below d (same class as the
+			// getEnsRecord bug); the lower bound must be the slice start d, not 0,
+			// so that d <= de <= len(data) and data[d:de] below can never panic.
+			// count==0 gives de==d, which is still accepted.
 			de := d + (count << 1)
-			if de > len(data) || de < 0 {
+			if de > len(data) || de < d {
 				return nil, 0, false
 			}
 			if count == 0 {
@@ -188,6 +204,13 @@ func processParam(data string, index int, dataOffset int, t *abi.Type, processed
 				}
 				count = ((count - 1) >> 5) + 1
 				for i := 0; i < count; i++ {
+					// A dynamic field whose declared length runs past the data
+					// (malformed or non-32-byte-aligned input) would index beyond
+					// processed, which is sized len(data)/64; treat it as a
+					// non-matching signature instead of panicking.
+					if dynIndex >= len(processed) {
+						return nil, 0, false
+					}
 					processed[dynIndex] = true
 					dynIndex++
 				}
@@ -249,6 +272,11 @@ func (p *EthereumParser) ParseInputData(signatures *[]bchain.FourByteSignature, 
 	parsed := bchain.EthereumParsedInputData{
 		MethodId: data[:10],
 	}
+	// skip decoding oversized calldata; see maxParseInputDataLen for the budget rationale
+	if len(data) > maxParseInputDataLen {
+		parsed.Truncated = true
+		return &parsed
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Error("ParseInputData recovered from panic: ", r, ", ", data, ",signatures ", signatures)
@@ -292,26 +320,4 @@ func (p *EthereumParser) ParseInputData(signatures *[]bchain.FourByteSignature, 
 	return &parsed
 }
 
-// getEnsRecord processes transaction log entry and tries to parse ENS record from it
-func getEnsRecord(l *rpcLogWithTxHash) *bchain.AddressAliasRecord {
-	if len(l.Topics) == 3 && l.Topics[0] == nameRegisteredEventSignature && len(l.Data) >= 322 {
-		address, err := addressFromPaddedHex(l.Topics[2])
-		if err != nil {
-			return nil
-		}
-		c, err := strconv.ParseInt(l.Data[194:194+64], 16, 64)
-		if err != nil {
-			return nil
-		}
-		de := 194 + 64 + (int(c) << 1)
-		if de > len(l.Data) || de < 0 {
-			return nil
-		}
-		b, err := hex.DecodeString(l.Data[194+64 : de])
-		if err != nil {
-			return nil
-		}
-		return &bchain.AddressAliasRecord{Address: address, Name: string(b)}
-	}
-	return nil
-}
+// ENS parsing lives in ens.go.

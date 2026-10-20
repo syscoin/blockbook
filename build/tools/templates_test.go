@@ -398,6 +398,126 @@ func TestEthereumClassicRPCAndBackendHTTPPortStayAligned(t *testing.T) {
 	}
 }
 
+func TestValidateRPCEnvVarsToleratesStagingCoin(t *testing.T) {
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+
+	withTemporarilyUnsetEnv(t, stagingEnvVar)
+	// An RPC override for a coin whose config lives only on a feature branch.
+	t.Setenv(devRPCURLHTTPPrefix+"nonexistent_wip_coin", "http://backend.example:8030")
+
+	// Assert on this coin specifically, not on a globally-clean result: the env may
+	// carry other orphan overrides (the multi-WIP-coin case this feature targets).
+	if err := validateRPCEnvVars(configsDir); err == nil || !strings.Contains(err.Error(), "nonexistent_wip_coin") {
+		t.Fatalf("expected nonexistent_wip_coin to be rejected without BB_STAGING, got %v", err)
+	}
+
+	t.Setenv(stagingEnvVar, "nonexistent_wip_coin")
+	if err := validateRPCEnvVars(configsDir); err != nil && strings.Contains(err.Error(), "nonexistent_wip_coin") {
+		t.Fatalf("BB_STAGING should tolerate nonexistent_wip_coin, got %v", err)
+	}
+}
+
+func TestBlockchainCfgOmitsMessageQueueCurveWhenUnset(t *testing.T) {
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+
+	withTemporarilyUnsetEnv(t,
+		buildEnvVar,
+		devMQURLPrefix+"bitcoin",
+		prodMQURLPrefix+"bitcoin",
+	)
+
+	config, err := LoadConfig(configsDir, "bitcoin")
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	if config.IPC.MessageQueueCurve != nil {
+		t.Fatal("expected bitcoin coin definition to omit message_queue_curve")
+	}
+
+	rendered := renderBlockchainCfg(t, config)
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal(rendered, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal(blockchaincfg) error = %v", err)
+	}
+	if _, ok := parsed["message_queue_curve"]; ok {
+		t.Fatalf("did not expect message_queue_curve in rendered blockchaincfg:\n%s", rendered)
+	}
+}
+
+func TestBlockchainCfgRendersMessageQueueCurveFromCoinIPC(t *testing.T) {
+	const raw = `{
+		"ipc": {
+			"message_queue_binding_template": "tcp://127.0.0.1:38330",
+			"message_queue_curve": {
+				"public_key": "client-public",
+				"secret_key": "client-secret",
+				"server_key": "server-public"
+			}
+		}
+	}`
+
+	var decoded Config
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		t.Fatalf("json.Unmarshal(coin ipc) error = %v", err)
+	}
+	if decoded.IPC.MessageQueueCurve == nil {
+		t.Fatal("expected ipc.message_queue_curve to decode")
+	}
+
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+	withTemporarilyUnsetEnv(t,
+		buildEnvVar,
+		devMQURLPrefix+"bitcoin",
+		prodMQURLPrefix+"bitcoin",
+	)
+
+	config, err := LoadConfig(configsDir, "bitcoin")
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	config.IPC.MessageQueueCurve = decoded.IPC.MessageQueueCurve
+
+	rendered := renderBlockchainCfg(t, config)
+	var parsed struct {
+		MessageQueueCurve *MessageQueueCurve `json:"message_queue_curve"`
+	}
+	if err := json.Unmarshal(rendered, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal(blockchaincfg) error = %v", err)
+	}
+	if parsed.MessageQueueCurve == nil {
+		t.Fatalf("expected message_queue_curve in rendered blockchaincfg:\n%s", rendered)
+	}
+	if parsed.MessageQueueCurve.PublicKey != "client-public" ||
+		parsed.MessageQueueCurve.SecretKey != "client-secret" ||
+		parsed.MessageQueueCurve.ServerKey != "server-public" {
+		t.Fatalf("message_queue_curve = %+v", parsed.MessageQueueCurve)
+	}
+}
+
+func renderBlockchainCfg(t *testing.T, config *Config) []byte {
+	t.Helper()
+
+	templ := config.ParseTemplate()
+	templ = template.Must(templ.ParseFiles(filepath.Join("..", "templates", "blockbook", "blockchaincfg.json")))
+
+	var blockchainCfg bytes.Buffer
+	if err := templ.ExecuteTemplate(&blockchainCfg, "main", config); err != nil {
+		t.Fatalf("ExecuteTemplate(blockchaincfg) error = %v", err)
+	}
+	return blockchainCfg.Bytes()
+}
+
+func TestStagingAliasesParsesListAndVariants(t *testing.T) {
+	t.Setenv(stagingEnvVar, "robinhood_archive, foo-bar")
+
+	got := stagingAliases()
+	for _, want := range []string{"robinhood_archive", "robinhood-archive", "foo-bar", "foo_bar"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("stagingAliases() missing %q", want)
+		}
+	}
+}
+
 func withTemporarilyUnsetEnv(t *testing.T, keys ...string) {
 	t.Helper()
 
@@ -423,4 +543,169 @@ func withTemporarilyUnsetEnv(t *testing.T, keys ...string) {
 			_ = os.Setenv(key, *value)
 		}
 	})
+}
+
+func TestAdditionalParamsDevOverlayAppliesOnlyToDevBuilds(t *testing.T) {
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+
+	tests := []struct {
+		buildEnv       string
+		wantFeePeriod  float64
+		wantFiatPeriod float64
+	}{
+		{buildEnv: buildEnvProd, wantFeePeriod: 10, wantFiatPeriod: 900},
+		{buildEnv: buildEnvDev, wantFeePeriod: 300, wantFiatPeriod: 3600},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.buildEnv, func(t *testing.T) {
+			withTemporarilyUnsetEnv(t, buildEnvVar)
+			t.Setenv(buildEnvVar, tt.buildEnv)
+
+			config, err := LoadConfig(configsDir, "ethereum_archive")
+			if err != nil {
+				t.Fatalf("LoadConfig() error = %v", err)
+			}
+
+			rendered := renderBlockchainCfg(t, config)
+
+			var renderedCfg struct {
+				FeeParams  string          `json:"alternative_estimate_fee_params"`
+				FiatParams string          `json:"fiat_rates_params"`
+				DevOverlay json.RawMessage `json:"additional_params_dev"`
+			}
+			if err := json.Unmarshal(rendered, &renderedCfg); err != nil {
+				t.Fatalf("json.Unmarshal(blockchaincfg) error = %v", err)
+			}
+			if renderedCfg.DevOverlay != nil {
+				t.Fatalf("additional_params_dev leaked into the rendered config: %s", renderedCfg.DevOverlay)
+			}
+
+			for name, params := range map[string]struct {
+				raw  string
+				want float64
+			}{
+				"alternative_estimate_fee_params": {raw: renderedCfg.FeeParams, want: tt.wantFeePeriod},
+				"fiat_rates_params":               {raw: renderedCfg.FiatParams, want: tt.wantFiatPeriod},
+			} {
+				var decoded map[string]interface{}
+				if err := json.Unmarshal([]byte(params.raw), &decoded); err != nil {
+					t.Fatalf("json.Unmarshal(%s = %q) error = %v", name, params.raw, err)
+				}
+				if got := decoded["periodSeconds"]; got != params.want {
+					t.Fatalf("%s periodSeconds = %v, want %v", name, got, params.want)
+				}
+			}
+
+			// The overlay retunes one field, so the rest of the setting must survive intact.
+			if !strings.Contains(renderedCfg.FeeParams, "gas.api.infura.io/v3/${api_key}/networks/1/suggestedGasFees") {
+				t.Fatalf("fee provider url lost in overlay merge: %q", renderedCfg.FeeParams)
+			}
+		})
+	}
+}
+
+func TestAllCoinConfigsRenderInBothBuildEnvs(t *testing.T) {
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+
+	entries, err := os.ReadDir(filepath.Join(configsDir, "coins"))
+	if err != nil {
+		t.Fatalf("ReadDir(coins) error = %v", err)
+	}
+
+	for _, entry := range entries {
+		coin := strings.TrimSuffix(entry.Name(), ".json")
+		if entry.IsDir() || coin == entry.Name() {
+			continue
+		}
+
+		t.Run(coin, func(t *testing.T) {
+			for _, buildEnv := range []string{buildEnvDev, buildEnvProd} {
+				withTemporarilyUnsetEnv(t, buildEnvVar)
+				t.Setenv(buildEnvVar, buildEnv)
+
+				config, err := LoadConfig(configsDir, coin)
+				if err != nil {
+					t.Fatalf("LoadConfig(%s) in %s error = %v", coin, buildEnv, err)
+				}
+				if isEmpty(config, "blockbook") {
+					continue
+				}
+
+				var renderedCfg map[string]json.RawMessage
+				if err := json.Unmarshal(renderBlockchainCfg(t, config), &renderedCfg); err != nil {
+					t.Fatalf("json.Unmarshal(blockchaincfg for %s in %s) error = %v", coin, buildEnv, err)
+				}
+				if _, ok := renderedCfg["additional_params_dev"]; ok {
+					t.Fatalf("additional_params_dev leaked into the rendered config of %s in %s", coin, buildEnv)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadConfigAppendsAddnodePeersFromEnv(t *testing.T) {
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+	t.Setenv(backendAddnodePrefix+"bitcoin", "p1.example:8333,10.0.0.5")
+
+	config, err := LoadConfig(configsDir, "bitcoin")
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+
+	templ := config.ParseTemplate()
+	// The real generateRPCAuth shells out to a repo-root script.
+	templ.Funcs(template.FuncMap{"generateRPCAuth": func(string, string) (string, error) { return "rpcauth=stub", nil }})
+	conf, err := os.ReadFile(filepath.Join("..", "templates", "backend", "config", config.Backend.ServerConfigFile))
+	if err != nil {
+		t.Fatalf("ReadFile(server config) error = %v", err)
+	}
+	templ = template.Must(templ.Parse(string(conf)))
+	var out bytes.Buffer
+	if err := templ.ExecuteTemplate(&out, "main", config); err != nil {
+		t.Fatalf("render server config error = %v", err)
+	}
+
+	var addnodes []string
+	for _, line := range strings.Split(out.String(), "\n") {
+		if strings.HasPrefix(line, "addnode=") {
+			addnodes = append(addnodes, strings.TrimPrefix(line, "addnode="))
+		}
+	}
+	if got, want := strings.Join(addnodes, " "), "ove.palatinus.cz p1.example:8333 10.0.0.5"; got != want {
+		t.Fatalf("rendered addnode lines = %q, want %q\n%s", got, want, out.String())
+	}
+}
+
+func TestLoadConfigRejectsInvalidAddnodePeers(t *testing.T) {
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+	t.Setenv(backendAddnodePrefix+"bitcoin", "secret.example\nrpcallowip=0.0.0.0/0")
+
+	_, err := LoadConfig(configsDir, "bitcoin")
+	if err == nil {
+		t.Fatal("expected an invalid addnode peer to fail the build")
+	}
+	if strings.Contains(err.Error(), "secret.example") {
+		t.Fatalf("error must not echo the private value: %v", err)
+	}
+}
+
+func TestLoadConfigRejectsAddnodePeersForUnknownAlias(t *testing.T) {
+	configsDir := filepath.Clean(filepath.Join("..", "..", "configs"))
+	withTemporarilyUnsetEnv(t, stagingEnvVar)
+	t.Setenv(backendAddnodePrefix+"bitcion", "p1.example")
+
+	if _, err := LoadConfig(configsDir, "bitcoin"); err == nil || !strings.Contains(err.Error(), "bitcion") {
+		t.Fatalf("expected the misspelled alias to be rejected, got %v", err)
+	}
+}
+
+func TestApplyBackendAddnodesRejectsCoinWithoutBackend(t *testing.T) {
+	config := &Config{}
+	config.Coin.Alias = "nobackend"
+	t.Setenv(backendAddnodePrefix+"nobackend", "p1.example")
+
+	if err := applyBackendAddnodesFromEnv(config); err == nil || !strings.Contains(err.Error(), "no backend package") {
+		t.Fatalf("expected peers for a coin without a backend to be rejected, got %v", err)
+	}
 }
