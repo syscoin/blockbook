@@ -3,24 +3,47 @@ package eth
 import (
 	"testing"
 	"time"
+
+	"github.com/juju/errors"
+	"github.com/trezor/blockbook/bchain"
 )
 
-func TestInfuraFeeStaleDuration(t *testing.T) {
-	got := infuraFeeStaleDuration(60)
-	want := 30 * time.Minute
+func TestFeeStaleDurationDefaultsToTenMinutes(t *testing.T) {
+	got := feeStaleDuration(10, 0)
+	want := 10 * time.Minute
 	if got != want {
-		t.Fatalf("infuraFeeStaleDuration(60) = %s, want %s", got, want)
+		t.Fatalf("feeStaleDuration(10, 0) = %s, want %s", got, want)
+	}
+}
+
+func TestFeeStaleDurationHonorsConfig(t *testing.T) {
+	got := feeStaleDuration(10, 90)
+	want := 90 * time.Second
+	if got != want {
+		t.Fatalf("feeStaleDuration(10, 90) = %s, want %s", got, want)
+	}
+}
+
+func TestFeeStaleDurationClampsToPeriod(t *testing.T) {
+	got := feeStaleDuration(60, 30)
+	want := 60 * time.Second
+	if got != want {
+		t.Fatalf("feeStaleDuration(60, 30) = %s, want %s (must not be shorter than the poll period)", got, want)
 	}
 }
 
 func TestInfuraFeeProviderUsesCachedFeesDuringStaleWindow(t *testing.T) {
 	provider := &infuraFeeProvider{
 		alternativeFeeProvider: &alternativeFeeProvider{
-			staleSyncDuration: infuraFeeStaleDuration(60),
+			ttl:               10 * time.Second,
+			staleSyncDuration: feeStaleDuration(10, 0),
+			fetch: func() (*bchain.Eip1559Fees, error) {
+				return nil, errors.New("provider down")
+			},
 		},
 	}
 
-	provider.processData(&infuraFeesResult{
+	provider.eip1559Fees = infuraFeesFromData(&infuraFeesResult{
 		BaseFee: "10",
 		Low: infuraFeeResult{
 			MaxPriorityFeePerGas: "1",
@@ -37,7 +60,7 @@ func TestInfuraFeeProviderUsesCachedFeesDuringStaleWindow(t *testing.T) {
 	})
 
 	provider.mux.Lock()
-	provider.lastSync = time.Now().Add(-29 * time.Minute)
+	provider.lastSync = time.Now().Add(-9 * time.Minute)
 	provider.mux.Unlock()
 
 	fees, err := provider.GetEip1559Fees()
@@ -49,7 +72,7 @@ func TestInfuraFeeProviderUsesCachedFeesDuringStaleWindow(t *testing.T) {
 	}
 
 	provider.mux.Lock()
-	provider.lastSync = time.Now().Add(-31 * time.Minute)
+	provider.lastSync = time.Now().Add(-11 * time.Minute)
 	provider.mux.Unlock()
 
 	fees, err = provider.GetEip1559Fees()

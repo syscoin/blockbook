@@ -1,10 +1,18 @@
 name: Export Repository Variables
-description: Export all repository/environment variables from a JSON map into GITHUB_ENV.
+description: Export repository variables and the provider RPC URL and backend peer secrets into GITHUB_ENV.
 
 inputs:
   vars_json:
     description: JSON object map of repository/environment variables.
     required: true
+  rpc_urls:
+    description: KEY=VALUE lines of BB_DEV_RPC_URL_* / BB_PROD_RPC_URL_* (pass secrets.BB_RPC_URLS).
+    required: false
+    default: ""
+  backend_peers:
+    description: KEY=VALUE lines of BB_ADDNODE_* private backend peers (pass secrets.BB_BACKEND_PEERS).
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -13,6 +21,8 @@ runs:
       shell: bash
       env:
         VARS_JSON: ${{ inputs.vars_json }}
+        RPC_URLS: ${{ inputs.rpc_urls }}
+        BACKEND_PEERS: ${{ inputs.backend_peers }}
       run: |
         python3 - <<'PY'
         import json
@@ -30,20 +40,46 @@ runs:
                 for line in prefixes_file
                 if line.strip() and not line.strip().startswith("#")
             )
+        # Provider URLs embed auth tokens and Actions variables are printed unmasked in public logs.
+        secret_prefixes = ("BB_DEV_RPC_URL_", "BB_PROD_RPC_URL_")
+        # Private peers must stay out of the public repo and its logs.
+        peer_prefix = "BB_ADDNODE_"
 
         def write_env_var(env_file, key, value):
             delimiter = f"__{uuid.uuid4().hex}__"
             env_file.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
 
+        def normalize(key):
+            for prefix in alias_prefixes:
+                if key.startswith(prefix):
+                    alias = key[len(prefix):]
+                    # Blockbook env lookups use lowercase coin aliases from configs/coins.
+                    return prefix + alias.lower().replace("-", "_")
+            return key
+
+        leaked = sorted(key for key in vars_map if key.startswith(secret_prefixes))
+        if leaked:
+            raise SystemExit(f"::error::move {', '.join(leaked)} from Actions variables to the BB_RPC_URLS secret")
+        leaked = sorted(key for key in vars_map if key.startswith(peer_prefix))
+        if leaked:
+            raise SystemExit(f"::error::move {', '.join(leaked)} from Actions variables to the BB_BACKEND_PEERS secret")
+
         with open(env_path, "a", encoding="utf-8") as env_file:
             for key, value in vars_map.items():
-                text = "" if value is None else str(value)
-                normalized = key
-                for prefix in alias_prefixes:
-                    if key.startswith(prefix):
-                        alias = key[len(prefix):]
-                        # Blockbook env lookups use lowercase coin aliases from configs/coins.
-                        normalized = prefix + alias.lower().replace("-", "_")
-                        break
-                write_env_var(env_file, normalized, text)
+                write_env_var(env_file, normalize(key), "" if value is None else str(value))
+            for line in os.environ.get("RPC_URLS", "").splitlines():
+                key, sep, value = line.strip().partition("=")
+                if not sep or not value or not key.startswith(secret_prefixes):
+                    continue
+                # The runner masks whole secret lines; the bare URL also shows up in later env headers and test errors.
+                print(f"::add-mask::{value}", flush=True)
+                write_env_var(env_file, normalize(key), value)
+            for line in os.environ.get("BACKEND_PEERS", "").splitlines():
+                key, sep, value = line.strip().partition("=")
+                if not sep or not value or not key.startswith(peer_prefix):
+                    continue
+                # Mask each peer too, so a single host printed later stays hidden.
+                for peer in [value, *value.replace(",", " ").split()]:
+                    print(f"::add-mask::{peer}", flush=True)
+                write_env_var(env_file, normalize(key), value)
         PY

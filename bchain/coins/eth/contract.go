@@ -1,7 +1,9 @@
 package eth
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"math/big"
 	"strings"
 
@@ -14,7 +16,6 @@ import (
 )
 
 const erc20TransferMethodSignature = "0xa9059cbb"                  // transfer(address,uint256)
-const erc721TransferFromMethodSignature = "0x23b872dd"             // transferFrom(address,address,uint256)
 const erc721SafeTransferFromMethodSignature = "0x42842e0e"         // safeTransferFrom(address,address,uint256)
 const erc721SafeTransferFromWithDataMethodSignature = "0xb88d4fde" // safeTransferFrom(address,address,uint256,bytes)
 const erc721TokenURIMethodSignature = "0xc87b56dd"                 // tokenURI(uint256)
@@ -24,28 +25,87 @@ const tokenTransferEventSignature = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f16
 const tokenERC1155TransferSingleEventSignature = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
 const tokenERC1155TransferBatchEventSignature = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
 
-const nameRegisteredEventSignature = "0xca6abbe9d7f11422cb6ca7629fbf6fe9efb1c621f71ce8f02b9f2a230097404f"
-
 const contractNameSignature = "0x06fdde03"
 const contractSymbolSignature = "0x95d89b41"
 const contractDecimalsSignature = "0x313ce567"
 const contractBalanceOfSignature = "0x70a08231"
 
-const ENSRegistryAddress = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e" // ENSRegistryAddress is the mainnet ENS registry contract address
+const (
+	evmWordBytes = 32
+	evmWordHex   = evmWordBytes * 2
+)
 
-func addressFromPaddedHex(s string) (string, error) {
-	var t big.Int
-	var ok bool
-	if has0xPrefix(s) {
-		_, ok = t.SetString(s[2:], 16)
-	} else {
-		_, ok = t.SetString(s, 16)
+// hexNibbles maps an ASCII byte to its hex value, or 0xff if it is not a hex digit.
+var hexNibbles = func() (t [256]byte) {
+	for i := range t {
+		t[i] = 0xff
 	}
-	if !ok {
+	for c := '0'; c <= '9'; c++ {
+		t[c] = byte(c - '0')
+	}
+	for c := 'a'; c <= 'f'; c++ {
+		t[c] = byte(c-'a') + 10
+		t[c-'a'+'A'] = byte(c-'a') + 10
+	}
+	return t
+}()
+
+// hexDecodeInto decodes exactly len(dst)*2 hex digits from s into dst without
+// allocating. It returns false when s has a different length or is not hex.
+func hexDecodeInto(dst []byte, s string) bool {
+	if len(s) != 2*len(dst) {
+		return false
+	}
+	for i := range dst {
+		hi, lo := hexNibbles[s[2*i]], hexNibbles[s[2*i+1]]
+		if hi|lo > 0xf {
+			return false
+		}
+		dst[i] = hi<<4 | lo
+	}
+	return true
+}
+
+// setBigFromHexWord parses the hex number s into v. A full 32-byte ABI word,
+// with or without 0x prefix, is decoded directly, which is roughly ten times
+// cheaper than big.Int.SetString. Any other input falls back to SetString with
+// the given base so that callers keep their behaviour for unusual data.
+func setBigFromHexWord(v *big.Int, s string, base int) bool {
+	h := s
+	if has0xPrefix(h) {
+		h = h[2:]
+	}
+	var b [evmWordBytes]byte
+	if hexDecodeInto(b[:], h) {
+		v.SetBytes(b[:])
+		return true
+	}
+	_, ok := v.SetString(s, base)
+	return ok
+}
+
+// addressFromPaddedHex returns the EIP-55 address stored in a 32-byte ABI word
+// (log topic or calldata slot). The address is the last 20 bytes, which are
+// decoded directly instead of through a big.Int round trip; the padding in
+// front of them is not validated, the same way BigToAddress discards the high
+// bytes. Inputs shorter than 20 bytes, or with invalid hex in the address
+// bytes, take the numeric path.
+func addressFromPaddedHex(s string) (string, error) {
+	if has0xPrefix(s) {
+		s = s[2:]
+	}
+	const addrHexLen = EthereumTypeAddressDescriptorLen * 2
+	if len(s) >= addrHexLen {
+		var a ethcommon.Address
+		if hexDecodeInto(a[:], s[len(s)-addrHexLen:]) {
+			return a.String(), nil
+		}
+	}
+	var t big.Int
+	if _, ok := t.SetString(s, 16); !ok {
 		return "", errors.New("Data is not a number")
 	}
-	a := ethcommon.BigToAddress(&t)
-	return a.String(), nil
+	return ethcommon.BigToAddress(&t).String(), nil
 }
 
 func processTransferEvent(l *bchain.RpcLog) (transfer *bchain.TokenTransfer, err error) {
@@ -59,14 +119,12 @@ func processTransferEvent(l *bchain.RpcLog) (transfer *bchain.TokenTransfer, err
 	var value big.Int
 	if tl == 3 {
 		standard = bchain.FungibleToken
-		_, ok := value.SetString(l.Data, 0)
-		if !ok {
+		if !setBigFromHexWord(&value, l.Data, 0) {
 			return nil, errors.New("ERC20 log Data is not a number")
 		}
 	} else if tl == 4 {
 		standard = bchain.NonFungibleToken
-		_, ok := value.SetString(l.Topics[3], 0)
-		if !ok {
+		if !setBigFromHexWord(&value, l.Topics[3], 0) {
 			return nil, errors.New("ERC721 log Topics[3] is not a number")
 		}
 	} else {
@@ -84,8 +142,8 @@ func processTransferEvent(l *bchain.RpcLog) (transfer *bchain.TokenTransfer, err
 	return &bchain.TokenTransfer{
 		Standard: standard,
 		Contract: EIP55AddressFromAddress(l.Address),
-		From:     EIP55AddressFromAddress(from),
-		To:       EIP55AddressFromAddress(to),
+		From:     from,
+		To:       to,
 		Value:    value,
 	}, nil
 }
@@ -114,21 +172,61 @@ func processERC1155TransferSingleEvent(l *bchain.RpcLog) (transfer *bchain.Token
 	if has0xPrefix(l.Data) {
 		data = data[2:]
 	}
-	_, ok := id.SetString(data[:64], 16)
-	if !ok {
+	if !setBigFromHexWord(&id, data[:evmWordHex], 16) {
 		return nil, errors.New("ERC1155 log Data id is not a number")
 	}
-	_, ok = value.SetString(data[64:128], 16)
-	if !ok {
+	if !setBigFromHexWord(&value, data[evmWordHex:2*evmWordHex], 16) {
 		return nil, errors.New("ERC1155 log Data value is not a number")
 	}
 	return &bchain.TokenTransfer{
 		Standard:         bchain.MultiToken,
 		Contract:         EIP55AddressFromAddress(l.Address),
-		From:             EIP55AddressFromAddress(from),
-		To:               EIP55AddressFromAddress(to),
+		From:             from,
+		To:               to,
 		MultiTokenValues: []bchain.MultiTokenValue{{Id: id, Value: value}},
 	}, nil
+}
+
+func parseEVMLogWordUint64(data string, offset int) (uint64, error) {
+	if offset < 0 || offset > len(data) || len(data)-offset < evmWordHex {
+		return 0, errors.New("ERC1155 TransferBatch, invalid data length")
+	}
+	var b [evmWordBytes]byte
+	if !hexDecodeInto(b[:], data[offset:offset+evmWordHex]) {
+		return 0, errors.New("ERC1155 TransferBatch, not a number")
+	}
+	for _, c := range b[:evmWordBytes-8] {
+		if c != 0 {
+			return 0, errors.New("ERC1155 TransferBatch, not a number")
+		}
+	}
+	return binary.BigEndian.Uint64(b[evmWordBytes-8:]), nil
+}
+
+func erc1155BatchOffsetHex(offsetBytes uint64) (int, error) {
+	if offsetBytes < 2*evmWordBytes {
+		return 0, errors.New("ERC1155 TransferBatch, invalid offset")
+	}
+	if offsetBytes%evmWordBytes != 0 {
+		return 0, errors.New("ERC1155 TransferBatch, invalid offset")
+	}
+	maxInt := uint64(^uint(0) >> 1)
+	if offsetBytes > maxInt/2 {
+		return 0, errors.New("ERC1155 TransferBatch, invalid offset")
+	}
+	return int(offsetBytes * 2), nil
+}
+
+func erc1155BatchArrayEnd(offset int, count uint64) (int, error) {
+	if offset < 0 {
+		return 0, errors.New("ERC1155 TransferBatch, invalid offset")
+	}
+	maxInt := uint64(^uint(0) >> 1)
+	base := uint64(offset) + evmWordHex
+	if base > maxInt || count > (maxInt-base)/evmWordHex {
+		return 0, errors.New("ERC1155 TransferBatch, invalid data length")
+	}
+	return int(base + count*evmWordHex), nil
 }
 
 func processERC1155TransferBatchEvent(l *bchain.RpcLog) (transfer *bchain.TokenTransfer, err error) {
@@ -154,41 +252,62 @@ func processERC1155TransferBatchEvent(l *bchain.RpcLog) (transfer *bchain.TokenT
 	if has0xPrefix(l.Data) {
 		data = data[2:]
 	}
-	var b big.Int
-	_, ok := b.SetString(data[:64], 16)
-	if !ok || !b.IsInt64() {
-		return nil, errors.New("ERC1155 TransferBatch, not a number")
+	if len(data) < 2*evmWordHex || len(data)%evmWordHex != 0 {
+		return nil, errors.New("ERC1155 TransferBatch, invalid data length")
 	}
-	offsetIds := int(b.Int64()) * 2
-	_, ok = b.SetString(data[64:128], 16)
-	if !ok || !b.IsInt64() {
-		return nil, errors.New("ERC1155 TransferBatch, not a number")
+	offsetIdsBytes, err := parseEVMLogWordUint64(data, 0)
+	if err != nil {
+		return nil, err
 	}
-	offsetValues := int(b.Int64()) * 2
-	_, ok = b.SetString(data[offsetIds:offsetIds+64], 16)
-	if !ok || !b.IsInt64() {
-		return nil, errors.New("ERC1155 TransferBatch, not a number")
+	offsetIds, err := erc1155BatchOffsetHex(offsetIdsBytes)
+	if err != nil {
+		return nil, err
 	}
-	countIds := int(b.Int64())
-	_, ok = b.SetString(data[offsetValues:offsetValues+64], 16)
-	if !ok || !b.IsInt64() {
-		return nil, errors.New("ERC1155 TransferBatch, not a number")
+	offsetValuesBytes, err := parseEVMLogWordUint64(data, evmWordHex)
+	if err != nil {
+		return nil, err
 	}
-	countValues := int(b.Int64())
+	offsetValues, err := erc1155BatchOffsetHex(offsetValuesBytes)
+	if err != nil {
+		return nil, err
+	}
+	countIds, err := parseEVMLogWordUint64(data, offsetIds)
+	if err != nil {
+		return nil, err
+	}
+	countValues, err := parseEVMLogWordUint64(data, offsetValues)
+	if err != nil {
+		return nil, err
+	}
 	if countIds != countValues {
 		return nil, errors.New("ERC1155 TransferBatch, count values and ids does not match")
 	}
-	idValues := make([]bchain.MultiTokenValue, countValues)
-	for i := 0; i < countValues; i++ {
+	endIds, err := erc1155BatchArrayEnd(offsetIds, countValues)
+	if err != nil {
+		return nil, err
+	}
+	if endIds > len(data) {
+		return nil, errors.New("ERC1155 TransferBatch, invalid ids data length")
+	}
+	endValues, err := erc1155BatchArrayEnd(offsetValues, countValues)
+	if err != nil {
+		return nil, err
+	}
+	if endValues > len(data) {
+		return nil, errors.New("ERC1155 TransferBatch, invalid values data length")
+	}
+	// countValues cannot truncate: the endValues <= len(data) check above bounds
+	// it to len(data)/evmWordHex.
+	count := int(countValues)
+	idValues := make([]bchain.MultiTokenValue, count)
+	for i := 0; i < count; i++ {
 		var id, value big.Int
-		o := offsetIds + 64 + 64*i
-		_, ok := id.SetString(data[o:o+64], 16)
-		if !ok {
+		o := offsetIds + evmWordHex + evmWordHex*i
+		if !setBigFromHexWord(&id, data[o:o+evmWordHex], 16) {
 			return nil, errors.New("ERC1155 log Data id is not a number")
 		}
-		o = offsetValues + 64 + 64*i
-		_, ok = value.SetString(data[o:o+64], 16)
-		if !ok {
+		o = offsetValues + evmWordHex + evmWordHex*i
+		if !setBigFromHexWord(&value, data[o:o+evmWordHex], 16) {
 			return nil, errors.New("ERC1155 log Data value is not a number")
 		}
 		idValues[i] = bchain.MultiTokenValue{Id: id, Value: value}
@@ -196,38 +315,63 @@ func processERC1155TransferBatchEvent(l *bchain.RpcLog) (transfer *bchain.TokenT
 	return &bchain.TokenTransfer{
 		Standard:         bchain.MultiToken,
 		Contract:         EIP55AddressFromAddress(l.Address),
-		From:             EIP55AddressFromAddress(from),
-		To:               EIP55AddressFromAddress(to),
+		From:             from,
+		To:               to,
 		MultiTokenValues: idValues,
 	}, nil
 }
 
-func contractGetTransfersFromLog(logs []*bchain.RpcLog) (bchain.TokenTransfers, error) {
+// contractGetTransfersFromLog extracts token transfers from receipt logs.
+// An unparseable log is skipped with a warning so that one malformed event
+// does not discard the valid transfers of the transaction.
+func contractGetTransfersFromLog(logs []*bchain.RpcLog, txid string, ignored []bchain.AddressDescriptor) bchain.TokenTransfers {
 	var r bchain.TokenTransfers
-	var tt *bchain.TokenTransfer
-	var err error
 	for _, l := range logs {
-		tl := len(l.Topics)
-		if tl > 0 {
-			signature := l.Topics[0]
-			if signature == tokenTransferEventSignature {
-				tt, err = processTransferEvent(l)
-			} else if signature == tokenERC1155TransferSingleEventSignature {
-				tt, err = processERC1155TransferSingleEvent(l)
-			} else if signature == tokenERC1155TransferBatchEventSignature {
-				tt, err = processERC1155TransferBatchEvent(l)
-			} else {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			if tt != nil {
-				r = append(r, tt)
-			}
+		if len(l.Topics) == 0 {
+			continue
+		}
+		var process func(*bchain.RpcLog) (*bchain.TokenTransfer, error)
+		switch l.Topics[0] {
+		case tokenTransferEventSignature:
+			process = processTransferEvent
+		case tokenERC1155TransferSingleEventSignature:
+			process = processERC1155TransferSingleEvent
+		case tokenERC1155TransferBatchEventSignature:
+			process = processERC1155TransferBatchEvent
+		default:
+			continue
+		}
+		// checked only for transfer events, before the costly decode
+		if isIgnoredContract(ignored, l.Address) {
+			continue
+		}
+		tt, err := process(l)
+		if err != nil {
+			glog.Warningf("contractGetTransfersFromLog: skipping unparseable log of contract %s, tx %s: %v", l.Address, txid, err)
+			continue
+		}
+		if tt != nil {
+			r = append(r, tt)
 		}
 	}
-	return r, nil
+	return r
+}
+
+// isIgnoredContract reports whether the hex address is one of the ignored contracts, without allocating.
+func isIgnoredContract(ignored []bchain.AddressDescriptor, address string) bool {
+	if len(ignored) == 0 || !has0xPrefix(address) {
+		return false
+	}
+	var desc [EthereumTypeAddressDescriptorLen]byte
+	if !hexDecodeInto(desc[:], address[2:]) {
+		return false
+	}
+	for _, c := range ignored {
+		if bytes.Equal(c, desc[:]) {
+			return true
+		}
+	}
+	return false
 }
 
 func contractGetTransfersFromTx(tx *bchain.RpcTransaction) (bchain.TokenTransfers, error) {
@@ -238,20 +382,20 @@ func contractGetTransfersFromTx(tx *bchain.RpcTransaction) (bchain.TokenTransfer
 			return nil, err
 		}
 		var t big.Int
-		_, ok := t.SetString(tx.Payload[10+64:], 16)
-		if !ok {
+		if !setBigFromHexWord(&t, tx.Payload[10+64:], 16) {
 			return nil, errors.New("Data is not a number")
 		}
 		r = append(r, &bchain.TokenTransfer{
 			Standard: bchain.FungibleToken,
 			Contract: EIP55AddressFromAddress(tx.To),
 			From:     EIP55AddressFromAddress(tx.From),
-			To:       EIP55AddressFromAddress(to),
+			To:       to,
 			Value:    t,
 		})
 	} else if len(tx.Payload) >= 10+192 &&
-		(strings.HasPrefix(tx.Payload, erc721TransferFromMethodSignature) ||
-			strings.HasPrefix(tx.Payload, erc721SafeTransferFromMethodSignature) ||
+		// transferFrom(address,address,uint256) 0x23b872dd is deliberately absent: ERC-20 shares the
+		// selector and is the common case, so without a receipt the standard cannot be told apart
+		(strings.HasPrefix(tx.Payload, erc721SafeTransferFromMethodSignature) ||
 			strings.HasPrefix(tx.Payload, erc721SafeTransferFromWithDataMethodSignature)) {
 		from, err := addressFromPaddedHex(tx.Payload[10 : 10+64])
 		if err != nil {
@@ -262,15 +406,14 @@ func contractGetTransfersFromTx(tx *bchain.RpcTransaction) (bchain.TokenTransfer
 			return nil, err
 		}
 		var t big.Int
-		_, ok := t.SetString(tx.Payload[10+128:10+192], 16)
-		if !ok {
+		if !setBigFromHexWord(&t, tx.Payload[10+128:10+192], 16) {
 			return nil, errors.New("Data is not a number")
 		}
 		r = append(r, &bchain.TokenTransfer{
 			Standard: bchain.NonFungibleToken,
 			Contract: EIP55AddressFromAddress(tx.To),
-			From:     EIP55AddressFromAddress(from),
-			To:       EIP55AddressFromAddress(to),
+			From:     from,
+			To:       to,
 			Value:    t,
 		})
 	}
@@ -284,6 +427,13 @@ func (b *EthereumRPC) EthereumTypeRpcCall(data, to, from string) (string, error)
 
 // EthereumTypeRpcCallAtBlock calls eth_call with given data and to address at a specific block.
 func (b *EthereumRPC) EthereumTypeRpcCallAtBlock(data, to, from string, blockNumber *big.Int) (string, error) {
+	return b.ethCallAtBlock(data, to, from, blockNumber, "single", 1)
+}
+
+// ethCallAtBlock is the shared single-eth_call primitive. mode labels the call in the eth_call
+// metrics and subCalls is how many logical reads it carries (1 for direct reads, the batch size
+// for a coalescing call), so no caller can opt out of the instrumentation.
+func (b *EthereumRPC) ethCallAtBlock(data, to, from string, blockNumber *big.Int, mode string, subCalls int) (string, error) {
 	args := map[string]interface{}{
 		"data": data,
 		"to":   to,
@@ -291,15 +441,14 @@ func (b *EthereumRPC) EthereumTypeRpcCallAtBlock(data, to, from string, blockNum
 	if from != "" {
 		args["from"] = from
 	}
-
-	b.observeEthCall("single", 1)
+	b.observeEthCall(mode, subCalls)
 	ctx, cancel := context.WithTimeout(context.Background(), b.Timeout)
 	defer cancel()
 	var r string
 	blockArg := bchain.ToBlockNumArg(blockNumber)
 	err := b.RPC.CallContext(ctx, &r, "eth_call", args, blockArg)
 	if err != nil {
-		b.observeEthCallError("single", "rpc")
+		b.observeEthCallError(mode, "rpc")
 		return "", err
 	}
 	return r, nil
@@ -374,56 +523,212 @@ func erc20BalanceOfCallData(addrDesc bchain.AddressDescriptor) string {
 	return contractBalanceOfSignature + padded[len(addr):] + addr
 }
 
+// fetchContractInfo reads name/symbol/decimals, short-circuiting as soon as name() shows the address
+// holds no token. (nil, nil) is a conclusive "no token"; an error says nothing about the contract.
 func (b *EthereumRPC) fetchContractInfo(address string) (*bchain.ContractInfo, error) {
-	var contract bchain.ContractInfo
 	b.observeEthCallContractInfo("name")
 	data, err := b.EthereumTypeRpcCall(contractNameSignature, address, "")
 	if err != nil {
-		// ignore the error from the eth_call - since geth v1.9.15 they changed the behavior
-		// and returning error "execution reverted" for some non contract addresses
+		// since geth v1.9.15 a call to a non-contract address reverts instead of returning
+		// empty data, so a deterministic error is the usual "not a token" signal
 		// https://github.com/ethereum/go-ethereum/issues/21249#issuecomment-648647672
-		// glog.Warning(errors.Annotatef(err, "Contract NameSignature %v", address))
-		return nil, nil
-		// return nil, errors.Annotatef(err, "erc20NameSignature %v", address)
+		if isNonRetriableEthCallError(err) {
+			return nil, nil
+		}
+		return nil, errors.Annotatef(err, "contract name() %v", address)
 	}
 	name := strings.TrimSpace(parseSimpleStringProperty(data))
-	if name != "" {
-		b.observeEthCallContractInfo("symbol")
-		data, err = b.EthereumTypeRpcCall(contractSymbolSignature, address, "")
-		if err != nil {
-			// glog.Warning(errors.Annotatef(err, "Contract SymbolSignature %v", address))
-			return nil, nil
-			// return nil, errors.Annotatef(err, "erc20SymbolSignature %v", address)
-		}
-		symbol := strings.TrimSpace(parseSimpleStringProperty(data))
-		b.observeEthCallContractInfo("decimals")
-		data, _ = b.EthereumTypeRpcCall(contractDecimalsSignature, address, "")
-		// if err != nil {
-		// 	glog.Warning(errors.Annotatef(err, "Contract DecimalsSignature %v", address))
-		// 	// return nil, errors.Annotatef(err, "erc20DecimalsSignature %v", address)
-		// }
-		contract = bchain.ContractInfo{
-			Contract: address,
-			Name:     name,
-			Symbol:   symbol,
-		}
-		d := parseSimpleNumericProperty(data)
-		if d != nil {
-			contract.Decimals = int(uint8(d.Uint64()))
-		} else {
-			contract.Decimals = EtherAmountDecimalPoint
-		}
-	} else {
+	if name == "" {
 		return nil, nil
 	}
-	return &contract, nil
+	b.observeEthCallContractInfo("symbol")
+	data, err = b.EthereumTypeRpcCall(contractSymbolSignature, address, "")
+	if err != nil {
+		// a contract whose symbol() reverts has never been surfaced as a token
+		if isNonRetriableEthCallError(err) {
+			return nil, nil
+		}
+		return nil, errors.Annotatef(err, "contract symbol() %v", address)
+	}
+	symbol := strings.TrimSpace(parseSimpleStringProperty(data))
+	b.observeEthCallContractInfo("decimals")
+	// decimals() is optional; an unreadable value falls back to the coin default
+	data, _ = b.EthereumTypeRpcCall(contractDecimalsSignature, address, "")
+	return &bchain.ContractInfo{
+		Contract: address,
+		Name:     name,
+		Symbol:   symbol,
+		Decimals: contractDecimalsOrDefault(parseSimpleNumericProperty(data)),
+	}, nil
+}
+
+// contractDecimalsOrDefault narrows a decimals() return to the stored width, falling back to the
+// coin default when the call yielded nothing usable.
+func contractDecimalsOrDefault(d *big.Int) int {
+	if d == nil {
+		return EtherAmountDecimalPoint
+	}
+	return int(uint8(d.Uint64()))
 }
 
 // GetContractInfo returns information about a contract
 func (b *EthereumRPC) GetContractInfo(contractDesc bchain.AddressDescriptor) (*bchain.ContractInfo, error) {
-	address := EIP55Address(contractDesc)
-	return b.fetchContractInfo(address)
+	info, err := b.fetchContractInfo(EIP55Address(contractDesc))
+	if info != nil {
+		// the one place the coin's address form is applied; the batched and Tron paths inherit it
+		info.Contract = b.contractAddress(contractDesc)
+	}
+	return info, err
 }
+
+// contractInfoFields are the metadata reads and their metric labels, in aggregate3 slot order.
+var contractInfoFields = [...]struct{ field, signature string }{
+	{"name", contractNameSignature},
+	{"symbol", contractSymbolSignature},
+	{"decimals", contractDecimalsSignature},
+}
+
+const contractInfoCallsPerContract = len(contractInfoFields)
+
+// multicall3StarvationCanary closes every aggregate3 chunk: a codeless call costs almost no gas, so
+// it fails only once the chunk ran out - the only way to tell a bare revert from a starved sub-call.
+const multicall3StarvationCanary = "0x0000000000000000000000000000000000000000"
+
+// EthereumTypeGetContractInfos resolves metadata for many contracts at once, in input order. One
+// aggregate3 call carries a chunk; without Multicall3 each contract falls back to the sequential path.
+func (b *EthereumRPC) EthereumTypeGetContractInfos(contractDescs []bchain.AddressDescriptor) []bchain.EthereumContractInfoResult {
+	if len(contractDescs) == 0 {
+		return nil
+	}
+	results := make([]bchain.EthereumContractInfoResult, len(contractDescs))
+	deployed, err := b.probeMulticall3()
+	if err != nil {
+		// visible so an eth_getCode-restricting provider is not silent
+		b.ObserveChainDataFallback("contract_info_multicall", "probe_error")
+	}
+	if !deployed {
+		for i := range contractDescs {
+			results[i] = b.contractInfoSequential(contractDescs[i])
+		}
+		return results
+	}
+	for _, i := range b.contractInfosMulticall3(contractDescs, results) {
+		results[i] = b.contractInfoSequential(contractDescs[i])
+	}
+	return results
+}
+
+// contractInfoSequential is the short-circuiting per-contract path: chains without Multicall3, and
+// elements aggregate3 left ambiguous.
+func (b *EthereumRPC) contractInfoSequential(contractDesc bchain.AddressDescriptor) bchain.EthereumContractInfoResult {
+	info, err := b.GetContractInfo(contractDesc)
+	return bchain.EthereumContractInfoResult{Info: info, Err: err}
+}
+
+// contractAddress renders the descriptor in the coin's own address form (EIP-55, Tron's Base58) so
+// a batched result carries the same address the single-contract path stores.
+func (b *EthereumRPC) contractAddress(contractDesc bchain.AddressDescriptor) string {
+	if b.Parser != nil {
+		if addresses, _, err := b.Parser.GetAddressesFromAddrDesc(contractDesc); err == nil && len(addresses) > 0 {
+			return addresses[0]
+		}
+	}
+	return EIP55Address(contractDesc)
+}
+
+// contractInfosMulticall3 fills results from gas-bounded aggregate3 chunks and returns the
+// indexes it could not settle; the caller re-reads those with independent eth_calls.
+func (b *EthereumRPC) contractInfosMulticall3(contractDescs []bchain.AddressDescriptor, results []bchain.EthereumContractInfoResult) (holes []int) {
+	valid := make([]int, 0, len(contractDescs))
+	for i := range contractDescs {
+		if len(contractDescs[i]) == EthereumTypeAddressDescriptorLen {
+			valid = append(valid, i)
+			continue
+		}
+		// a malformed descriptor would fail the whole chunk at encode time
+		holes = append(holes, i)
+	}
+	// the canary takes a slot of its own, so the chunk still fits the configured budget
+	perChunk := (b.multicall3MaxCalls() - 1) / contractInfoCallsPerContract
+	if perChunk < 1 {
+		perChunk = 1
+	}
+	starved := 0
+	for start := 0; start < len(valid); start += perChunk {
+		end := start + perChunk
+		if end > len(valid) {
+			end = len(valid)
+		}
+		chunk := valid[start:end]
+		res, err := b.EthereumTypeMulticallAggregate3(contractInfoCalls(contractDescs, chunk), nil)
+		if err != nil {
+			// chunk failures are usually systemic: stop at the first and leave the rest to the
+			// sequential path, one fallback event and one log line per request
+			holes = append(holes, valid[start:]...)
+			b.ObserveChainDataFallback("contract_info_multicall", "error")
+			glog.Warningf("contract info multicall3 failed at chunk [%d:%d), falling back for %d contract(s): %v", start, end, len(valid)-start, err)
+			break
+		}
+		b.observeEthCallContractInfos(len(chunk))
+		// the canary is the last slot; see multicall3StarvationCanary
+		gasStarved := !res[len(res)-1].Success
+		for j, i := range chunk {
+			slots := res[j*contractInfoCallsPerContract : (j+1)*contractInfoCallsPerContract]
+			if gasStarved && (emptyAggregate3Failure(slots[0]) || emptyAggregate3Failure(slots[1])) {
+				// re-read rather than record a verdict the caller would go on to cache
+				holes = append(holes, i)
+				starved++
+				continue
+			}
+			results[i] = contractInfoFromAggregate3(b.contractAddress(contractDescs[i]), slots)
+		}
+	}
+	// element-level holes, counted apart from a failing chunk's one "error" event
+	b.observeChainDataFallback("contract_info_multicall", "elem_fallback", starved)
+	return holes
+}
+
+// contractInfoCalls lays out one chunk: every contract's metadata reads in order, then the canary.
+func contractInfoCalls(contractDescs []bchain.AddressDescriptor, chunk []int) []bchain.EthereumMulticallCall {
+	calls := make([]bchain.EthereumMulticallCall, 0, len(chunk)*contractInfoCallsPerContract+1)
+	for _, i := range chunk {
+		target := hexutil.Encode(contractDescs[i])
+		for _, f := range contractInfoFields {
+			// a reverting metadata getter yields Success=false, not a failed batch
+			calls = append(calls, bchain.EthereumMulticallCall{Target: target, CallData: f.signature, AllowFailure: true})
+		}
+	}
+	return append(calls, bchain.EthereumMulticallCall{Target: multicall3StarvationCanary, AllowFailure: true})
+}
+
+// contractInfoFromAggregate3 reaches the verdict fetchContractInfo would from the same three reads.
+func contractInfoFromAggregate3(address string, slots []bchain.EthereumMulticallResult) bchain.EthereumContractInfoResult {
+	var name string
+	if slots[0].Success {
+		name = strings.TrimSpace(parseSimpleStringProperty(slots[0].Data))
+	}
+	// a failed or blank name() is how the chain reports that there is no token here, and a
+	// reverting symbol() has never been surfaced as one either
+	if name == "" || !slots[1].Success {
+		return bchain.EthereumContractInfoResult{}
+	}
+	var decimals *big.Int
+	if slots[2].Success {
+		decimals = parseSimpleNumericProperty(slots[2].Data)
+	}
+	return bchain.EthereumContractInfoResult{Info: &bchain.ContractInfo{
+		Contract: address,
+		Name:     name,
+		Symbol:   strings.TrimSpace(parseSimpleStringProperty(slots[1].Data)),
+		Decimals: contractDecimalsOrDefault(decimals),
+	}}
+}
+
+// ErrInvalidErc20Balance means a balanceOf eth_call yielded no usable balance: either it returned
+// unparseable data (empty "0x" or non-32-byte output) or it reverted deterministically. Both are
+// benign and common for dead/non-conforming/rebasing tokens; callers treat it as "no balance" and
+// must not log it at warning level (tracked via the observeEthCallError "invalid"/"reverted" metrics).
+var ErrInvalidErc20Balance = errors.New("Invalid balance")
 
 // EthereumTypeGetErc20ContractBalance returns balance of ERC20 contract for given address
 func (b *EthereumRPC) EthereumTypeGetErc20ContractBalance(addrDesc, contractDesc bchain.AddressDescriptor) (*big.Int, error) {
@@ -436,12 +741,18 @@ func (b *EthereumRPC) EthereumTypeGetErc20ContractBalanceAtBlock(addrDesc, contr
 	req := erc20BalanceOfCallData(addrDesc)
 	data, err := b.EthereumTypeRpcCallAtBlock(req, contract, "", blockNumber)
 	if err != nil {
+		// A deterministic revert (balanceOf reverts for this holder) is benign: no usable
+		// balance. Match the batch path and treat it as ErrInvalidErc20Balance
+		if isNonRetriableEthCallError(err) {
+			b.observeEthCallError("single", "reverted")
+			return nil, ErrInvalidErc20Balance
+		}
 		return nil, err
 	}
 	r := parseSimpleNumericProperty(data)
 	if r == nil {
 		b.observeEthCallError("single", "invalid")
-		return nil, errors.New("Invalid balance")
+		return nil, ErrInvalidErc20Balance
 	}
 	return r, nil
 }
@@ -457,41 +768,154 @@ func (b *EthereumRPC) erc20BatchSize() int {
 	return defaultErc20BatchSize
 }
 
-// EthereumTypeGetErc20ContractBalances returns balances of multiple ERC20 contracts for given address.
-// It uses RPC batch calls and returns nil entries for failed/invalid results.
+// EthereumTypeGetErc20ContractBalances returns balances of multiple ERC20 contracts for a given
+// address; see EthereumTypeGetErc20ContractBalancesAtBlock.
 func (b *EthereumRPC) EthereumTypeGetErc20ContractBalances(addrDesc bchain.AddressDescriptor, contractDescs []bchain.AddressDescriptor) ([]*big.Int, error) {
 	return b.EthereumTypeGetErc20ContractBalancesAtBlock(addrDesc, contractDescs, nil)
 }
 
-// EthereumTypeGetErc20ContractBalancesAtBlock returns balances of multiple ERC20 contracts for given address at a specific block.
-// It uses RPC batch calls and returns nil entries for failed/invalid results.
+// EthereumTypeGetErc20ContractBalancesAtBlock returns balances for multiple ERC20 contracts at a
+// block: Multicall3 aggregate3 when available (contracts it leaves unsettled go through the
+// JSON-RPC batch), else the JSON-RPC batch alone. Nil entries mark failed/invalid results,
+// in input order.
 func (b *EthereumRPC) EthereumTypeGetErc20ContractBalancesAtBlock(addrDesc bchain.AddressDescriptor, contractDescs []bchain.AddressDescriptor, blockNumber *big.Int) ([]*big.Int, error) {
 	if len(contractDescs) == 0 {
 		return nil, nil
 	}
-	batcher, ok := b.RPC.(batchCaller)
-	if !ok {
-		// Some RPC clients do not support batching; caller will fall back to single calls.
-		return nil, errors.New("BatchCallContext not supported")
-	}
-	batchSize := b.erc20BatchSize()
 	// Same calldata for all balanceOf calls; only the contract address varies per element.
 	callData := erc20BalanceOfCallData(addrDesc)
+	batcher, hasBatcher := b.RPC.(batchCaller)
+	if !hasBatcher {
+		// Some RPC clients do not support batching; caller will fall back to single calls.
+		// Multicall3 needs no batcher itself, but settling its holes does.
+		return nil, errors.New("BatchCallContext not supported")
+	}
+
+	// Gate on the cached probe so non-multicall chains don't build calls just to discard them.
+	deployed, probeErr := b.probeMulticall3()
+	if probeErr != nil {
+		// Transient probe failure — visible so an eth_getCode-restricting provider is not silent.
+		b.ObserveChainDataFallback("erc20_multicall", "probe_error")
+	}
+	if !deployed {
+		return b.erc20BalancesBatchChunked(batcher, callData, contractDescs, blockNumber)
+	}
+	balances, holes := b.erc20BalancesMulticall3(callData, contractDescs, blockNumber)
+	if len(holes) == 0 {
+		return balances, nil
+	}
+	// Callers treat a present entry — even nil — as authoritative, so settle holes with
+	// independent eth_calls (full gas cap each) instead of reporting them as nil.
+	sub := make([]bchain.AddressDescriptor, len(holes))
+	for j, i := range holes {
+		sub[j] = contractDescs[i]
+	}
+	subBalances, err := b.erc20BalancesBatchChunked(batcher, callData, sub, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+	for j, i := range holes {
+		balances[i] = subBalances[j]
+	}
+	return balances, nil
+}
+
+// erc20BalancesBatchChunked fetches balances via the JSON-RPC batch path, split into
+// erc20BatchSize chunks to keep each batch request within provider limits.
+func (b *EthereumRPC) erc20BalancesBatchChunked(batcher batchCaller, callData string, contractDescs []bchain.AddressDescriptor, blockNumber *big.Int) ([]*big.Int, error) {
 	balances := make([]*big.Int, len(contractDescs))
+	batchSize := b.erc20BatchSize()
 	for start := 0; start < len(contractDescs); start += batchSize {
 		end := start + batchSize
 		if end > len(contractDescs) {
 			end = len(contractDescs)
 		}
-		// Process a bounded slice to keep batch RPC requests within size limits.
-		batchBalances, err := b.erc20BalancesBatchAtBlock(batcher, callData, contractDescs[start:end], blockNumber)
+		chunkBalances, err := b.erc20BalancesBatchAtBlock(batcher, callData, contractDescs[start:end], blockNumber)
 		if err != nil {
 			return nil, err
 		}
-		// Preserve original ordering when merging per-batch results.
-		copy(balances[start:end], batchBalances)
+		copy(balances[start:end], chunkBalances)
 	}
 	return balances, nil
+}
+
+// emptyAggregate3Failure reports an element that failed with no returndata: a bare revert()
+// and gas starvation are indistinguishable from the element alone.
+func emptyAggregate3Failure(r bchain.EthereumMulticallResult) bool {
+	return !r.Success && len(r.Data) <= 2
+}
+
+// erc20BalancesMulticall3 fetches balanceOf via gas-bounded aggregate3 chunks. holes are the
+// indexes it could not settle; the caller must re-read those with independent eth_calls.
+func (b *EthereumRPC) erc20BalancesMulticall3(callData string, contractDescs []bchain.AddressDescriptor, blockNumber *big.Int) (balances []*big.Int, holes []int) {
+	balances = make([]*big.Int, len(contractDescs))
+	// Tallied per element and emitted once: this loop runs per held token, and every
+	// observe* call would otherwise rebuild a label map and re-resolve the child counter.
+	starved, elemErrors, invalid := 0, 0, 0
+	valid := make([]int, 0, len(contractDescs))
+	for i := range contractDescs {
+		if len(contractDescs[i]) == EthereumTypeAddressDescriptorLen {
+			valid = append(valid, i)
+		}
+	}
+	if skipped := len(contractDescs) - len(valid); skipped > 0 {
+		glog.V(2).Infof("erc20 balances multicall3: excluding %d malformed contract descriptor(s)", skipped)
+	}
+	maxCalls := b.multicall3MaxCalls()
+	for start := 0; start < len(valid); start += maxCalls {
+		end := start + maxCalls
+		if end > len(valid) {
+			end = len(valid)
+		}
+		chunk := valid[start:end]
+		calls := make([]bchain.EthereumMulticallCall, len(chunk))
+		for j, i := range chunk {
+			calls[j] = bchain.EthereumMulticallCall{
+				Target:   hexutil.Encode(contractDescs[i]),
+				CallData: callData,
+				// a reverting balanceOf yields Success=false, not a failed batch
+				AllowFailure: true,
+			}
+		}
+		results, err := b.EthereumTypeMulticallAggregate3(calls, blockNumber)
+		if err != nil {
+			// Chunk failures are usually systemic: stop at the first, keep decoded chunks and
+			// leave the rest to the caller — one fallback event and one log line per request.
+			holes = append(holes, valid[start:]...)
+			b.ObserveChainDataFallback("erc20_multicall", "error")
+			glog.Warningf("erc20 balances multicall3 failed at chunk [%d:%d), falling back for %d contract(s): %v", start, end, len(valid)-start, err)
+			break
+		}
+		// Starvation usually shows up as a trailing run: a sub-call that exhausts the gas
+		// leaves aggregate3 only the 1/64 the EVM withholds, rarely enough for the calls
+		// after it. A heuristic, not an invariant — it assumes comparably priced sub-calls,
+		// and a mid-chunk gas hog can spare enough for the rest to succeed, leaving its own
+		// empty failure read as a bare revert and its balance nil. Accepted because treating
+		// every empty failure as starved costs a metered call per dead token per request.
+		tailStarved := len(results) > 0 && emptyAggregate3Failure(results[len(results)-1])
+		for j := range results {
+			i := chunk[j]
+			if !results[j].Success {
+				elemErrors++
+				// Once the tail is starved, earlier empty failures may be starved too.
+				if tailStarved && emptyAggregate3Failure(results[j]) {
+					holes = append(holes, i)
+					starved++
+				}
+				continue
+			}
+			// nil on unparseable output (empty/short), matching the batch path
+			balances[i] = parseSimpleNumericProperty(results[j].Data)
+			if balances[i] == nil {
+				invalid++
+			}
+		}
+	}
+	b.observeEthCallErrors("multicall", "elem", elemErrors)
+	b.observeEthCallErrors("multicall", "invalid", invalid)
+	// element-level holes, counted apart from a failing chunk's one "error" event
+	b.observeChainDataFallback("erc20_multicall", "elem_fallback", starved)
+	return balances, holes
 }
 
 func (b *EthereumRPC) erc20BalancesBatch(batcher batchCaller, callData string, contractDescs []bchain.AddressDescriptor) ([]*big.Int, error) {
@@ -534,7 +958,10 @@ func (b *EthereumRPC) erc20BalancesBatchAtBlock(batcher batchCaller, callData st
 			balances[i] = parseSimpleNumericProperty(data)
 			if balances[i] == nil {
 				b.observeEthCallError("single", "invalid")
-				glog.Warningf("erc20 single eth_call invalid result for %s: %q", hexutil.Encode(contractDesc), data)
+				// Benign and high-volume: a successful eth_call returning empty/non-32-byte data, typical of
+				// dead (self-destructed) or non-ERC20-conforming tokens that linger in holders' contract lists.
+				// Tracked via the "invalid" metric; logged at V(2) to avoid flooding (one line per holder request).
+				glog.V(2).Infof("erc20 single eth_call invalid result for %s: %q", hexutil.Encode(contractDesc), data)
 			}
 		}
 		return balances, nil
@@ -556,7 +983,7 @@ func (b *EthereumRPC) erc20BalancesBatchAtBlock(batcher batchCaller, callData st
 			balances[i] = parseSimpleNumericProperty(data)
 			if balances[i] == nil {
 				b.observeEthCallError("single", "invalid")
-				glog.Warningf("erc20 single eth_call invalid result for %s: %q", hexutil.Encode(contractDescs[i]), data)
+				glog.V(2).Infof("erc20 single eth_call invalid result for %s: %q", hexutil.Encode(contractDescs[i]), data)
 			}
 			continue
 		}
@@ -565,7 +992,9 @@ func (b *EthereumRPC) erc20BalancesBatchAtBlock(batcher batchCaller, callData st
 		balances[i] = parseSimpleNumericProperty(results[i])
 		if balances[i] == nil {
 			b.observeEthCallError("batch", "invalid")
-			glog.Warningf("erc20 batch eth_call invalid result for %s: %q", hexutil.Encode(contractDescs[i]), results[i])
+			// Benign and high-volume: see the single-call note above. Same event on the batch success path,
+			// dominated by widely-airdropped dead/non-conforming tokens. Tracked via the "invalid" metric.
+			glog.V(2).Infof("erc20 batch eth_call invalid result for %s: %q", hexutil.Encode(contractDescs[i]), results[i])
 		}
 	}
 	return balances, nil
@@ -578,6 +1007,8 @@ func isNonRetriableEthCallError(err error) bool {
 	// These errors are deterministic for the given call data and won't succeed on retry.
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "execution reverted") ||
+		// Tron's phrasing for no code at the address; a single-call retry cannot succeed either.
+		strings.Contains(msg, "smart contract is not exist") ||
 		strings.Contains(msg, "invalid opcode") ||
 		strings.Contains(msg, "out of gas") ||
 		strings.Contains(msg, "stack underflow") ||

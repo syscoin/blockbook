@@ -360,7 +360,8 @@ type EthereumSpecific struct {
 	Nonce                uint64                                 `json:"nonce" ts_doc:"Transaction nonce (sequential number from the sender)."`
 	GasLimit             *big.Int                               `json:"gasLimit" ts_doc:"Maximum gas allowed by the sender for this transaction."`
 	GasUsed              *big.Int                               `json:"gasUsed,omitempty" ts_doc:"Actual gas consumed by the transaction execution."`
-	GasPrice             *Amount                                `json:"gasPrice,omitempty" ts_doc:"Price (in Wei or base units) per gas unit."`
+	GasPrice             *Amount                                `json:"gasPrice,omitempty" ts_doc:"Price (in Wei or base units) per gas unit bid by the sender."`
+	EffectiveGasPrice    *Amount                                `json:"effectiveGasPrice,omitempty" ts_doc:"Actual gas price paid per gas unit; on L2 networks this differs from gasPrice and is used for the fee."`
 	MaxPriorityFeePerGas *Amount                                `json:"maxPriorityFeePerGas,omitempty"`
 	MaxFeePerGas         *Amount                                `json:"maxFeePerGas,omitempty"`
 	BaseFeePerGas        *Amount                                `json:"baseFeePerGas,omitempty"`
@@ -403,7 +404,7 @@ type Tx struct {
 	Hex                    string            `json:"hex,omitempty" ts_doc:"Raw hex-encoded transaction data."`
 	Rbf                    bool              `json:"rbf,omitempty" ts_doc:"Indicates if this transaction is replace-by-fee (RBF) enabled."`
 	CoinSpecificData       json.RawMessage   `json:"coinSpecificData,omitempty" ts_type:"any" ts_doc:"Blockchain-specific extended data."`
-	ChainExtraData         *TxChainExtraData `json:"chainExtraData,omitempty" ts_type:"{ payloadType: 'tron'; payload?: TronChainExtraData } | { payloadType: string; payload?: any }" ts_doc:"Additional normalized chain-specific transaction data. Use payloadType as discriminator for payload."`
+	ChainExtraData         *TxChainExtraData `json:"chainExtraData,omitempty" ts_doc:"Additional normalized chain-specific transaction data. Use payloadType as discriminator for payload."`
 	TokenTransfers         []TokenTransfer   `json:"tokenTransfers,omitempty" ts_doc:"List of token transfers that occurred in this transaction."`
 	// SYSCOIN: account-context transaction summary fields for compact wallet history.
 	Direction             string          `json:"direction,omitempty" ts_doc:"Transaction direction relative to the queried account, when returned by account summary endpoints."`
@@ -468,6 +469,12 @@ type AddressFilter struct {
 	// WithConfirmedNonce set to true makes the Ethereum-like address response include the confirmed nonce,
 	// which requires an extra eth_getTransactionCount("latest") backend call; off by default to avoid that cost.
 	WithConfirmedNonce bool `ts_doc:"If true, additionally fetch and return the confirmed nonce for Ethereum-like addresses (extra backend call)."`
+	// PrivatePendingNonces carries the account nonces of the caller's in-flight private (alternative
+	// send-tx) transactions when the request declared them (see server.WsPrivatePending). For
+	// Ethereum-like nonce lookups it routes the query to the alternative provider and each value
+	// counts as an occupied nonce slot in the pending-nonce walk, alongside Blockbook's own cached
+	// private txs (see raiseToPendingFloor); empty otherwise.
+	PrivatePendingNonces []uint64 `ts_doc:"Ethereum-like: account nonces of the caller's in-flight private transactions, if the request declared them."`
 }
 
 // StakingPool holds data about address participation in a staking pool contract
@@ -517,7 +524,7 @@ type Address struct {
 	Erc20Contract  *ContractInfoResult    `json:"erc20Contract,omitempty" ts_doc:"@deprecated: replaced by contractInfo"`
 	AddressAliases AddressAliasesMap      `json:"addressAliases,omitempty" ts_doc:"Aliases assigned to this address."`
 	StakingPools   []StakingPool          `json:"stakingPools,omitempty" ts_doc:"List of staking pool data if address interacts with staking."`
-	ChainExtraData *AccountChainExtraData `json:"chainExtraData,omitempty" ts_type:"{ payloadType: 'tron'; payload?: TronAccountExtraData } | { payloadType: string; payload?: any }" ts_doc:"Additional normalized chain-specific account/address data. Use payloadType as discriminator for payload."`
+	ChainExtraData *AccountChainExtraData `json:"chainExtraData,omitempty" ts_doc:"Additional normalized chain-specific account/address data. Use payloadType as discriminator for payload."`
 	// helpers for explorer
 	Filter        string              `json:"-" ts_doc:"Filter used internally for data retrieval."`
 	XPubAddresses map[string]struct{} `json:"-" ts_doc:"Set of derived XPUB addresses (internal usage)."`

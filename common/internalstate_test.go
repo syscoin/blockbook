@@ -138,3 +138,150 @@ func TestWsIPBlocklistSnapshotOrderAndReset(t *testing.T) {
 		t.Fatalf("after reset snapshot len = %d, want 0", got)
 	}
 }
+
+// TestSetBackendInfoKeepsLastGoodOnError covers the guard that stops a failed
+// GetChainInfo from zeroing the backend height: publishing 0 makes the "backend stuck"
+// alerts read "no blocks produced", and the recovery jump back to the real height then
+// blinds their delta() window and resets the tip-advance timestamp.
+func TestSetBackendInfoKeepsLastGoodOnError(t *testing.T) {
+	is := &InternalState{}
+	is.SetBackendInfo(&BackendInfo{Blocks: 100, Version: "v1", Subversion: "sub"})
+	advance := is.GetBackendTipLastAdvance()
+
+	is.SetBackendInfo(&BackendInfo{BackendError: "GetChainInfo: connection refused"})
+
+	bi := is.GetBackendInfo()
+	if bi.Blocks != 100 {
+		t.Errorf("Blocks = %d, want the last known good 100", bi.Blocks)
+	}
+	if bi.Version != "v1" || bi.Subversion != "sub" {
+		t.Errorf("version fields were blanked: %+v", bi)
+	}
+	if bi.BackendError == "" {
+		t.Error("BackendError was not recorded")
+	}
+	if got := is.GetBackendTipLastAdvance(); !got.Equal(advance) {
+		t.Errorf("tip advance moved on error: %v -> %v", advance, got)
+	}
+
+	// Recovery must not read as an advance just because the error left the height alone.
+	is.SetBackendInfo(&BackendInfo{Blocks: 100, Version: "v1"})
+	if got := is.GetBackendTipLastAdvance(); !got.Equal(advance) {
+		t.Errorf("tip advance moved on recovery without a new block: %v -> %v", advance, got)
+	}
+	if is.GetBackendInfo().BackendError != "" {
+		t.Error("BackendError was not cleared on recovery")
+	}
+}
+
+// TestSetBackendInfoStoresGenesisHeight guards the narrowness of the error path: a
+// backend that legitimately answers with height 0 must still be stored.
+func TestSetBackendInfoStoresGenesisHeight(t *testing.T) {
+	is := &InternalState{}
+	is.SetBackendInfo(&BackendInfo{Blocks: 0, Version: "genesis"})
+	if got := is.GetBackendInfo().Version; got != "genesis" {
+		t.Errorf("Version = %q, want %q", got, "genesis")
+	}
+}
+
+// TestBackendTipAdvanceSurvivesRestart covers the persisted tip-advance reference.
+// BackendInfo is not persisted, so comparing against it made every process start look
+// like a fresh advance - the reason blockbook_tip_age_seconds stayed pinned near zero
+// through a crash loop instead of climbing.
+func TestBackendTipAdvanceSurvivesRestart(t *testing.T) {
+	is := &InternalState{}
+	is.SetBackendInfo(&BackendInfo{Blocks: 500})
+	advance := is.GetBackendTipLastAdvance()
+
+	packed, err := is.Pack()
+	if err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	restored, err := UnpackInternalState(packed)
+	if err != nil {
+		t.Fatalf("UnpackInternalState: %v", err)
+	}
+	if !restored.BackendTipLastAdvance.Equal(advance) {
+		t.Errorf("advance not persisted: %v -> %v", advance, restored.BackendTipLastAdvance)
+	}
+	if restored.BackendTipHeight != 500 {
+		t.Errorf("BackendTipHeight = %d, want 500", restored.BackendTipHeight)
+	}
+
+	// The backend is still at the same height after the restart: this is a stall, so the
+	// age must keep climbing from the original timestamp rather than restart at zero.
+	restored.SetBackendInfo(&BackendInfo{Blocks: 500})
+	if got := restored.GetBackendTipLastAdvance(); !got.Equal(advance) {
+		t.Errorf("restart reset the tip advance: %v -> %v", advance, got)
+	}
+}
+
+// TestBackendTipAdvanceOnRollback checks that a lower height still counts as the backend
+// being alive, so a reorg or a replaced backend cannot wedge the age at "climbing".
+func TestBackendTipAdvanceOnRollback(t *testing.T) {
+	is := &InternalState{}
+	is.SetBackendInfo(&BackendInfo{Blocks: 500})
+	advance := is.GetBackendTipLastAdvance()
+
+	is.SetBackendInfo(&BackendInfo{Blocks: 480})
+	got := is.GetBackendTipLastAdvance()
+	if !got.After(advance) {
+		t.Errorf("rollback did not refresh the tip advance: %v -> %v", advance, got)
+	}
+	if is.BackendTipHeight != 480 {
+		t.Errorf("BackendTipHeight = %d, want 480", is.BackendTipHeight)
+	}
+}
+
+// TestComputeAvgBlockPeriodSubSecond covers the reason the fractional average exists: the
+// integer form truncates, so a sub-second chain reports 0 - and both "backend stuck" rules
+// are gated on blockbook_avg_block_period > 0, which silently excluded Arbitrum (~0.24s),
+// BNB Smart Chain (~0.45s) and Robinhood (~0.10s) from either of them.
+func TestComputeAvgBlockPeriodSubSecond(t *testing.T) {
+	// 102 block times spaced 250ms apart, rounded into the uint32 seconds they are stored
+	// as: 101 intervals over ~25s.
+	is := &InternalState{}
+	times := make([]uint32, avgBlockPeriodSample+2)
+	for i := range times {
+		times[i] = uint32(i) / 4
+	}
+	is.SetBlockTimes(times)
+
+	if got := is.GetAvgBlockPeriod(); got != 0 {
+		t.Errorf("GetAvgBlockPeriod() = %d, want 0 (integer form truncates)", got)
+	}
+	got := is.GetAvgBlockPeriodSeconds()
+	if got < 0.2 || got > 0.3 {
+		t.Errorf("GetAvgBlockPeriodSeconds() = %v, want ~0.25", got)
+	}
+}
+
+// TestComputeAvgBlockPeriodNotEnoughBlocks pins the "not yet computed" case: early in an
+// initial build or reindex there are too few block times, and the metric reads 0.
+func TestComputeAvgBlockPeriodNotEnoughBlocks(t *testing.T) {
+	is := &InternalState{}
+	is.SetBlockTimes(make([]uint32, avgBlockPeriodSample))
+	if got := is.GetAvgBlockPeriodSeconds(); got != 0 {
+		t.Errorf("GetAvgBlockPeriodSeconds() = %v, want 0", got)
+	}
+}
+
+// TestComputeAvgBlockPeriodDividesByRealIntervalCount checks the float form divides the
+// span by the number of intervals it actually covers. The integer form divides a span of
+// avgBlockPeriodSample+1 intervals by avgBlockPeriodSample and so runs ~1% high; it is
+// left alone because it feeds the sync ETA.
+func TestComputeAvgBlockPeriodDividesByRealIntervalCount(t *testing.T) {
+	is := &InternalState{}
+	times := make([]uint32, avgBlockPeriodSample+2)
+	for i := range times {
+		times[i] = uint32(i) * 3
+	}
+	is.SetBlockTimes(times)
+
+	if got := is.GetAvgBlockPeriodSeconds(); got != 3 {
+		t.Errorf("GetAvgBlockPeriodSeconds() = %v, want exactly 3", got)
+	}
+	if got := is.GetAvgBlockPeriod(); got != 3 {
+		t.Errorf("GetAvgBlockPeriod() = %d, want 3 (3.03 truncated)", got)
+	}
+}

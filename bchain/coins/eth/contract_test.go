@@ -5,6 +5,7 @@ package eth
 import (
 	"fmt"
 	"math/big"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -12,12 +13,116 @@ import (
 	"github.com/trezor/blockbook/tests/dbtestdata"
 )
 
-func Test_contractGetTransfersFromLog(t *testing.T) {
+func Test_addressFromPaddedHex(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    []*bchain.RpcLog
-		want    bchain.TokenTransfers
+		input   string
+		want    string
 		wantErr bool
+	}{
+		{name: "padded topic", input: "0x0000000000000000000000002aacf811ac1a60081ea39f7783c0d26c500871a8", want: "0x2aaCF811aC1A60081EA39F7783c0D26c500871a8"},
+		{name: "padded no prefix", input: "0000000000000000000000002aacf811ac1a60081ea39f7783c0d26c500871a8", want: "0x2aaCF811aC1A60081EA39F7783c0D26c500871a8"},
+		{name: "uppercase 0X prefix", input: "0X0000000000000000000000005DC6288B35E0807A3D6FEB89B3A2FF4AB773168E", want: "0x5Dc6288b35E0807A3d6fEB89b3a2Ff4aB773168e"},
+		{name: "bare address", input: "0x5dc6288b35e0807a3d6feb89b3a2ff4ab773168e", want: "0x5Dc6288b35E0807A3d6fEB89b3a2Ff4aB773168e"},
+		{name: "odd length over 20 bytes keeps low 20 bytes", input: "f5dc6288b35e0807a3d6feb89b3a2ff4ab773168e", want: "0x5Dc6288b35E0807A3d6fEB89b3a2Ff4aB773168e"},
+		{name: "zero word", input: "0x0000000000000000000000000000000000000000000000000000000000000000", want: "0x0000000000000000000000000000000000000000"},
+		{name: "short value is left-padded", input: "0x1a2b3c", want: "0x00000000000000000000000000000000001A2b3c"},
+		{name: "padding is not validated", input: "0xzzzzzzzzzzzzzzzzzzzzzzzz2aacf811ac1a60081ea39f7783c0d26c500871a8", want: "0x2aaCF811aC1A60081EA39F7783c0D26c500871a8"},
+		{name: "invalid hex in address bytes", input: "0x0000000000000000000000002aacf811ac1a60081ea39f7783c0d26c500871zz", wantErr: true},
+		{name: "invalid short", input: "0xzz", wantErr: true},
+		{name: "prefix only", input: "0x", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := addressFromPaddedHex(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("addressFromPaddedHex(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("addressFromPaddedHex(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+			// callers store the result unmodified, so it must already be EIP-55
+			if got != "" && got != EIP55AddressFromAddress(got) {
+				t.Errorf("addressFromPaddedHex(%q) = %q is not EIP-55 checksummed", tt.input, got)
+			}
+		})
+	}
+}
+
+func Test_setBigFromHexWord(t *testing.T) {
+	const word = "00000000000000000000000000000000000000000000000000000000000f4240"
+	tests := []struct {
+		name  string
+		input string
+		base  int
+		want  string
+		ok    bool
+	}{
+		{name: "word with prefix", input: "0x" + word, base: 0, want: "1000000", ok: true},
+		{name: "word without prefix", input: word, base: 16, want: "1000000", ok: true},
+		{name: "uppercase word", input: "0X" + strings.ToUpper(word), base: 0, want: "1000000", ok: true},
+		{name: "max word", input: strings.Repeat("f", 64), base: 16, want: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1)).String(), ok: true},
+		{name: "zero word", input: "0x" + strings.Repeat("0", 64), base: 0, want: "0", ok: true},
+		{name: "short value falls back to SetString base 0", input: "0x1a2b", base: 0, want: "6699", ok: true},
+		{name: "short value falls back to SetString base 16", input: "1a2b", base: 16, want: "6699", ok: true},
+		{name: "long value falls back to SetString", input: "0x1" + word, base: 0, want: new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1000000)).String(), ok: true},
+		{name: "invalid hex in word", input: "0x" + word[:62] + "zz", base: 0, ok: false},
+		{name: "prefix only", input: "0x", base: 0, ok: false},
+		{name: "empty", input: "", base: 16, ok: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var v big.Int
+			ok := setBigFromHexWord(&v, tt.input, tt.base)
+			if ok != tt.ok {
+				t.Fatalf("setBigFromHexWord(%q) ok = %v, want %v", tt.input, ok, tt.ok)
+			}
+			if ok && v.String() != tt.want {
+				t.Errorf("setBigFromHexWord(%q) = %s, want %s", tt.input, v.String(), tt.want)
+			}
+			// must agree with the generic big.Int parser on every accepted input
+			var ref big.Int
+			if _, refOk := ref.SetString(tt.input, tt.base); refOk != tt.ok || (ok && ref.Cmp(&v) != 0) {
+				t.Errorf("setBigFromHexWord(%q) disagrees with big.Int.SetString: %v/%s vs %v/%s", tt.input, ok, v.String(), refOk, ref.String())
+			}
+		})
+	}
+}
+
+func Test_parseEVMLogWordUint64(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    string
+		offset  int
+		want    uint64
+		wantErr bool
+	}{
+		{name: "small", data: strings.Repeat("0", 63) + "3", want: 3},
+		{name: "max uint64", data: strings.Repeat("0", 48) + strings.Repeat("f", 16), want: ^uint64(0)},
+		{name: "overflow", data: strings.Repeat("0", 47) + "1" + strings.Repeat("0", 16), wantErr: true},
+		{name: "second word", data: strings.Repeat("0", 64) + strings.Repeat("0", 62) + "40", offset: 64, want: 64},
+		{name: "invalid hex", data: strings.Repeat("0", 62) + "zz", wantErr: true},
+		{name: "too short", data: strings.Repeat("0", 63), wantErr: true},
+		{name: "negative offset", data: strings.Repeat("0", 64), offset: -1, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseEVMLogWordUint64(tt.data, tt.offset)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseEVMLogWordUint64(%q, %d) error = %v, wantErr %v", tt.data, tt.offset, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("parseEVMLogWordUint64(%q, %d) = %d, want %d", tt.data, tt.offset, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_contractGetTransfersFromLog(t *testing.T) {
+	tests := []struct {
+		name string
+		args []*bchain.RpcLog
+		want bchain.TokenTransfers
 	}{
 		{
 			name: "ERC20 transfer 1",
@@ -208,11 +313,7 @@ func Test_contractGetTransfersFromLog(t *testing.T) {
 		}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := contractGetTransfersFromLog(tt.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("contractGetTransfersFromLog error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := contractGetTransfersFromLog(tt.args, "0xtxid", nil)
 			if len(got) != len(tt.want) {
 				t.Errorf("contractGetTransfersFromLog len not same, %+v, want %+v", got, tt.want)
 			}
@@ -224,6 +325,71 @@ func Test_contractGetTransfersFromLog(t *testing.T) {
 
 			}
 		})
+	}
+}
+
+func erc1155BatchWord(n uint64) string {
+	return fmt.Sprintf("%064x", n)
+}
+
+func malformedERC1155TransferBatchLog(count uint64) *bchain.RpcLog {
+	return &bchain.RpcLog{
+		Address: "0x1111111111111111111111111111111111111111",
+		Topics: []string{
+			tokenERC1155TransferBatchEventSignature,
+			"0x0000000000000000000000002222222222222222222222222222222222222222",
+			"0x0000000000000000000000003333333333333333333333333333333333333333",
+			"0x0000000000000000000000004444444444444444444444444444444444444444",
+		},
+		Data: "0x" +
+			erc1155BatchWord(0x40) +
+			erc1155BatchWord(0x60) +
+			erc1155BatchWord(count) +
+			erc1155BatchWord(count),
+	}
+}
+
+func Test_processERC1155TransferBatchEventRejectsMalformedLogBeforeAllocation(t *testing.T) {
+	const count = 200000
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	transfer, err := processERC1155TransferBatchEvent(malformedERC1155TransferBatchLog(count))
+	runtime.ReadMemStats(&after)
+	if err == nil {
+		t.Fatal("processERC1155TransferBatchEvent returned nil error for malformed ERC1155 TransferBatch")
+	}
+	if transfer != nil {
+		t.Fatalf("processERC1155TransferBatchEvent transfer = %+v, want nil", transfer)
+	}
+	if strings.Contains(err.Error(), "recovered from panic") {
+		t.Fatalf("processERC1155TransferBatchEvent recovered from panic instead of validating input: %v", err)
+	}
+	if delta := after.TotalAlloc - before.TotalAlloc; delta > 1_000_000 {
+		t.Fatalf("processERC1155TransferBatchEvent allocated %d bytes for malformed ERC1155 TransferBatch count %d", delta, count)
+	}
+}
+
+func Test_contractGetTransfersFromLogSkipsMalformedERC1155TransferBatch(t *testing.T) {
+	logs := []*bchain.RpcLog{
+		malformedERC1155TransferBatchLog(200000),
+		{ // valid ERC20 Transfer in the same receipt
+			Address: "0x76a45e8976499ab9ae223cc584019341d5a84e96",
+			Topics: []string{
+				tokenTransferEventSignature,
+				"0x0000000000000000000000002aacf811ac1a60081ea39f7783c0d26c500871a8",
+				"0x000000000000000000000000e9a5216ff992cfa01594d43501a56e12769eb9d2",
+			},
+			Data: "0x0000000000000000000000000000000000000000000000000000000000000123",
+		},
+	}
+	transfers := contractGetTransfersFromLog(logs, "0xtxid", nil)
+	if len(transfers) != 1 {
+		t.Fatalf("contractGetTransfersFromLog transfers = %+v, want the valid transfer kept", transfers)
+	}
+	// the address could have different case
+	if strings.ToLower(transfers[0].Contract) != "0x76a45e8976499ab9ae223cc584019341d5a84e96" {
+		t.Fatalf("contractGetTransfersFromLog kept transfer of contract %s, want the valid ERC20 transfer", transfers[0].Contract)
 	}
 }
 
@@ -256,8 +422,21 @@ func Test_contractGetTransfersFromTx(t *testing.T) {
 			},
 		},
 		{
-			name: "ERC721 transferFrom",
+			// 0x23b872dd is shared by ERC-20 and ERC-721, so no standard can be derived from calldata
+			name: "transferFrom with the shared ERC-20/ERC-721 selector yields nothing",
 			args: (b2.Txs[2].CoinSpecificData.(bchain.EthereumSpecificData)).Tx,
+			want: bchain.TokenTransfers{},
+		},
+		{
+			name: "ERC721 safeTransferFrom",
+			args: &bchain.RpcTransaction{
+				From: "0x837e3f699d85a4b0b99894567e9233dfb1dcb081",
+				To:   "0xcda9fc258358ecaa88845f19af595e908bb7efe9",
+				Payload: erc721SafeTransferFromMethodSignature +
+					"000000000000000000000000837e3f699d85a4b0b99894567e9233dfb1dcb081" +
+					"0000000000000000000000007b62eb7fe80350dc7ec945c0b73242cb9877fb1b" +
+					"0000000000000000000000000000000000000000000000000000000000000001",
+			},
 			want: bchain.TokenTransfers{
 				{
 					Standard: bchain.NonFungibleToken,
@@ -265,6 +444,28 @@ func Test_contractGetTransfersFromTx(t *testing.T) {
 					From:     "0x837e3f699d85a4b0b99894567e9233dfb1dcb081",
 					To:       "0x7b62eb7fe80350dc7ec945c0b73242cb9877fb1b",
 					Value:    *big.NewInt(1),
+				},
+			},
+		},
+		{
+			name: "ERC721 safeTransferFrom with data",
+			args: &bchain.RpcTransaction{
+				From: "0x837e3f699d85a4b0b99894567e9233dfb1dcb081",
+				To:   "0xcda9fc258358ecaa88845f19af595e908bb7efe9",
+				Payload: erc721SafeTransferFromWithDataMethodSignature +
+					"000000000000000000000000837e3f699d85a4b0b99894567e9233dfb1dcb081" +
+					"0000000000000000000000007b62eb7fe80350dc7ec945c0b73242cb9877fb1b" +
+					"0000000000000000000000000000000000000000000000000000000000000002" +
+					"0000000000000000000000000000000000000000000000000000000000000080" +
+					"0000000000000000000000000000000000000000000000000000000000000000",
+			},
+			want: bchain.TokenTransfers{
+				{
+					Standard: bchain.NonFungibleToken,
+					Contract: "0xcda9fc258358ecaa88845f19af595e908bb7efe9",
+					From:     "0x837e3f699d85a4b0b99894567e9233dfb1dcb081",
+					To:       "0x7b62eb7fe80350dc7ec945c0b73242cb9877fb1b",
+					Value:    *big.NewInt(2),
 				},
 			},
 		},

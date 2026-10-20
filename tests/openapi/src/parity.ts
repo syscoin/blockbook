@@ -97,6 +97,7 @@ const _WsReq: Compat<Bb.WsReq, Schemas["WsRequest"], "WsRequest"> = true;
 const _WsRes: Compat<Bb.WsRes, Schemas["WsResponse"], "WsResponse"> = true;
 
 const _WsAccountInfoReq: Compat<Bb.WsAccountInfoReq, Schemas["WsAccountInfoReq"], "WsAccountInfoReq"> = true;
+const _WsPrivatePending: Compat<Bb.WsPrivatePending, Schemas["WsPrivatePending"], "WsPrivatePending"> = true;
 const _WsContractInfoReq: Compat<Bb.WsContractInfoReq, Schemas["WsContractInfoReq"], "WsContractInfoReq"> = true;
 const _WsBackendInfo: Compat<Bb.WsBackendInfo, Schemas["WsBackendInfo"], "WsBackendInfo"> = true;
 const _WsInfoRes: Compat<Bb.WsInfoRes, Schemas["WsInfoRes"], "WsInfoRes"> = true;
@@ -113,6 +114,8 @@ const _WsEstimateFeeReq: Compat<Bb.WsEstimateFeeReq, Schemas["WsEstimateFeeReq"]
 const _Eip1559Fee: Compat<Bb.Eip1559Fee, Schemas["Eip1559Fee"], "Eip1559Fee"> = true;
 const _Eip1559Fees: Compat<Bb.Eip1559Fees, Schemas["Eip1559Fees"], "Eip1559Fees"> = true;
 const _WsEstimateFeeRes: Compat<Bb.WsEstimateFeeRes, Schemas["WsEstimateFeeRes"], "WsEstimateFeeRes"> = true;
+const _EthereumGasData: Compat<Bb.EthereumGasData, Schemas["EthereumGasData"], "EthereumGasData"> = true;
+const _WsNewBlock: Compat<Bb.WsNewBlock, Schemas["WsNewBlock"], "WsNewBlock"> = true;
 const _WsSendTransactionReq: Compat<Bb.WsSendTransactionReq, Schemas["WsSendTransactionReq"], "WsSendTransactionReq"> = true;
 const _WsSubscribeAddressesReq: Compat<Bb.WsSubscribeAddressesReq, Schemas["WsSubscribeAddressesReq"], "WsSubscribeAddressesReq"> = true;
 const _WsSubscribeFiatRatesReq: Compat<Bb.WsSubscribeFiatRatesReq, Schemas["WsSubscribeFiatRatesReq"], "WsSubscribeFiatRatesReq"> = true;
@@ -148,10 +151,11 @@ void [
   _BackendInfo, _InternalStateColumn, _BlockbookInfo, _SystemInfo,
   _FiatTicker, _FiatTickers, _AvailableVsCurrencies,
   _WsReq, _WsRes,
-  _WsAccountInfoReq, _WsContractInfoReq, _WsBackendInfo, _WsInfoRes,
+  _WsAccountInfoReq, _WsPrivatePending, _WsContractInfoReq, _WsBackendInfo, _WsInfoRes,
   _WsBlockHashReq, _WsBlockHashRes, _WsBlockReq, _WsBlockFilterReq, _WsBlockFiltersBatchReq,
   _WsAccountUtxoReq, _WsBalanceHistoryReq, _WsTransactionReq, _WsTransactionSpecificReq,
   _WsEstimateFeeReq, _Eip1559Fee, _Eip1559Fees, _WsEstimateFeeRes,
+  _EthereumGasData, _WsNewBlock,
   _WsSendTransactionReq, _WsSubscribeAddressesReq, _WsSubscribeFiatRatesReq,
   _WsCurrentFiatRatesReq, _WsFiatRatesForTimestampsReq, _WsFiatRatesTickersListReq,
   _WsMempoolFiltersReq, _WsRpcCallReq, _WsRpcCallRes,

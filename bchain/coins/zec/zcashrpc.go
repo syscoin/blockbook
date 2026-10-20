@@ -108,7 +108,7 @@ func (z *ZCashRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 		ProtocolVersion: string(networkInfo.Result.ProtocolVersion),
 		Timeoffset:      networkInfo.Result.Timeoffset,
 		Consensus:       chainInfo.Result.Consensus,
-		Warnings:        networkInfo.Result.Warnings,
+		Warnings:        string(networkInfo.Result.Warnings),
 	}, nil
 }
 
@@ -271,11 +271,6 @@ func (z *ZCashRPC) getRawTransaction(txid string) (json.RawMessage, error) {
 // It could be optimized for mempool, i.e. without block time and confirmations
 func (z *ZCashRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
 	return z.GetTransaction(txid)
-}
-
-// GetMempoolEntry returns mempool data for given transaction
-func (z *ZCashRPC) GetMempoolEntry(txid string) (*bchain.MempoolEntry, error) {
-	return nil, errors.New("GetMempoolEntry: not implemented")
 }
 
 // GetBlockRaw is not supported

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -64,35 +65,46 @@ func (b *BitcoinRPC) MissingBlockRetryOverride() *bchain.MissingBlockRetry {
 	return b.ChainConfig.MissingBlockRetry
 }
 
+// XpubConfigOverride exposes the per-chain xpub expansion and cache config
+// override (or nil to use built-in defaults). Consumed by api.NewWorker via
+// a duck-typed interface assertion.
+func (b *BitcoinRPC) XpubConfigOverride() *bchain.XpubConfig {
+	if b.ChainConfig == nil {
+		return nil
+	}
+	return b.ChainConfig.XpubConfig
+}
+
 // Configuration represents json config file
 type Configuration struct {
-	CoinName                     string `json:"coin_name"`
-	CoinShortcut                 string `json:"coin_shortcut"`
-	RPCURL                       string `json:"rpc_url"`
-	RPCUser                      string `json:"rpc_user"`
-	RPCPass                      string `json:"rpc_pass"`
-	RPCTimeout                   int    `json:"rpc_timeout"`
-	AddressAliases               bool   `json:"address_aliases,omitempty"`
-	Parse                        bool   `json:"parse"`
-	MessageQueueBinding          string `json:"message_queue_binding"`
-	Subversion                   string `json:"subversion"`
-	BlockAddressesToKeep         int    `json:"block_addresses_to_keep"`
-	MempoolWorkers               int    `json:"mempool_workers"`
-	MempoolSubWorkers            int    `json:"mempool_sub_workers"`
-	MempoolResyncBatchSize       int    `json:"mempool_resync_batch_size,omitempty"`
-	AddressFormat                string `json:"address_format"`
-	SupportsEstimateFee          bool   `json:"supports_estimate_fee"`
-	SupportsEstimateSmartFee     bool   `json:"supports_estimate_smart_fee"`
-	XPubMagic                    uint32 `json:"xpub_magic,omitempty"`
-	XPubMagicSegwitP2sh          uint32 `json:"xpub_magic_segwit_p2sh,omitempty"`
-	XPubMagicSegwitNative        uint32 `json:"xpub_magic_segwit_native,omitempty"`
-	Slip44                       uint32 `json:"slip44,omitempty"`
-	AlternativeEstimateFee       string `json:"alternative_estimate_fee,omitempty"`
-	AlternativeEstimateFeeParams string `json:"alternative_estimate_fee_params,omitempty"`
-	MinimumCoinbaseConfirmations int    `json:"minimumCoinbaseConfirmations,omitempty"`
-	MempoolGolombFilterP         uint8  `json:"mempool_golomb_filter_p,omitempty"`
-	MempoolFilterScripts         string `json:"mempool_filter_scripts,omitempty"`
-	MempoolFilterUseZeroedKey    bool   `json:"mempool_filter_use_zeroed_key,omitempty"`
+	CoinName                     string              `json:"coin_name"`
+	CoinShortcut                 string              `json:"coin_shortcut"`
+	RPCURL                       string              `json:"rpc_url"`
+	RPCUser                      string              `json:"rpc_user"`
+	RPCPass                      string              `json:"rpc_pass"`
+	RPCTimeout                   int                 `json:"rpc_timeout"`
+	AddressAliases               bool                `json:"address_aliases,omitempty"`
+	Parse                        bool                `json:"parse"`
+	MessageQueueBinding          string              `json:"message_queue_binding"`
+	MessageQueueCurve            *bchain.CurveConfig `json:"message_queue_curve,omitempty"`
+	Subversion                   string              `json:"subversion"`
+	BlockAddressesToKeep         int                 `json:"block_addresses_to_keep"`
+	MempoolWorkers               int                 `json:"mempool_workers"`
+	MempoolSubWorkers            int                 `json:"mempool_sub_workers"`
+	MempoolResyncBatchSize       int                 `json:"mempool_resync_batch_size,omitempty"`
+	AddressFormat                string              `json:"address_format"`
+	SupportsEstimateFee          bool                `json:"supports_estimate_fee"`
+	SupportsEstimateSmartFee     bool                `json:"supports_estimate_smart_fee"`
+	XPubMagic                    uint32              `json:"xpub_magic,omitempty"`
+	XPubMagicSegwitP2sh          uint32              `json:"xpub_magic_segwit_p2sh,omitempty"`
+	XPubMagicSegwitNative        uint32              `json:"xpub_magic_segwit_native,omitempty"`
+	Slip44                       uint32              `json:"slip44,omitempty"`
+	AlternativeEstimateFee       string              `json:"alternative_estimate_fee,omitempty"`
+	AlternativeEstimateFeeParams string              `json:"alternative_estimate_fee_params,omitempty"`
+	MinimumCoinbaseConfirmations int                 `json:"minimumCoinbaseConfirmations,omitempty"`
+	MempoolGolombFilterP         uint8               `json:"mempool_golomb_filter_p,omitempty"`
+	MempoolFilterScripts         string              `json:"mempool_filter_scripts,omitempty"`
+	MempoolFilterUseZeroedKey    bool                `json:"mempool_filter_use_zeroed_key,omitempty"`
 	// SYSCOIN: NEVM RPC endpoints used for SPT metadata enrichment.
 	Web3RPCURL       string `json:"web3_rpc_url,omitempty"`
 	Web3RPCURLBackup string `json:"web3_rpc_url_backup,omitempty"`
@@ -104,6 +116,9 @@ type Configuration struct {
 	// MissingBlockRetry overrides the sync-worker missing-block retry policy
 	// per chain. All fields are optional; missing fields use built-in defaults.
 	MissingBlockRetry *bchain.MissingBlockRetry `json:"missingBlockRetry,omitempty"`
+	// XpubConfig overrides the xpub address expansion and cache limits.
+	// All fields are optional; missing fields use built-in defaults.
+	XpubConfig *bchain.XpubConfig `json:"xpubConfig,omitempty"`
 }
 
 // AverageBlockTimeDuration returns AverageBlockTimeMs as a time.Duration.
@@ -234,6 +249,13 @@ func (b *BitcoinRPC) Initialize() error {
 			// disable AlternativeEstimateFee logic
 			b.alternativeFeeProvider = nil
 		}
+	} else if b.ChainConfig.AlternativeEstimateFee == "mempoolspaceprecise" {
+		glog.Info("Using MempoolSpacePreciseFee")
+		if b.alternativeFeeProvider, err = NewMempoolSpacePreciseFee(b, b.ChainConfig.AlternativeEstimateFeeParams, b.metrics); err != nil {
+			glog.Error("MempoolSpacePreciseFee error ", err, " Reverting to default estimateFee functionality")
+			// disable AlternativeEstimateFee logic
+			b.alternativeFeeProvider = nil
+		}
 	} else if b.ChainConfig.AlternativeEstimateFee == "mempoolspaceblock" {
 		glog.Info("Using MempoolSpaceBlockFee")
 		if b.alternativeFeeProvider, err = NewMempoolSpaceBlockFee(b, b.ChainConfig.AlternativeEstimateFeeParams, b.metrics); err != nil {
@@ -281,7 +303,7 @@ func (b *BitcoinRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOut
 		TxReceive:      "hashtx",
 	}
 
-	mq, err := bchain.NewMQ(b.ChainConfig.MessageQueueBinding, b.pushHandler, bitcoinTopics)
+	mq, err := bchain.NewMQ(b.ChainConfig.MessageQueueBinding, b.ChainConfig.MessageQueueCurve, b.pushHandler, bitcoinTopics)
 	if err != nil {
 		glog.Error("mq: ", err)
 		return err
@@ -354,6 +376,29 @@ type ResGetBlockCount struct {
 	Result uint32           `json:"result"`
 }
 
+// coreWarnings decodes the "warnings" field of getblockchaininfo and
+// getnetworkinfo. Bitcoin Core 25.0+ returns it as an array of strings, while
+// older versions (and nodes started with -deprecatedrpc=warnings) return a
+// single string. Accepting either shape keeps blockbook compatible across Core
+// versions.
+type coreWarnings string
+
+func (w *coreWarnings) UnmarshalJSON(data []byte) error {
+	// Core 25.0+: array of warning strings.
+	var arr []string
+	if err := json.Unmarshal(data, &arr); err == nil {
+		*w = coreWarnings(strings.Join(arr, " "))
+		return nil
+	}
+	// Pre-25.0 / -deprecatedrpc=warnings: a single string.
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*w = coreWarnings(s)
+	return nil
+}
+
 // getblockchaininfo
 
 type CmdGetBlockChainInfo struct {
@@ -369,7 +414,7 @@ type ResGetBlockChainInfo struct {
 		Bestblockhash string            `json:"bestblockhash"`
 		Difficulty    common.JSONNumber `json:"difficulty"`
 		SizeOnDisk    int64             `json:"size_on_disk"`
-		Warnings      string            `json:"warnings"`
+		Warnings      coreWarnings      `json:"warnings"`
 	} `json:"result"`
 }
 
@@ -386,7 +431,7 @@ type ResGetNetworkInfo struct {
 		Subversion      common.JSONNumber `json:"subversion"`
 		ProtocolVersion common.JSONNumber `json:"protocolversion"`
 		Timeoffset      float64           `json:"timeoffset"`
-		Warnings        string            `json:"warnings"`
+		Warnings        coreWarnings      `json:"warnings"`
 	} `json:"result"`
 }
 
@@ -541,18 +586,6 @@ type ResSendRawTransaction struct {
 	Result string           `json:"result"`
 }
 
-// getmempoolentry
-
-type CmdGetMempoolEntry struct {
-	Method string   `json:"method"`
-	Params []string `json:"params"`
-}
-
-type ResGetMempoolEntry struct {
-	Error  *bchain.RPCError     `json:"error"`
-	Result *bchain.MempoolEntry `json:"result"`
-}
-
 // GetBestBlockHash returns hash of the tip of the best-block-chain.
 func (b *BitcoinRPC) GetBestBlockHash() (string, error) {
 
@@ -624,10 +657,10 @@ func (b *BitcoinRPC) GetChainInfo() (*bchain.ChainInfo, error) {
 	rv.Version = string(resNi.Result.Version)
 	rv.ProtocolVersion = string(resNi.Result.ProtocolVersion)
 	if len(resCi.Result.Warnings) > 0 {
-		rv.Warnings = resCi.Result.Warnings + " "
+		rv.Warnings = string(resCi.Result.Warnings) + " "
 	}
 	if resCi.Result.Warnings != resNi.Result.Warnings {
-		rv.Warnings += resNi.Result.Warnings
+		rv.Warnings += string(resNi.Result.Warnings)
 	}
 	return rv, nil
 }
@@ -1071,6 +1104,11 @@ func (b *BitcoinRPC) EstimateFee(blocks int) (big.Int, error) {
 		return b.EstimateSmartFee(blocks, true)
 	}
 
+	// Core-0.14-lineage estimatefee never estimates 1 block (always -1); the node's own
+	// estimatesmartfee bumps the target to 2, so mirror that here.
+	if blocks == 1 {
+		blocks = 2
+	}
 	glog.V(1).Info("rpc: estimatefee ", blocks)
 
 	res := ResEstimateFee{}
@@ -1087,6 +1125,10 @@ func (b *BitcoinRPC) EstimateFee(blocks int) (big.Int, error) {
 	r, err = b.Parser.AmountToBigInt(res.Result)
 	if err != nil {
 		return r, err
+	}
+	// the node signals "not enough data" with -1; never hand a negative fee to clients
+	if r.Sign() < 0 {
+		return r, errors.Errorf("estimatefee: no fee estimate available for %d blocks", blocks)
 	}
 	return r, nil
 }
@@ -1135,33 +1177,6 @@ func SendRawTransactionWithParams(b *BitcoinRPC, p bchain.SendRawTransactionPara
 	}
 	if res.Error != nil {
 		return "", res.Error
-	}
-	return res.Result, nil
-}
-
-// GetMempoolEntry returns mempool data for given transaction
-func (b *BitcoinRPC) GetMempoolEntry(txid string) (*bchain.MempoolEntry, error) {
-	glog.V(1).Info("rpc: getmempoolentry")
-
-	res := ResGetMempoolEntry{}
-	req := CmdGetMempoolEntry{
-		Method: "getmempoolentry",
-		Params: []string{txid},
-	}
-	err := b.Call(&req, &res)
-	if err != nil {
-		return nil, err
-	}
-	if res.Error != nil {
-		return nil, res.Error
-	}
-	res.Result.FeeSat, err = b.Parser.AmountToBigInt(res.Result.Fee)
-	if err != nil {
-		return nil, err
-	}
-	res.Result.ModifiedFeeSat, err = b.Parser.AmountToBigInt(res.Result.ModifiedFee)
-	if err != nil {
-		return nil, err
 	}
 	return res.Result, nil
 }

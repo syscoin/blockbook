@@ -3,9 +3,9 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 
 import { OpenApiFetchClient } from "./client.js";
 import { OpenApiContract, preview } from "./openapi.js";
-import { allowOutOfSync, resolveHTTPBase, resolveWSURL } from "./config.js";
+import { allowOutOfSync, resolveHTTPBase, resolveWSURL, userAgentHeaders } from "./config.js";
 import { SkipTest } from "./errors.js";
-import { addressPage, addressPageSize, blockPageSize, sampleAddrTxProbeMax, sampleBlockPageSize, sampleBlockProbeMax, sciNotationTxLimit, sciNotationWindow, scientificNotationPattern, txSearchWindow, wsDialTimeoutMs, wsMessageTimeoutMs } from "./constants.js";
+import { addressPage, addressPageSize, blockPageSize, sampleAddressCandidatesPerTx, sampleAddressMaxTxs, sampleAddressProbeMax, sampleAddrTxProbeMax, sampleBlockPageSize, sampleBlockProbeMax, sciNotationTxLimit, sciNotationWindow, scientificNotationPattern, txSearchWindow, wsDialTimeoutMs, wsMessageTimeoutMs } from "./constants.js";
 import {
   assertAddressMatches,
   buildAddressDetailsPath,
@@ -15,6 +15,7 @@ import {
   extractTxIDs,
   firstAddressFromTx,
   firstAddressFromTxPreferVin,
+  sampleAddressCandidatesFromTx,
   isAddressCandidate,
   isEVMAddress as isEVMAddressValue,
   isFiatDataUnavailable,
@@ -30,6 +31,135 @@ import {
 } from "./support.js";
 
 import type { Capability, AddressResponse, BlockHashResponse, BlockResponse, BlockSummary, FiatTickerResponse, StatusResponse, TxResponse, UtxoResponse, WsEnvelope, WsInfoResponse, WsMethod, WsResponse } from "./types.js";
+
+// ---------------------------------------------------------------------------
+// WebSocket connection
+// ---------------------------------------------------------------------------
+
+// wsConnection wraps a single persistent WebSocket and multiplexes requests
+// over it by matching responses to the originating request ID.
+class wsConnection {
+  private ws: WebSocket | null = null;
+  private pendings = new Map<
+    string,
+    { resolve: (value: unknown) => void; reject: (reason: unknown) => void; timer: NodeJS.Timeout }
+  >();
+  private closed = false;
+
+  constructor(
+    private readonly url: string,
+    private readonly contract: OpenApiContract,
+  ) {}
+
+  get isClosed(): boolean {
+    return this.closed;
+  }
+
+  connect(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      // Guard against hangs below the ws handshake layer (DNS / TCP).
+      let settled = false;
+      const guard = setTimeout(() => {
+        if (settled) { return; }
+        settled = true;
+        this.ws?.terminate();
+        reject(new Error(`websocket connect timed out for ${this.url}`));
+      }, wsDialTimeoutMs);
+
+      this.ws = new WebSocket(this.url, {
+        handshakeTimeout: wsDialTimeoutMs,
+        rejectUnauthorized: process.env.OPENAPI_INSECURE_TLS === "0",
+        agent: wsProxyAgent(),
+        headers: userAgentHeaders(),
+      });
+      this.ws.on("open", () => {
+        if (settled) { return; }
+        settled = true;
+        clearTimeout(guard);
+        resolve();
+      });
+      this.ws.on("error", (err) => {
+        if (settled) { return; }
+        settled = true;
+        clearTimeout(guard);
+        this.closed = true;
+        reject(err);
+      });
+      this.ws.on("close", () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(guard);
+          reject(new Error("websocket closed before handshake completed"));
+        }
+        this.closed = true;
+        for (const [, p] of this.pendings) {
+          clearTimeout(p.timer);
+          p.reject(new Error("websocket connection closed"));
+        }
+        this.pendings.clear();
+      });
+      this.ws.on("message", (data) => {
+        let response: WsResponse;
+        try {
+          response = JSON.parse(data.toString()) as WsResponse;
+        } catch {
+          return;
+        }
+        const pending = this.pendings.get(response.id);
+        if (!pending) {
+          return;
+        }
+        clearTimeout(pending.timer);
+        this.pendings.delete(response.id);
+        if (isWsError(response.data)) {
+          pending.reject(
+            new Error(`websocket ${response.id} returned error: ${response.data.error.message}`),
+          );
+          return;
+        }
+        pending.resolve(response.data);
+      });
+    });
+  }
+
+  async request<T>(request: WsEnvelope, dataSchemaRef?: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendings.delete(request.id);
+        reject(new Error(`websocket ${request.method} timed out for ${this.url}`));
+      }, wsMessageTimeoutMs);
+      this.pendings.set(request.id, {
+        resolve: (value) => {
+          if (dataSchemaRef) {
+            this.contract.validateSchemaRef(dataSchemaRef, `WS ${request.method} response data`, value);
+          }
+          resolve(value as T);
+        },
+        reject,
+        timer,
+      });
+      if (this.ws) {
+        try {
+          this.ws.send(JSON.stringify(request));
+        } catch (err) {
+          clearTimeout(timer);
+          this.pendings.delete(request.id);
+          reject(err);
+        }
+      } else {
+        clearTimeout(timer);
+        this.pendings.delete(request.id);
+        reject(new Error("websocket not connected"));
+      }
+    });
+  }
+
+  close(): void {
+    this.closed = true;
+    this.ws?.close();
+    this.ws = null;
+  }
+}
 
 // proxyFromEnv returns the configured egress proxy URL (sandboxed/corporate networks that only allow
 // outbound traffic via HTTP(S)_PROXY), or "" when none is set. Shared by the fetch dispatcher setup
@@ -51,6 +181,8 @@ function wsProxyAgent(): HttpsProxyAgent<string> | undefined {
 
 export class TestContext {
   readonly client: OpenApiFetchClient;
+  private wsConn_: wsConnection | undefined;
+  private wsConnInit_: Promise<wsConnection> | undefined;
 
   private status?: NonNullable<StatusResponse["blockbook"]>;
   private nextWSReq = 0;
@@ -139,6 +271,24 @@ export class TestContext {
     return found;
   }
 
+  // preloadSamples eagerly resolves the most commonly-needed sample types so
+  // that downstream tests hit the cache rather than triggering redundant probe
+  // chains.  getSampleAddressTx is deliberately excluded here — it can probe
+  // 40+ transactions with paginated address lookups and is only needed by a
+  // handful of tests; it stays lazy.
+  async preloadSamples() {
+    await this.getSampleIndexedBlock();
+    await this.getSampleTxID();
+    await this.getSampleAddress();
+    try {
+      await this.sampleFiatTickerOrSkip();
+    } catch (error) {
+      if (!(error instanceof SkipTest)) {
+        throw error;
+      }
+    }
+  }
+
   async getSampleIndexedHeight() {
     if (this.sampleIndexResolved) {
       return this.sampleIndexHash ? { height: this.sampleIndexHeight, hash: this.sampleIndexHash } : undefined;
@@ -194,6 +344,17 @@ export class TestContext {
     return undefined;
   }
 
+  // sampleIndexedBlockOrFail is for tests that need a block carrying transactions; the failure
+  // names the real cause (an empty-block run), not the block index.
+  async sampleIndexedBlockOrFail() {
+    const sample = await this.getSampleIndexedBlock();
+    if (!sample) {
+      const status = await this.getStatus();
+      throw new Error(`no block with transactions in the last ${sampleBlockProbeMax} blocks below height ${status.bestHeight ?? 0}`);
+    }
+    return sample;
+  }
+
   async getSampleTxID() {
     if (this.sampleTxResolved) {
       return this.sampleTxID || undefined;
@@ -243,10 +404,64 @@ export class TestContext {
       return undefined;
     }
 
-    this.sampleAddress = this.isEVMTxID(txid)
-      ? firstAddressFromTxPreferVin(tx)
-      : firstAddressFromTx(tx);
+    const preferVin = this.isEVMTxID(txid);
+    const fallback = sampleAddressCandidatesFromTx(tx, preferVin)[0] ?? "";
+    this.sampleAddress = (await this.findBoundedAddress(tx, preferVin)) ?? fallback;
     return this.sampleAddress || undefined;
+  }
+
+  // findBoundedAddress walks the sample tx, then the other txs of its block and the blocks below,
+  // for a participant whose total tx count stays under sampleAddressMaxTxs. Address-history tests
+  // otherwise land on a bot (a random BSC sender had 4.9e8 txs) whose even time-bounded history
+  // is unservable. Returns undefined when the probe budget runs out.
+  private async findBoundedAddress(sampleTx: TxResponse, preferVin: boolean) {
+    let probed = 0;
+    const probeTx = async (tx: TxResponse) => {
+      probed++;
+      for (const address of sampleAddressCandidatesFromTx(tx, preferVin).slice(0, sampleAddressCandidatesPerTx)) {
+        if (await this.isBoundedAddress(address)) {
+          return address;
+        }
+      }
+      return undefined;
+    };
+
+    const found = await probeTx(sampleTx);
+    if (found) {
+      return found;
+    }
+    const top = positiveNumber(sampleTx.blockHeight) ? sampleTx.blockHeight : 0;
+    const lower = Math.max(1, top - txSearchWindow + 1);
+    for (let height = top; height >= lower && probed < sampleAddressProbeMax; height--) {
+      const hash = height === sampleTx.blockHeight && sampleTx.blockHash ? sampleTx.blockHash : await this.getBlockHashForHeight(height, false);
+      if (!hash) {
+        continue;
+      }
+      const block = await this.getBlockByHashForSampling(hash, false);
+      for (const txid of block?.txIDs ?? []) {
+        if (!txid || txid === sampleTx.txid) {
+          continue;
+        }
+        if (probed >= sampleAddressProbeMax) {
+          break;
+        }
+        const tx = await this.getTransactionByID(txid, false);
+        const address = tx ? await probeTx(tx) : undefined;
+        if (address) {
+          return address;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private async isBoundedAddress(address: string) {
+    const result = await this.client.getMaybe(
+      "/api/v2/address/{address}",
+      buildAddressDetailsPath(address, "basic", addressPage, addressPageSize),
+    );
+    const txs = result.status === 200 ? result.data?.txs : undefined;
+    return typeof txs === "number" && txs <= sampleAddressMaxTxs;
   }
 
   async sampleAddressOrSkip() {
@@ -498,18 +713,52 @@ export class TestContext {
   }
 
   async wsCallWithID<T>(id: string, method: WsMethod, params: unknown, dataSchemaRef?: string) {
+    const conn = await this.ensureWSConnection();
     const request: WsEnvelope = { id, method, params };
-    try {
-      return await this.wsCallOnce<T>(this.wsURL, request, dataSchemaRef);
-    } catch (error) {
-      const upgraded = upgradeWSBaseToWSS(this.wsURL);
-      if (!upgraded) {
-        throw error;
-      }
-      const result = await this.wsCallOnce<T>(upgraded, request, dataSchemaRef);
-      this.wsURL = upgraded;
-      return result;
+    return conn.request<T>(request, dataSchemaRef);
+  }
+
+  // ensureWSConnection lazily dials the shared WebSocket connection (so WS
+  // tests pay a single handshake per coin, not one per call) and redials when
+  // the previous connection died. The connection multiplexes concurrent
+  // requests by ID, so callers share it freely. The first dial tries the
+  // configured ws:// URL; if that fails it tries wss:// and updates this.wsURL
+  // so later dials skip the fallback. wsConnInit_ guards against concurrent
+  // calls dialing twice; a failed dial is not cached, so a transient outage
+  // does not poison every later WS test of the coin.
+  private ensureWSConnection(): Promise<wsConnection> {
+    if (this.wsConn_ && !this.wsConn_.isClosed) {
+      return Promise.resolve(this.wsConn_);
     }
+    if (!this.wsConnInit_) {
+      this.wsConnInit_ = (async () => {
+        const conn = new wsConnection(this.wsURL, this.contract);
+        try {
+          await conn.connect();
+          return conn;
+        } catch (firstError) {
+          const upgraded = upgradeWSBaseToWSS(this.wsURL);
+          if (!upgraded) {
+            throw firstError;
+          }
+          const conn2 = new wsConnection(upgraded, this.contract);
+          await conn2.connect();
+          this.wsURL = upgraded;
+          return conn2;
+        }
+      })().then(
+        (conn) => {
+          this.wsConn_ = conn;
+          this.wsConnInit_ = undefined;
+          return conn;
+        },
+        (error) => {
+          this.wsConnInit_ = undefined;
+          throw error;
+        },
+      );
+    }
+    return this.wsConnInit_;
   }
 
   isEVMTxID(txid: string) {
@@ -519,6 +768,12 @@ export class TestContext {
 
   isEVMAddress(address: string) {
     return isEVMAddressValue(address) || (this.coin === "tron" && isTronAddress(address));
+  }
+
+  close() {
+    this.wsConn_?.close();
+    this.wsConn_ = undefined;
+    this.wsConnInit_ = undefined;
   }
 
   private async probeCapabilities() {
@@ -660,41 +915,5 @@ export class TestContext {
     return summary;
   }
 
-  private wsCallOnce<T>(wsURL: string, request: WsEnvelope, dataSchemaRef?: string) {
-    return new Promise<T>((resolve, reject) => {
-      const ws = new WebSocket(wsURL, {
-        handshakeTimeout: wsDialTimeoutMs,
-        rejectUnauthorized: process.env.OPENAPI_INSECURE_TLS === "0",
-        agent: wsProxyAgent(),
-      });
-      const timeout = setTimeout(() => {
-        ws.terminate();
-        reject(new Error(`websocket ${request.method} timed out for ${wsURL}`));
-      }, wsMessageTimeoutMs);
 
-      ws.on("open", () => {
-        ws.send(JSON.stringify(request));
-      });
-      ws.on("message", (data) => {
-        const response = JSON.parse(data.toString()) as WsResponse;
-        if (response.id !== request.id) {
-          return;
-        }
-        clearTimeout(timeout);
-        ws.close();
-        if (isWsError(response.data)) {
-          reject(new Error(`websocket ${request.method} returned error: ${response.data.error.message}`));
-          return;
-        }
-        if (dataSchemaRef) {
-          this.contract.validateSchemaRef(dataSchemaRef, `WS ${request.method} response data`, response.data);
-        }
-        resolve(response.data as T);
-      });
-      ws.on("error", (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-    });
-  }
 }

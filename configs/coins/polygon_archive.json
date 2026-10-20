@@ -59,7 +59,7 @@
             "mempool_sub_workers": 2,
             "block_addresses_to_keep": 600,
             "additional_params": {
-                "averageBlockTimeMs": 2000,
+                "averageBlockTimeMs": 1500,
                 "missingBlockRetry": {
                     "retryDelayMs": 1000,
                     "recheckThreshold": 10,
@@ -69,7 +69,7 @@
                 "address_aliases": true,
                 "eip1559Fees": true,
                 "alternative_estimate_fee": "infura",
-                "alternative_estimate_fee_params": "{\"url\": \"https://gas.api.infura.io/v3/${api_key}/networks/137/suggestedGasFees\", \"periodSeconds\": 60}",
+                "alternative_estimate_fee_params": "{\"url\": \"https://gas.api.infura.io/v3/${api_key}/networks/137/suggestedGasFees\", \"periodSeconds\": 10}",
                 "mempoolTxTimeoutHours": 12,
                 "processInternalTransactions": true,
                 "trace_timeout": "10s",
@@ -79,6 +79,14 @@
                 "fiat_rates_vs_currencies": "AED,ARS,AUD,BDT,BHD,BMD,BRL,CAD,CHF,CLP,CNY,CZK,DKK,EUR,GBP,HKD,HUF,IDR,ILS,INR,JPY,KRW,KWD,LKR,MMK,MXN,MYR,NGN,NOK,NZD,PHP,PKR,PLN,RUB,SAR,SEK,SGD,THB,TRY,TWD,UAH,USD,VEF,VND,ZAR,BTC,ETH",
                 "fiat_rates_params": "{\"coin\": \"polygon-ecosystem-token\",\"platformIdentifier\": \"polygon-pos\",\"platformVsCurrency\": \"usd\",\"periodSeconds\": 900}",
                 "fourByteSignatures": "https://www.4byte.directory/api/v1/signatures/"
+            },
+            "additional_params_dev": {
+                "alternative_estimate_fee_params": {
+                    "periodSeconds": 300
+                },
+                "fiat_rates_params": {
+                    "periodSeconds": 3600
+                }
             }
         }
     },

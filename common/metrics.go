@@ -1,11 +1,14 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/trezor/blockbook/configs"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -18,85 +21,111 @@ import (
 // GetMetrics builds and registers the collectors by reflection at startup. Adding a
 // metric means adding a struct field with a tag here and a matching entry in the YAML.
 type Metrics struct {
-	WebsocketRequests                 *prometheus.CounterVec   `metric:"websocket_requests"`
-	WebsocketSubscribes               *prometheus.GaugeVec     `metric:"websocket_subscribes"`
-	WebsocketClients                  prometheus.Gauge         `metric:"websocket_clients"`
-	WebsocketReqDuration              *prometheus.HistogramVec `metric:"websocket_req_duration"`
-	WebsocketChannelCloses            *prometheus.CounterVec   `metric:"websocket_channel_closes"`
-	WebsocketUnknownMethods           *prometheus.CounterVec   `metric:"websocket_unknown_methods"`
-	WebsocketAddrNotifications        *prometheus.CounterVec   `metric:"websocket_addr_notifications"`
-	WebsocketNewBlockTxs              *prometheus.CounterVec   `metric:"websocket_new_block_txs"`
-	WebsocketNewBlockTxsDuration      *prometheus.HistogramVec `metric:"websocket_new_block_txs_duration_seconds"`
-	BalanceHistoryFiatDuration        *prometheus.HistogramVec `metric:"balance_history_fiat_duration_seconds"`
-	BalanceHistoryFiatFallback        *prometheus.CounterVec   `metric:"balance_history_fiat_fallback_total"`
-	BalanceHistoryPoints              *prometheus.HistogramVec `metric:"balance_history_points"`
-	BalanceHistoryTxs                 *prometheus.HistogramVec `metric:"balance_history_txs"`
-	BalanceHistoryCapExceeded         *prometheus.CounterVec   `metric:"balance_history_cap_exceeded_total"`
-	WebsocketEthReceipt               *prometheus.CounterVec   `metric:"websocket_eth_receipt"`
-	WebsocketNewBlockTxsSubscriptions prometheus.Gauge         `metric:"websocket_new_block_txs_subscriptions"`
-	WebsocketNewBlockNotifications    prometheus.Counter       `metric:"websocket_new_block_notifications"`
-	WebsocketConnectionRequests       prometheus.Histogram     `metric:"websocket_connection_requests"`
-	WebsocketConnectionRejections     *prometheus.CounterVec   `metric:"websocket_connection_rejections"`
-	WebsocketUniqueIPs                prometheus.Gauge         `metric:"websocket_unique_ips"`
-	WebsocketMaxConnectionsPerIP      prometheus.Gauge         `metric:"websocket_max_connections_per_ip"`
-	WebsocketBlockedIPs               prometheus.Gauge         `metric:"websocket_blocked_ips"`
-	WebsocketBlockedConnections       prometheus.Counter       `metric:"websocket_blocked_connections"`
-	RestUIRateLimitRejections         *prometheus.CounterVec   `metric:"rest_ui_rate_limit_rejections"`
-	RestUIActiveIPs                   prometheus.Gauge         `metric:"rest_ui_active_ips"`
-	RestUIMaxActiveRequestsPerIP      prometheus.Gauge         `metric:"rest_ui_max_active_requests_per_ip"`
-	RestUIBlockedIPs                  prometheus.Gauge         `metric:"rest_ui_blocked_ips"`
-	IndexResyncDuration               prometheus.Histogram     `metric:"index_resync_duration"`
-	MempoolResyncDuration             prometheus.Histogram     `metric:"mempool_resync_duration"`
-	MempoolResyncThroughput           *prometheus.HistogramVec `metric:"mempool_resync_throughput_txs_per_second"`
-	TxCacheEfficiency                 *prometheus.CounterVec   `metric:"txcache_efficiency"`
-	RPCLatency                        *prometheus.HistogramVec `metric:"rpc_latency"`
-	ChainDataFallbacks                *prometheus.CounterVec   `metric:"rpc_fallback_calls_total"`
-	EthCallRequests                   *prometheus.CounterVec   `metric:"eth_call_requests"`
-	EthCallErrors                     *prometheus.CounterVec   `metric:"eth_call_errors"`
-	EthCallBatchSize                  prometheus.Histogram     `metric:"eth_call_batch_size"`
-	EthCallContractInfo               *prometheus.CounterVec   `metric:"eth_call_contract_info_requests"`
-	EthCallTokenURI                   *prometheus.CounterVec   `metric:"eth_call_token_uri_requests"`
-	EthCallStakingPool                *prometheus.CounterVec   `metric:"eth_call_staking_pool_requests"`
-	IndexResyncErrors                 *prometheus.CounterVec   `metric:"index_resync_errors"`
-	IndexBlockNotFoundRetries         prometheus.Counter       `metric:"index_block_not_found_retries"`
-	IndexReorgEvents                  *prometheus.CounterVec   `metric:"index_reorg_events"`
-	IndexSyncYields                   *prometheus.CounterVec   `metric:"index_sync_yields"`
-	IndexDBSize                       prometheus.Gauge         `metric:"index_db_size"`
-	ExplorerViews                     *prometheus.CounterVec   `metric:"explorer_views"`
-	MempoolSize                       prometheus.Gauge         `metric:"mempool_size"`
-	EthAlternativeMempoolEvents       *prometheus.CounterVec   `metric:"eth_alternative_mempool_reconciliation_events_total"`
-	EthAlternativeMempoolTxResidence  *prometheus.HistogramVec `metric:"eth_alternative_mempool_tx_residence_seconds"`
-	EthAlternativeMempoolCacheSize    prometheus.Gauge         `metric:"eth_alternative_mempool_cache_size"`
-	EstimatedFee                      *prometheus.GaugeVec     `metric:"estimated_fee"`
-	AvgBlockPeriod                    prometheus.Gauge         `metric:"avg_block_period"`
-	SyncBlockStats                    *prometheus.GaugeVec     `metric:"sync_block_stats"`
-	SyncHotnessStats                  *prometheus.GaugeVec     `metric:"sync_hotness_stats"`
-	AddrContractsCacheEntries         prometheus.Gauge         `metric:"addr_contracts_cache_entries"`
-	AddrContractsCacheBytes           prometheus.Gauge         `metric:"addr_contracts_cache_bytes"`
-	AddrContractsCacheHits            prometheus.Counter       `metric:"addr_contracts_cache_hits_total"`
-	AddrContractsCacheMisses          prometheus.Counter       `metric:"addr_contracts_cache_misses_total"`
-	AddrContractsCacheFlushes         *prometheus.CounterVec   `metric:"addr_contracts_cache_flush_total"`
-	DbColumnRows                      *prometheus.GaugeVec     `metric:"dbcolumn_rows"`
-	DbColumnSize                      *prometheus.GaugeVec     `metric:"dbcolumn_size"`
-	BlockbookAppInfo                  *prometheus.GaugeVec     `metric:"app_info"`
-	BlockbookBestHeight               prometheus.Gauge         `metric:"best_height"`
-	Synchronized                      prometheus.Gauge         `metric:"synchronized"`
-	BackendBestHeight                 prometheus.Gauge         `metric:"backend_best_height"`
-	BackendTipAgeSeconds              prometheus.Gauge         `metric:"tip_age_seconds"`
-	BackendSubscriptionAgeSeconds     prometheus.Gauge         `metric:"backend_subscription_age_seconds"`
-	BackendSubscriptionEvents         *prometheus.CounterVec   `metric:"backend_subscription_events"`
-	AverageBlockTimeSeconds           prometheus.Gauge         `metric:"average_block_time_seconds"`
-	ExplorerPendingRequests           *prometheus.GaugeVec     `metric:"explorer_pending_requests"`
-	WebsocketPendingRequests          *prometheus.GaugeVec     `metric:"websocket_pending_requests"`
-	XPubCacheSize                     prometheus.Gauge         `metric:"xpub_cache_size"`
-	CoingeckoRequests                 *prometheus.CounterVec   `metric:"coingecko_requests"`
-	CoingeckoRangeRequests            *prometheus.CounterVec   `metric:"coingecko_range_requests"`
-	FiatRatesUpdateDuration           *prometheus.HistogramVec `metric:"fiat_rates_update_duration_seconds"`
-	FiatRatesFetchedUnits             *prometheus.CounterVec   `metric:"fiat_rates_fetched_units_total"`
-	FiatRatesFetchedTokens            *prometheus.CounterVec   `metric:"fiat_rates_fetched_tokens_total"`
-	FiatRatesUnable                   *prometheus.CounterVec   `metric:"fiat_rates_unable_total"`
-	AlternativeFeeProviderRequests    *prometheus.CounterVec   `metric:"alternative_fee_provider_requests"`
-	EthSyncRpcErrors                  *prometheus.CounterVec   `metric:"eth_sync_rpc_errors"`
+	WebsocketRequests                  *prometheus.CounterVec   `metric:"websocket_requests"`
+	WebsocketSubscribes                *prometheus.GaugeVec     `metric:"websocket_subscribes"`
+	WebsocketClients                   prometheus.Gauge         `metric:"websocket_clients"`
+	WebsocketReqDuration               *prometheus.HistogramVec `metric:"websocket_req_duration"`
+	WebsocketChannelCloses             *prometheus.CounterVec   `metric:"websocket_channel_closes"`
+	WebsocketUnknownMethods            *prometheus.CounterVec   `metric:"websocket_unknown_methods"`
+	WebsocketAddrNotifications         *prometheus.CounterVec   `metric:"websocket_addr_notifications"`
+	WebsocketNewBlockTxs               *prometheus.CounterVec   `metric:"websocket_new_block_txs"`
+	WebsocketNewBlockTxsDuration       *prometheus.HistogramVec `metric:"websocket_new_block_txs_duration_seconds"`
+	BalanceHistoryFiatDuration         *prometheus.HistogramVec `metric:"balance_history_fiat_duration_seconds"`
+	BalanceHistoryFiatFallback         *prometheus.CounterVec   `metric:"balance_history_fiat_fallback_total"`
+	BalanceHistoryPoints               *prometheus.HistogramVec `metric:"balance_history_points"`
+	BalanceHistoryTxs                  *prometheus.HistogramVec `metric:"balance_history_txs"`
+	BalanceHistoryCapExceeded          *prometheus.CounterVec   `metric:"balance_history_cap_exceeded_total"`
+	WebsocketEthReceipt                *prometheus.CounterVec   `metric:"websocket_eth_receipt"`
+	WebsocketNewBlockTxsSubscriptions  prometheus.Gauge         `metric:"websocket_new_block_txs_subscriptions"`
+	WebsocketNewBlockNotifications     prometheus.Counter       `metric:"websocket_new_block_notifications"`
+	WebsocketConnectionRequests        prometheus.Histogram     `metric:"websocket_connection_requests"`
+	WebsocketConnectionRejections      *prometheus.CounterVec   `metric:"websocket_connection_rejections"`
+	WebsocketUniqueIPs                 prometheus.Gauge         `metric:"websocket_unique_ips"`
+	WebsocketMaxConnectionsPerIP       prometheus.Gauge         `metric:"websocket_max_connections_per_ip"`
+	WebsocketBlockedIPs                prometheus.Gauge         `metric:"websocket_blocked_ips"`
+	WebsocketBlockedConnections        prometheus.Counter       `metric:"websocket_blocked_connections"`
+	RestUIRateLimitRejections          *prometheus.CounterVec   `metric:"rest_ui_rate_limit_rejections"`
+	RestUIActiveIPs                    prometheus.Gauge         `metric:"rest_ui_active_ips"`
+	RestUIMaxActiveRequestsPerIP       prometheus.Gauge         `metric:"rest_ui_max_active_requests_per_ip"`
+	RestUIBlockedIPs                   prometheus.Gauge         `metric:"rest_ui_blocked_ips"`
+	IndexResyncDuration                prometheus.Histogram     `metric:"index_resync_duration"`
+	MempoolResyncDuration              prometheus.Histogram     `metric:"mempool_resync_duration"`
+	MempoolResyncThroughput            *prometheus.HistogramVec `metric:"mempool_resync_throughput_txs_per_second"`
+	TxCacheEfficiency                  *prometheus.CounterVec   `metric:"txcache_efficiency"`
+	RPCLatency                         *prometheus.HistogramVec `metric:"rpc_latency"`
+	ChainDataFallbacks                 *prometheus.CounterVec   `metric:"rpc_fallback_calls_total"`
+	EthCallRequests                    *prometheus.CounterVec   `metric:"eth_call_requests"`
+	EthCallErrors                      *prometheus.CounterVec   `metric:"eth_call_errors"`
+	EthCallBatchSize                   prometheus.Histogram     `metric:"eth_call_batch_size"`
+	EthCallMulticallRequests           prometheus.Counter       `metric:"eth_call_multicall_requests"`
+	EthCallContractInfo                *prometheus.CounterVec   `metric:"eth_call_contract_info_requests"`
+	EthCallTokenURI                    *prometheus.CounterVec   `metric:"eth_call_token_uri_requests"`
+	EthCallStakingPool                 *prometheus.CounterVec   `metric:"eth_call_staking_pool_requests"`
+	IndexResyncErrors                  *prometheus.CounterVec   `metric:"index_resync_errors"`
+	IndexBlockNotFoundRetries          prometheus.Counter       `metric:"index_block_not_found_retries"`
+	IndexReorgEvents                   *prometheus.CounterVec   `metric:"index_reorg_events"`
+	IndexSyncYields                    *prometheus.CounterVec   `metric:"index_sync_yields"`
+	IndexDBSize                        prometheus.Gauge         `metric:"index_db_size"`
+	InternalDataErrorQueue             prometheus.Gauge         `metric:"internal_data_error_queue"`
+	InternalDataHeals                  *prometheus.CounterVec   `metric:"internal_data_heals"`
+	ExplorerViews                      *prometheus.CounterVec   `metric:"explorer_views"`
+	MempoolSize                        prometheus.Gauge         `metric:"mempool_size"`
+	MempoolLastSync                    *prometheus.GaugeVec     `metric:"mempool_last_sync_timestamp_seconds"`
+	EthAlternativeMempoolEvents        *prometheus.CounterVec   `metric:"eth_alternative_mempool_reconciliation_events_total"`
+	EthAlternativeMempoolTxResidence   *prometheus.HistogramVec `metric:"eth_alternative_mempool_tx_residence_seconds"`
+	EthAlternativeMempoolCacheSize     prometheus.Gauge         `metric:"eth_alternative_mempool_cache_size"`
+	EthAlternativeMempoolOldestAge     prometheus.Gauge         `metric:"eth_alternative_mempool_oldest_age_seconds"`
+	EthAlternativeSendNotSurfaced      *prometheus.CounterVec   `metric:"eth_alternative_send_not_surfaced_total"`
+	EthAlternativePendingFloorRaised   *prometheus.CounterVec   `metric:"eth_alternative_pending_floor_raised_total"`
+	EthAlternativePendingFloorStranded *prometheus.CounterVec   `metric:"eth_alternative_pending_floor_stranded_total"`
+	EthAlternativeNonceRequests        *prometheus.CounterVec   `metric:"eth_alternative_nonce_requests_total"`
+	SendTxRequests                     *prometheus.CounterVec   `metric:"sendtx_requests_total"`
+	EthSendTxPath                      *prometheus.CounterVec   `metric:"eth_sendtx_path_total"`
+	EthAlternativeSendTx               *prometheus.CounterVec   `metric:"eth_alternative_sendtx_total"`
+	EthAlternativeSendTxDuration       *prometheus.HistogramVec `metric:"eth_alternative_sendtx_duration_seconds"`
+	EthAlternativeEstimateGasRequests  *prometheus.CounterVec   `metric:"eth_alternative_estimate_gas_requests_total"`
+	EstimatedFee                       *prometheus.GaugeVec     `metric:"estimated_fee"`
+	AvgBlockPeriod                     prometheus.Gauge         `metric:"avg_block_period"`
+	SyncBlockStats                     *prometheus.GaugeVec     `metric:"sync_block_stats"`
+	SyncHotnessStats                   *prometheus.GaugeVec     `metric:"sync_hotness_stats"`
+	AddrContractsCacheEntries          prometheus.Gauge         `metric:"addr_contracts_cache_entries"`
+	AddrContractsCacheBytes            prometheus.Gauge         `metric:"addr_contracts_cache_bytes"`
+	AddrContractsCacheHits             prometheus.Counter       `metric:"addr_contracts_cache_hits_total"`
+	AddrContractsCacheMisses           prometheus.Counter       `metric:"addr_contracts_cache_misses_total"`
+	AddrContractsCacheFlushes          *prometheus.CounterVec   `metric:"addr_contracts_cache_flush_total"`
+	DbColumnRows                       *prometheus.GaugeVec     `metric:"dbcolumn_rows"`
+	DbColumnSize                       *prometheus.GaugeVec     `metric:"dbcolumn_size"`
+	BlockbookAppInfo                   *prometheus.GaugeVec     `metric:"app_info"`
+	BlockbookBestHeight                prometheus.Gauge         `metric:"best_height"`
+	InitialSync                        prometheus.Gauge         `metric:"initial_sync"`
+	Synchronized                       prometheus.Gauge         `metric:"synchronized"`
+	BackendBestHeight                  prometheus.Gauge         `metric:"backend_best_height"`
+	BackendTipAgeSeconds               prometheus.Gauge         `metric:"tip_age_seconds"`
+	BackendSubscriptionAgeSeconds      prometheus.Gauge         `metric:"backend_subscription_age_seconds"`
+	BackendSubscriptionEvents          *prometheus.CounterVec   `metric:"backend_subscription_events"`
+	AverageBlockTimeSeconds            prometheus.Gauge         `metric:"average_block_time_seconds"`
+	ExplorerPendingRequests            *prometheus.GaugeVec     `metric:"explorer_pending_requests"`
+	WebsocketPendingRequests           *prometheus.GaugeVec     `metric:"websocket_pending_requests"`
+	XPubCacheSize                      prometheus.Gauge         `metric:"xpub_cache_size"`
+	XPubCacheBytes                     prometheus.Gauge         `metric:"xpub_cache_bytes"`
+	XPubCacheHits                      prometheus.Counter       `metric:"xpub_cache_hits_total"`
+	XPubCacheMisses                    *prometheus.CounterVec   `metric:"xpub_cache_misses_total"`
+	CoingeckoRequests                  *prometheus.CounterVec   `metric:"coingecko_requests"`
+	CoingeckoRangeRequests             *prometheus.CounterVec   `metric:"coingecko_range_requests"`
+	FiatRatesUpdateDuration            *prometheus.HistogramVec `metric:"fiat_rates_update_duration_seconds"`
+	FiatRatesFetchedUnits              *prometheus.CounterVec   `metric:"fiat_rates_fetched_units_total"`
+	FiatRatesFetchedTokens             *prometheus.CounterVec   `metric:"fiat_rates_fetched_tokens_total"`
+	FiatRatesUnable                    *prometheus.CounterVec   `metric:"fiat_rates_unable_total"`
+	AlternativeFeeProviderRequests     *prometheus.CounterVec   `metric:"alternative_fee_provider_requests"`
+	AlternativeFeeProviderLastSync     *prometheus.GaugeVec     `metric:"alternative_fee_provider_last_sync_timestamp_seconds"`
+	AlternativeFeeProviderCache        *prometheus.CounterVec   `metric:"alternative_fee_provider_cache"`
+	EthEip1559Fee                      *prometheus.GaugeVec     `metric:"eth_eip1559_fee"`
+	EthEip1559BaseFee                  prometheus.Gauge         `metric:"eth_eip1559_base_fee"`
+	EthEip1559FeeSource                *prometheus.CounterVec   `metric:"eth_eip1559_fee_source_total"`
+	EthBlockGasUsedRatio               prometheus.Gauge         `metric:"eth_block_gas_used_ratio"`
+	EthBlockBaseFee                    prometheus.Gauge         `metric:"eth_block_base_fee"`
+	RPCSyncLatency                     *prometheus.HistogramVec `metric:"rpc_sync_latency"`
+	EthSyncRpcErrors                   *prometheus.CounterVec   `metric:"eth_sync_rpc_errors"`
 }
 
 // Labels represents a collection of label name -> value mappings.
@@ -165,7 +194,36 @@ func GetMetrics(coin string) (*Metrics, error) {
 		}
 	}
 
+	if err := registerGoRuntimeMetrics(); err != nil {
+		return nil, fmt.Errorf("metrics: registering Go runtime metrics: %w", err)
+	}
+
 	return metrics, nil
+}
+
+// registerGoRuntimeMetrics swaps the default Go collector (memstats gauges only) for one
+// that also exports GC CPU time and the live/goal heap from runtime/metrics, so the GC
+// share of an instance's CPU can be read from Grafana instead of a pprof session.
+// The alloc/free size histograms are left out: ~30 series per instance for no question
+// the memstats gauges do not already answer.
+func registerGoRuntimeMetrics() error {
+	extended := collectors.NewGoCollector(
+		collectors.WithGoCollectorRuntimeMetrics(
+			collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile(`^/cpu/classes/`)},
+			collectors.MetricsGC,
+		),
+		collectors.WithoutGoCollectorRuntimeMetrics(regexp.MustCompile(`^/gc/heap/(allocs|frees)-by-size:bytes$`)),
+	)
+	// Both collectors describe the same go_memstats_* descriptors, so the stock one has to go first.
+	prometheus.Unregister(collectors.NewGoCollector())
+	if err := prometheus.Register(extended); err != nil {
+		var already prometheus.AlreadyRegisteredError
+		if errors.As(err, &already) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // fieldTypeToMetricType maps a Metrics struct field's Go type to the metric `type`

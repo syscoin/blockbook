@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -15,9 +16,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/trezor/blockbook/api"
 	"github.com/trezor/blockbook/bchain"
 	"github.com/trezor/blockbook/bchain/coins/eth"
+	"github.com/trezor/blockbook/common"
 	"github.com/trezor/blockbook/tests/dbtestdata"
 )
 
@@ -165,6 +168,183 @@ func TestParseAllowedOrigins(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseAllowedEvmCallMethods(t *testing.T) {
+	tests := []struct {
+		name    string
+		env     string
+		want    []string
+		wantErr bool
+	}{
+		{name: "empty", env: "", want: nil},
+		{name: "empty entries only", env: " , ,", wantErr: true},
+		{name: "single selector", env: "0xdd62ed3e", want: []string{"dd62ed3e"}},
+		{name: "without prefix", env: "dd62ed3e", want: []string{"dd62ed3e"}},
+		{name: "uppercase", env: "0XDD62ED3E", want: []string{"dd62ed3e"}},
+		{name: "multiple with spaces", env: " 0xdd62ed3e , 0x70a08231 ", want: []string{"dd62ed3e", "70a08231"}},
+		{name: "empty entries skipped", env: "0xdd62ed3e,,0x70a08231", want: []string{"dd62ed3e", "70a08231"}},
+		{name: "too short", env: "0xdd62ed", wantErr: true},
+		{name: "too long", env: "0xdd62ed3e00", wantErr: true},
+		{name: "odd length", env: "0xdd62ed3", wantErr: true},
+		{name: "non hex", env: "0xdd62ed3g", wantErr: true},
+		{name: "bare prefix", env: "0x", wantErr: true},
+		{name: "one invalid among valid", env: "0xdd62ed3e,invalid", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseAllowedEvmCallMethods("FAKE_ALLOWED_EVM_CALL_METHODS", tt.env)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("parseAllowedEvmCallMethods(%q) = nil err, want error", tt.env)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseAllowedEvmCallMethods(%q) unexpected error: %v", tt.env, err)
+			}
+			if tt.want == nil && got != nil {
+				t.Fatalf("parseAllowedEvmCallMethods(%q) = %v, want nil", tt.env, got)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("parseAllowedEvmCallMethods(%q) len = %d, want %d", tt.env, len(got), len(tt.want))
+			}
+			for _, selector := range tt.want {
+				if _, ok := got[selector]; !ok {
+					t.Fatalf("parseAllowedEvmCallMethods(%q) missing %q", tt.env, selector)
+				}
+			}
+		})
+	}
+}
+
+func TestRpcCallAllowed(t *testing.T) {
+	// allowance(owner, spender) calldata with the 0xdd62ed3e selector
+	const allowanceData = "0xdd62ed3e0000000000000000000000009ea3721b5bf3b64b4418c38b603154d2d597fae3000000000000000000000000e4db1c5a1b709ce4d2ada6985d9d506e58f73829"
+	const allowedTo = "0xcdA9FC258358EcaA88845f19Af595e908bb7EfE9"
+	const otherTo = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+	allowedToSet := map[string]struct{}{strings.ToLower(allowedTo): {}}
+	allowanceSelectorSet := map[string]struct{}{"dd62ed3e": {}}
+
+	tests := []struct {
+		name    string
+		to      map[string]struct{}
+		methods map[string]struct{}
+		req     WsRpcCallReq
+		want    bool
+	}{
+		{
+			name: "no allowlists configured allows all",
+			req:  WsRpcCallReq{To: otherTo, Data: "0x12345678"},
+			want: true,
+		},
+		{
+			name: "allowed address passes",
+			to:   allowedToSet,
+			req:  WsRpcCallReq{To: allowedTo, Data: "0x12345678"},
+			want: true,
+		},
+		{
+			name: "allowed address is case-insensitive",
+			to:   allowedToSet,
+			req:  WsRpcCallReq{To: strings.ToUpper(allowedTo), Data: "0x12345678"},
+			want: true,
+		},
+		{
+			name: "address not allowed without methods list",
+			to:   allowedToSet,
+			req:  WsRpcCallReq{To: otherTo, Data: allowanceData},
+			want: false,
+		},
+		{
+			name:    "allowed address passes regardless of selector",
+			to:      allowedToSet,
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: allowedTo, Data: "0x12345678"},
+			want:    true,
+		},
+		{
+			name:    "allowed selector passes to any address",
+			to:      allowedToSet,
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: allowanceData},
+			want:    true,
+		},
+		{
+			name:    "selector alone is enough for exact 4 byte calldata",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: "0xdd62ed3e"},
+			want:    true,
+		},
+		{
+			name:    "uppercase hex calldata matches",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: "0XDD62ED3E"},
+			want:    true,
+		},
+		{
+			name:    "only methods list set rejects other selectors",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: "0x70a08231000000000000000000000000e4db1c5a1b709ce4d2ada6985d9d506e58f73829"},
+			want:    false,
+		},
+		{
+			name:    "not allowed address nor selector",
+			to:      allowedToSet,
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: "0x12345678"},
+			want:    false,
+		},
+		{
+			name:    "missing 0x prefix fails closed",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: allowanceData[2:]},
+			want:    false,
+		},
+		{
+			name:    "odd length calldata fails closed",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: allowanceData + "0"},
+			want:    false,
+		},
+		{
+			name:    "non hex tail after valid selector fails closed",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: "0xdd62ed3exx"},
+			want:    false,
+		},
+		{
+			name:    "calldata shorter than selector fails closed",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: "0xdd62ed"},
+			want:    false,
+		},
+		{
+			name:    "empty calldata fails closed",
+			methods: allowanceSelectorSet,
+			req:     WsRpcCallReq{To: otherTo, Data: ""},
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := &common.InternalState{}
+			is.SetRpcCallAllowlists(&common.RpcCallAllowlists{To: tt.to, Methods: tt.methods})
+			s := &WebsocketServer{is: is}
+			if got := s.rpcCallAllowed(&tt.req); got != tt.want {
+				t.Fatalf("rpcCallAllowed(to=%q, data=%q) = %v, want %v", tt.req.To, tt.req.Data, got, tt.want)
+			}
+		})
+	}
+
+	t.Run("nil snapshot allows all", func(t *testing.T) {
+		s := &WebsocketServer{is: &common.InternalState{}}
+		if !s.rpcCallAllowed(&WsRpcCallReq{To: otherTo, Data: "0x12345678"}) {
+			t.Fatal("rpcCallAllowed with uninitialized snapshot = false, want true")
+		}
+	})
 }
 
 func TestParseTrustedProxies(t *testing.T) {
@@ -765,11 +945,11 @@ func TestConnMessageRateClockSkew(t *testing.T) {
 }
 
 func TestWebsocketConnectionLimiterConnectionAttempts(t *testing.T) {
-	limiter := newWebsocketConnectionLimiter()
+	limiter := newWebsocketConnectionLimiter(defaultWsMaxConnectionsPerIP, defaultWsMaxConnectionAttemptsPerIP)
 	now := time.Unix(1700000000, 0)
 	ip := "192.0.2.10"
 
-	for i := 0; i < maxWebsocketConnectionAttemptsPerIP; i++ {
+	for i := 0; i < defaultWsMaxConnectionAttemptsPerIP; i++ {
 		ok, reason := limiter.accept(ip, now)
 		if !ok {
 			t.Fatalf("accept(%d) rejected with %q", i, reason)
@@ -789,12 +969,12 @@ func TestWebsocketConnectionLimiterConnectionAttempts(t *testing.T) {
 }
 
 func TestWebsocketConnectionLimiterActiveConnections(t *testing.T) {
-	limiter := newWebsocketConnectionLimiter()
+	limiter := newWebsocketConnectionLimiter(defaultWsMaxConnectionsPerIP, defaultWsMaxConnectionAttemptsPerIP)
 	now := time.Unix(1700000000, 0)
 	ip := "192.0.2.20"
 
-	for i := 0; i < maxWebsocketConnectionsPerIP; i++ {
-		if i > 0 && i%maxWebsocketConnectionAttemptsPerIP == 0 {
+	for i := 0; i < defaultWsMaxConnectionsPerIP; i++ {
+		if i > 0 && i%defaultWsMaxConnectionAttemptsPerIP == 0 {
 			now = now.Add(websocketConnectionAttemptWindow + time.Second)
 		}
 		ok, reason := limiter.accept(ip, now)
@@ -815,8 +995,21 @@ func TestWebsocketConnectionLimiterActiveConnections(t *testing.T) {
 	}
 }
 
+func TestWebsocketConnectionLimiterDisabled(t *testing.T) {
+	// 0 caps disable both the connection and attempt checks; accept never rejects.
+	limiter := newWebsocketConnectionLimiter(0, 0)
+	now := time.Unix(1700000000, 0)
+	ip := "192.0.2.60"
+
+	for i := 0; i < defaultWsMaxConnectionsPerIP+defaultWsMaxConnectionAttemptsPerIP+1; i++ {
+		if ok, reason := limiter.accept(ip, now); !ok {
+			t.Fatalf("accept(%d) rejected with %q on a disabled limiter", i, reason)
+		}
+	}
+}
+
 func TestWebsocketConnectionLimiterSweepEvictsIdleEntries(t *testing.T) {
-	limiter := newWebsocketConnectionLimiter()
+	limiter := newWebsocketConnectionLimiter(defaultWsMaxConnectionsPerIP, defaultWsMaxConnectionAttemptsPerIP)
 	now := time.Unix(1700000000, 0)
 	idle := "192.0.2.40"
 	active := "192.0.2.41"
@@ -846,7 +1039,7 @@ func TestWebsocketConnectionLimiterSweepEvictsIdleEntries(t *testing.T) {
 }
 
 func TestWebsocketConnectionLimiterStats(t *testing.T) {
-	limiter := newWebsocketConnectionLimiter()
+	limiter := newWebsocketConnectionLimiter(defaultWsMaxConnectionsPerIP, defaultWsMaxConnectionAttemptsPerIP)
 	now := time.Unix(1700000000, 0)
 	a := "192.0.2.50"
 	b := "192.0.2.51"
@@ -886,7 +1079,7 @@ func TestWebsocketConnectionLimiterStats(t *testing.T) {
 }
 
 func TestWebsocketConnectionLimiterCleanup(t *testing.T) {
-	limiter := newWebsocketConnectionLimiter()
+	limiter := newWebsocketConnectionLimiter(defaultWsMaxConnectionsPerIP, defaultWsMaxConnectionAttemptsPerIP)
 	now := time.Unix(1700000000, 0)
 	ip := "192.0.2.30"
 
@@ -1261,8 +1454,11 @@ func TestWebsocketShutdownWaitsForInFlightWork(t *testing.T) {
 	go func() {
 		// Simulate a DB-touching goroutine that takes some time.
 		time.Sleep(50 * time.Millisecond)
-		s.workDone()
+		// Signal completion before workDone(): workDone() is what releases
+		// Shutdown, so closing afterwards races with the check below and the
+		// non-blocking select can observe finished as still open.
 		close(finished)
+		s.workDone()
 	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1341,6 +1537,103 @@ func TestWebsocketTrackWorkAppliesGlobalLimit(t *testing.T) {
 	s.workDone()
 	if s.activeRequests != 0 {
 		t.Fatalf("activeRequests = %d after workDone, want 0", s.activeRequests)
+	}
+}
+
+func TestWebsocketMempoolFilterResponseSlots(t *testing.T) {
+	c := &websocketChannel{
+		mempoolFiltersSlots: make(chan struct{}, maxWebsocketMempoolFiltersResponses),
+	}
+	for i := 0; i < maxWebsocketMempoolFiltersResponses; i++ {
+		if !c.acquireMempoolFiltersSlot() {
+			t.Fatalf("acquireMempoolFiltersSlot() = false at slot %d", i)
+		}
+	}
+	if c.acquireMempoolFiltersSlot() {
+		t.Fatal("acquireMempoolFiltersSlot() = true at limit")
+	}
+	c.releaseMempoolFiltersSlot()
+	if !c.acquireMempoolFiltersSlot() {
+		t.Fatal("acquireMempoolFiltersSlot() = false after release")
+	}
+}
+
+func TestWebsocketCloseOutReleasesQueuedMempoolFilterResponses(t *testing.T) {
+	c := &websocketChannel{
+		out:                 make(chan *WsRes, outChannelSize),
+		mempoolFiltersSlots: make(chan struct{}, maxWebsocketMempoolFiltersResponses),
+		alive:               true,
+	}
+	if !c.acquireMempoolFiltersSlot() {
+		t.Fatal("acquireMempoolFiltersSlot() = false")
+	}
+	c.DataOut(&WsRes{ID: "mempool", Data: struct{}{}, release: c.releaseMempoolFiltersSlot})
+	if got := len(c.mempoolFiltersSlots); got != 1 {
+		t.Fatalf("held mempool filter slots = %d before CloseOut, want 1", got)
+	}
+	if closed, reason := c.CloseOut("test"); !closed || reason != "test" {
+		t.Fatalf("CloseOut() = %v, %q, want true, test", closed, reason)
+	}
+	if got := len(c.mempoolFiltersSlots); got != 0 {
+		t.Fatalf("held mempool filter slots = %d after CloseOut, want 0", got)
+	}
+}
+
+// TestWebsocketOutputLoopReleasesMempoolFilterSlotAfterWrite exercises the
+// primary slot-release path for a live connection: outputLoop's c.finalize(m)
+// after a successful WriteJSON. Neither TestWebsocketMempoolFilterResponseSlots
+// (raw semaphore) nor TestWebsocketCloseOutReleasesQueuedMempoolFilterResponses
+// (drain-on-close) touch this line, so without this test a removal of the
+// finalize call would leak a slot on every successful response and go undetected.
+func TestWebsocketOutputLoopReleasesMempoolFilterSlotAfterWrite(t *testing.T) {
+	// Stand up a real websocket connection pair so outputLoop's WriteJSON and
+	// finalize run against a live *websocket.Conn.
+	upgrader := websocket.Upgrader{}
+	serverConnCh := make(chan *websocket.Conn, 1)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade: %v", err)
+			return
+		}
+		serverConnCh <- conn
+	}))
+	defer ts.Close()
+
+	clientConn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(ts.URL, "http"), nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer clientConn.Close()
+	serverConn := <-serverConnCh
+	defer serverConn.Close()
+
+	c := &websocketChannel{
+		conn:                serverConn,
+		out:                 make(chan *WsRes, outChannelSize),
+		mempoolFiltersSlots: make(chan struct{}, maxWebsocketMempoolFiltersResponses),
+		alive:               true,
+	}
+	if !c.acquireMempoolFiltersSlot() {
+		t.Fatal("acquireMempoolFiltersSlot() = false")
+	}
+	c.out <- &WsRes{ID: "mempool", Data: struct{}{}, release: c.releaseMempoolFiltersSlot}
+	close(c.out) // outputLoop returns once the single queued response is written
+
+	s := &WebsocketServer{}
+	done := make(chan struct{})
+	go func() {
+		s.outputLoop(c)
+		close(done)
+	}()
+
+	if _, _, err := clientConn.ReadMessage(); err != nil {
+		t.Fatalf("client read: %v", err)
+	}
+	<-done
+
+	if got := len(c.mempoolFiltersSlots); got != 0 {
+		t.Fatalf("held mempool filter slots = %d after successful write, want 0", got)
 	}
 }
 

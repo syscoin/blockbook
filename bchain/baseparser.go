@@ -201,6 +201,12 @@ func (p *BaseParser) UseAddressAliases() bool {
 	return p.AddressAliases
 }
 
+// UseEnsReverseAliases returns false - ENS reverse labels are an EthereumType concern,
+// and off unless that parser opts the chain in.
+func (p *BaseParser) UseEnsReverseAliases() bool {
+	return false
+}
+
 // ParseTxFromJson parses JSON message containing transaction and returns Tx struct
 func (p *BaseParser) ParseTxFromJson(msg json.RawMessage) (*Tx, error) {
 	var tx Tx
@@ -408,6 +414,11 @@ func (p *BaseParser) DeriveAddressDescriptorsFromTo(descriptor *XpubDescriptor, 
 // EthereumTypeGetTokenTransfersFromTx is unsupported
 func (p *BaseParser) EthereumTypeGetTokenTransfersFromTx(tx *Tx) (TokenTransfers, error) {
 	return nil, errors.New("Not supported")
+}
+
+// EthereumTypeIsIgnoredContract ignores no contract by default
+func (p *BaseParser) EthereumTypeIsIgnoredContract(contract AddressDescriptor) bool {
+	return false
 }
 
 // GetEthereumTxData returns default pending status for non-Ethereum-like chains.
