@@ -2073,9 +2073,58 @@ func TestGetAddrDescTransactions_ScanBound(t *testing.T) {
 		require.NoError(t, d2.WriteBatch(wb))
 	}
 	matches := 0
-	require.NoError(t, d2.GetAddrDescTransactions(shortDesc, 0, ^uint32(0), func(txid string, height uint32, indexes []int32) error {
+	err = d2.GetAddrDescTransactions(shortDesc, 0, ^uint32(0), func(txid string, height uint32, indexes []int32) error {
 		matches++
 		return nil
-	}))
+	})
+	require.ErrorContains(t, err, "address transaction scan limit exceeded")
 	require.Equal(t, 0, matches, "scan must abort before reaching the trailing matching key")
+}
+
+func TestGetAddrDescTransactions_CompleteDescriptorScanLimit(t *testing.T) {
+	d := setupRocksDB(t, &testBitcoinParser{BitcoinParser: bitcoinTestnetParser()})
+	defer closeAndDestroyRocksDB(t, d)
+
+	addrDesc := addressToAddrDesc(dbtestdata.Addr1, d.chainParser)
+	btxid, err := d.chainParser.PackTxid(dbtestdata.TxidB1T1)
+	require.NoError(t, err)
+	idxBuf := make([]byte, vlq.MaxLen32)
+	l := packVarint32(1, idxBuf) // output 0, terminator bit set
+	matchingVal := append(append([]byte{}, btxid...), idxBuf[:l]...)
+
+	// Complete P2PKH scripts can prefix longer indexed scripts; these suffixes sort before the address's own history during a full-range scan.
+	prefixScript := func(i int) bchain.AddressDescriptor {
+		return append(append(bchain.AddressDescriptor{}, addrDesc...), 0x02, byte(i>>8), byte(i), 0x75)
+	}
+	foreignDesc := prefixScript(0)
+	parsedDesc, err := d.chainParser.GetAddrDescFromVout(&bchain.Vout{ScriptPubKey: bchain.ScriptPubKey{Hex: hex.EncodeToString(foreignDesc)}})
+	require.NoError(t, err)
+	require.Equal(t, foreignDesc, parsedDesc)
+	require.True(t, d.chainParser.IsAddrDescIndexable(parsedDesc))
+
+	wb := grocksdb.NewWriteBatch()
+	defer wb.Destroy()
+	for i := 0; i < maxAddrDescScanNonMatching; i++ {
+		wb.PutCF(d.cfh[cfAddresses], packAddressKey(prefixScript(i), 101), []byte{0})
+	}
+	wb.PutCF(d.cfh[cfAddresses], packAddressKey(addrDesc, 100), matchingVal)
+	require.NoError(t, d.WriteBatch(wb))
+
+	matches := 0
+	callback := func(txid string, height uint32, indexes []int32) error {
+		require.Equal(t, dbtestdata.TxidB1T1, txid)
+		require.Equal(t, uint32(100), height)
+		matches++
+		return nil
+	}
+	require.NoError(t, d.GetTransactions(dbtestdata.Addr1, 0, ^uint32(0), callback))
+	require.Equal(t, 1, matches, "a complete address remains readable at the scan bound")
+
+	wb.Clear()
+	wb.PutCF(d.cfh[cfAddresses], packAddressKey(prefixScript(maxAddrDescScanNonMatching), 101), []byte{0})
+	require.NoError(t, d.WriteBatch(wb))
+	matches = 0
+	err = d.GetTransactions(dbtestdata.Addr1, 0, ^uint32(0), callback)
+	require.ErrorContains(t, err, "address transaction scan limit exceeded")
+	require.Equal(t, 0, matches, "exhausting the bound must not return an incomplete history as success")
 }

@@ -623,15 +623,10 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			if glog.V(2) {
 				glog.Warningf("rocksdb: addrDesc %s - mixed with %s", addrDesc, hex.EncodeToString(key))
 			}
-			// keys of other lengths belong to different (longer) descriptors
-			// that merely share addrDesc as a prefix; a complete descriptor
-			// never hits this path. Abort if too many are skipped so a
-			// truncated descriptor does not turn into a long scan over
-			// unrelated keys.
+			// Longer indexed scripts can share even a complete descriptor as a prefix. Bound the scan, but report exhaustion so callers cannot mistake partial history for a complete result.
 			nonMatching++
 			if nonMatching > maxAddrDescScanNonMatching {
-				glog.Warningf("rocksdb: addrDesc %s - aborting scan after %d non-matching keys, likely a partial address descriptor", hex.EncodeToString(addrDesc), nonMatching)
-				break
+				return errors.Errorf("address transaction scan limit exceeded for descriptor %s after %d non-matching keys", hex.EncodeToString(addrDesc), nonMatching)
 			}
 			continue
 		}
