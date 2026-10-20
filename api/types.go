@@ -272,6 +272,7 @@ type ContractInfoResult struct {
 
 // Token contains info about tokens held by an address
 type Token struct {
+	// SYSCOIN: Both standard fields include the emitted SPTAllocated value.
 	// Deprecated: Use Standard instead.
 	Type             bchain.TokenStandardName `json:"type" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated'" ts_doc:"@deprecated: Use standard instead."`
 	Standard         bchain.TokenStandardName `json:"standard" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated'"`
@@ -328,6 +329,7 @@ func (a Tokens) Less(i, j int) bool {
 
 // TokenTransfer contains info about a token transfer done in a transaction
 type TokenTransfer struct {
+	// SYSCOIN: Both standard fields include the emitted SPT value.
 	// Deprecated: Use Standard instead.
 	Type             bchain.TokenStandardName `json:"type" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT'" ts_doc:"@deprecated: Use standard instead."`
 	Standard         bchain.TokenStandardName `json:"standard" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT'"`

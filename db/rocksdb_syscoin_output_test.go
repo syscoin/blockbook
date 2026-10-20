@@ -1,5 +1,6 @@
 //go:build unittest
 
+// SYSCOIN: Regression coverage for indexed output decoding, bulk indexing, and reorg restoration.
 package db
 
 import (

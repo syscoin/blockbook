@@ -1,5 +1,6 @@
 //go:build unittest
 
+// SYSCOIN: Regression coverage for asset filtering and summary pagination across upstream merges.
 package api
 
 import (

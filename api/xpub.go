@@ -326,6 +326,7 @@ func (w *Worker) xpubGetAddressTxids(addrDesc bchain.AddressDescriptor, mempool 
 	return txs, complete, nil
 }
 
+// SYSCOIN: An asset mask also prevents use of the unfiltered transaction cache.
 func isUnfilteredXpubTxidFilter(filter *AddressFilter) bool {
 	return filter == nil || filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff && filter.AssetsMask == bchain.AllMask
 }
@@ -728,6 +729,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		page = 0
 	}
 	if filter == nil {
+		// SYSCOIN: An omitted filter includes every asset transaction type.
 		filter = &AddressFilter{Vout: AddressFilterVoutOff, AssetsMask: bchain.AllMask}
 	}
 	type mempoolMap struct {
@@ -760,7 +762,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 			accountAddrDescs[string(da[i].addrDesc)] = struct{}{}
 		}
 	}
-	// setup filtering of txids
+	// SYSCOIN: Asset masks participate in confirmed transaction filtering.
 	var txidFilter func(txid *xpubTxid, ad *xpubAddress) bool
 	if !(filter.FromHeight == 0 && filter.ToHeight == 0 && filter.Vout == AddressFilterVoutOff && filter.AssetsMask == bchain.AllMask) {
 		toHeight := maxUint32
@@ -777,6 +779,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 					return false
 				}
 			}
+			// SYSCOIN: Match asset transaction types from the indexed version.
 			if filter.AssetsMask != bchain.AllMask {
 				ta, err := w.db.GetTxAddresses(txid.txid)
 				if err != nil || ta == nil {
@@ -792,6 +795,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 		}
 		filtered = true
 	}
+	// SYSCOIN: Apply mempool filters independently of confirmed transaction metadata.
 	xpubMempoolTxidFilter := func(txid *xpubTxid) bool {
 		if filter.FromHeight != 0 {
 			return false
@@ -809,6 +813,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 	// process mempool, only if ToHeight is not specified
 	if filter.ToHeight == 0 && !filter.OnlyConfirmed {
 		txmMap = make(map[string]*Tx)
+		// SYSCOIN: Count transactions once while retaining per-address balance updates.
 		countedMempoolTxs := make(map[string]struct{})
 		addedMempoolEntries := make(map[string]struct{})
 		mempoolEntries = make(bchain.MempoolTxidEntries, 0)
@@ -822,6 +827,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 				for _, txid := range newTxids {
 					// the same tx can have multiple addresses from the same xpub, get it from backend it only once
 					tx, foundTx := txmMap[txid.txid]
+					// SYSCOIN: Asset filtering needs the transaction version even for basic detail.
 					needTx := option != AccountDetailsBasic || filter.AssetsMask != bchain.AllMask
 					if option == AccountDetailsBasic && !needTx {
 						// Basic detail: skip per-tx loading. Count unique mempool txids
@@ -845,6 +851,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 					}
 					// skip already confirmed txs, mempool may be out of sync
 					if tx.Confirmations == 0 {
+						// SYSCOIN: Exclude mempool transactions outside the requested asset mask.
 						if filter.AssetsMask != bchain.AllMask {
 							mask := assetMaskFromVersion(w.chainParser, tx.Version)
 							if mask != bchain.AllMask && uint32(filter.AssetsMask)&uint32(mask) != uint32(mask) {
@@ -857,6 +864,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 						}
 						uBalSat.Add(&uBalSat, tx.getAddrVoutValue(ad.addrDesc))
 						uBalSat.Sub(&uBalSat, tx.getAddrVinValue(ad.addrDesc))
+						// SYSCOIN: Accumulate SPT mempool balances for each derived address.
 						if option > AccountDetailsBasic {
 							addrKey := string(ad.addrDesc)
 							assetMempool := xpubAssetMempool[addrKey]
@@ -867,7 +875,7 @@ func (w *Worker) GetXpubAddress(xpub string, page int, txsOnPage int, option Acc
 							tx.addAddrVoutAssetMempool(ad.addrDesc, assetMempool)
 							tx.addAddrVinAssetMempool(ad.addrDesc, assetMempool)
 						}
-						// Mempool txs enter the paged sequence once, uniquely and filtered.
+						// SYSCOIN: Mempool txs enter the paged sequence once, uniquely and filtered.
 						if xpubMempoolTxidFilter(&txid) {
 							if _, added := addedMempoolEntries[txid.txid]; added {
 								continue

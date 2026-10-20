@@ -623,7 +623,7 @@ func (d *RocksDB) GetAddrDescTransactions(addrDesc bchain.AddressDescriptor, low
 			if glog.V(2) {
 				glog.Warningf("rocksdb: addrDesc %s - mixed with %s", addrDesc, hex.EncodeToString(key))
 			}
-			// Longer indexed scripts can share even a complete descriptor as a prefix. Bound the scan, but report exhaustion so callers cannot mistake partial history for a complete result.
+			// SYSCOIN: Longer indexed scripts can share even a complete descriptor as a prefix. Report scan exhaustion so callers cannot mistake partial history for a complete result.
 			nonMatching++
 			if nonMatching > maxAddrDescScanNonMatching {
 				return errors.Errorf("address transaction scan limit exceeded for descriptor %s after %d non-matching keys", hex.EncodeToString(addrDesc), nonMatching)
@@ -1457,6 +1457,7 @@ func (d *RocksDB) GetTxAddressesOutput(txid string, vout uint32) (*TxOutput, err
 		return nil, nil
 	}
 	var l int
+	// SYSCOIN: Our transaction-address records include a version before the height.
 	if supportsSyscoinAssets(d.chainParser) {
 		_, l = unpackVaruint(buf) // version
 	}
@@ -1850,6 +1851,7 @@ func (d *RocksDB) packedTxInputLen(buf []byte) int {
 			_, n := unpackVaruint(buf[pos:])     // prev vout
 			pos += n
 		}
+		// SYSCOIN: Include the optional asset suffix when skipping an extended input.
 		if supportsSyscoinAssets(d.chainParser) {
 			pos += packedAssetInfoLen(buf[pos:])
 		}
@@ -1858,6 +1860,7 @@ func (d *RocksDB) packedTxInputLen(buf []byte) int {
 	al, pos := unpackVaruint(buf)
 	pos += int(al)           // addrDesc
 	pos += int(buf[pos]) + 1 // value
+	// SYSCOIN: Basic inputs also carry the optional asset suffix.
 	if supportsSyscoinAssets(d.chainParser) {
 		pos += packedAssetInfoLen(buf[pos:])
 	}
@@ -1881,6 +1884,7 @@ func (d *RocksDB) packedTxOutputLen(buf []byte) int {
 		_, n = unpackVaruint(buf[pos:]) // spent height
 		pos += n
 	}
+	// SYSCOIN: Skip the asset suffix after the output's optional spending metadata.
 	if supportsSyscoinAssets(d.chainParser) {
 		pos += packedAssetInfoLen(buf[pos:])
 	}
@@ -3197,7 +3201,7 @@ func unpackAssetInfo(buf []byte) (*bchain.AssetInfo, int) {
 	return &bchain.AssetInfo{AssetGuid: assetGuid, ValueSat: &valueSat}, l
 }
 
-// packedAssetInfoLen skips optional Syscoin metadata without allocating its value.
+// SYSCOIN: packedAssetInfoLen skips optional asset metadata without allocating its value.
 // Keep in sync with appendAssetInfo/unpackAssetInfo.
 func packedAssetInfoLen(buf []byte) int {
 	flag, pos := unpackVaruint(buf)

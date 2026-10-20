@@ -2077,10 +2077,12 @@ func TestGetAddrDescTransactions_ScanBound(t *testing.T) {
 		matches++
 		return nil
 	})
+	// SYSCOIN: Exhaustion must be reported instead of returning a successful partial history.
 	require.ErrorContains(t, err, "address transaction scan limit exceeded")
 	require.Equal(t, 0, matches, "scan must abort before reaching the trailing matching key")
 }
 
+// SYSCOIN: A complete, indexable descriptor can still prefix unrelated scripts.
 func TestGetAddrDescTransactions_CompleteDescriptorScanLimit(t *testing.T) {
 	d := setupRocksDB(t, &testBitcoinParser{BitcoinParser: bitcoinTestnetParser()})
 	defer closeAndDestroyRocksDB(t, d)

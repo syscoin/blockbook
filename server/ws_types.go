@@ -28,6 +28,7 @@ type resultError struct {
 }
 
 // WsAccountInfoReq carries parameters for the 'getAccountInfo' method.
+// SYSCOIN: Details also accepts the lightweight txsummary response.
 type WsAccountInfoReq struct {
 	Descriptor        string            `json:"descriptor" ts_doc:"Address or XPUB descriptor to query."`
 	Details           string            `json:"details,omitempty" ts_type:"'basic' | 'tokens' | 'tokenBalances' | 'txids' | 'txsummary' | 'txslight' | 'txs'" ts_doc:"Level of detail to retrieve about the account."`
