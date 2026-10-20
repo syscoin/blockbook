@@ -138,6 +138,7 @@ func TestMarkNullableIsScopedToInterface(t *testing.T) {
 	}
 }
 
+// SYSCOIN: Keep generated memo types consistent with the base64 JSON wire format.
 func TestTransactionMemoMatchesJSONWireType(t *testing.T) {
 	memo := []byte{0, 1, 2, 0xff, 0x0a}
 	encoded, err := json.Marshal(api.Tx{Memo: memo})
@@ -164,6 +165,7 @@ func TestTransactionMemoMatchesJSONWireType(t *testing.T) {
 	}
 }
 
+// SYSCOIN: Preserve the emitted SPT standards in generated TypeScript unions.
 func TestSyscoinTokenStandardsMatchGeneratedTypes(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

@@ -1134,6 +1134,7 @@ var errFilteredScanLimit = NewAPIError("Filtered history is too large to scan, n
 func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool, filter *AddressFilter, maxResults int) ([]string, error) {
 	var err error
 	txids := make([]string, 0, 4)
+	// SYSCOIN: Filter transaction versions against the requested asset mask.
 	txMatchesAssetMask := func(txid string) (bool, error) {
 		if filter.AssetsMask == bchain.AllMask {
 			return true, nil
@@ -1148,6 +1149,7 @@ func (w *Worker) getAddressTxids(addrDesc bchain.AddressDescriptor, mempool bool
 		}
 		return uint32(filter.AssetsMask)&uint32(mask) == uint32(mask), nil
 	}
+	// SYSCOIN: Asset-mask rejections share the upstream bound for filtered scans.
 	nonMatching := 0
 	skipNonMatching := func() error {
 		nonMatching++

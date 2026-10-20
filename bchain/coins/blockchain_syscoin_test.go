@@ -1,5 +1,6 @@
 //go:build unittest
 
+// SYSCOIN: Regression coverage for broadcast options and their metrics wrapper.
 package coins
 
 import (
