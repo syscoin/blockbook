@@ -273,8 +273,8 @@ type ContractInfoResult struct {
 // Token contains info about tokens held by an address
 type Token struct {
 	// Deprecated: Use Standard instead.
-	Type             bchain.TokenStandardName `json:"type" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155'" ts_doc:"@deprecated: Use standard instead."`
-	Standard         bchain.TokenStandardName `json:"standard" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155'"`
+	Type             bchain.TokenStandardName `json:"type" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated'" ts_doc:"@deprecated: Use standard instead."`
+	Standard         bchain.TokenStandardName `json:"standard" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated'"`
 	Name             string                   `json:"name" ts_doc:"Readable name of the token."`
 	Path             string                   `json:"path,omitempty" ts_doc:"Derivation path if this token is derived from an XPUB-based address."`
 	Contract         string                   `json:"contract,omitempty" ts_doc:"Contract address on-chain."`
@@ -329,8 +329,8 @@ func (a Tokens) Less(i, j int) bool {
 // TokenTransfer contains info about a token transfer done in a transaction
 type TokenTransfer struct {
 	// Deprecated: Use Standard instead.
-	Type             bchain.TokenStandardName `json:"type" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155'" ts_doc:"@deprecated: Use standard instead."`
-	Standard         bchain.TokenStandardName `json:"standard" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155'"`
+	Type             bchain.TokenStandardName `json:"type" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT'" ts_doc:"@deprecated: Use standard instead."`
+	Standard         bchain.TokenStandardName `json:"standard" ts_type:"'' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT'"`
 	From             string                   `json:"from" ts_doc:"Source address of the token transfer."`
 	To               string                   `json:"to" ts_doc:"Destination address of the token transfer."`
 	Contract         string                   `json:"contract" ts_doc:"Contract address of the token."`
@@ -413,7 +413,7 @@ type Tx struct {
 	AccountAssetTransfers []TokenTransfer `json:"accountAssetTransfers,omitempty" ts_doc:"Syscoin SPT transfers summarized relative to the queried account."`
 	// SYSCOIN: SPT transaction type and optional decoded memo.
 	TokenType        *bchain.TokenType `json:"tokenType,omitempty" ts_doc:"Syscoin SPT transaction type."`
-	Memo             []byte            `json:"memo,omitempty" ts_doc:"Syscoin SPT memo decoded from OP_RETURN."`
+	Memo             []byte            `json:"memo,omitempty" ts_type:"string" ts_doc:"Base64-encoded Syscoin SPT memo decoded from OP_RETURN."`
 	EthereumSpecific *EthereumSpecific `json:"ethereumSpecific,omitempty" ts_doc:"Ethereum-like blockchain specific data (if applicable)."`
 	AddressAliases   AddressAliasesMap `json:"addressAliases,omitempty" ts_doc:"Aliases for addresses involved in this transaction."`
 }

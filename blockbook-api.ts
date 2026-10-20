@@ -149,8 +149,8 @@ export interface MultiTokenValue {
 }
 export interface TokenTransfer {
     /** @deprecated: Use standard instead. */
-    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
-    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
+    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT';
+    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPT';
     /** Source address of the token transfer. */
     from: string;
     /** Destination address of the token transfer. */
@@ -167,6 +167,8 @@ export interface TokenTransfer {
     value?: string;
     /** List of multiple ID-value pairs for ERC1155 transfers. */
     multiTokenValues?: MultiTokenValue[];
+    /** Syscoin SPT asset GUID. */
+    assetGuid?: string;
 }
 export interface Vout {
     /** Amount (in satoshi or base units) of the output. */
@@ -193,6 +195,18 @@ export interface Vout {
     isOwn?: boolean;
     /** Output script type (e.g., 'P2PKH', 'P2SH'). */
     type?: string;
+    /** Syscoin SPT metadata for this output. */
+    assetInfo?: AssetInfo;
+}
+export interface AssetInfo {
+    /** Syscoin SPT asset GUID. */
+    assetGuid?: string;
+    /** SPT amount in base units. */
+    value?: string;
+    /** SPT amount as a decimal string. */
+    valueStr?: string;
+    /** Syscoin SPT asset symbol, if available. */
+    symbol?: string;
 }
 export interface Vin {
     /** ID/hash of the originating transaction (where the UTXO comes from). */
@@ -217,6 +231,8 @@ export interface Vin {
     asm?: string;
     /** Data for coinbase inputs (when mining). */
     coinbase?: string;
+    /** Syscoin SPT metadata for this input. */
+    assetInfo?: AssetInfo;
 }
 export interface Tx {
     /** Transaction ID (hash). */
@@ -261,7 +277,7 @@ export interface Tx {
     chainExtraData?: TxChainExtraData;
     /** List of token transfers that occurred in this transaction. */
     tokenTransfers?: TokenTransfer[];
-    /** SYSCOIN Transaction direction relative to the queried account, when returned by account summary endpoints. */
+    /** Transaction direction relative to the queried account, when returned by account summary endpoints. */
     direction?: string;
     /** Total input value belonging to the queried account, when returned by account summary endpoints. */
     addressValueIn?: string;
@@ -271,7 +287,7 @@ export interface Tx {
     accountAssetTransfers?: TokenTransfer[];
     /** Syscoin SPT transaction type. */
     tokenType?: string;
-    /** Syscoin SPT memo decoded from OP_RETURN. */
+    /** Base64-encoded Syscoin SPT memo decoded from OP_RETURN. */
     memo?: string;
     /** Ethereum-like blockchain specific data (if applicable). */
     ethereumSpecific?: EthereumSpecific;
@@ -373,8 +389,8 @@ export interface ContractInfoResult {
 }
 export interface Token {
     /** @deprecated: Use standard instead. */
-    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
-    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155';
+    type: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated';
+    standard: '' | 'XPUBAddress' | 'ERC20' | 'ERC721' | 'ERC1155' | 'BEP20' | 'BEP721' | 'BEP1155' | 'TRC20' | 'TRC721' | 'TRC1155' | 'SPTAllocated';
     /** Readable name of the token. */
     name: string;
     /** Derivation path if this token is derived from an XPUB-based address. */
@@ -457,8 +473,12 @@ export interface Address {
     confirmedNonce?: string;
     /** Number of tokens with any historical usage at this address. */
     usedTokens?: number;
+    /** Number of Syscoin SPT assets with any historical usage at this address. */
+    usedAssetTokens?: number;
     /** List of tokens associated with this address. */
     tokens?: Token[];
+    /** List of Syscoin SPT assets associated with this address. */
+    tokensAsset?: Token[];
     /** Total value of the address in secondary currency (e.g. fiat). */
     secondaryValue?: number;
     /** Sum of token values in base currency. */
@@ -499,6 +519,8 @@ export interface Utxo {
     lockTime?: number;
     /** Indicates if this UTXO originated from a coinbase transaction. */
     coinbase?: boolean;
+    /** Syscoin SPT metadata for this UTXO. */
+    assetInfo?: AssetInfo;
 }
 export interface BalanceHistory {
     /** Unix timestamp for this point in the balance history. */
@@ -908,6 +930,10 @@ export interface WsSendTransactionReq {
     hex?: string;
     /** Use alternative RPC method to broadcast transaction. */
     disableAlternativeRpc: boolean;
+    /** Optional Syscoin Core maxfeerate parameter. */
+    maxfeerate?: string;
+    /** Optional Syscoin Core maxburnamount parameter. */
+    maxburnamount?: string;
 }
 export interface WsSubscribeAddressesReq {
     /** List of addresses to subscribe for updates (e.g., new transactions). */

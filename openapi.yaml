@@ -1841,7 +1841,7 @@ components:
     TokenStandard:
       type: string
       description: Token standard name. Empty string means no token standard is known.
-      enum: ["", XPUBAddress, ERC20, ERC721, ERC1155, BEP20, BEP721, BEP1155, TRC20, TRC721, TRC1155]
+      enum: ["", XPUBAddress, ERC20, ERC721, ERC1155, BEP20, BEP721, BEP1155, TRC20, TRC721, TRC1155, SPT, SPTAllocated]
 
     BlockHashResponse:
       type: object
@@ -1914,6 +1914,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MultiTokenValue"
+        assetGuid:
+          type: string
+          description: Syscoin SPT asset GUID.
+
+    AssetInfo:
+      type: object
+      description: Syscoin SPT metadata attached to a transaction input, output, or UTXO.
+      properties:
+        assetGuid:
+          type: string
+          description: Syscoin SPT asset GUID.
+        value:
+          $ref: "#/components/schemas/AmountString"
+        valueStr:
+          type: string
+          description: SPT amount as a decimal string.
+        symbol:
+          type: string
+          description: SPT asset symbol, if available.
 
     Vin:
       type: object
@@ -1945,6 +1964,8 @@ components:
           type: string
         coinbase:
           type: string
+        assetInfo:
+          $ref: "#/components/schemas/AssetInfo"
 
     Vout:
       type: object
@@ -1979,6 +2000,8 @@ components:
           type: boolean
         type:
           type: string
+        assetInfo:
+          $ref: "#/components/schemas/AssetInfo"
 
     EthereumInternalTransfer:
       type: object
@@ -2170,7 +2193,8 @@ components:
           description: Syscoin SPT transaction type.
         memo:
           type: string
-          description: Syscoin SPT memo decoded from OP_RETURN.
+          contentEncoding: base64
+          description: Base64-encoded Syscoin SPT memo decoded from OP_RETURN.
         ethereumSpecific:
           $ref: "#/components/schemas/EthereumSpecific"
         addressAliases:
@@ -2402,8 +2426,16 @@ components:
           type: string
         usedTokens:
           type: integer
+        usedAssetTokens:
+          type: integer
+          description: Number of Syscoin SPT assets with historical usage at this address.
         tokens:
           type: array
+          items:
+            $ref: "#/components/schemas/Token"
+        tokensAsset:
+          type: array
+          description: Syscoin SPT assets associated with this address.
           items:
             $ref: "#/components/schemas/Token"
         secondaryValue:
@@ -2454,6 +2486,8 @@ components:
           type: integer
         coinbase:
           type: boolean
+        assetInfo:
+          $ref: "#/components/schemas/AssetInfo"
 
     BalanceHistory:
       type: object
@@ -3100,6 +3134,12 @@ components:
         disableAlternativeRpc:
           type: boolean
           default: false
+        maxfeerate:
+          type: string
+          description: Optional Syscoin Core maxfeerate parameter.
+        maxburnamount:
+          type: string
+          description: Optional Syscoin Core maxburnamount parameter.
 
     WsMempoolFiltersReq:
       type: object

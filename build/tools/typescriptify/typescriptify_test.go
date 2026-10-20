@@ -3,11 +3,14 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/trezor/blockbook/api"
 	"github.com/trezor/blockbook/bchain"
 )
 
@@ -132,5 +135,66 @@ func TestMarkNullableIsScopedToInterface(t *testing.T) {
 	}
 	if _, err := applyNullable(body, []nullableField{{iface: "B", json: "missing"}}, "    "); err == nil {
 		t.Error("expected error for a field the interface does not have")
+	}
+}
+
+func TestTransactionMemoMatchesJSONWireType(t *testing.T) {
+	memo := []byte{0, 1, 2, 0xff, 0x0a}
+	encoded, err := json.Marshal(api.Tx{Memo: memo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &fields); err != nil {
+		t.Fatal(err)
+	}
+	var wireMemo string
+	if err := json.Unmarshal(fields["memo"], &wireMemo); err != nil {
+		t.Fatalf("transaction memo must be a JSON string: %v", err)
+	}
+	if want := base64.StdEncoding.EncodeToString(memo); wireMemo != want {
+		t.Fatalf("transaction memo = %q, want base64 %q", wireMemo, want)
+	}
+	out, err := generate([]interface{}{api.Tx{}}, bchain.ChainExtraPayloads)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "\n    memo?: string;\n") {
+		t.Fatal("generated transaction memo does not match its optional JSON string representation")
+	}
+}
+
+func TestSyscoinTokenStandardsMatchGeneratedTypes(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		root     interface{}
+		standard bchain.TokenStandardName
+	}{
+		{"Token", api.Token{}, bchain.SPTTokenType},
+		{"TokenTransfer", api.TokenTransfer{}, bchain.TokenStandardName("SPT")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := generate([]interface{}{tc.root}, bchain.ChainExtraPayloads)
+			if err != nil {
+				t.Fatal(err)
+			}
+			start := strings.Index(out, "export interface "+tc.name+" {\n")
+			if start < 0 {
+				t.Fatalf("missing %s interface", tc.name)
+			}
+			body := strings.SplitN(out[start:], "\n}", 2)[0]
+			for _, field := range []string{"type", "standard"} {
+				found := false
+				for _, line := range strings.Split(body, "\n") {
+					if strings.HasPrefix(strings.TrimSpace(line), field+":") {
+						found = strings.Contains(line, "'"+string(tc.standard)+"'")
+						break
+					}
+				}
+				if !found {
+					t.Errorf("%s.%s excludes emitted Syscoin value %q", tc.name, field, tc.standard)
+				}
+			}
+		})
 	}
 }
