@@ -36,6 +36,24 @@ These fields appear on existing transaction endpoints, including
 `/api/v2/tx/{txid}` and address transaction lists. They are omitted for ordinary
 base coin transactions.
 
+### Spending transaction lookups
+
+The `syscoin` and `syscoin_testnet` package configurations enable
+`-extendedindex`. This stores the spending transaction ID, input index, and
+block height with each spent output during indexing. `/spending/{txid}/{vout}`
+can then read the spender directly instead of scanning the output address's
+transaction history. Transaction responses also include `spentTxId`,
+`spentIndex`, and `spentHeight` where applicable, without requiring
+`?spending=true`.
+
+Existing Blockbook databases created without `-extendedindex` must be rebuilt
+before using the updated service configuration. Changing the startup flag alone
+does not backfill historical records and fails with `ExtendedIndex setting does
+not match`. Build the new index in a separate database directory, retain the
+original index for rollback, and verify synchronization and spending lookups
+before switching public traffic. The Syscoin Core blockchain data does not need
+to be rebuilt.
+
 ## Address Responses
 
 Address responses retain the standard Blockbook `tokens` array for regular
