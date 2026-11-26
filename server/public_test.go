@@ -1280,6 +1280,53 @@ func testWebsocketPendingRequestLimit(t *testing.T, limit int) {
 	}
 }
 
+// subscribeWebsocketAddresses runs one subscribeAddresses request carrying n
+// copies of Addr1 (the cap is checked before deduplication) through the request
+// handler and returns the error, if any.
+func subscribeWebsocketAddresses(t *testing.T, s *WebsocketServer, n int) error {
+	t.Helper()
+	addresses := make([]string, n)
+	for i := range addresses {
+		addresses[i] = dbtestdata.Addr1
+	}
+	params, err := json.Marshal(WsSubscribeAddressesReq{Addresses: addresses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = requestHandlers["subscribeAddresses"](s, &websocketChannel{}, &WsReq{ID: "sub", Method: "subscribeAddresses", Params: params})
+	return err
+}
+
+func Test_WebsocketSubscribeAddressesUTXODefaultExceeds1000(t *testing.T) {
+	parser, chain := setupChain(t)
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+
+	// a heavy Bitcoin wallet (several used accounts) exceeds the former EVM-sized cap of 1000
+	if err := subscribeWebsocketAddresses(t, s.websocket, 1001); err != nil {
+		t.Fatalf("1001 addresses on a UTXO chain: got %v, want subscribed", err)
+	}
+	err := subscribeWebsocketAddresses(t, s.websocket, defaultWsMaxSubscribeAddressesUTXO+1)
+	if err == nil || !strings.Contains(err.Error(), "addresses max 5000") {
+		t.Fatalf("over the UTXO cap: got %v, want rejection", err)
+	}
+}
+
+func Test_WebsocketSubscribeAddressesLimitEnvOverride(t *testing.T) {
+	t.Setenv("FAKE_WS_MAX_SUBSCRIBE_ADDRESSES", "3")
+	parser, chain := setupChain(t)
+	s, dbpath := setupPublicHTTPServer(parser, chain, t, false)
+	defer closeAndDestroyPublicServer(t, s, dbpath)
+
+	if err := subscribeWebsocketAddresses(t, s.websocket, 3); err != nil {
+		t.Fatalf("at the cap: got %v, want subscribed", err)
+	}
+	err := subscribeWebsocketAddresses(t, s.websocket, 4)
+	if err == nil || !strings.Contains(err.Error(), "addresses max 3") {
+		t.Fatalf("over the cap: got %v, want rejection", err)
+	}
+}
+
 func Test_WebsocketClosesWhenPendingRequestLimitExceeded(t *testing.T) {
 	testWebsocketPendingRequestLimit(t, defaultWsPendingRequestsLimit)
 }
@@ -2916,6 +2963,31 @@ func Test_sanitizeAccountPagingParams(t *testing.T) {
 				t.Errorf("sanitizeAccountPagingParams(%d, %d, %d, %d) = (%d, %d), want (%d, %d)",
 					tt.page, tt.pageSize, tt.defaultPageSize, tt.maxPageSize,
 					page, pageSize, tt.wantPage, tt.wantPageSize)
+			}
+		})
+	}
+}
+
+func Test_getAddressQueryParams_voutFilter(t *testing.T) {
+	tests := []struct {
+		filter string
+		want   int
+	}{
+		{"", api.AddressFilterVoutOff},
+		{"inputs", api.AddressFilterVoutInputs},
+		{"outputs", api.AddressFilterVoutOutputs},
+		{"0", 0},
+		{"7", 7},
+		{"-3", api.AddressFilterVoutOff},
+		{"abc", api.AddressFilterVoutOff},
+	}
+	var s *PublicServer
+	for _, tt := range tests {
+		t.Run(tt.filter, func(t *testing.T) {
+			r := httptest.NewRequest("GET", "/api/v2/address/x?filter="+tt.filter, nil)
+			_, _, _, filter, _, _ := s.getAddressQueryParams(r, api.AccountDetailsTxidHistory, txsInAPI)
+			if filter.Vout != tt.want {
+				t.Errorf("filter=%q: Vout = %d, want %d", tt.filter, filter.Vout, tt.want)
 			}
 		})
 	}
